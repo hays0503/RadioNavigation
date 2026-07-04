@@ -1,0 +1,24 @@
+Assets:
+- Assets/Packages/testui/ciferblat.png
+- Assets/Packages/testui/closebtn.png
+- Assets/Packages/testui/cursor.png
+- Assets/Packages/testui/Documents.prefab
+- Assets/Packages/testui/expendedicon.png
+- Assets/Packages/testui/ground.png
+- Assets/Packages/testui/Manifest.asset
+- Assets/Packages/testui/panel.png
+- Assets/Packages/testui/Radio.prefab
+- Assets/Packages/testui/sone.png
+- Assets/Packages/testui/tumbler.png
+Paths:
+- d4997e10c8ae38e4d817ba2577a7dfdf: ciferblat
+- 1e7ebeca0998666459fa7d963ba9e0fe: closebtn
+- ed1da96152e34324a93c14df617a0f69: cursor
+- 584e51af9503e8b4c8be823e0e1b12d9: Documents
+- 23f06033c05bd0e48bb26ee468d238d1: expendedicon
+- 4e7be80be03e10b45949ad0152ac574a: ground
+- 47cd0800d5f0dd34facfe170bc5a894d: Manifest
+- 32b66ba888ad03f4da595632b5585666: panel
+- fa4d736a56f28634a986975e622591e8: Radio
+- fe63a8edc87e1134594db7f9d0d6945c: sone
+- 2fb8dfc55cabafc4195995ca7c318e48: tumbler

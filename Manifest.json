@@ -1,0 +1,9 @@
+{
+  "name": "TestUI Radio Panel",
+  "version": "1.0",
+  "description": "Custom radio panel UI with ground/toggle mechanics",
+  "author": "testui",
+  "supportedGameVersions": ["2026.1"],
+  "assemblyName": "testui",
+  "permissions": ["Reflection"]
+}
