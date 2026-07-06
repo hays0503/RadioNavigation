@@ -34,10 +34,10 @@ namespace UBOAT.Mods.TestUI
                 return;
 
             Vector2 dir = Input.mousePosition - cursorRect.position;
-            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f;
-            angle = Mathf.Clamp(angle, minAngle, maxAngle);
+            if (dir.y < 0) dir.y = 0;
+            float angle = Mathf.Atan2(dir.x, dir.y) * Mathf.Rad2Deg;
 
-            cursorRect.localRotation = Quaternion.Euler(0, 0, angle);
+            cursorRect.localRotation = Quaternion.Euler(0, 0, -angle);
 
             if (RadioHandler.Instance != null)
                 RadioHandler.Instance.CursorAngle = angle;

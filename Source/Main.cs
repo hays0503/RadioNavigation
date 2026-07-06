@@ -142,6 +142,15 @@ namespace UBOAT.Mods.TestUI
                 if (expander != null && expander.GetComponent<ExpanderHandler>() == null)
                     expander.gameObject.AddComponent<ExpanderHandler>();
 
+                Transform volumeSpiner = radio.transform.Find("VolumeSpiner");
+                if (volumeSpiner == null)
+                    volumeSpiner = radio.transform.Find("VolumeSpinner");
+                if (volumeSpiner != null && volumeSpiner.GetComponent<VolumeSpinnerHandler>() == null)
+                {
+                    volumeSpiner.gameObject.AddComponent<VolumeSpinnerHandler>();
+                    Debug.Log("[TestUI][Main] VolumeSpinnerHandler added to " + volumeSpiner.name);
+                }
+
                 radio.transform.SetParent(viewport, false);
                 radio.transform.localPosition = new Vector3(300f, 100f, 0f);
                 radio.SetActive(true);
