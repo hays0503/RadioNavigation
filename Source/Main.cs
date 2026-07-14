@@ -105,14 +105,9 @@ namespace UBOAT.Mods.TestUI
                 if (radio.GetComponent<PanelDragHandler>() == null)
                     radio.AddComponent<PanelDragHandler>();
 
-                Transform cursor = radio.transform.Find("Cursor") ?? radio.transform.Find("cursor");
-                if (cursor == null && radio.transform.childCount > 0)
-                    cursor = radio.transform.GetChild(0);
-                if (cursor != null)
-                {
-                    if (cursor.GetComponent<CursorHandler>() == null)
-                        cursor.gameObject.AddComponent<CursorHandler>();
-                }
+                Transform cursor = radio.transform.Find("CursorSpinner");
+                if (cursor != null && cursor.GetComponent<CursorHandler>() == null)
+                    cursor.gameObject.AddComponent<CursorHandler>();
 
                 Transform toggle = radio.transform.Find("Toggle");
                 if (toggle != null && toggle.GetComponent<ToggleHandler>() == null)
@@ -142,13 +137,25 @@ namespace UBOAT.Mods.TestUI
                 if (expander != null && expander.GetComponent<ExpanderHandler>() == null)
                     expander.gameObject.AddComponent<ExpanderHandler>();
 
-                Transform volumeSpiner = radio.transform.Find("VolumeSpiner");
-                if (volumeSpiner == null)
-                    volumeSpiner = radio.transform.Find("VolumeSpinner");
-                if (volumeSpiner != null && volumeSpiner.GetComponent<VolumeSpinnerHandler>() == null)
+                Transform radioZone = radio.transform.Find("RadioZone");
+                if (radioZone != null && radioZone.GetComponent<ZoneHandler>() == null)
                 {
-                    volumeSpiner.gameObject.AddComponent<VolumeSpinnerHandler>();
-                    Debug.Log("[TestUI][Main] VolumeSpinnerHandler added to " + volumeSpiner.name);
+                    radioZone.gameObject.AddComponent<ZoneHandler>();
+                    Debug.Log("[TestUI][Main] ZoneHandler added to " + radioZone.name);
+                }
+
+                Transform volumeSpinner = radio.transform.Find("VolumeSpinner");
+                if (volumeSpinner != null && volumeSpinner.GetComponent<VolumeSpinnerHandler>() == null)
+                {
+                    volumeSpinner.gameObject.AddComponent<VolumeSpinnerHandler>();
+                    Debug.Log("[TestUI][Main] VolumeSpinnerHandler added to " + volumeSpinner.name);
+                }
+
+                Transform feedbackSpinner = radio.transform.Find("FeedbackSpinner");
+                if (feedbackSpinner != null && feedbackSpinner.GetComponent<FeedbackSpinnerHandler>() == null)
+                {
+                    feedbackSpinner.gameObject.AddComponent<FeedbackSpinnerHandler>();
+                    Debug.Log("[TestUI][Main] FeedbackSpinnerHandler added to " + feedbackSpinner.name);
                 }
 
                 radio.transform.SetParent(viewport, false);
