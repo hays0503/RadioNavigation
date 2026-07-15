@@ -6,10 +6,10 @@ namespace UBOAT.Mods.TestUI
     public class RadioHandler : BlockInputUI
     {
         public static RadioHandler Instance;
+        public static event System.Action<bool> OnVisibilityChanged;
 
         [SerializeField] private CanvasGroup canvasGroup;
 
-        [SerializeField]
         private float _cursorAngle;
         public float CursorAngle
         {
@@ -30,18 +30,34 @@ namespace UBOAT.Mods.TestUI
             set
             {
                 _isVisible = value;
+                if (canvasGroup == null)
+                {
+                    Debug.LogError("[TestUI][RadioHandler] canvasGroup is null, cannot set visibility");
+                    return;
+                }
                 canvasGroup.alpha = value ? 1f : 0f;
                 canvasGroup.interactable = value;
                 canvasGroup.blocksRaycasts = value;
+                if (OnVisibilityChanged != null)
+                    OnVisibilityChanged(value);
             }
         }
 
         private void Awake()
         {
-            if (Instance == null)
-                Instance = this;
-            else
+            if (Instance != null && Instance != this)
+            {
+                Debug.LogWarning("[TestUI][RadioHandler] Duplicate instance destroyed");
                 Destroy(gameObject);
+                return;
+            }
+            Instance = this;
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this)
+                Instance = null;
         }
 
         private void Start()
@@ -53,8 +69,14 @@ namespace UBOAT.Mods.TestUI
 
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape) && IsVisible)
-                IsVisible = false;
+            if (!Input.GetKeyDown(KeyCode.Escape) || !IsVisible)
+                return;
+
+            if (UnityEngine.EventSystems.EventSystem.current != null &&
+                UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject != null)
+                return;
+
+            IsVisible = false;
         }
 
         public void ToggleVisibility()

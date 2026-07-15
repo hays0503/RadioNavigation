@@ -13,9 +13,14 @@ namespace UBOAT.Mods.TestUI
 
         private Image[] zoneImages;
         private int currentIndex;
+        private Transform parentTransform;
+        private Toggle powerToggle;
+        private Image groundBgImage;
 
         private void Start()
         {
+            parentTransform = transform.parent;
+
             zoneImages = new Image[ZoneNames.Length];
             for (int i = 0; i < ZoneNames.Length; i++)
             {
@@ -25,12 +30,26 @@ namespace UBOAT.Mods.TestUI
                     zoneImages[i] = t.GetComponent<Image>();
                     SetupClickHandler(t.gameObject);
                 }
+                else
+                {
+                    Debug.LogWarning("[TestUI][ZoneHandler] Zone child '" + ZoneNames[i] + "' not found in prefab");
+                }
 
                 SetAlpha(i, i == 0 ? visibleAlpha : hiddenAlpha);
             }
             currentIndex = 0;
 
-            Debug.Log("[TestUI][ZoneHandler] Started, zone=" + ZoneNames[currentIndex]);
+            if (parentTransform != null)
+            {
+                Transform toggleT = parentTransform.Find("Toggle");
+                powerToggle = toggleT != null ? toggleT.GetComponent<Toggle>() : null;
+
+                Transform groundT = parentTransform.Find("Ground");
+                Transform bgT = groundT?.Find("Background");
+                groundBgImage = bgT != null ? bgT.GetComponent<Image>() : null;
+            }
+
+            Debug.Log("[TestUI][Zone] Started, zone=" + ZoneNames[currentIndex]);
         }
 
         private void SetupClickHandler(GameObject child)
@@ -48,7 +67,7 @@ namespace UBOAT.Mods.TestUI
                 PointerEventData ped = data as PointerEventData;
                 if (ped != null && ped.button == PointerEventData.InputButton.Left)
                 {
-                    Debug.Log("[TestUI][ZoneHandler] LMB click on " + child.name + " -> next");
+                    Debug.Log("[TestUI][Zone] LMB click on " + child.name + " -> next");
                     NextZone();
                 }
             });
@@ -63,7 +82,7 @@ namespace UBOAT.Mods.TestUI
                 PointerEventData ped = data as PointerEventData;
                 if (ped != null && ped.button == PointerEventData.InputButton.Right)
                 {
-                    Debug.Log("[TestUI][ZoneHandler] RMB click on " + child.name + " -> previous");
+                    Debug.Log("[TestUI][Zone] RMB click on " + child.name + " -> previous");
                     PreviousZone();
                 }
             });
@@ -77,7 +96,9 @@ namespace UBOAT.Mods.TestUI
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex + 1) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
-            Debug.Log("[TestUI][ZoneHandler] switched to " + ZoneNames[currentIndex]);
+#if DEBUG
+            Debug.Log("[TestUI][Zone] switched to " + ZoneNames[currentIndex]);
+#endif
         }
 
         private void PreviousZone()
@@ -87,33 +108,37 @@ namespace UBOAT.Mods.TestUI
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex - 1 + ZoneNames.Length) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
-            Debug.Log("[TestUI][ZoneHandler] switched to " + ZoneNames[currentIndex]);
+#if DEBUG
+            Debug.Log("[TestUI][Zone] switched to " + ZoneNames[currentIndex]);
+#endif
         }
 
         private bool CanSwitchZone()
         {
-            Transform parent = transform.parent;
-            if (parent == null)
+            if (parentTransform == null)
                 return false;
 
-            Transform toggleT = parent.Find("Toggle");
-            if (toggleT == null)
-                return false;
-            Toggle powerToggle = toggleT.GetComponent<Toggle>();
             if (powerToggle == null || !powerToggle.isOn)
                 return false;
 
-            Transform groundT = parent.Find("Ground");
-            if (groundT == null)
-                return false;
-            Transform bgT = groundT.Find("Background");
-            if (bgT == null)
-                return false;
-            Image groundBg = bgT.GetComponent<Image>();
-            if (groundBg == null || groundBg.color.a <= 0.5f)
+            if (groundBgImage == null || groundBgImage.color.a <= GroundHandler.ActiveAlphaThreshold)
                 return false;
 
             return true;
+        }
+
+        private void OnDestroy()
+        {
+            for (int i = 0; i < ZoneNames.Length; i++)
+            {
+                Transform t = transform.Find(ZoneNames[i]);
+                if (t != null)
+                {
+                    var trigger = t.GetComponent<EventTrigger>();
+                    if (trigger != null)
+                        trigger.triggers.Clear();
+                }
+            }
         }
 
         private void SetAlpha(int index, float alpha)

@@ -8,6 +8,11 @@ namespace UBOAT.Mods.TestUI
     internal static class RadioStoryIntegration
     {
         private const string LocaleKey = "Radio/OpenT3PLL38";
+        private const string LeaveStationKey = "Radio/LeaveStation";
+        private const string LocalePrefix = "Stories/";
+        private const string StageFieldName = "stage";
+        private const bool AllowOriginal = true;
+        private const bool PreventOriginal = false;
 
         private static Type _decisionType;
         private static ConstructorInfo _decisionCtor;
@@ -17,28 +22,55 @@ namespace UBOAT.Mods.TestUI
         private static MethodInfo _insertMethod;
         private static MethodInfo _onUpdatedMethod;
         private static bool _initialized;
+        private static PropertyInfo _languageProp;
+
+        internal static void ResetRuntimeState()
+        {
+            _initialized = false;
+            _decisionType = null;
+            _decisionCtor = null;
+            _localizationKeyProp = null;
+            _stageField = null;
+            _decisionsProp = null;
+            _insertMethod = null;
+            _onUpdatedMethod = null;
+            _languageProp = null;
+        }
+
+        private static bool TryInit()
+        {
+            if (_initialized)
+                return true;
+            Init();
+            return _initialized;
+        }
 
         private static void Init()
         {
             if (_initialized)
                 return;
-            _initialized = true;
+
+            string gameVersion = Application.version;
+            Debug.Log("[TestUI] UBOAT version: " + gameVersion);
 
             var storyType = typeof(RadioStory).BaseType;
-
-            _insertMethod = storyType?.GetMethod("InsertDecision",
-                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
-            if (_insertMethod != null)
+            if (storyType == null)
             {
-                _decisionType = _insertMethod.GetParameters()[1].ParameterType;
-                Debug.Log("[TestUI] Decision type: " + _decisionType.FullName);
-            }
-            if (_decisionType == null)
-            {
-                Debug.LogError("[TestUI] Decision type not found");
+                Debug.LogError("[TestUI] RadioStory.BaseType is null — game types may have changed in v" + gameVersion);
                 return;
             }
 
+            _insertMethod = storyType.GetMethod("InsertDecision",
+                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
+            if (_insertMethod != null)
+                _decisionType = _insertMethod.GetParameters()[1].ParameterType;
+            if (_decisionType == null)
+            {
+                Debug.LogError("[TestUI] Decision type not found — check game version " + gameVersion);
+                return;
+            }
+
+            Debug.Log("[TestUI] Decision type: " + _decisionType.FullName);
             _localizationKeyProp = _decisionType.GetProperty("LocalizationKey");
 
             foreach (var ctor in _decisionType.GetConstructors(BindingFlags.Public | BindingFlags.Instance))
@@ -55,81 +87,60 @@ namespace UBOAT.Mods.TestUI
             }
 
             if (_decisionCtor == null)
-                Debug.LogError("[TestUI] No suitable Decision constructor found");
+            {
+                Debug.LogError("[TestUI] No suitable Decision constructor found in v" + gameVersion);
+                return;
+            }
 
-            _stageField = typeof(RadioStory).GetField("stage", BindingFlags.NonPublic | BindingFlags.Instance);
+            _stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
 
-            _decisionsProp = storyType?.GetProperty("Decisions",
+            _decisionsProp = storyType.GetProperty("Decisions",
                 BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
 
-            _onUpdatedMethod = storyType?.GetMethod("OnUpdated",
+            _onUpdatedMethod = storyType.GetMethod("OnUpdated",
                 BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance,
                 null, Type.EmptyTypes, null);
+
+            _languageProp = GetLanguageProperty();
+
+            _initialized = true;
         }
 
         public static void InjectT3PLL38Decision(RadioStory __instance)
         {
             try
             {
-                Debug.Log("[TestUI] ContinueStory postfix entered");
-                Init();
-                if (_decisionCtor == null || _stageField == null)
+                if (!TryInit() || _decisionCtor == null || _stageField == null)
                 {
-                    Debug.LogWarning("[TestUI] Required reflection targets not found, aborting");
+                    Debug.LogWarning("[TestUI] Init failed, cannot inject T3PLL38");
                     return;
                 }
 
-                int stageValue = (int)_stageField.GetValue(__instance);
-                Debug.Log("[TestUI] stage=" + stageValue + " (1=MainChoices)");
-                if (stageValue != 1)
+                if (!IsStageOne(__instance))
                     return;
 
-                if (_decisionsProp == null)
-                {
-                    Debug.LogError("[TestUI] Decisions property not found");
-                    return;
-                }
-
-                var decisions = _decisionsProp.GetValue(__instance);
+                var decisions = GetDecisions(__instance);
                 if (decisions == null)
-                {
-                    Debug.LogWarning("[TestUI] Decisions is null");
                     return;
-                }
 
-                int count = (int)decisions.GetType().GetProperty("Count").GetValue(decisions);
+                var decisionsList = decisions as System.Collections.IList;
+                int count = GetDecisionCount(decisions, decisionsList);
+                if (count < 0) return;
+
                 Debug.Log("[TestUI] Decision count=" + count);
-                for (int i = 0; i < count; i++)
+
+                if (DecisionAlreadyExists(decisions, decisionsList, count))
                 {
-                    var item = decisions.GetType().GetProperty("Item")?.GetValue(decisions, new object[] { i });
-                    if (item != null && _localizationKeyProp != null)
-                    {
-                        string key = (string)_localizationKeyProp.GetValue(item);
-                        Debug.Log("[TestUI]   Menu[" + i + "] key=" + key);
-                    }
+                    Debug.Log("[TestUI] T3PLL38 decision already exists, skipping injection");
+                    return;
                 }
 
                 int insertIndex = count > 0 ? count - 1 : 0;
+                object decision = CreateDecision();
+                if (decision == null) return;
 
-                int paramCount = _decisionCtor.GetParameters().Length;
-                object[] ctorArgs = new object[paramCount];
-                ctorArgs[0] = LocaleKey;
-                ctorArgs[1] = null;
-                ctorArgs[2] = true;
-                ctorArgs[3] = new Action(ToggleRadio);
-                ctorArgs[4] = 0;
-                ctorArgs[5] = null;
-                for (int i = 6; i < paramCount; i++)
-                    ctorArgs[i] = Array.Empty<object>();
-
-                object decision = _decisionCtor.Invoke(ctorArgs);
-                Debug.Log("[TestUI] Decision created OK");
-
-                _insertMethod?.Invoke(__instance, new object[] { insertIndex, decision });
-                Debug.Log("[TestUI] Decision inserted at " + insertIndex);
-
-                _onUpdatedMethod?.Invoke(__instance, null);
-                Debug.Log("[TestUI] OnUpdated called");
+                InsertDecision(__instance, insertIndex, decision);
+                NotifyUpdated(__instance);
             }
             catch (Exception ex)
             {
@@ -137,9 +148,122 @@ namespace UBOAT.Mods.TestUI
             }
         }
 
+        private static bool IsStageOne(RadioStory __instance)
+        {
+            int stageValue = (int)_stageField.GetValue(__instance);
+            Debug.Log("[TestUI] stage=" + stageValue + " (1=MainChoices)");
+            return stageValue == 1;
+        }
+
+        private static object GetDecisions(RadioStory __instance)
+        {
+            if (_decisionsProp == null)
+            {
+                Debug.LogError("[TestUI] Decisions property not found");
+                return null;
+            }
+
+            var decisions = _decisionsProp.GetValue(__instance);
+            if (decisions == null)
+                Debug.LogWarning("[TestUI] Decisions is null");
+            return decisions;
+        }
+
+        private static int GetDecisionCount(object decisions, System.Collections.IList list)
+        {
+            if (list != null)
+                return list.Count;
+
+            if (decisions == null) return -1;
+            int count = (int)decisions.GetType().GetProperty("Count").GetValue(decisions);
+            Debug.LogWarning("[TestUI] Decisions does not implement IList, using reflection fallback");
+            return count;
+        }
+
+        private static bool DecisionAlreadyExists(object decisions, System.Collections.IList list, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                object item = list != null ? list[i] : decisions.GetType().GetProperty("Item")?.GetValue(decisions, new object[] { i });
+                if (item != null && _localizationKeyProp != null)
+                {
+                    string key = (string)_localizationKeyProp.GetValue(item);
+#if DEBUG
+                    Debug.Log("[TestUI]   Menu[" + i + "] key=" + key);
+#endif
+                    if (key == LocaleKey)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        private static object CreateDecision()
+        {
+            int paramCount = _decisionCtor.GetParameters().Length;
+            object[] ctorArgs = new object[paramCount];
+            ctorArgs[0] = LocaleKey;
+            ctorArgs[1] = null;
+            ctorArgs[2] = true;
+            ctorArgs[3] = new Action(ToggleRadio);
+            ctorArgs[4] = 0;
+            ctorArgs[5] = null;
+            var ctorParams = _decisionCtor.GetParameters();
+            for (int i = 6; i < paramCount; i++)
+            {
+                var paramType = ctorParams[i].ParameterType;
+                if (paramType == typeof(object[]))
+                    ctorArgs[i] = Array.Empty<object>();
+                else if (paramType == typeof(string))
+                    ctorArgs[i] = null;
+                else if (paramType.IsValueType)
+                    ctorArgs[i] = Activator.CreateInstance(paramType);
+                else
+                    ctorArgs[i] = null;
+            }
+
+            object decision = _decisionCtor.Invoke(ctorArgs);
+            if (decision == null)
+                Debug.LogWarning("[TestUI] Decision creation returned null");
+            return decision;
+        }
+
+        private static void InsertDecision(RadioStory __instance, int index, object decision)
+        {
+            try
+            {
+                _insertMethod.Invoke(__instance, new object[] { index, decision });
+                Debug.Log("[TestUI] Decision inserted at " + index);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[TestUI] InsertDecision failed: " + ex);
+            }
+        }
+
+        private static void NotifyUpdated(RadioStory __instance)
+        {
+            if (_onUpdatedMethod != null)
+            {
+                try
+                {
+                    _onUpdatedMethod.Invoke(__instance, null);
+                    Debug.Log("[TestUI] OnUpdated called");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[TestUI] OnUpdated invoke failed: " + ex);
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[TestUI] OnUpdated method not found — UI may not reflect new decision");
+            }
+        }
+
         public static bool OverrideLocaleKey(string key, ref string __result)
         {
-            if (key == "Stories/" + LocaleKey || key == LocaleKey)
+            if (key == LocalePrefix + LocaleKey || key == LocaleKey)
             {
                 __result = GetLocalizedLabel();
                 return false;
@@ -147,13 +271,19 @@ namespace UBOAT.Mods.TestUI
             return true;
         }
 
+        private static readonly System.Collections.Generic.Dictionary<string, string> LocaleLabels =
+            new System.Collections.Generic.Dictionary<string, string>
+        {
+            { "russian", "T3PLL38 бортовой радиоприемник сверхдлинных и длинных волн" },
+        };
+
         private static string GetLocalizedLabel()
         {
             try
             {
                 string lang = GetCurrentLanguage();
-                if (lang == "russian")
-                    return "T3PLL38 бортовой радиоприемник сверхдлинных и длинных волн";
+                if (lang != null && LocaleLabels.TryGetValue(lang, out string label))
+                    return label;
             }
             catch (Exception ex)
             {
@@ -162,60 +292,78 @@ namespace UBOAT.Mods.TestUI
             return "T3PLL38 on-board radio receiver for very long and long waves";
         }
 
+        private static PropertyInfo GetLanguageProperty()
+        {
+            var singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, com.uboat.game")
+                ?? Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, Assembly-CSharp");
+            if (singletonType == null) return null;
+            var loadSingleton = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
+            if (loadSingleton == null) return null;
+            var localeType = Type.GetType("UBOAT.Game.Core.Data.Locale, com.uboat.game")
+                ?? Type.GetType("UBOAT.Game.Core.Data.Locale, Assembly-CSharp");
+            if (localeType == null) return null;
+            return localeType.GetProperty("Language", BindingFlags.Public | BindingFlags.Instance);
+        }
+
         private static string GetCurrentLanguage()
         {
             try
             {
-                var singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, com.uboat.game");
-                if (singletonType == null)
-                    singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, Assembly-CSharp");
-                if (singletonType == null)
+                if (_languageProp == null)
                     return "english";
+                var singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, com.uboat.game")
+                    ?? Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, Assembly-CSharp");
+                if (singletonType == null) return "english";
                 var loadSingleton = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
-                if (loadSingleton == null)
-                    return "english";
-                var localeType = Type.GetType("UBOAT.Game.Core.Data.Locale, com.uboat.game");
-                if (localeType == null)
-                    return "english";
+                if (loadSingleton == null) return "english";
+                var localeType = Type.GetType("UBOAT.Game.Core.Data.Locale, com.uboat.game")
+                    ?? Type.GetType("UBOAT.Game.Core.Data.Locale, Assembly-CSharp");
+                if (localeType == null) return "english";
                 object locale = loadSingleton.Invoke(null, new object[] { localeType });
-                if (locale == null)
-                    return "english";
-                var langProp = localeType.GetProperty("Language", BindingFlags.Public | BindingFlags.Instance);
-                if (langProp == null)
-                    return "english";
-                string lang = langProp.GetValue(locale) as string;
+                if (locale == null) return "english";
+                string lang = _languageProp.GetValue(locale) as string;
                 return lang?.ToLowerInvariant() ?? "english";
             }
-            catch
+            catch (Exception ex)
             {
+                Debug.LogWarning("[TestUI] GetCurrentLanguage failed: " + ex);
                 return "english";
             }
         }
 
         public static bool HandleCustomDecisions(RadioStory __instance, object decision)
         {
-            Init();
-            if (_localizationKeyProp == null)
-                return true;
-
-            string key = (string)_localizationKeyProp.GetValue(decision);
-
-            if (key == "Radio/LeaveStation")
+            try
             {
-                Debug.Log("[TestUI] LeaveStation - hiding T3PLLä38 panel");
-                if (RadioHandler.Instance != null)
-                    RadioHandler.Instance.IsVisible = false;
-                return true;
-            }
+                if (!TryInit())
+                    return AllowOriginal;
+                if (_localizationKeyProp == null)
+                    return AllowOriginal;
 
-            if (key == LocaleKey)
+                string key = (string)_localizationKeyProp.GetValue(decision);
+
+                if (key == LeaveStationKey)
+                {
+                    Debug.Log("[TestUI] LeaveStation - hiding T3PLL38 panel");
+                    if (RadioHandler.Instance != null)
+                        RadioHandler.Instance.IsVisible = false;
+                    return AllowOriginal;
+                }
+
+                if (key == LocaleKey)
+                {
+                    Debug.Log("[TestUI] T3PLL38 toggled");
+                    ToggleRadio();
+                    return PreventOriginal;
+                }
+
+                return AllowOriginal;
+            }
+            catch (Exception ex)
             {
-                Debug.Log("[TestUI] T3PLLä38 toggled");
-                ToggleRadio();
-                return false;
+                Debug.LogWarning("[TestUI] HandleCustomDecisions failed (fail-open): " + ex);
+                return AllowOriginal;
             }
-
-            return true;
         }
 
         public static void HideRadioOnStop()

@@ -11,6 +11,7 @@ namespace UBOAT.Mods.TestUI
         private Toggle radioToggle;
         private const float DimAlpha = 0.4f;
         private const float MaxAlpha = 1f;
+        internal const float ActiveAlphaThreshold = 0.5f;
 
         private string StateLog()
         {
@@ -51,6 +52,12 @@ namespace UBOAT.Mods.TestUI
         {
             Transform bgT = transform.Find("Background");
             bgImage = bgT != null ? bgT.GetComponent<Image>() : null;
+            if (bgImage == null)
+            {
+                Debug.LogError("[TestUI][GroundHandler] Background Image not found, disabling");
+                enabled = false;
+                return;
+            }
             if (bgImage != null)
             {
                 Color c = bgImage.color;
@@ -74,23 +81,28 @@ namespace UBOAT.Mods.TestUI
                 }
             }
 
-            radioToggle = transform.parent.Find("Toggle")?.GetComponent<Toggle>();
+            if (transform.parent != null)
+                radioToggle = transform.parent.Find("Toggle")?.GetComponent<Toggle>();
+            else
+                Debug.LogError("[TestUI][GroundHandler] transform.parent is null");
             if (radioToggle != null)
             {
                 radioToggle.isOn = false;
                 radioToggle.interactable = false;
             }
 
+#if DEBUG
             Debug.Log("[TestUI][Ground] Start " + StateLog());
+#endif
         }
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            bool isActive = bgImage != null && bgImage.color.a > 0.5f;
+            bool isActive = bgImage != null && bgImage.color.a > ActiveAlphaThreshold;
 
             if (isActive && radioToggle != null && radioToggle.isOn)
             {
-                radioToggle.isOn = false;
+                radioToggle.SetIsOnWithoutNotify(false);
                 radioToggle.interactable = false;
             }
 
@@ -111,7 +123,9 @@ namespace UBOAT.Mods.TestUI
             if (radioToggle != null)
                 radioToggle.interactable = !isActive;
 
+#if DEBUG
             Debug.Log("[TestUI][Ground] onClick screenPos=" + eventData.position + " " + StateLog());
+#endif
         }
     }
 }

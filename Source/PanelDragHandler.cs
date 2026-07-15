@@ -11,56 +11,79 @@ namespace UBOAT.Mods.TestUI
         private Canvas parentCanvas;
         private Texture2D moveCursorTexture;
         private static readonly Vector2 cursorHotspot = new Vector2(16, 16);
+        private static Texture2D _cachedCursorTexture;
         private bool moveCursorActive;
+        private bool isDragging;
+        private int activePointerId = -1;
+        private ExpanderHandler _expander;
 
         private void Start()
         {
             panelRect = GetComponent<RectTransform>();
+            if (panelRect == null)
+            {
+                Debug.LogError("[TestUI][PanelDragHandler] RectTransform not found, disabling");
+                enabled = false;
+                return;
+            }
+
             parentCanvas = GetComponentInParent<Canvas>();
-            GenerateMoveCursor();
+            if (parentCanvas == null)
+                Debug.LogWarning("[TestUI][PanelDragHandler] Canvas not found in parents, drag scaling may be off");
+
+            if (_cachedCursorTexture == null)
+                _cachedCursorTexture = GenerateMoveCursor();
+            moveCursorTexture = _cachedCursorTexture;
+            _expander = GetComponentInChildren<ExpanderHandler>(true);
         }
 
-        private void GenerateMoveCursor()
+        private static Texture2D GenerateMoveCursor()
         {
-            moveCursorTexture = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+            var tex = new Texture2D(32, 32, TextureFormat.RGBA32, false);
             Color transparent = new Color(0, 0, 0, 0);
             Color white = Color.white;
 
-            for (int x = 0; x < 32; x++)
-                for (int y = 0; y < 32; y++)
-                    moveCursorTexture.SetPixel(x, y, transparent);
+            Color32[] pixels = new Color32[1024];
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = transparent;
 
-            for (int y = 4; y <= 27; y++)
-                moveCursorTexture.SetPixel(15, y, white);
+            for (int y = 4; y <= 27; y++) pixels[32 * y + 15] = white;
+            for (int x = 4; x <= 27; x++) pixels[32 * 15 + x] = white;
 
-            for (int x = 4; x <= 27; x++)
-                moveCursorTexture.SetPixel(x, 15, white);
+            pixels[32 * 3 + 15] = white;
+            pixels[32 * 2 + 14] = white;
+            pixels[32 * 2 + 15] = white;
+            pixels[32 * 2 + 16] = white;
+            pixels[32 * 1 + 15] = white;
 
-            moveCursorTexture.SetPixel(15, 3, white);
-            moveCursorTexture.SetPixel(14, 2, white);
-            moveCursorTexture.SetPixel(15, 2, white);
-            moveCursorTexture.SetPixel(16, 2, white);
-            moveCursorTexture.SetPixel(15, 1, white);
+            pixels[32 * 28 + 15] = white;
+            pixels[32 * 29 + 14] = white;
+            pixels[32 * 29 + 15] = white;
+            pixels[32 * 29 + 16] = white;
+            pixels[32 * 30 + 15] = white;
 
-            moveCursorTexture.SetPixel(15, 28, white);
-            moveCursorTexture.SetPixel(14, 29, white);
-            moveCursorTexture.SetPixel(15, 29, white);
-            moveCursorTexture.SetPixel(16, 29, white);
-            moveCursorTexture.SetPixel(15, 30, white);
+            pixels[32 * 15 + 3] = white;
+            pixels[32 * 14 + 2] = white;
+            pixels[32 * 15 + 2] = white;
+            pixels[32 * 16 + 2] = white;
+            pixels[32 * 15 + 1] = white;
 
-            moveCursorTexture.SetPixel(3, 15, white);
-            moveCursorTexture.SetPixel(2, 14, white);
-            moveCursorTexture.SetPixel(2, 15, white);
-            moveCursorTexture.SetPixel(2, 16, white);
-            moveCursorTexture.SetPixel(1, 15, white);
+            pixels[32 * 15 + 28] = white;
+            pixels[32 * 14 + 29] = white;
+            pixels[32 * 15 + 29] = white;
+            pixels[32 * 16 + 29] = white;
+            pixels[32 * 15 + 30] = white;
 
-            moveCursorTexture.SetPixel(28, 15, white);
-            moveCursorTexture.SetPixel(29, 14, white);
-            moveCursorTexture.SetPixel(29, 15, white);
-            moveCursorTexture.SetPixel(29, 16, white);
-            moveCursorTexture.SetPixel(30, 15, white);
+            tex.SetPixels32(pixels);
+            tex.Apply();
 
-            moveCursorTexture.Apply();
+            Application.quitting += () =>
+            {
+                if (tex != null)
+                    Object.Destroy(tex);
+            };
+
+            return tex;
         }
 
         public void OnBeginDrag(PointerEventData eventData)
@@ -68,20 +91,28 @@ namespace UBOAT.Mods.TestUI
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
 
-            GameObject pressed = eventData.pointerPress;
-            if (pressed != null && pressed.GetComponentInParent<ExpanderHandler>() != null)
+            if (_expander != null && eventData.pointerPress != null &&
+                eventData.pointerPress.transform.IsChildOf(_expander.transform))
                 return;
+
+            isDragging = true;
+            activePointerId = eventData.pointerId;
         }
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (parentCanvas == null)
+            if (!isDragging || eventData.pointerId != activePointerId || parentCanvas == null)
                 return;
 
             panelRect.anchoredPosition += eventData.delta / parentCanvas.scaleFactor;
         }
 
-        public void OnEndDrag(PointerEventData eventData) { }
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (eventData.pointerId != activePointerId) return;
+            isDragging = false;
+            activePointerId = -1;
+        }
 
         public void OnPointerEnter(PointerEventData eventData)
         {

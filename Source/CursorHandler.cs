@@ -7,33 +7,50 @@ namespace UBOAT.Mods.TestUI
 {
     public class CursorHandler : BlockInputUI, IDragHandler, IBeginDragHandler, IEndDragHandler
     {
-        [SerializeField] private float minAngle = -90f;
-        [SerializeField] private float maxAngle = 90f;
+        private const float MinAngle = -90f;
+        private const float MaxAngle = 90f;
 
         private bool isDragging;
+        private int activePointerId = -1;
         private RectTransform cursorRect;
 
         private void Start()
         {
             cursorRect = GetComponent<RectTransform>();
+            if (cursorRect == null)
+            {
+                Debug.LogError("[TestUI][CursorHandler] RectTransform not found, disabling");
+                enabled = false;
+                return;
+            }
             cursorRect.pivot = new Vector2(0.5f, 0.5f);
 
-            GetComponent<Image>().raycastTarget = true;
+            Image img = GetComponent<Image>();
+            if (img != null)
+                img.raycastTarget = true;
+            else
+                Debug.LogError("[TestUI][CursorHandler] Image component not found, drag may not work");
         }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
+            if (cursorRect == null)
+            {
+                Debug.LogError("[TestUI][CursorHandler] cursorRect not initialized");
+                return;
+            }
             isDragging = true;
+            activePointerId = eventData.pointerId;
         }
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (!isDragging)
+            if (!isDragging || eventData.pointerId != activePointerId)
                 return;
 
-            Vector2 dir = Input.mousePosition - cursorRect.position;
+            Vector2 dir = eventData.position - (Vector2)cursorRect.position;
             if (dir.y < 0) dir.y = 0;
             float angle = Mathf.Atan2(dir.x, dir.y) * Mathf.Rad2Deg;
 
@@ -45,7 +62,9 @@ namespace UBOAT.Mods.TestUI
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            if (eventData.pointerId != activePointerId) return;
             isDragging = false;
+            activePointerId = -1;
         }
     }
 }

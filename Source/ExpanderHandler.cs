@@ -5,9 +5,9 @@ namespace UBOAT.Mods.TestUI
 {
     public class ExpanderHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
-        [SerializeField] private float sensitivity = 0.005f;
-        [SerializeField] private float minScale = 0.5f;
-        [SerializeField] private float maxScale = 3f;
+        private const float Sensitivity = 0.005f;
+        private const float MinScale = 0.5f;
+        private const float MaxScale = 3f;
 
         private RectTransform panelRect;
         private bool isDragging;
@@ -16,12 +16,23 @@ namespace UBOAT.Mods.TestUI
 
         private void Start()
         {
+            if (transform.parent == null)
+            {
+                Debug.LogError("[TestUI][ExpanderHandler] parent is null — cannot get panel RectTransform");
+                return;
+            }
             panelRect = transform.parent.GetComponent<RectTransform>();
+            if (panelRect == null)
+            {
+                Debug.LogError("[TestUI][ExpanderHandler] parent has no RectTransform");
+                enabled = false;
+            }
         }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (panelRect == null) return;
             isDragging = true;
             dragStartScale = panelRect.localScale;
             dragStartMouseX = eventData.position.x;
@@ -30,8 +41,8 @@ namespace UBOAT.Mods.TestUI
         public void OnDrag(PointerEventData eventData)
         {
             if (!isDragging) return;
-            float diff = (eventData.position.x - dragStartMouseX) * sensitivity;
-            float newScale = Mathf.Clamp(dragStartScale.x + diff, minScale, maxScale);
+            float diff = (eventData.position.x - dragStartMouseX) * Sensitivity;
+            float newScale = Mathf.Clamp(dragStartScale.x + diff, MinScale, MaxScale);
             panelRect.localScale = Vector3.one * newScale;
         }
 

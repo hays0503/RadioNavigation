@@ -13,6 +13,7 @@ namespace UBOAT.Mods.TestUI
 
         protected RectTransform spinnerRect;
         protected bool isDragging;
+        protected int activePointerId = -1;
         protected float currentAngle;
 
         public float Angle => currentAngle;
@@ -30,9 +31,15 @@ namespace UBOAT.Mods.TestUI
         }
         protected virtual void OnAngleUpdated(float angle) { }
 
-        private void Start()
+        protected virtual void Awake()
         {
             spinnerRect = GetComponent<RectTransform>();
+            if (spinnerRect == null)
+            {
+                Debug.LogError("[TestUI][" + DebugTag + "] RectTransform not found, disabling");
+                enabled = false;
+                return;
+            }
             spinnerRect.pivot = new Vector2(0.5f, 0.5f);
 
             Image img = GetComponent<Image>();
@@ -50,15 +57,21 @@ namespace UBOAT.Mods.TestUI
         {
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
+            if (spinnerRect == null)
+            {
+                Debug.LogError("[TestUI][" + DebugTag + "] spinnerRect not initialized");
+                return;
+            }
             isDragging = true;
+            activePointerId = eventData.pointerId;
         }
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (!isDragging)
+            if (!isDragging || eventData.pointerId != activePointerId)
                 return;
 
-            Vector2 dir = Input.mousePosition - spinnerRect.position;
+            Vector2 dir = eventData.position - (Vector2)spinnerRect.position;
             if (!HandleDragDirection(dir))
                 return;
 
@@ -76,7 +89,9 @@ namespace UBOAT.Mods.TestUI
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            if (eventData.pointerId != activePointerId) return;
             isDragging = false;
+            activePointerId = -1;
         }
     }
 }

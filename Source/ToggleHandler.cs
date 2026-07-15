@@ -4,6 +4,7 @@ using UnityEngine.UI;
 
 namespace UBOAT.Mods.TestUI
 {
+    [DefaultExecutionOrder(-1)]
     public class ToggleHandler : MonoBehaviour, IPointerClickHandler
     {
         private Toggle toggleComp;
@@ -12,6 +13,8 @@ namespace UBOAT.Mods.TestUI
         private RectTransform toggleRect;
         private Image dialImage;
         private Color originalDialColor;
+
+        private static readonly Color DialActiveColor = new Color32(0xFF, 0xEC, 0xB6, 0xFF);
 
         private string DebugImg(GameObject go)
         {
@@ -35,7 +38,20 @@ namespace UBOAT.Mods.TestUI
         private void Start()
         {
             toggleComp = GetComponent<Toggle>();
+            if (toggleComp == null)
+            {
+                Debug.LogError("[TestUI][ToggleHandler] Toggle component not found, disabling");
+                enabled = false;
+                return;
+            }
+
             toggleRect = GetComponent<RectTransform>();
+            if (toggleRect == null)
+            {
+                Debug.LogError("[TestUI][ToggleHandler] RectTransform not found, disabling");
+                enabled = false;
+                return;
+            }
 
             Transform bg = transform.Find("Background");
             if (bg != null)
@@ -44,6 +60,11 @@ namespace UBOAT.Mods.TestUI
                 offImage = bg.Find("off")?.gameObject;
             }
 
+            if (transform.parent == null)
+            {
+                Debug.LogError("[TestUI][ToggleHandler] transform.parent is null");
+                return;
+            }
             Transform dial = transform.parent.Find("ciferbllat");
             if (dial != null)
             {
@@ -59,17 +80,16 @@ namespace UBOAT.Mods.TestUI
                 + " toggle.isOn=" + toggleComp.isOn
                 + " dialColor=" + (dialImage != null ? dialImage.color.ToString() : "no-dial"));
 
-            toggleComp.isOn = false;
-            toggleComp.interactable = false;
             toggleComp.onValueChanged.AddListener(OnToggleChanged);
 
-            OnToggleChanged(false);
+            OnToggleChanged(toggleComp.isOn);
         }
 
         private string ImgState(GameObject go) => go != null ? go.activeSelf.ToString() : "null";
 
         public void OnPointerClick(PointerEventData eventData)
         {
+#if DEBUG
             Vector3[] corners = new Vector3[4];
             toggleRect.GetWorldCorners(corners);
 
@@ -79,34 +99,28 @@ namespace UBOAT.Mods.TestUI
                 + " corners=" + corners[0] + " " + corners[1] + " " + corners[2] + " " + corners[3]
                 + " on=" + DebugImg(onImage)
                 + " off=" + DebugImg(offImage));
+#endif
         }
 
         private void OnToggleChanged(bool isOn)
         {
             if (onImage != null)
-            {
                 onImage.SetActive(isOn);
-                Image img = onImage.GetComponent<Image>();
-                if (img != null) img.enabled = isOn;
-            }
             if (offImage != null)
-            {
                 offImage.SetActive(!isOn);
-                Image img = offImage.GetComponent<Image>();
-                if (img != null) img.enabled = !isOn;
-            }
 
             if (dialImage != null)
             {
-                Color onColor = new Color32(0xFF, 0xEC, 0xB6, 0xFF);
-                dialImage.color = isOn ? onColor : originalDialColor;
+                dialImage.color = isOn ? DialActiveColor : originalDialColor;
             }
 
+#if DEBUG
             Debug.Log("[TestUI][Toggle] OnToggleChanged"
                 + " isOn=" + isOn
                 + " on=" + DebugImg(onImage)
                 + " off=" + DebugImg(offImage)
                 + " dialColor=" + (dialImage != null ? dialImage.color.ToString() : "no-dial"));
+#endif
         }
 
         private void OnDestroy()

@@ -9,6 +9,7 @@ using UBOAT.Game.Core.Serialization;
 using UBOAT.Game.Scene.Stories;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Object = UnityEngine.Object;
 using UnityEngine.UI;
 
 namespace UBOAT.Mods.TestUI
@@ -17,68 +18,109 @@ namespace UBOAT.Mods.TestUI
     public class Main : IUserMod
     {
         [Inject] private static ResourceManager resourceManager;
+        [NonSerializedInGameState] private Harmony _harmony;
+        private static bool _loaded;
 
         public void OnLoaded()
         {
-            try
+            Debug.Log("[TestUI][Main] TestUI v" + Assembly.GetExecutingAssembly().GetName().Version + ", UBOAT " + Application.version);
+
+            if (_loaded)
             {
-                var harmony = new Harmony("UBOAT.Mods.TestUI");
-                var patchType = typeof(RadioStoryIntegration);
-                var anyStatic = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
-
-                var continueStory = typeof(RadioStory).GetMethod("ContinueStory", BindingFlags.Public | BindingFlags.Instance);
-                if (continueStory != null)
-                {
-                    harmony.Patch(continueStory, postfix: new HarmonyMethod(patchType.GetMethod("InjectT3PLL38Decision", anyStatic)));
-                    Debug.Log("[TestUI] Patched RadioStory.ContinueStory");
-                }
-
-                var retrieveString1 = typeof(Locale).GetMethod("RetrieveString", new[] { typeof(string) });
-                if (retrieveString1 != null)
-                {
-                    harmony.Patch(retrieveString1, prefix: new HarmonyMethod(patchType.GetMethod("OverrideLocaleKey", anyStatic)));
-                    Debug.Log("[TestUI] Patched Locale.RetrieveString");
-                }
-
-                var retrieveString2 = typeof(Locale).GetMethod("RetrieveString", new[] { typeof(string), typeof(string) });
-                if (retrieveString2 != null)
-                {
-                    harmony.Patch(retrieveString2, prefix: new HarmonyMethod(patchType.GetMethod("OverrideLocaleKey", anyStatic)));
-                    Debug.Log("[TestUI] Patched Locale.RetrieveString(string,string)");
-                }
-
-                var onDecision = typeof(RadioStory).GetMethod("OnDecisionSelected", BindingFlags.NonPublic | BindingFlags.Instance);
-                if (onDecision != null)
-                {
-                    harmony.Patch(onDecision, prefix: new HarmonyMethod(patchType.GetMethod("HandleCustomDecisions", anyStatic)));
-                    Debug.Log("[TestUI] Patched RadioStory.OnDecisionSelected");
-                }
-
-                var onStopped = typeof(RadioStory).GetMethod("OnStopped", BindingFlags.NonPublic | BindingFlags.Instance);
-                if (onStopped != null)
-                {
-                    harmony.Patch(onStopped, postfix: new HarmonyMethod(patchType.GetMethod("HideRadioOnStop", anyStatic)));
-                    Debug.Log("[TestUI] Patched RadioStory.OnStopped");
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("[TestUI] Harmony patch failed: " + e);
+                _harmony?.UnpatchAll();
+                RadioStoryIntegration.ResetRuntimeState();
+                Debug.Log("[TestUI][Main] Previous patches removed, runtime state reset (reload)");
             }
 
+            _harmony = new Harmony("UBOAT.Mods.TestUI");
+            var patchType = typeof(RadioStoryIntegration);
+            var anyStatic = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
+
+            var continueStory = typeof(RadioStory).GetMethod("ContinueStory", BindingFlags.Public | BindingFlags.Instance);
+            var retrieveString1 = typeof(Locale).GetMethod("RetrieveString", new[] { typeof(string) });
+            var retrieveString2 = typeof(Locale).GetMethod("RetrieveString", new[] { typeof(string), typeof(string) });
+            var onDecision = typeof(RadioStory).GetMethod("OnDecisionSelected", BindingFlags.NonPublic | BindingFlags.Instance);
+            var onStopped = typeof(RadioStory).GetMethod("OnStopped", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            var targets = new[]
+            {
+                new { method = continueStory, prefix = (HarmonyMethod)null, postfix = new HarmonyMethod(patchType.GetMethod("InjectT3PLL38Decision", anyStatic)), name = "RadioStory.ContinueStory" },
+                new { method = retrieveString1, prefix = new HarmonyMethod(patchType.GetMethod("OverrideLocaleKey", anyStatic)), postfix = (HarmonyMethod)null, name = "Locale.RetrieveString" },
+                new { method = retrieveString2, prefix = new HarmonyMethod(patchType.GetMethod("OverrideLocaleKey", anyStatic)), postfix = (HarmonyMethod)null, name = "Locale.RetrieveString(string,string)" },
+                new { method = onDecision, prefix = new HarmonyMethod(patchType.GetMethod("HandleCustomDecisions", anyStatic)), postfix = (HarmonyMethod)null, name = "RadioStory.OnDecisionSelected" },
+                new { method = onStopped, prefix = (HarmonyMethod)null, postfix = new HarmonyMethod(patchType.GetMethod("HideRadioOnStop", anyStatic)), name = "RadioStory.OnStopped" },
+            };
+
+            string missing = null;
+            foreach (var t in targets)
+            {
+                if (t.method == null)
+                    missing = (missing ?? "") + t.name + ", ";
+            }
+            if (missing != null)
+            {
+                Debug.LogError("[TestUI] Pre-flight failed — target methods not found: " + missing.TrimEnd(',', ' '));
+            }
+            else
+            {
+                int applied = 0;
+                foreach (var t in targets)
+                {
+                    try
+                    {
+                        _harmony.Patch(t.method, prefix: t.prefix, postfix: t.postfix);
+                        Debug.Log("[TestUI] Patched " + t.name);
+                        applied++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError("[TestUI] Patch failed for " + t.name + ": " + ex.Message);
+                        _harmony.UnpatchAll();
+                        Debug.Log("[TestUI] All patches rolled back due to partial failure");
+                        break;
+                    }
+                }
+                Debug.Log("[TestUI] Patches applied: " + applied + "/" + targets.Length);
+            }
+
+            SceneEventsListener.OnSceneStart -= SceneEventsListener_OnSceneStart;
+            SceneEventsListener.OnSceneAwake -= SceneEventsListener_OnSceneAwake;
             SceneEventsListener.OnSceneStart += SceneEventsListener_OnSceneStart;
             SceneEventsListener.OnSceneAwake += SceneEventsListener_OnSceneAwake;
+
+            _loaded = true;
+
+            Debug.Log("[TestUI][DIAG] version=" + Assembly.GetExecutingAssembly().GetName().Version +
+                " game=" + Application.version +
+                " di=" + (InjectionFramework.Instance != null ? "ok" : "null") +
+                " resourceManager=" + (resourceManager != null ? "ok" : "null"));
         }
+
+#if DEBUG
+        private static void DumpHierarchy(Transform t, string indent)
+        {
+            Debug.Log(indent + t.name);
+            foreach (Transform child in t)
+                DumpHierarchy(child, indent + "  ");
+        }
+#endif
 
         private void SceneEventsListener_OnSceneAwake(Scene scene)
         {
+            if (InjectionFramework.Instance == null)
+            {
+                Debug.LogError("[TestUI][Main] InjectionFramework.Instance is null — DI not initialized. Ensure 'Injection' or 'Reflection' permission in Manifest.json");
+                return;
+            }
+
             try
             {
                 InjectionFramework.Instance.InjectIntoAssembly(Assembly.GetExecutingAssembly());
+                Debug.Log("[TestUI][Main] DI injection completed");
             }
             catch (Exception e)
             {
-                Debug.LogError("[TestUI][Main] Injection failed (Awake)");
+                Debug.LogError("[TestUI][Main] Injection failed (Awake): " + e.Message);
                 Debug.LogException(e);
             }
         }
@@ -88,79 +130,62 @@ namespace UBOAT.Mods.TestUI
             try
             {
                 if (scene.name != "Main Scene")
+                {
+                    Debug.Log("[TestUI][Main] Scene '" + scene.name + "' is not Main Scene, skipping");
                     return;
+                }
 
                 Transform viewport = GameObject.Find("/GUI/Viewport")?.transform;
                 if (viewport == null)
+                {
+                    Debug.LogWarning("[TestUI][Main] '/GUI/Viewport' not found — GUI hierarchy may have changed in this UBOAT version");
                     return;
+                }
 
+                if (resourceManager == null)
+                {
+                    Debug.LogError("[TestUI][Main] ResourceManager not injected — DI failed");
+                    return;
+                }
+
+                if (RadioHandler.Instance != null && RadioHandler.Instance.gameObject != null)
+                {
+                    Debug.Log("[TestUI][Main] Reusing existing Radio panel");
+                    return;
+                }
+
+                Debug.Log("[TestUI][Main] InstantiatePrefab(\"Radio\") from resourceManager — AssetBundle Bundles/testui expected to be loaded by game mod loader");
                 GameObject radio = resourceManager.InstantiatePrefab("Radio");
                 if (radio == null)
+                {
+                    Debug.LogError("[TestUI][Main] Prefab 'Radio' not found in AssetBundle or InstantiatePrefab returned null. Check Bundles/testui");
                     return;
-
-                if (radio.GetComponent<RadioHandler>() == null)
-                    radio.AddComponent<RadioHandler>();
-                if (radio.GetComponent<CanvasGroup>() == null)
-                    radio.AddComponent<CanvasGroup>();
-                if (radio.GetComponent<PanelDragHandler>() == null)
-                    radio.AddComponent<PanelDragHandler>();
-
-                Transform cursor = radio.transform.Find("CursorSpinner");
-                if (cursor != null && cursor.GetComponent<CursorHandler>() == null)
-                    cursor.gameObject.AddComponent<CursorHandler>();
-
-                Transform toggle = radio.transform.Find("Toggle");
-                if (toggle != null && toggle.GetComponent<ToggleHandler>() == null)
-                    toggle.gameObject.AddComponent<ToggleHandler>();
-
-                Transform ground = radio.transform.Find("Ground");
-                Transform groundBg = ground?.Find("Background");
-                Transform groundCm = groundBg?.Find("GroundCheckmark");
-                Image cmImg = groundCm?.GetComponent<Image>();
-                Debug.Log("[TestUI][Main] Ground exists=" + (ground != null)
-                    + " Background exists=" + (groundBg != null)
-                    + " Checkmark exists=" + (groundCm != null)
-                    + " [Ground] pos=" + (ground != null ? ground.localPosition.ToString() : "null")
-                    + " [Background] pos=" + (groundBg != null ? groundBg.localPosition.ToString() : "null")
-                    + " img=" + (groundBg != null && groundBg.GetComponent<Image>() != null)
-                    + " [Checkmark] pos=" + (groundCm != null ? groundCm.localPosition.ToString() : "null")
-                    + " sprite=" + (cmImg != null && cmImg.sprite != null ? cmImg.sprite.name : "no-sprite")
-                    + " imgEnabled=" + (cmImg != null ? cmImg.enabled.ToString() : "no-img")
-                    + " imgAlpha=" + (cmImg != null ? cmImg.color.a.ToString("F2") : "-"));
-                if (ground != null && ground.GetComponent<GroundHandler>() == null)
-                {
-                    ground.gameObject.AddComponent<GroundHandler>();
-                    Debug.Log("[TestUI][Main] GroundHandler added to " + ground.name);
                 }
 
-                Transform expander = radio.transform.Find("Expander");
-                if (expander != null && expander.GetComponent<ExpanderHandler>() == null)
-                    expander.gameObject.AddComponent<ExpanderHandler>();
-
-                Transform radioZone = radio.transform.Find("RadioZone");
-                if (radioZone != null && radioZone.GetComponent<ZoneHandler>() == null)
+                string[] requiredChildren = { "CursorSpinner", "Toggle", "Ground", "Ground/Background", "Ground/Background/GroundCheckmark", "Expander", "RadioZone", "VolumeSpinner", "FeedbackSpinner" };
+                var missing = new System.Collections.Generic.List<string>();
+                foreach (var path in requiredChildren)
                 {
-                    radioZone.gameObject.AddComponent<ZoneHandler>();
-                    Debug.Log("[TestUI][Main] ZoneHandler added to " + radioZone.name);
+                    if (radio.transform.Find(path) == null)
+                        missing.Add(path);
+                }
+                if (missing.Count > 0)
+                {
+                    Debug.LogError("[TestUI][Main] Prefab structure validation FAILED. Missing: " + string.Join(", ", missing));
+                    Object.Destroy(radio);
+                    return;
                 }
 
-                Transform volumeSpinner = radio.transform.Find("VolumeSpinner");
-                if (volumeSpinner != null && volumeSpinner.GetComponent<VolumeSpinnerHandler>() == null)
-                {
-                    volumeSpinner.gameObject.AddComponent<VolumeSpinnerHandler>();
-                    Debug.Log("[TestUI][Main] VolumeSpinnerHandler added to " + volumeSpinner.name);
-                }
+                RadioInstaller.Instantiate(radio, viewport);
 
-                Transform feedbackSpinner = radio.transform.Find("FeedbackSpinner");
-                if (feedbackSpinner != null && feedbackSpinner.GetComponent<FeedbackSpinnerHandler>() == null)
-                {
-                    feedbackSpinner.gameObject.AddComponent<FeedbackSpinnerHandler>();
-                    Debug.Log("[TestUI][Main] FeedbackSpinnerHandler added to " + feedbackSpinner.name);
-                }
+                int hCount = radio.GetComponents<MonoBehaviour>().Length;
+                Debug.Log("[TestUI][DIAG] scene=" + scene.name +
+                    " radio=created handlers=" + hCount +
+                    " visible=" + (RadioHandler.Instance != null ? RadioHandler.Instance.IsVisible.ToString() : "no-instance"));
 
-                radio.transform.SetParent(viewport, false);
-                radio.transform.localPosition = new Vector3(300f, 100f, 0f);
-                radio.SetActive(true);
+#if DEBUG
+                DumpHierarchy(radio.transform, "[TestUI][Main] Prefab hierarchy: ");
+#endif
             }
             catch (Exception e)
             {
