@@ -72,6 +72,8 @@ namespace UBOAT.Mods.TestUI
 
         private void NextZone()
         {
+            if (!CanSwitchZone())
+                return;
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex + 1) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
@@ -80,10 +82,38 @@ namespace UBOAT.Mods.TestUI
 
         private void PreviousZone()
         {
+            if (!CanSwitchZone())
+                return;
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex - 1 + ZoneNames.Length) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
             Debug.Log("[TestUI][ZoneHandler] switched to " + ZoneNames[currentIndex]);
+        }
+
+        private bool CanSwitchZone()
+        {
+            Transform parent = transform.parent;
+            if (parent == null)
+                return false;
+
+            Transform toggleT = parent.Find("Toggle");
+            if (toggleT == null)
+                return false;
+            Toggle powerToggle = toggleT.GetComponent<Toggle>();
+            if (powerToggle == null || !powerToggle.isOn)
+                return false;
+
+            Transform groundT = parent.Find("Ground");
+            if (groundT == null)
+                return false;
+            Transform bgT = groundT.Find("Background");
+            if (bgT == null)
+                return false;
+            Image groundBg = bgT.GetComponent<Image>();
+            if (groundBg == null || groundBg.color.a <= 0.5f)
+                return false;
+
+            return true;
         }
 
         private void SetAlpha(int index, float alpha)
