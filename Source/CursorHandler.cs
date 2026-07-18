@@ -5,12 +5,15 @@ using UnityEngine.UI;
 
 namespace UBOAT.Mods.TestUI
 {
-    public class CursorHandler : BlockInputUI, IDragHandler, IBeginDragHandler, IEndDragHandler
+    public class CursorHandler : BlockInputUI, IDragHandler, IBeginDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler, IScrollHandler
     {
         private const float MinAngle = -90f;
         private const float MaxAngle = 90f;
+        private const float ScrollStepNormal = 3f;
+        private const float ScrollStepFine = 0.5f;
 
         private bool isDragging;
+        private bool _isHovering;
         private int activePointerId = -1;
         private RectTransform cursorRect;
 
@@ -36,6 +39,7 @@ namespace UBOAT.Mods.TestUI
         {
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
+            if (!ToggleHandler.IsInteractable) return;
             if (cursorRect == null)
             {
                 Debug.LogError("[TestUI][CursorHandler] cursorRect not initialized");
@@ -49,6 +53,7 @@ namespace UBOAT.Mods.TestUI
         {
             if (!isDragging || eventData.pointerId != activePointerId)
                 return;
+            if (!ToggleHandler.IsInteractable) return;
 
             Vector2 dir = eventData.position - (Vector2)cursorRect.position;
             if (dir.y < 0) dir.y = 0;
@@ -65,6 +70,55 @@ namespace UBOAT.Mods.TestUI
             if (eventData.pointerId != activePointerId) return;
             isDragging = false;
             activePointerId = -1;
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            _isHovering = true;
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            _isHovering = false;
+        }
+
+        public void OnScroll(PointerEventData eventData)
+        {
+            if (!ToggleHandler.IsInteractable) return;
+            if (cursorRect == null) return;
+
+            float delta = eventData.scrollDelta.y;
+            if (delta == 0f) return;
+
+            float step = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)
+                ? ScrollStepFine
+                : ScrollStepNormal;
+
+            float newAngle = Mathf.Clamp(
+                RadioHandler.Instance.CursorAngle + delta * step,
+                MinAngle, MaxAngle);
+
+            cursorRect.localRotation = Quaternion.Euler(0, 0, -newAngle);
+
+            if (RadioHandler.Instance != null)
+                RadioHandler.Instance.CursorAngle = newAngle;
+
+            eventData.Use();
+        }
+
+        private void Update()
+        {
+            if (!_isHovering || !ToggleHandler.IsInteractable) return;
+
+            float scrollY = Input.mouseScrollDelta.y;
+            if (Mathf.Abs(scrollY) < 0.01f) return;
+
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != gameObject)
+                EventSystem.current.SetSelectedGameObject(gameObject);
+
+            ScrollRect scrollRect = GetComponentInParent<ScrollRect>();
+            if (scrollRect != null)
+                scrollRect.StopMovement();
         }
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -6,6 +7,8 @@ namespace UBOAT.Mods.TestUI
 {
     public abstract class SpinnerHandlerBase : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
+        public event Action<float> OnValueChanged;
+
         [SerializeField] protected float minAngle = 0f;
         [SerializeField] protected float maxAngle = 140f;
         [SerializeField] protected float startAngle = 0f;
@@ -29,7 +32,11 @@ namespace UBOAT.Mods.TestUI
                 return false;
             return true;
         }
-        protected virtual void OnAngleUpdated(float angle) { }
+        protected virtual void OnAngleUpdated(float angle)
+        {
+            if (OnValueChanged != null)
+                OnValueChanged(angle);
+        }
 
         protected virtual void Awake()
         {
@@ -57,6 +64,7 @@ namespace UBOAT.Mods.TestUI
         {
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
+            if (!ToggleHandler.IsInteractable) return;
             if (spinnerRect == null)
             {
                 Debug.LogError("[TestUI][" + DebugTag + "] spinnerRect not initialized");
@@ -70,6 +78,7 @@ namespace UBOAT.Mods.TestUI
         {
             if (!isDragging || eventData.pointerId != activePointerId)
                 return;
+            if (!ToggleHandler.IsInteractable) return;
 
             Vector2 dir = eventData.position - (Vector2)spinnerRect.position;
             if (!HandleDragDirection(dir))

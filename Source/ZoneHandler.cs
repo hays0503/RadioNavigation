@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -6,6 +7,8 @@ namespace UBOAT.Mods.TestUI
 {
     public class ZoneHandler : MonoBehaviour
     {
+        public event Action<int> OnZoneChanged;
+
         private static readonly string[] ZoneNames = { "Zone1", "Zone2", "Zone3", "Zone4", "Zone5" };
 
         [SerializeField] private float visibleAlpha = 1f;
@@ -13,9 +16,8 @@ namespace UBOAT.Mods.TestUI
 
         private Image[] zoneImages;
         private int currentIndex;
+        public int CurrentIndex => currentIndex;
         private Transform parentTransform;
-        private Toggle powerToggle;
-        private Image groundBgImage;
 
         private void Start()
         {
@@ -38,16 +40,6 @@ namespace UBOAT.Mods.TestUI
                 SetAlpha(i, i == 0 ? visibleAlpha : hiddenAlpha);
             }
             currentIndex = 0;
-
-            if (parentTransform != null)
-            {
-                Transform toggleT = parentTransform.Find("Toggle");
-                powerToggle = toggleT != null ? toggleT.GetComponent<Toggle>() : null;
-
-                Transform groundT = parentTransform.Find("Ground");
-                Transform bgT = groundT?.Find("Background");
-                groundBgImage = bgT != null ? bgT.GetComponent<Image>() : null;
-            }
 
             Debug.Log("[TestUI][Zone] Started, zone=" + ZoneNames[currentIndex]);
         }
@@ -96,6 +88,8 @@ namespace UBOAT.Mods.TestUI
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex + 1) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
+            if (OnZoneChanged != null)
+                OnZoneChanged(currentIndex);
 #if DEBUG
             Debug.Log("[TestUI][Zone] switched to " + ZoneNames[currentIndex]);
 #endif
@@ -108,6 +102,8 @@ namespace UBOAT.Mods.TestUI
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex - 1 + ZoneNames.Length) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
+            if (OnZoneChanged != null)
+                OnZoneChanged(currentIndex);
 #if DEBUG
             Debug.Log("[TestUI][Zone] switched to " + ZoneNames[currentIndex]);
 #endif
@@ -115,16 +111,7 @@ namespace UBOAT.Mods.TestUI
 
         private bool CanSwitchZone()
         {
-            if (parentTransform == null)
-                return false;
-
-            if (powerToggle == null || !powerToggle.isOn)
-                return false;
-
-            if (groundBgImage == null || groundBgImage.color.a <= GroundHandler.ActiveAlphaThreshold)
-                return false;
-
-            return true;
+            return parentTransform != null && ToggleHandler.IsInteractable;
         }
 
         private void OnDestroy()

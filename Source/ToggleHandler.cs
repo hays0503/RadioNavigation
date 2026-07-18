@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -7,6 +8,18 @@ namespace UBOAT.Mods.TestUI
     [DefaultExecutionOrder(-1)]
     public class ToggleHandler : MonoBehaviour, IPointerClickHandler
     {
+        public event Action<bool> OnValueChanged;
+
+        public static bool IsRadioOn { get; private set; }
+        public static bool IsInteractable { get; private set; }
+        private static bool _groundActive;
+
+        public static void SetGroundActive(bool active)
+        {
+            _groundActive = active;
+            IsInteractable = IsRadioOn && active;
+        }
+
         private Toggle toggleComp;
         private GameObject onImage;
         private GameObject offImage;
@@ -44,6 +57,7 @@ namespace UBOAT.Mods.TestUI
                 enabled = false;
                 return;
             }
+            toggleComp.graphic = null;
 
             toggleRect = GetComponent<RectTransform>();
             if (toggleRect == null)
@@ -104,15 +118,27 @@ namespace UBOAT.Mods.TestUI
 
         private void OnToggleChanged(bool isOn)
         {
+            IsRadioOn = isOn;
+            IsInteractable = isOn && _groundActive;
+
             if (onImage != null)
-                onImage.SetActive(isOn);
+            {
+                if (onImage.activeSelf != isOn)
+                    onImage.SetActive(isOn);
+            }
             if (offImage != null)
-                offImage.SetActive(!isOn);
+            {
+                if (offImage.activeSelf == isOn)
+                    offImage.SetActive(!isOn);
+            }
 
             if (dialImage != null)
             {
                 dialImage.color = isOn ? DialActiveColor : originalDialColor;
             }
+
+            if (OnValueChanged != null)
+                OnValueChanged(isOn);
 
 #if DEBUG
             Debug.Log("[TestUI][Toggle] OnToggleChanged"

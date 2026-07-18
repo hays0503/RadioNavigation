@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -6,6 +7,8 @@ namespace UBOAT.Mods.TestUI
 {
     public class GroundHandler : MonoBehaviour, IPointerClickHandler
     {
+        public event Action<bool> OnValueChanged;
+
         private Image bgImage;
         private Image groundCheckmark;
         private Toggle radioToggle;
@@ -90,6 +93,7 @@ namespace UBOAT.Mods.TestUI
                 radioToggle.isOn = false;
                 radioToggle.interactable = false;
             }
+            ToggleHandler.SetGroundActive(false);
 
 #if DEBUG
             Debug.Log("[TestUI][Ground] Start " + StateLog());
@@ -102,7 +106,7 @@ namespace UBOAT.Mods.TestUI
 
             if (isActive && radioToggle != null && radioToggle.isOn)
             {
-                radioToggle.SetIsOnWithoutNotify(false);
+                radioToggle.isOn = false;
                 radioToggle.interactable = false;
             }
 
@@ -122,6 +126,11 @@ namespace UBOAT.Mods.TestUI
 
             if (radioToggle != null)
                 radioToggle.interactable = !isActive;
+
+            ToggleHandler.SetGroundActive(!isActive);
+
+            if (OnValueChanged != null)
+                OnValueChanged(!isActive);
 
 #if DEBUG
             Debug.Log("[TestUI][Ground] onClick screenPos=" + eventData.position + " " + StateLog());
