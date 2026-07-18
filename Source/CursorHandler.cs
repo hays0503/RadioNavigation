@@ -33,6 +33,14 @@ namespace UBOAT.Mods.TestUI
                 img.raycastTarget = true;
             else
                 Debug.LogError("[TestUI][CursorHandler] Image component not found, drag may not work");
+
+            if (GetComponent<ScrollRect>() == null)
+            {
+                ScrollRect sr = gameObject.AddComponent<ScrollRect>();
+                sr.horizontal = false;
+                sr.vertical = false;
+                sr.movementType = ScrollRect.MovementType.Unclamped;
+            }
         }
 
         public void OnBeginDrag(PointerEventData eventData)
