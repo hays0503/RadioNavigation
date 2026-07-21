@@ -19,6 +19,8 @@ namespace UBOAT.Mods.TestUI
         public DateTime Commissioned;
         public DateTime? Decommissioned;
         public int PowerW;
+        public float BeamHeadingDegTrue;
+        public float BeamHalfWidthDeg;
         public BeaconHistoryEntry[] History;
     }
 
@@ -35,6 +37,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 2000,
+                BeamHeadingDegTrue = 270f,
+                BeamHalfWidthDeg = 90f,
                 // History: TRQ → FRQ, date of change unknown. Kept active state only.
                 History = new[]
                 {
@@ -55,6 +59,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 240f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -74,6 +80,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1942, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 280f,
+                BeamHalfWidthDeg = 90f,
                 // History: freq changed 303 → 285, date of change unknown. Kept active state only.
                 History = new[]
                 {
@@ -94,6 +102,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 210f,
+                BeamHalfWidthDeg = 90f,
                 // History: freq changed 311 → 315, date of change unknown. Kept active state only.
                 History = new[]
                 {
@@ -114,6 +124,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1941, 1, 1),
                 Decommissioned = null,
                 PowerW = 3000,
+                BeamHeadingDegTrue = 330f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -133,6 +145,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1941, 1, 1),
                 Decommissioned = null,
                 PowerW = 3000,
+                BeamHeadingDegTrue = 0f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -152,6 +166,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1941, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 315f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -171,6 +187,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 315f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -190,6 +208,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 270f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -209,6 +229,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 270f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -228,6 +250,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 270f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -247,6 +271,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 180f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -266,6 +292,8 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                BeamHeadingDegTrue = 270f,
+                BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
