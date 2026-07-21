@@ -37,7 +37,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 2000,
-                BeamHeadingDegTrue = 270f,
+                BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
                 // History: TRQ → FRQ, date of change unknown. Kept active state only.
                 History = new[]
@@ -59,7 +59,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 240f,
+                BeamHeadingDegTrue = 270f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
@@ -80,7 +80,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1942, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 280f,
+                BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
                 // History: freq changed 303 → 285, date of change unknown. Kept active state only.
                 History = new[]
@@ -102,7 +102,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 210f,
+                BeamHeadingDegTrue = 247.5f,
                 BeamHalfWidthDeg = 90f,
                 // History: freq changed 311 → 315, date of change unknown. Kept active state only.
                 History = new[]
@@ -124,7 +124,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1941, 1, 1),
                 Decommissioned = null,
                 PowerW = 3000,
-                BeamHeadingDegTrue = 330f,
+                BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
@@ -145,7 +145,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1941, 1, 1),
                 Decommissioned = null,
                 PowerW = 3000,
-                BeamHeadingDegTrue = 0f,
+                BeamHeadingDegTrue = 180f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
@@ -166,7 +166,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1941, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 315f,
+                BeamHeadingDegTrue = 112.5f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
@@ -187,7 +187,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 315f,
+                BeamHeadingDegTrue = 300f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
@@ -208,7 +208,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 270f,
+                BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
@@ -229,7 +229,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 270f,
+                BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
@@ -250,7 +250,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 270f,
+                BeamHeadingDegTrue = 300f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
@@ -271,7 +271,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 180f,
+                BeamHeadingDegTrue = 330f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
@@ -292,7 +292,7 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 270f,
+                BeamHeadingDegTrue = 300f,
                 BeamHalfWidthDeg = 90f,
                 History = new[]
                 {
