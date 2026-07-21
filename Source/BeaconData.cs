@@ -1,89 +1,213 @@
 namespace UBOAT.Mods.TestUI
 {
-    public struct BeaconInfo
+    public struct BeaconHistoryEntry
+    {
+        public string From;
+        public string To;
+        public string Callsign;
+        public float? FrequencyKHz;
+    }
+
+    public struct BeaconStation
     {
         public string Name;
         public string Country;
-        public string Callsign;
         public double Latitude;
         public double Longitude;
-        public string ActivationDate;
-        public float FrequencyKHz;
+        public string Commissioned;
+        public string Decommissioned;
+        public int PowerW;
+        public BeaconHistoryEntry[] History;
     }
 
     public static class BeaconData
     {
-        public static readonly BeaconInfo[] Beacons =
+        public static readonly BeaconStation[] Stations =
         {
-            new BeaconInfo
+            new BeaconStation
             {
                 Name = "Ploneis (Quimper)",
                 Country = "France",
-                Callsign = "FRQ",
                 Latitude = 48.018333,
                 Longitude = -4.215278,
-                ActivationDate = "1942-06-01",
-                FrequencyKHz = 257.0f
+                Commissioned = "1940-01-01",
+                Decommissioned = null,
+                PowerW = 2000,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1940-01-01", To = null, Callsign = "TRQ", FrequencyKHz = 257.0f },
+                    new BeaconHistoryEntry { From = null, To = null, Callsign = "FRQ", FrequencyKHz = 257.0f }
+                }
             },
-            new BeaconInfo
+            new BeaconStation
             {
                 Name = "Stavanger–Varhaug",
                 Country = "Norway",
-                Callsign = "LEC",
                 Latitude = 58.625556,
                 Longitude = 5.630278,
-                ActivationDate = "1942-06-01",
-                FrequencyKHz = 319.0f
+                Commissioned = "1940-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1940-01-01", To = null, Callsign = "LEC", FrequencyKHz = 319.0f }
+                }
             },
-            new BeaconInfo
+            new BeaconStation
             {
                 Name = "Lugo (Outeiro de Rei)",
                 Country = "Spain",
-                Callsign = "LG",
                 Latitude = 43.248056,
                 Longitude = -7.482222,
-                ActivationDate = "1942-06-01",
-                FrequencyKHz = 285.0f
+                Commissioned = "1942-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1942-01-01", To = null, Callsign = "LG", FrequencyKHz = 303.0f },
+                    new BeaconHistoryEntry { From = null, To = null, Callsign = "LG", FrequencyKHz = 285.0f }
+                }
             },
-            new BeaconInfo
+            new BeaconStation
             {
                 Name = "Sevilla",
                 Country = "Spain",
-                Callsign = "SL",
                 Latitude = 37.521389,
                 Longitude = -6.021667,
-                ActivationDate = "1942-06-01",
-                FrequencyKHz = 315.0f
+                Commissioned = "1940-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1940-01-01", To = null, Callsign = "SL", FrequencyKHz = 311.0f },
+                    new BeaconHistoryEntry { From = null, To = null, Callsign = "SL", FrequencyKHz = 315.0f }
+                }
             },
-            new BeaconInfo
+            new BeaconStation
             {
                 Name = "Andøya",
                 Country = "Norway",
-                Callsign = "LEX",
-                Latitude = 69.148333,
+                Latitude = 69.148056,
                 Longitude = 15.883333,
-                ActivationDate = "1943-04-01",
-                FrequencyKHz = 332.5f
+                Commissioned = "1941-01-01",
+                Decommissioned = null,
+                PowerW = 3000,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1941-01-01", To = null, Callsign = "LEX", FrequencyKHz = 332.5f }
+                }
             },
-            new BeaconInfo
+            new BeaconStation
             {
                 Name = "Bjørnøya",
                 Country = "Norway",
-                Callsign = "LJS",
                 Latitude = 74.492778,
                 Longitude = 19.059722,
-                ActivationDate = "1943-06-01",
-                FrequencyKHz = 332.5f
+                Commissioned = "1941-01-01",
+                Decommissioned = null,
+                PowerW = 3000,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1941-01-01", To = null, Callsign = "LJS", FrequencyKHz = 332.5f }
+                }
             },
-            new BeaconInfo
+            new BeaconStation
             {
                 Name = "Jan Mayen",
                 Country = "Norway",
-                Callsign = "LMC",
-                Latitude = 71.050000,
+                Latitude = 71.05,
                 Longitude = -8.233333,
-                ActivationDate = "1943-08-01",
-                FrequencyKHz = 332.5f
+                Commissioned = "1941-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1941-01-01", To = null, Callsign = "LMC", FrequencyKHz = 332.5f }
+                }
+            },
+            new BeaconStation
+            {
+                Name = "Beauvais",
+                Country = "France",
+                Latitude = 49.682222,
+                Longitude = 2.745556,
+                Commissioned = "1944-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 307.0f }
+                }
+            },
+            new BeaconStation
+            {
+                Name = "Bayeux",
+                Country = "France",
+                Latitude = 49.283333,
+                Longitude = -0.7,
+                Commissioned = "1944-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 306.0f }
+                }
+            },
+            new BeaconStation
+            {
+                Name = "Petten",
+                Country = "Netherlands",
+                Latitude = 52.766667,
+                Longitude = 4.666667,
+                Commissioned = "1944-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 481.0f }
+                }
+            },
+            new BeaconStation
+            {
+                Name = "Plougourvest",
+                Country = "France",
+                Latitude = 48.55,
+                Longitude = -4.083333,
+                Commissioned = "1944-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = null }
+                }
+            },
+            new BeaconStation
+            {
+                Name = "Brieg",
+                Country = "Germany (1944) / Poland",
+                Latitude = 50.85,
+                Longitude = 17.483333,
+                Commissioned = "1944-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 316.0f }
+                }
+            },
+            new BeaconStation
+            {
+                Name = "Husum",
+                Country = "Germany",
+                Latitude = 54.483333,
+                Longitude = 9.05,
+                Commissioned = "1944-01-01",
+                Decommissioned = null,
+                PowerW = 1500,
+                History = new[]
+                {
+                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 481.0f }
+                }
             }
         };
     }
