@@ -39,7 +39,7 @@ namespace UBOAT.Mods.TestUI
                 ScrollRect sr = gameObject.AddComponent<ScrollRect>();
                 sr.horizontal = false;
                 sr.vertical = false;
-                sr.movementType = ScrollRect.MovementType.Unclamped;
+                sr.movementType = ScrollRect.MovementType.Unrestricted;
             }
         }
 

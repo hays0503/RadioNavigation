@@ -61,6 +61,9 @@ namespace UBOAT.Mods.TestUI
             if (feedbackSpinner != null && feedbackSpinner.GetComponent<FeedbackSpinnerHandler>() == null)
                 feedbackSpinner.gameObject.AddComponent<FeedbackSpinnerHandler>();
 
+            if (radio.GetComponent<InformationPanelHandler>() == null)
+                radio.AddComponent<InformationPanelHandler>();
+
             radio.transform.SetParent(viewport, false);
             radio.transform.localPosition = new Vector3(300f, 100f, 0f);
             radio.SetActive(true);

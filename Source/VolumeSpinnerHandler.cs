@@ -8,6 +8,7 @@ namespace UBOAT.Mods.TestUI
 
         protected override void OnAngleUpdated(float angle)
         {
+            base.OnAngleUpdated(angle);
 #if DEBUG
             Debug.Log("[TestUI][" + DebugTag + "] angle=" + angle);
 #endif

@@ -1,3 +1,4 @@
+using System;
 using UBOAT.Game.UI;
 using UnityEngine;
 
@@ -6,7 +7,8 @@ namespace UBOAT.Mods.TestUI
     public class RadioHandler : BlockInputUI
     {
         public static RadioHandler Instance;
-        public static event System.Action<bool> OnVisibilityChanged;
+        public static event Action<bool> OnVisibilityChanged;
+        public event Action<float> OnCursorAngleChanged;
 
         [SerializeField] private CanvasGroup canvasGroup;
 
@@ -19,6 +21,8 @@ namespace UBOAT.Mods.TestUI
                 if (_cursorAngle == value)
                     return;
                 _cursorAngle = value;
+                if (OnCursorAngleChanged != null)
+                    OnCursorAngleChanged(value);
             }
         }
 

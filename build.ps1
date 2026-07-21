@@ -9,13 +9,16 @@ $refs = @(
     "$GamePath\UBOAT_Data\Managed\Assembly-CSharp.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.CoreModule.dll",
+    "$GamePath\UBOAT_Data\Managed\UnityEngine.UIModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.UI.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.IMGUIModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.InputLegacyModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.PhysicsModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.TextRenderingModule.dll",
     "$GamePath\UBOAT_Data\Managed\0Harmony.dll",
-    "$GamePath\UBOAT_Data\Managed\DWS.Common.dll"
+    "$GamePath\UBOAT_Data\Managed\com.uboat.dependencies.dll",
+    "$GamePath\UBOAT_Data\Managed\com.uboat.game.dll",
+    "$GamePath\UBOAT_Data\Managed\com.uboat.modapi.dll"
 )
 
 $refArgs = $refs | ForEach-Object { "/reference:`"$_`"" }
