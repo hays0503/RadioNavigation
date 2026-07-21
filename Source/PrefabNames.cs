@@ -16,5 +16,8 @@ namespace UBOAT.Mods.TestUI
         public const string DialFace = "ciferbllat";
         public const string ZonePrefix = "Zone";
         public const string PanelRoot = "Radio";
+        public const string DebugAnglePanel = "DebugAnglePanel";
+        public const string AngleBeacon = "AngleBeacon";
+        public const string AngleBeaconSlider = "AngleBeaconSlider";
     }
 }

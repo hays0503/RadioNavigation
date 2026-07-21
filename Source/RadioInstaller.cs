@@ -64,6 +64,10 @@ namespace UBOAT.Mods.TestUI
             if (radio.GetComponent<InformationPanelHandler>() == null)
                 radio.AddComponent<InformationPanelHandler>();
 
+            Transform debugAnglePanel = radio.transform.Find(PrefabNames.DebugAnglePanel);
+            if (debugAnglePanel != null && debugAnglePanel.GetComponent<DebugAngleHandler>() == null)
+                debugAnglePanel.gameObject.AddComponent<DebugAngleHandler>();
+
             radio.transform.SetParent(viewport, false);
             radio.transform.localPosition = new Vector3(300f, 100f, 0f);
             radio.SetActive(true);
