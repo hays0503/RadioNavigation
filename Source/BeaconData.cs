@@ -1,9 +1,11 @@
+using System;
+
 namespace UBOAT.Mods.TestUI
 {
     public struct BeaconHistoryEntry
     {
-        public string From;
-        public string To;
+        public DateTime? From;
+        public DateTime? To;
         public string Callsign;
         public float? FrequencyKHz;
     }
@@ -14,8 +16,8 @@ namespace UBOAT.Mods.TestUI
         public string Country;
         public double Latitude;
         public double Longitude;
-        public string Commissioned;
-        public string Decommissioned;
+        public DateTime Commissioned;
+        public DateTime? Decommissioned;
         public int PowerW;
         public BeaconHistoryEntry[] History;
     }
@@ -30,13 +32,18 @@ namespace UBOAT.Mods.TestUI
                 Country = "France",
                 Latitude = 48.018333,
                 Longitude = -4.215278,
-                Commissioned = "1940-01-01",
+                Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 2000,
+                // History: TRQ → FRQ, date of change unknown. Kept active state only.
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1940-01-01", To = null, Callsign = "TRQ", FrequencyKHz = 257.0f },
-                    new BeaconHistoryEntry { From = null, To = null, Callsign = "FRQ", FrequencyKHz = 257.0f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1940, 1, 1),
+                        Callsign = "FRQ",
+                        FrequencyKHz = 257.0f
+                    }
                 }
             },
             new BeaconStation
@@ -45,12 +52,17 @@ namespace UBOAT.Mods.TestUI
                 Country = "Norway",
                 Latitude = 58.625556,
                 Longitude = 5.630278,
-                Commissioned = "1940-01-01",
+                Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1940-01-01", To = null, Callsign = "LEC", FrequencyKHz = 319.0f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1940, 1, 1),
+                        Callsign = "LEC",
+                        FrequencyKHz = 319.0f
+                    }
                 }
             },
             new BeaconStation
@@ -59,13 +71,18 @@ namespace UBOAT.Mods.TestUI
                 Country = "Spain",
                 Latitude = 43.248056,
                 Longitude = -7.482222,
-                Commissioned = "1942-01-01",
+                Commissioned = new DateTime(1942, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                // History: freq changed 303 → 285, date of change unknown. Kept active state only.
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1942-01-01", To = null, Callsign = "LG", FrequencyKHz = 303.0f },
-                    new BeaconHistoryEntry { From = null, To = null, Callsign = "LG", FrequencyKHz = 285.0f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1942, 1, 1),
+                        Callsign = "LG",
+                        FrequencyKHz = 285.0f
+                    }
                 }
             },
             new BeaconStation
@@ -74,13 +91,18 @@ namespace UBOAT.Mods.TestUI
                 Country = "Spain",
                 Latitude = 37.521389,
                 Longitude = -6.021667,
-                Commissioned = "1940-01-01",
+                Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                // History: freq changed 311 → 315, date of change unknown. Kept active state only.
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1940-01-01", To = null, Callsign = "SL", FrequencyKHz = 311.0f },
-                    new BeaconHistoryEntry { From = null, To = null, Callsign = "SL", FrequencyKHz = 315.0f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1940, 1, 1),
+                        Callsign = "SL",
+                        FrequencyKHz = 315.0f
+                    }
                 }
             },
             new BeaconStation
@@ -89,12 +111,17 @@ namespace UBOAT.Mods.TestUI
                 Country = "Norway",
                 Latitude = 69.148056,
                 Longitude = 15.883333,
-                Commissioned = "1941-01-01",
+                Commissioned = new DateTime(1941, 1, 1),
                 Decommissioned = null,
                 PowerW = 3000,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1941-01-01", To = null, Callsign = "LEX", FrequencyKHz = 332.5f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1941, 1, 1),
+                        Callsign = "LEX",
+                        FrequencyKHz = 332.5f
+                    }
                 }
             },
             new BeaconStation
@@ -103,12 +130,17 @@ namespace UBOAT.Mods.TestUI
                 Country = "Norway",
                 Latitude = 74.492778,
                 Longitude = 19.059722,
-                Commissioned = "1941-01-01",
+                Commissioned = new DateTime(1941, 1, 1),
                 Decommissioned = null,
                 PowerW = 3000,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1941-01-01", To = null, Callsign = "LJS", FrequencyKHz = 332.5f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1941, 1, 1),
+                        Callsign = "LJS",
+                        FrequencyKHz = 332.5f
+                    }
                 }
             },
             new BeaconStation
@@ -117,12 +149,17 @@ namespace UBOAT.Mods.TestUI
                 Country = "Norway",
                 Latitude = 71.05,
                 Longitude = -8.233333,
-                Commissioned = "1941-01-01",
+                Commissioned = new DateTime(1941, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1941-01-01", To = null, Callsign = "LMC", FrequencyKHz = 332.5f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1941, 1, 1),
+                        Callsign = "LMC",
+                        FrequencyKHz = 332.5f
+                    }
                 }
             },
             new BeaconStation
@@ -131,12 +168,17 @@ namespace UBOAT.Mods.TestUI
                 Country = "France",
                 Latitude = 49.682222,
                 Longitude = 2.745556,
-                Commissioned = "1944-01-01",
+                Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 307.0f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1944, 1, 1),
+                        Callsign = null,
+                        FrequencyKHz = 307.0f
+                    }
                 }
             },
             new BeaconStation
@@ -145,12 +187,17 @@ namespace UBOAT.Mods.TestUI
                 Country = "France",
                 Latitude = 49.283333,
                 Longitude = -0.7,
-                Commissioned = "1944-01-01",
+                Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 306.0f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1944, 1, 1),
+                        Callsign = null,
+                        FrequencyKHz = 306.0f
+                    }
                 }
             },
             new BeaconStation
@@ -159,12 +206,17 @@ namespace UBOAT.Mods.TestUI
                 Country = "Netherlands",
                 Latitude = 52.766667,
                 Longitude = 4.666667,
-                Commissioned = "1944-01-01",
+                Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 481.0f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1944, 1, 1),
+                        Callsign = null,
+                        FrequencyKHz = 481.0f
+                    }
                 }
             },
             new BeaconStation
@@ -173,26 +225,36 @@ namespace UBOAT.Mods.TestUI
                 Country = "France",
                 Latitude = 48.55,
                 Longitude = -4.083333,
-                Commissioned = "1944-01-01",
+                Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = null }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1944, 1, 1),
+                        Callsign = null,
+                        FrequencyKHz = null
+                    }
                 }
             },
             new BeaconStation
             {
                 Name = "Brieg",
-                Country = "Germany (1944) / Poland",
+                Country = "Germany",
                 Latitude = 50.85,
                 Longitude = 17.483333,
-                Commissioned = "1944-01-01",
+                Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 316.0f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1944, 1, 1),
+                        Callsign = null,
+                        FrequencyKHz = 316.0f
+                    }
                 }
             },
             new BeaconStation
@@ -201,12 +263,17 @@ namespace UBOAT.Mods.TestUI
                 Country = "Germany",
                 Latitude = 54.483333,
                 Longitude = 9.05,
-                Commissioned = "1944-01-01",
+                Commissioned = new DateTime(1944, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
                 History = new[]
                 {
-                    new BeaconHistoryEntry { From = "1944-01-01", To = null, Callsign = null, FrequencyKHz = 481.0f }
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1944, 1, 1),
+                        Callsign = null,
+                        FrequencyKHz = 481.0f
+                    }
                 }
             }
         };
