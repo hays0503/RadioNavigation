@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,9 +12,9 @@ namespace UBOAT.Mods.TestUI
         private Text volumeText;
         private Text feedbackText;
         private Text frequencyText;
-
-        private float currentAngle;
-        private int currentZoneIndex;
+        private Text stationText;
+        private Text[] patternTexts;
+        private Text signalText;
 
         private ToggleHandler toggleHandler;
         private GroundHandler groundHandler;
@@ -21,6 +22,14 @@ namespace UBOAT.Mods.TestUI
         private VolumeSpinnerHandler volumeSpinner;
         private FeedbackSpinnerHandler feedbackSpinner;
         private RadioHandler radioHandler;
+        private SonneController sonneController;
+
+        private float _currentFreqKHz;
+        private int _currentZoneIndex;
+        private float _patternUpdateTimer;
+        private const float PatternUpdateInterval = 0.5f;
+        private float _signalUpdateTimer;
+        private const float SignalUpdateInterval = 0.15f;
 
         private void Start()
         {
@@ -40,12 +49,40 @@ namespace UBOAT.Mods.TestUI
             volumeText = CreateLabel(content, "VolumeStatus", "Volume: 0%");
             feedbackText = CreateLabel(content, "FeedbackStatus", "Feedback: 0%");
             frequencyText = CreateLabel(content, "FrequencyStatus", "Freq: ---");
+            stationText = CreateLabel(content, "StationStatus", "");
+
+            CreateSeparator(content, "Sep1");
+            signalText = CreateLabel(content, "SignalStatus", "--- Signal: ");
+            signalText.supportRichText = true;
+            signalText.color = Color.cyan;
+
+            CreateSeparator(content, "Sep2");
+            CreateLabel(content, "PatternsHeader", "--- Signal Patterns ---");
+
+            patternTexts = new Text[6];
+            for (int i = 0; i < patternTexts.Length; i++)
+                patternTexts[i] = CreateLabel(content, "Pattern" + i, "");
 
             FindHandlers();
-
             Subscribe();
-
             RefreshAll();
+        }
+
+        private void Update()
+        {
+            _patternUpdateTimer += Time.deltaTime;
+            if (_patternUpdateTimer >= PatternUpdateInterval)
+            {
+                _patternUpdateTimer = 0f;
+                UpdatePatterns();
+            }
+
+            _signalUpdateTimer += Time.deltaTime;
+            if (_signalUpdateTimer >= SignalUpdateInterval)
+            {
+                _signalUpdateTimer = 0f;
+                UpdateSignalDisplay();
+            }
         }
 
         private static void EnsureLayout(Transform content)
@@ -92,6 +129,16 @@ namespace UBOAT.Mods.TestUI
             return text;
         }
 
+        private static void CreateSeparator(Transform parent, string name)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(200, 2);
+            var img = go.AddComponent<Image>();
+            img.color = new Color(1f, 1f, 1f, 0.2f);
+        }
+
         private void FindHandlers()
         {
             toggleHandler = GetComponentInChildren<ToggleHandler>(true);
@@ -100,6 +147,7 @@ namespace UBOAT.Mods.TestUI
             volumeSpinner = GetComponentInChildren<VolumeSpinnerHandler>(true);
             feedbackSpinner = GetComponentInChildren<FeedbackSpinnerHandler>(true);
             radioHandler = GetComponent<RadioHandler>();
+            sonneController = GetComponent<SonneController>();
 
             if (toggleHandler == null) Debug.LogError("[TestUI][InfoPanel] ToggleHandler not found");
             if (groundHandler == null) Debug.LogError("[TestUI][InfoPanel] GroundHandler not found");
@@ -107,6 +155,7 @@ namespace UBOAT.Mods.TestUI
             if (volumeSpinner == null) Debug.LogError("[TestUI][InfoPanel] VolumeSpinnerHandler not found");
             if (feedbackSpinner == null) Debug.LogError("[TestUI][InfoPanel] FeedbackSpinnerHandler not found");
             if (radioHandler == null) Debug.LogError("[TestUI][InfoPanel] RadioHandler not found");
+            if (sonneController == null) Debug.LogError("[TestUI][InfoPanel] SonneController not found");
         }
 
         private void Subscribe()
@@ -121,8 +170,8 @@ namespace UBOAT.Mods.TestUI
                 volumeSpinner.OnValueChanged += OnVolumeChanged;
             if (feedbackSpinner != null)
                 feedbackSpinner.OnValueChanged += OnFeedbackChanged;
-            if (radioHandler != null)
-                radioHandler.OnCursorAngleChanged += OnDialChanged;
+
+            RadioHandler.OnFrequencyChanged += OnFrequencyChanged;
         }
 
         private void Unsubscribe()
@@ -137,8 +186,8 @@ namespace UBOAT.Mods.TestUI
                 volumeSpinner.OnValueChanged -= OnVolumeChanged;
             if (feedbackSpinner != null)
                 feedbackSpinner.OnValueChanged -= OnFeedbackChanged;
-            if (radioHandler != null)
-                radioHandler.OnCursorAngleChanged -= OnDialChanged;
+
+            RadioHandler.OnFrequencyChanged -= OnFrequencyChanged;
         }
 
         private void RefreshAll()
@@ -154,7 +203,7 @@ namespace UBOAT.Mods.TestUI
             if (feedbackSpinner != null)
                 OnFeedbackChanged(feedbackSpinner.Angle);
             if (radioHandler != null)
-                OnDialChanged(radioHandler.CursorAngle);
+                OnFrequencyChanged(DialConfig.AngleToFrequency(radioHandler.CursorAngle + 90f, GetZoneIndex()), GetZoneIndex());
         }
 
         private bool IsGroundActive()
@@ -194,10 +243,8 @@ namespace UBOAT.Mods.TestUI
 
         private void OnZoneChanged(int index)
         {
-            currentZoneIndex = index;
             if (zoneText != null)
                 zoneText.text = "Zone: " + (index + 1);
-            UpdateFrequencyDisplay();
         }
 
         private void OnVolumeChanged(float angle)
@@ -212,22 +259,125 @@ namespace UBOAT.Mods.TestUI
                 feedbackText.text = "Feedback: " + Mathf.RoundToInt(angle / 140f * 100f) + "%";
         }
 
-        private void OnDialChanged(float angle)
+        private void OnFrequencyChanged(float freqKHz, int zoneIndex)
         {
-            currentAngle = angle + 90f;
-            UpdateFrequencyDisplay();
+            _currentFreqKHz = freqKHz;
+            _currentZoneIndex = zoneIndex;
+
+            string formatted = DialConfig.FormatFrequency(freqKHz, zoneIndex);
+            string bandId = zoneIndex >= 0 && zoneIndex < DialConfig.Bands.Length
+                ? DialConfig.Bands[zoneIndex].Id : "?";
+            if (frequencyText != null)
+                frequencyText.text = "Freq: " + formatted + " (Band " + bandId + ")";
+
+            string stationName = FindClosestStation(freqKHz, zoneIndex);
+            if (stationText != null)
+                stationText.text = stationName;
+
+            UpdatePatterns();
         }
 
-        private void UpdateFrequencyDisplay()
+        private void UpdatePatterns()
         {
-            if (frequencyText == null)
+            if (sonneController == null || patternTexts == null)
                 return;
 
-            float freq = DialConfig.AngleToFrequency(currentAngle, currentZoneIndex);
-            string formatted = DialConfig.FormatFrequency(freq, currentZoneIndex);
-            string bandId = currentZoneIndex >= 0 && currentZoneIndex < DialConfig.Bands.Length
-                ? DialConfig.Bands[currentZoneIndex].Id : "?";
-            frequencyText.text = "Freq: " + formatted + " (Band " + bandId + ")  Angle: " + currentAngle.ToString("F1") + "°";
+            if (_currentZoneIndex != 1)
+            {
+                for (int i = 0; i < patternTexts.Length; i++)
+                    if (patternTexts[i] != null)
+                        patternTexts[i].text = "";
+                return;
+            }
+
+            int displayIndex = 0;
+            for (int i = 0; i < sonneController.StationCount && displayIndex < patternTexts.Length; i++)
+            {
+                var diag = sonneController.GetStationDiagnostics(i);
+                if (diag.Gain < 0.001f)
+                    continue;
+
+                string name = diag.Name ?? "?";
+                if (name.Length > 12)
+                    name = name.Substring(0, 12);
+
+                string beam = diag.InBeam ? "IN BEAM" : "OUTSIDE";
+                string bfo = diag.BeatFrequency.ToString("F0") + "Hz";
+                string gain = Mathf.RoundToInt(diag.Gain * 100f) + "%";
+                string phase = diag.SchedulerPhase.ToString();
+
+                string line = name + " [" + beam + "] " + gain + " BFO:" + bfo + " " + phase;
+                if (diag.InBeam)
+                    line += "\n  Dots:" + diag.DotCount + " Bearing:" + diag.CurrentBearing + "°";
+
+                patternTexts[displayIndex].text = line;
+
+                if (diag.InBeam)
+                    patternTexts[displayIndex].color = Color.green;
+                else
+                    patternTexts[displayIndex].color = new Color(0.6f, 0.6f, 0.6f);
+
+                displayIndex++;
+            }
+
+            for (int i = displayIndex; i < patternTexts.Length; i++)
+                if (patternTexts[i] != null)
+                    patternTexts[i].text = "";
+        }
+
+        private void UpdateSignalDisplay()
+        {
+            if (sonneController == null || signalText == null)
+                return;
+
+            if (_currentZoneIndex != 1)
+            {
+                signalText.text = "--- Signal: ";
+                signalText.color = Color.gray;
+                return;
+            }
+
+            string rich = sonneController.GetSignalRichText();
+            if (string.IsNullOrEmpty(rich))
+            {
+                signalText.text = "--- Signal: ";
+                signalText.color = Color.gray;
+                return;
+            }
+
+            signalText.text = "--- Signal: " + rich;
+            signalText.color = Color.white;
+        }
+
+        private string FindClosestStation(float freqKHz, int zoneIndex)
+        {
+            if (zoneIndex != 1)
+                return "";
+
+            float bestDelta = float.MaxValue;
+            float bestFreq = 0f;
+            string bestName = null;
+
+            var stations = BeaconData.Stations;
+            for (int i = 0; i < stations.Length; i++)
+            {
+                float? stationFreq = stations[i].History?[0].FrequencyKHz;
+                if (stationFreq == null) continue;
+
+                float delta = Math.Abs(freqKHz - stationFreq.Value);
+                if (delta < bestDelta)
+                {
+                    bestDelta = delta;
+                    bestFreq = stationFreq.Value;
+                    bestName = stations[i].Name;
+                }
+            }
+
+            if (bestName == null || bestDelta > 20f)
+                return "";
+
+            float gain = Mathf.Exp(-(bestDelta * bestDelta) / (2f * 1.5f * 1.5f));
+            return bestName + " " + DialConfig.FormatFrequency(bestFreq, zoneIndex) + " " + Mathf.RoundToInt(gain * 100f) + "%";
         }
 
         private void OnDestroy()

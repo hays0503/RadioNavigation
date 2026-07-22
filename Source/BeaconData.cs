@@ -21,13 +21,52 @@ namespace UBOAT.Mods.TestUI
         public int PowerW;
         public float BeamHeadingDegTrue;
         public float BeamHalfWidthDeg;
+        public int CycleDurationSeconds;
         public BeaconHistoryEntry[] History;
+
+        public int[] GetDotCountToBearingTable()
+        {
+            var config = ConsolCycleConfig.GetForCycleDuration(CycleDurationSeconds);
+            int maxCount = config.MaxNavigationCount;
+            var table = new int[maxCount + 1];
+
+            for (int i = 0; i <= maxCount; i++)
+            {
+                float ratio = maxCount > 0 ? (float)i / maxCount : 0f;
+                float bearing = BeamHeadingDegTrue - BeamHalfWidthDeg + ratio * 2f * BeamHalfWidthDeg;
+                table[i] = (int)((bearing + 360f) % 360f);
+            }
+
+            return table;
+        }
     }
 
     public static class BeaconData
     {
         public static readonly BeaconStation[] Stations =
         {
+            new BeaconStation
+            {
+                Name = "Bushmills",
+                Country = "UK",
+                Latitude = 55.2028,
+                Longitude = -6.5,
+                Commissioned = new DateTime(1940, 1, 1),
+                Decommissioned = null,
+                PowerW = 1500,
+                BeamHeadingDegTrue = 310.2f,
+                BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 40,
+                History = new[]
+                {
+                    new BeaconHistoryEntry
+                    {
+                        From = new DateTime(1940, 1, 1),
+                        Callsign = "MWN",
+                        FrequencyKHz = 266.0f
+                    }
+                }
+            },
             new BeaconStation
             {
                 Name = "Ploneis (Quimper)",
@@ -37,9 +76,9 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 2000,
-                BeamHeadingDegTrue = 315f,
+                BeamHeadingDegTrue = 286.2f,
                 BeamHalfWidthDeg = 90f,
-                // History: TRQ → FRQ, date of change unknown. Kept active state only.
+                CycleDurationSeconds = 40,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -52,15 +91,16 @@ namespace UBOAT.Mods.TestUI
             },
             new BeaconStation
             {
-                Name = "Stavanger–Varhaug",
+                Name = "Stavanger-Varhaug",
                 Country = "Norway",
                 Latitude = 58.625556,
                 Longitude = 5.630278,
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 270f,
+                BeamHeadingDegTrue = 247f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -80,9 +120,9 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1942, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 315f,
+                BeamHeadingDegTrue = 270f,
                 BeamHalfWidthDeg = 90f,
-                // History: freq changed 303 → 285, date of change unknown. Kept active state only.
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -102,9 +142,9 @@ namespace UBOAT.Mods.TestUI
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
-                BeamHeadingDegTrue = 247.5f,
+                BeamHeadingDegTrue = 261f,
                 BeamHalfWidthDeg = 90f,
-                // History: freq changed 311 → 315, date of change unknown. Kept active state only.
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -117,7 +157,7 @@ namespace UBOAT.Mods.TestUI
             },
             new BeaconStation
             {
-                Name = "Andøya",
+                Name = "Andoya",
                 Country = "Norway",
                 Latitude = 69.148056,
                 Longitude = 15.883333,
@@ -126,6 +166,7 @@ namespace UBOAT.Mods.TestUI
                 PowerW = 3000,
                 BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -138,7 +179,7 @@ namespace UBOAT.Mods.TestUI
             },
             new BeaconStation
             {
-                Name = "Bjørnøya",
+                Name = "Bjornoya",
                 Country = "Norway",
                 Latitude = 74.492778,
                 Longitude = 19.059722,
@@ -147,6 +188,7 @@ namespace UBOAT.Mods.TestUI
                 PowerW = 3000,
                 BeamHeadingDegTrue = 180f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -168,6 +210,7 @@ namespace UBOAT.Mods.TestUI
                 PowerW = 1500,
                 BeamHeadingDegTrue = 112.5f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -189,6 +232,7 @@ namespace UBOAT.Mods.TestUI
                 PowerW = 1500,
                 BeamHeadingDegTrue = 300f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -210,6 +254,7 @@ namespace UBOAT.Mods.TestUI
                 PowerW = 1500,
                 BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -231,6 +276,7 @@ namespace UBOAT.Mods.TestUI
                 PowerW = 1500,
                 BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -252,6 +298,7 @@ namespace UBOAT.Mods.TestUI
                 PowerW = 1500,
                 BeamHeadingDegTrue = 300f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -273,6 +320,7 @@ namespace UBOAT.Mods.TestUI
                 PowerW = 1500,
                 BeamHeadingDegTrue = 330f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -294,6 +342,7 @@ namespace UBOAT.Mods.TestUI
                 PowerW = 1500,
                 BeamHeadingDegTrue = 300f,
                 BeamHalfWidthDeg = 90f,
+                CycleDurationSeconds = 60,
                 History = new[]
                 {
                     new BeaconHistoryEntry

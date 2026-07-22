@@ -61,6 +61,13 @@ namespace UBOAT.Mods.TestUI
             if (feedbackSpinner != null && feedbackSpinner.GetComponent<FeedbackSpinnerHandler>() == null)
                 feedbackSpinner.gameObject.AddComponent<FeedbackSpinnerHandler>();
 
+            if (radio.GetComponent<SonneController>() == null)
+            {
+                if (radio.GetComponent<AudioSource>() == null)
+                    radio.AddComponent<AudioSource>();
+                radio.AddComponent<SonneController>();
+            }
+
             if (radio.GetComponent<InformationPanelHandler>() == null)
                 radio.AddComponent<InformationPanelHandler>();
 

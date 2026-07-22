@@ -16,6 +16,7 @@
 | 6 | [Phase6-Architecture.md](Plan/Phase6-Architecture.md) | Красота | Высокая | 8 из 9 | ✅ |
 | 7 | [Phase7-Verification.md](Plan/Phase7-Verification.md) | Критично | Низкая | 5 из 5 | ✅ |
 | 8 | [Phase8-Testing.md](Plan/Phase8-Testing.md) | Важно | Средняя | 5 из 5 | ✅ |
+| 9 | [Phase9-SonneSignal.md](Plan/Phase9-SonneSignal.md) | Функция | Высокая | 6 из 6 | ✅ |
 
 ---
 
@@ -31,6 +32,7 @@
 | Красота | 5 | Единый стиль (после архитектуры) | ✅ |
 | Критично | 7 | Мод работает, ничего не сломано | ✅ |
 | Важно | 8 | Покрытие тестами / diagnostics | ✅ |
+| Функция | 9 | Sonne/Consol навигационный сигнал | ✅ |
 
 > **Изменён порядок**: Phase 3 (Reflection) теперь **перед** Phase 5 (Style). Phase 5.7 (InjectionFramework null-check) **удалён** — покрыто в Phase 1.19 (consolidated guard + try-catch). Phase 7 получила новый шаг 7.4 (AssetBundle lifecycle). **v3**: Phase 1 получила 5 новых шагов (1.21-1.25) — идемпотентность, дубликаты, атомарность, fail-open, reset state. Phase 2 — 3 новых (2.16-2.18) — валидация prefab, null-checks, touch guard. Phase 6 — 2 новых (6.11-6.12) — UI state machine, AssetBundle ownership.
 

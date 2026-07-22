@@ -8,9 +8,16 @@ namespace UBOAT.Mods.TestUI
     {
         public static RadioHandler Instance;
         public static event Action<bool> OnVisibilityChanged;
+        public static event Action<float, int> OnFrequencyChanged;
+
         public event Action<float> OnCursorAngleChanged;
 
         [SerializeField] private CanvasGroup canvasGroup;
+
+        private SonneController _sonneController;
+        private ZoneHandler _zoneHandler;
+        private float _currentAngle;
+        private int _currentZoneIndex;
 
         private float _cursorAngle;
         public float CursorAngle
@@ -23,6 +30,7 @@ namespace UBOAT.Mods.TestUI
                 _cursorAngle = value;
                 if (OnCursorAngleChanged != null)
                     OnCursorAngleChanged(value);
+                EmitFrequency();
             }
         }
 
@@ -68,6 +76,13 @@ namespace UBOAT.Mods.TestUI
         {
             if (canvasGroup == null)
                 canvasGroup = GetComponent<CanvasGroup>();
+
+            _sonneController = GetComponent<SonneController>();
+            _zoneHandler = GetComponentInChildren<ZoneHandler>(true);
+
+            if (_zoneHandler != null)
+                _zoneHandler.OnZoneChanged += OnZoneChanged;
+
             IsVisible = false;
         }
 
@@ -86,6 +101,25 @@ namespace UBOAT.Mods.TestUI
         public void ToggleVisibility()
         {
             IsVisible = !IsVisible;
+        }
+
+        private void OnZoneChanged(int index)
+        {
+            _currentZoneIndex = index;
+            EmitFrequency();
+        }
+
+        private void EmitFrequency()
+        {
+            _currentAngle = _cursorAngle + 90f;
+            float freq = DialConfig.AngleToFrequency(_currentAngle, _currentZoneIndex);
+            if (OnFrequencyChanged != null)
+                OnFrequencyChanged(freq, _currentZoneIndex);
+        }
+
+        public void NotifyCursorChanged()
+        {
+            EmitFrequency();
         }
     }
 }
