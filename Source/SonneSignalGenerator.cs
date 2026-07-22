@@ -5,28 +5,68 @@ namespace UBOAT.Mods.TestUI
 {
     public static class SonneSignalGenerator
     {
-        public static int CalculateDotCount(float delta, float beamHalfWidthDeg, int maxCount)
-        {
-            if (beamHalfWidthDeg <= 0f)
-                return maxCount / 2;
+        public const float SectorWidthDeg = 5f;
+        public const int TotalSignals = 60;
+        public const float DegPerSign = SectorWidthDeg / TotalSignals;
 
-            float ratio = (delta + beamHalfWidthDeg) / (2f * beamHalfWidthDeg);
-            ratio = Math.Max(0f, Math.Min(1f, ratio));
-            return (int)Math.Round(ratio * maxCount);
+        public struct SectorResult
+        {
+            public int DotCount;
+            public bool IsDashSector;
+            public float LocalAngle;
+            public float SectorBase;
         }
 
-        public static float CalculateDashRatio(float delta, float beamHalfWidthDeg)
+        public static SectorResult CalculateSector(float bearing, float baseAngle)
         {
-            if (beamHalfWidthDeg <= 0f)
-                return 0.5f;
+            float delta = ((bearing - baseAngle) % 360f + 360f) % 360f;
+            float localAngle = delta % SectorWidthDeg;
+            int sectorNumber = (int)(delta / SectorWidthDeg);
+            bool isDashSector = (sectorNumber % 2 == 1);
 
-            float ratio = (delta + beamHalfWidthDeg) / (2f * beamHalfWidthDeg);
-            return Math.Max(0f, Math.Min(1f, ratio));
+            int dotCount;
+            if (isDashSector)
+                dotCount = (int)(((SectorWidthDeg - localAngle) / SectorWidthDeg) * TotalSignals);
+            else
+                dotCount = (int)((localAngle / SectorWidthDeg) * TotalSignals);
+
+            dotCount = Math.Max(0, Math.Min(TotalSignals, dotCount));
+
+            return new SectorResult
+            {
+                DotCount = dotCount,
+                IsDashSector = isDashSector,
+                LocalAngle = localAngle,
+                SectorBase = bearing - localAngle
+            };
+        }
+
+        public static float RestoreBearingFromDotCount(int dotCount, bool isDashSector, float sectorBase)
+        {
+            int correctedDots;
+            if (isDashSector)
+                correctedDots = TotalSignals - dotCount;
+            else
+                correctedDots = dotCount;
+
+            return sectorBase + correctedDots * DegPerSign;
         }
 
         public static int[] GenerateBearingTable(BeaconStation station)
         {
-            return station.GetDotCountToBearingTable();
+            var config = ConsolCycleConfig.Cycle60s;
+            int maxCount = config.MaxNavigationCount;
+            var table = new int[maxCount + 1];
+
+            for (int i = 0; i <= maxCount; i++)
+            {
+                float ratio = maxCount > 0 ? (float)i / maxCount : 0f;
+                float localAngle = ratio * SectorWidthDeg;
+                float bearing = station.BaseAngle + localAngle;
+                table[i] = (int)((bearing + 360f) % 360f);
+            }
+
+            return table;
         }
 
         public static int LookupBearing(int dotCount, int[] bearingTable)
@@ -41,8 +81,7 @@ namespace UBOAT.Mods.TestUI
         public static NavigationElementType[] GenerateConsolPattern(
             string callsign,
             int dotCount,
-            ConsolCycleConfig config,
-            int[] bearingTable)
+            ConsolCycleConfig config)
         {
             var result = new List<NavigationElementType>();
 

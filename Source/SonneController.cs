@@ -61,6 +61,10 @@ namespace UBOAT.Mods.TestUI
         private const float NavUpdateInterval = 0.2f;
         private const float TuningUpdateInterval = 0.016f;
 
+        private readonly List<PositionFixCalculator.Measurement> _measurements = new List<PositionFixCalculator.Measurement>();
+        private PositionFixCalculator.FixResult _lastFix;
+        private bool _fixValid;
+
         private void Awake()
         {
             _atmosphere = new Atmosphere(Environment.TickCount);
@@ -335,6 +339,12 @@ namespace UBOAT.Mods.TestUI
             UpdateStationNavigation();
         }
 
+        public bool HasFix => _fixValid;
+        public float FixLatitude => _lastFix.Latitude;
+        public float FixLongitude => _lastFix.Longitude;
+        public float FixErrorKm => _lastFix.ErrorKm;
+        public int MeasurementCount => _measurements.Count;
+
         private void Update()
         {
             _tuningUpdateTimer += Time.deltaTime;
@@ -429,53 +439,55 @@ namespace UBOAT.Mods.TestUI
         private void UpdateStationNavigation()
         {
             var stations = BeaconData.Stations;
+            _measurements.Clear();
+
             for (int i = 0; i < stations.Length; i++)
             {
                 float bearing = CalculateBearing(
                     _playerLatitude, _playerLongitude,
                     (float)stations[i].Latitude, (float)stations[i].Longitude);
 
-                float delta = NormalizeAngle(bearing - stations[i].BeamHeadingDegTrue);
-
-                if (Math.Abs(delta) > stations[i].BeamHalfWidthDeg)
-                {
-                    _stations[i].InBeam = false;
-                    _stations[i].DotCount = 0;
-                    _stations[i].CurrentBearing = 0;
-                    _stations[i].TransitionIndex = _stations[i].Config.MaxNavigationCount;
-                    _stations[i].Pattern = new NavigationPattern(
-                        System.Array.Empty<Group>(), 8);
-                    _stations[i].Scheduler.Navigation = _stations[i].Pattern;
-                    continue;
-                }
-
-                var config = _stations[i].Config;
-                int dotCount = SonneSignalGenerator.CalculateDotCount(delta, stations[i].BeamHalfWidthDeg, config.MaxNavigationCount);
-                int currentBearing = SonneSignalGenerator.LookupBearing(dotCount, _stations[i].Scheduler.BearingTable);
+                var sector = SonneSignalGenerator.CalculateSector(bearing, stations[i].BaseAngle);
 
                 _stations[i].InBeam = true;
-                _stations[i].DotCount = dotCount;
-                _stations[i].CurrentBearing = currentBearing;
-                _stations[i].TransitionIndex = dotCount;
+                _stations[i].DotCount = sector.DotCount;
+                _stations[i].CurrentBearing = (int)((bearing + 360f) % 360f);
+                _stations[i].TransitionIndex = sector.DotCount;
 
                 string callsign = stations[i].History != null && stations[i].History.Length > 0 && !string.IsNullOrEmpty(stations[i].History[0].Callsign)
                     ? stations[i].History[0].Callsign
                     : stations[i].Name.Substring(0, Math.Min(2, stations[i].Name.Length)).ToUpper();
 
+                var config = _stations[i].Config;
                 var consolPattern = SonneSignalGenerator.GenerateConsolPattern(
-                    callsign, dotCount, config, _stations[i].Scheduler.BearingTable);
+                    callsign, sector.DotCount, config);
 
                 _stations[i].Scheduler.CurrentConsolPattern = consolPattern;
                 _stations[i].Scheduler.CalculateCyclePause(consolPattern.Length, 50f);
 
+                _measurements.Add(new PositionFixCalculator.Measurement
+                {
+                    StationIndex = i,
+                    Latitude = (float)stations[i].Latitude,
+                    Longitude = (float)stations[i].Longitude,
+                    Bearing = bearing,
+                    Weight = 1f
+                });
+
 #if DEBUG
                 Debug.Log("[TestUI][DIAG] Nav station=" + stations[i].Name +
                     " bearing=" + bearing.ToString("F1") + "°" +
-                    " Δbeam=" + delta.ToString("F1") + "°" +
-                    " dotCount=" + dotCount + "/" + config.MaxNavigationCount +
-                    " currentBearing=" + currentBearing + "°" +
+                    " dotCount=" + sector.DotCount + "/" + SonneSignalGenerator.TotalSignals +
+                    " isDashSector=" + sector.IsDashSector +
+                    " localAngle=" + sector.LocalAngle.ToString("F2") + "°" +
                     " patternLen=" + consolPattern.Length);
 #endif
+            }
+
+            if (_measurements.Count >= 2)
+            {
+                _lastFix = PositionFixCalculator.Calculate(_measurements);
+                _fixValid = _lastFix.Valid;
             }
         }
 

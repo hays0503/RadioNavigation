@@ -9,32 +9,27 @@ namespace UBOAT.Mods.TestUI
         public float EquisignalMs;
         public float MinCyclePauseMs;
         public int MaxNavigationCount;
-
-        public static readonly ConsolCycleConfig Cycle40s = new ConsolCycleConfig
-        {
-            DotDurationMs = 222f,
-            DashDurationMs = 666f,
-            ElementGapMs = 222f,
-            CallsignDotMs = 100f,
-            EquisignalMs = 500f,
-            MinCyclePauseMs = 2000f,
-            MaxNavigationCount = 40
-        };
+        public float DegPerSign;
+        public float SectorWidthDeg;
+        public int TotalSignals;
 
         public static readonly ConsolCycleConfig Cycle60s = new ConsolCycleConfig
         {
-            DotDurationMs = 231f,
-            DashDurationMs = 693f,
-            ElementGapMs = 231f,
+            DotDurationMs = 250f,
+            DashDurationMs = 250f,
+            ElementGapMs = 0f,
             CallsignDotMs = 100f,
             EquisignalMs = 500f,
             MinCyclePauseMs = 2000f,
-            MaxNavigationCount = 60
+            MaxNavigationCount = 60,
+            DegPerSign = 5f / 60f,
+            SectorWidthDeg = 5f,
+            TotalSignals = 60
         };
 
         public static ConsolCycleConfig GetForCycleDuration(int cycleDurationSeconds)
         {
-            return cycleDurationSeconds <= 40 ? Cycle40s : Cycle60s;
+            return Cycle60s;
         }
 
         public float ElementDurationMs(bool isDash)

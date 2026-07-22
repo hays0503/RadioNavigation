@@ -22,6 +22,7 @@ namespace UBOAT.Mods.TestUI
         public float BeamHeadingDegTrue;
         public float BeamHalfWidthDeg;
         public int CycleDurationSeconds;
+        public float BaseAngle;
         public BeaconHistoryEntry[] History;
 
         public int[] GetDotCountToBearingTable()
@@ -57,6 +58,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 310.2f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 40,
+                BaseAngle = 310.2f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -79,6 +81,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 286.2f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 40,
+                BaseAngle = 110.0f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -101,6 +104,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 247f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 230.0f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -123,6 +127,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 270f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 310.0f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -145,6 +150,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 261f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 80.0f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -167,6 +173,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 315f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -189,6 +196,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 180f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 180f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -211,6 +219,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 112.5f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 112.5f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -233,6 +242,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 300f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 300f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -255,6 +265,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 315f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -277,6 +288,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 315f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 315f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -299,6 +311,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 300f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 300f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -321,6 +334,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 330f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 330f,
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -343,6 +357,7 @@ namespace UBOAT.Mods.TestUI
                 BeamHeadingDegTrue = 300f,
                 BeamHalfWidthDeg = 90f,
                 CycleDurationSeconds = 60,
+                BaseAngle = 300f,
                 History = new[]
                 {
                     new BeaconHistoryEntry

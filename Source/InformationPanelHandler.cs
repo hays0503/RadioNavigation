@@ -15,6 +15,7 @@ namespace UBOAT.Mods.TestUI
         private Text stationText;
         private Text[] patternTexts;
         private Text signalText;
+        private Text fixText;
 
         private ToggleHandler toggleHandler;
         private GroundHandler groundHandler;
@@ -62,6 +63,11 @@ namespace UBOAT.Mods.TestUI
             patternTexts = new Text[6];
             for (int i = 0; i < patternTexts.Length; i++)
                 patternTexts[i] = CreateLabel(content, "Pattern" + i, "");
+
+            CreateSeparator(content, "Sep3");
+            fixText = CreateLabel(content, "FixStatus", "--- Position Fix: ---");
+            fixText.supportRichText = true;
+            fixText.color = Color.yellow;
 
             FindHandlers();
             Subscribe();
@@ -323,6 +329,35 @@ namespace UBOAT.Mods.TestUI
             for (int i = displayIndex; i < patternTexts.Length; i++)
                 if (patternTexts[i] != null)
                     patternTexts[i].text = "";
+
+            UpdateFixDisplay();
+        }
+
+        private void UpdateFixDisplay()
+        {
+            if (sonneController == null || fixText == null)
+                return;
+
+            if (_currentZoneIndex != 1 || !sonneController.HasFix)
+            {
+                fixText.text = "--- Position Fix: ---";
+                fixText.color = Color.gray;
+                return;
+            }
+
+            float lat = sonneController.FixLatitude;
+            float lon = sonneController.FixLongitude;
+            float err = sonneController.FixErrorKm;
+            int meas = sonneController.MeasurementCount;
+
+            string latDir = lat >= 0 ? "N" : "S";
+            string lonDir = lon >= 0 ? "E" : "W";
+
+            fixText.text = "--- Position Fix ---\n" +
+                "Fix: " + Math.Abs(lat).ToString("F4") + "° " + latDir +
+                " " + Math.Abs(lon).ToString("F4") + "° " + lonDir + "\n" +
+                "Beacons: " + meas + " | Error: " + err.ToString("F1") + " km";
+            fixText.color = err < 15f ? Color.green : (err < 35f ? Color.yellow : Color.red);
         }
 
         private void UpdateSignalDisplay()
