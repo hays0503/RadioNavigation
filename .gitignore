@@ -1,0 +1,21 @@
+# Build output
+radionavigation.dll
+radionavigation.pdb
+radionavigation.deps.json
+bin/
+obj/
+
+# Analysis
+graphify-out/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.cache
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

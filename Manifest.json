@@ -1,10 +1,10 @@
 {
-  "name": "TestUI Radio Panel",
+  "name": "RadioNavigation",
   "version": "2.0",
-  "description": "Custom radio panel UI with ground/toggle mechanics",
+  "description": "CONSOLE/Sonne radio navigation beacon panel with audio synthesis and position fix",
   "author": "testui",
   "supportedGameVersions": ["2026.1"],
-  "assemblyName": "testui",
+  "assemblyName": "radionavigation",
   "permissions": ["Reflection"],
   "dependencies": {}
 }

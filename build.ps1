@@ -15,16 +15,18 @@ $refs = @(
     "$GamePath\UBOAT_Data\Managed\UnityEngine.InputLegacyModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.PhysicsModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.TextRenderingModule.dll",
+    "$GamePath\UBOAT_Data\Managed\UnityEngine.AudioModule.dll",
     "$GamePath\UBOAT_Data\Managed\0Harmony.dll",
     "$GamePath\UBOAT_Data\Managed\com.uboat.dependencies.dll",
     "$GamePath\UBOAT_Data\Managed\com.uboat.game.dll",
-    "$GamePath\UBOAT_Data\Managed\com.uboat.modapi.dll"
+    "$GamePath\UBOAT_Data\Managed\com.uboat.modapi.dll",
+    "$GamePath\UBOAT_Data\Managed\Unity.TextMeshPro.dll"
 )
 
 $refArgs = $refs | ForEach-Object { "/reference:`"$_`"" }
-$srcFiles = Get-ChildItem $srcDir -Filter "*.cs" | ForEach-Object { "`"" + $_.FullName + "`"" }
+$srcFiles = Get-ChildItem $srcDir -Filter "*.cs" -Recurse | ForEach-Object { "`"" + $_.FullName + "`"" }
 
-$outPath = Join-Path $OutputDir "testui.dll"
+$outPath = Join-Path $OutputDir "radionavigation.dll"
 
 csc /target:library `
     /out:$outPath `
@@ -35,8 +37,8 @@ csc /target:library `
     $srcFiles
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "[TestUI] Build OK -> $outPath"
+    Write-Host "[RadioNavigation] Build OK -> $outPath"
 } else {
-    Write-Host "[TestUI] Build FAILED (exit $LASTEXITCODE)"
+    Write-Host "[RadioNavigation] Build FAILED (exit $LASTEXITCODE)"
     exit $LASTEXITCODE
 }
