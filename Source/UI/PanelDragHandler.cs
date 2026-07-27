@@ -11,16 +11,16 @@ namespace UBOAT.Mods.RadioNavigation
         private Canvas parentCanvas;
         private Texture2D moveCursorTexture;
         private static readonly Vector2 cursorHotspot = new Vector2(16, 16);
-        private static Texture2D _cachedCursorTexture;
+        private static Texture2D cachedCursorTexture;
         private bool moveCursorActive;
         private bool isDragging;
         private int activePointerId = -1;
-        private ExpanderHandler _expander;
+        private ExpanderHandler expander;
 
         private void Start()
         {
             panelRect = GetComponent<RectTransform>();
-            if (panelRect == null)
+            if (panelRect.IsNull())
             {
                 Debug.LogError("[RadioNav][PanelDragHandler] RectTransform not found, disabling");
                 enabled = false;
@@ -28,13 +28,13 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             parentCanvas = GetComponentInParent<Canvas>();
-            if (parentCanvas == null)
+            if (parentCanvas.IsNull())
                 Debug.LogWarning("[RadioNav][PanelDragHandler] Canvas not found in parents, drag scaling may be off");
 
-            if (_cachedCursorTexture == null)
-                _cachedCursorTexture = GenerateMoveCursor();
-            moveCursorTexture = _cachedCursorTexture;
-            _expander = GetComponentInChildren<ExpanderHandler>(true);
+            if (cachedCursorTexture.IsNull())
+                cachedCursorTexture = GenerateMoveCursor();
+            moveCursorTexture = cachedCursorTexture;
+            expander = GetComponentInChildren<ExpanderHandler>(true);
         }
 
         private static Texture2D GenerateMoveCursor()
@@ -79,7 +79,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             Application.quitting += () =>
             {
-                if (tex != null)
+                if (tex.IsNotNull())
                     Object.Destroy(tex);
             };
 
@@ -91,17 +91,20 @@ namespace UBOAT.Mods.RadioNavigation
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
 
-            if (_expander != null && eventData.pointerPress != null &&
-                eventData.pointerPress.transform.IsChildOf(_expander.transform))
+            if (expander.IsNotNull() && eventData.pointerPress.IsNotNull() &&
+                eventData.pointerPress.transform.IsChildOf(expander.transform))
                 return;
 
             isDragging = true;
             activePointerId = eventData.pointerId;
         }
 
+        private bool IsActiveDrag(PointerEventData eventData) =>
+            isDragging && eventData.pointerId == activePointerId;
+
         public void OnDrag(PointerEventData eventData)
         {
-            if (!isDragging || eventData.pointerId != activePointerId || parentCanvas == null)
+            if (!IsActiveDrag(eventData) || parentCanvas.IsNull())
                 return;
 
             panelRect.anchoredPosition += eventData.delta / parentCanvas.scaleFactor;

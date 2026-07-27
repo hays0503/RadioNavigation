@@ -103,7 +103,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static float AngleToFrequency(float angle, int bandIndex)
         {
-            if (bandIndex < 0 || bandIndex >= Bands.Length)
+            if (bandIndex.IsNegative() || bandIndex >= Bands.Length)
                 return float.NaN;
 
             BandConfig band = Bands[bandIndex];
@@ -144,7 +144,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (float.IsNaN(frequency))
                 return "---";
 
-            if (bandIndex < 0 || bandIndex >= Bands.Length)
+            if (bandIndex.IsNegative() || bandIndex >= Bands.Length)
                 return frequency.ToString("F0");
 
             BandConfig band = Bands[bandIndex];

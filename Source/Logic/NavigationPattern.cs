@@ -42,7 +42,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public bool GetElement(int index)
         {
-            if (Groups.Length == 0) return false;
+            if (Groups.Length.IsZero()) return false;
             int g = index / ElementsPerGroup;
             int e = index % ElementsPerGroup;
             if (g >= Groups.Length) return false;
@@ -52,13 +52,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static string FormatPattern(NavigationPattern pattern)
         {
-            if (pattern.Groups == null || pattern.Groups.Length == 0)
+            if (pattern.Groups.IsNull() || pattern.Groups.Length.IsZero())
                 return "---";
 
             string result = "";
             for (int g = 0; g < pattern.Groups.Length; g++)
             {
-                if (g > 0) result += " ";
+                if (g.IsPositive()) result += " ";
                 result += "[";
                 for (int e = 0; e < pattern.ElementsPerGroup; e++)
                 {
@@ -76,7 +76,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static string FormatCompact(NavigationPattern pattern)
         {
-            if (pattern.Groups == null || pattern.Groups.Length == 0)
+            if (pattern.Groups.IsNull() || pattern.Groups.Length.IsZero())
                 return "---";
 
             string result = "";
@@ -109,19 +109,19 @@ namespace UBOAT.Mods.RadioNavigation
 
     public struct CallsignPattern : IKeySequence
     {
-        private readonly NavigationPattern _inner;
+        private readonly NavigationPattern inner;
 
-        public int ElementCount => _inner.ElementCount;
+        public int ElementCount => inner.ElementCount;
         public string Description => "CALL";
 
         public CallsignPattern(string callsign)
         {
-            _inner = MorseAlphabet.TextToPattern(callsign);
+            inner = MorseAlphabet.TextToPattern(callsign);
         }
 
         public bool GetElement(int index)
         {
-            return _inner.GetElement(index);
+            return inner.GetElement(index);
         }
     }
 }

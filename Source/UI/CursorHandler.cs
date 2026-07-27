@@ -13,14 +13,14 @@ namespace UBOAT.Mods.RadioNavigation
         private const float ScrollStepFine = 0.5f;
 
         private bool isDragging;
-        private bool _isHovering;
+        private bool isHovering;
         private int activePointerId = -1;
         private RectTransform cursorRect;
 
         private void Start()
         {
             cursorRect = GetComponent<RectTransform>();
-            if (cursorRect == null)
+            if (cursorRect.IsNull())
             {
                 Debug.LogError("[RadioNav][CursorHandler] RectTransform not found, disabling");
                 enabled = false;
@@ -29,12 +29,12 @@ namespace UBOAT.Mods.RadioNavigation
             cursorRect.pivot = new Vector2(0.5f, 0.5f);
 
             Image img = GetComponent<Image>();
-            if (img != null)
+            if (img.IsNotNull())
                 img.raycastTarget = true;
             else
                 Debug.LogError("[RadioNav][CursorHandler] Image component not found, drag may not work");
 
-            if (GetComponent<ScrollRect>() == null)
+            if (GetComponent<ScrollRect>().IsNull())
             {
                 ScrollRect sr = gameObject.AddComponent<ScrollRect>();
                 sr.horizontal = false;
@@ -48,7 +48,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
             if (!ToggleHandler.IsInteractable) return;
-            if (cursorRect == null)
+            if (cursorRect.IsNull())
             {
                 Debug.LogError("[RadioNav][CursorHandler] cursorRect not initialized");
                 return;
@@ -57,19 +57,22 @@ namespace UBOAT.Mods.RadioNavigation
             activePointerId = eventData.pointerId;
         }
 
+        private bool IsActiveDrag(PointerEventData eventData) =>
+            isDragging && eventData.pointerId == activePointerId;
+
         public void OnDrag(PointerEventData eventData)
         {
-            if (!isDragging || eventData.pointerId != activePointerId)
+            if (!IsActiveDrag(eventData))
                 return;
             if (!ToggleHandler.IsInteractable) return;
 
             Vector2 dir = eventData.position - (Vector2)cursorRect.position;
-            if (dir.y < 0) dir.y = 0;
+            if (dir.y.IsNegative()) dir.y = 0;
             float angle = Mathf.Atan2(dir.x, dir.y) * Mathf.Rad2Deg;
 
             cursorRect.localRotation = Quaternion.Euler(0, 0, -angle);
 
-            if (RadioHandler.Instance != null)
+            if (RadioHandler.Instance.IsNotNull())
                 RadioHandler.Instance.CursorAngle = angle;
         }
 
@@ -82,21 +85,21 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            _isHovering = true;
+            isHovering = true;
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            _isHovering = false;
+            isHovering = false;
         }
 
         public void OnScroll(PointerEventData eventData)
         {
             if (!ToggleHandler.IsInteractable) return;
-            if (cursorRect == null) return;
+            if (cursorRect.IsNull()) return;
 
             float delta = eventData.scrollDelta.y;
-            if (delta == 0f) return;
+            if (delta.IsZero()) return;
 
             float step = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)
                 ? ScrollStepFine
@@ -108,7 +111,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             cursorRect.localRotation = Quaternion.Euler(0, 0, -newAngle);
 
-            if (RadioHandler.Instance != null)
+            if (RadioHandler.Instance.IsNotNull())
                 RadioHandler.Instance.CursorAngle = newAngle;
 
             eventData.Use();
@@ -116,16 +119,16 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
-            if (!_isHovering || !ToggleHandler.IsInteractable) return;
+            if (!isHovering || !ToggleHandler.IsInteractable) return;
 
             float scrollY = Input.mouseScrollDelta.y;
-            if (Mathf.Abs(scrollY) < 0.01f) return;
+            if (Mathf.Abs(scrollY).IsNegligible(0.01f)) return;
 
-            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != gameObject)
+            if (EventSystem.current.IsNotNull() && EventSystem.current.currentSelectedGameObject != gameObject)
                 EventSystem.current.SetSelectedGameObject(gameObject);
 
             ScrollRect scrollRect = GetComponentInParent<ScrollRect>();
-            if (scrollRect != null)
+            if (scrollRect.IsNotNull())
                 scrollRect.StopMovement();
         }
     }

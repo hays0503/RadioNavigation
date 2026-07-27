@@ -4,46 +4,46 @@ namespace UBOAT.Mods.RadioNavigation
 {
     public class CarrierGenerator
     {
-        private double _phase;
-        private float _frequency;
-        private float _sampleRate;
+        private double phase;
+        private float frequency;
+        private float sampleRate;
 
         public float Frequency
         {
-            get => _frequency;
-            set => _frequency = Math.Max(0f, value);
+            get => frequency;
+            set => frequency = Math.Max(0f, value);
         }
 
         public CarrierGenerator(float sampleRate)
         {
-            _sampleRate = sampleRate;
-            _phase = 0.0;
+            this.sampleRate = sampleRate;
+            phase = 0.0;
         }
 
         public float NextSample()
         {
-            if (_frequency <= 0f)
+            if (frequency.IsNonPositive())
                 return 0f;
 
-            float sample = (float)Math.Sin(2.0 * Math.PI * _frequency * _phase / _sampleRate);
-            _phase += 1.0;
+            float sample = (float)Math.Sin(2.0 * Math.PI * frequency * phase / sampleRate);
+            phase += 1.0;
 
-            if (_phase >= _sampleRate)
-                _phase -= _sampleRate;
+            if (phase >= sampleRate)
+                phase -= sampleRate;
 
             return sample;
         }
 
         public void Reset()
         {
-            _phase = 0.0;
+            phase = 0.0;
         }
     }
 
     public class Atmosphere
     {
-        private readonly Random _rng;
-        private float _qsbPhase;
+        private readonly Random rng;
+        private float qsbPhase;
 
         public float NoiseFloor { get; set; } = 0.002f;
         public float ImpulseProbability { get; set; } = 0.001f;
@@ -53,41 +53,41 @@ namespace UBOAT.Mods.RadioNavigation
 
         public Atmosphere(int seed)
         {
-            _rng = new Random(seed);
-            _qsbPhase = 0f;
+            rng = new Random(seed);
+            qsbPhase = 0f;
         }
 
         public float Apply(float sample, float sampleRate)
         {
-            float qsb = 1f - QsbDepth * (0.5f + 0.5f * (float)Math.Sin(2.0 * Math.PI * QsbFrequency * _qsbPhase / sampleRate));
-            _qsbPhase += 1f;
-            if (_qsbPhase >= sampleRate)
-                _qsbPhase -= sampleRate;
+            float qsb = 1f - QsbDepth * (0.5f + 0.5f * (float)Math.Sin(2.0 * Math.PI * QsbFrequency * qsbPhase / sampleRate));
+            qsbPhase += 1f;
+            if (qsbPhase >= sampleRate)
+                qsbPhase -= sampleRate;
 
             float noise = GaussianNoise() * NoiseFloor;
 
-            if (_rng.NextDouble() < ImpulseProbability)
-                noise += ImpulseAmplitude * ((float)_rng.NextDouble() * 2f - 1f);
+            if (rng.NextDouble() < ImpulseProbability)
+                noise += ImpulseAmplitude * ((float)rng.NextDouble() * 2f - 1f);
 
-            if (_rng.NextDouble() < 0.0001)
-                noise += 0.15f * ((float)_rng.NextDouble() * 2f - 1f);
+            if (rng.NextDouble() < 0.0001)
+                noise += 0.15f * ((float)rng.NextDouble() * 2f - 1f);
 
             return sample * qsb + noise;
         }
 
         private float GaussianNoise()
         {
-            double u1 = 1.0 - _rng.NextDouble();
-            double u2 = 1.0 - _rng.NextDouble();
+            double u1 = 1.0 - rng.NextDouble();
+            double u2 = 1.0 - rng.NextDouble();
             return (float)(Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2));
         }
     }
 
     public class ReceiverDsp
     {
-        private float _agcGain;
-        private float _prevFilter;
-        private double _whistlePhase;
+        private float agcGain;
+        private float prevFilter;
+        private double whistlePhase;
 
         public float AgcAttackRate { get; set; } = 0.001f;
         public float AgcReleaseRate { get; set; } = 0.0001f;
@@ -97,35 +97,35 @@ namespace UBOAT.Mods.RadioNavigation
 
         public ReceiverDsp(float sampleRate)
         {
-            _agcGain = 1f;
-            _prevFilter = 0f;
-            _whistlePhase = 0.0;
+            agcGain = 1f;
+            prevFilter = 0f;
+            whistlePhase = 0.0;
         }
 
         public float Process(float sample, float sampleRate)
         {
             float envelope = Math.Abs(sample);
 
-            if (envelope > _agcGain)
-                _agcGain += AgcAttackRate * (envelope - _agcGain);
+            if (envelope > agcGain)
+                agcGain += AgcAttackRate * (envelope - agcGain);
             else
-                _agcGain += AgcReleaseRate * (envelope - _agcGain);
+                agcGain += AgcReleaseRate * (envelope - agcGain);
 
-            if (_agcGain < 0.01f)
-                _agcGain = 0.01f;
+            if (agcGain.IsNegligible(0.01f))
+                agcGain = 0.01f;
 
-            float agcSample = sample / _agcGain;
+            float agcSample = sample / agcGain;
 
             float alpha = FilterCutoff / (FilterCutoff + sampleRate / (2f * (float)Math.PI));
-            _prevFilter += alpha * (agcSample - _prevFilter);
+            prevFilter += alpha * (agcSample - prevFilter);
 
-            float saturated = (float)Math.Tanh(SaturationDrive * _prevFilter);
+            float saturated = (float)Math.Tanh(SaturationDrive * prevFilter);
 
-            if (WhistleLevel > 0.001f)
+            if (WhistleLevel.IsSignificant())
             {
-                float whistle = (float)Math.Sin(2.0 * Math.PI * 600.0 * _whistlePhase / sampleRate);
-                _whistlePhase += 1.0;
-                if (_whistlePhase >= sampleRate) _whistlePhase -= sampleRate;
+                float whistle = (float)Math.Sin(2.0 * Math.PI * 600.0 * whistlePhase / sampleRate);
+                whistlePhase += 1.0;
+                if (whistlePhase >= sampleRate) whistlePhase -= sampleRate;
                 saturated += whistle * WhistleLevel * 0.12f;
             }
 
@@ -134,9 +134,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void Reset()
         {
-            _agcGain = 1f;
-            _prevFilter = 0f;
-            _whistlePhase = 0.0;
+            agcGain = 1f;
+            prevFilter = 0f;
+            whistlePhase = 0.0;
         }
     }
 }

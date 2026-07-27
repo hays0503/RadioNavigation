@@ -14,103 +14,103 @@ namespace UBOAT.Mods.RadioNavigation
         private const bool AllowOriginal = true;
         private const bool PreventOriginal = false;
 
-        private static Type _decisionType;
-        private static ConstructorInfo _decisionCtor;
-        private static PropertyInfo _localizationKeyProp;
-        private static FieldInfo _stageField;
-        private static PropertyInfo _decisionsProp;
-        private static MethodInfo _insertMethod;
-        private static MethodInfo _onUpdatedMethod;
-        private static bool _initialized;
-        private static PropertyInfo _languageProp;
+        private static Type decisionType;
+        private static ConstructorInfo decisionCtor;
+        private static PropertyInfo localizationKeyProp;
+        private static FieldInfo stageField;
+        private static PropertyInfo decisionsProp;
+        private static MethodInfo insertMethod;
+        private static MethodInfo onUpdatedMethod;
+        private static bool initialized;
+        private static PropertyInfo languageProp;
 
         internal static void ResetRuntimeState()
         {
-            _initialized = false;
-            _decisionType = null;
-            _decisionCtor = null;
-            _localizationKeyProp = null;
-            _stageField = null;
-            _decisionsProp = null;
-            _insertMethod = null;
-            _onUpdatedMethod = null;
-            _languageProp = null;
+            initialized = false;
+            decisionType = null;
+            decisionCtor = null;
+            localizationKeyProp = null;
+            stageField = null;
+            decisionsProp = null;
+            insertMethod = null;
+            onUpdatedMethod = null;
+            languageProp = null;
         }
 
         private static bool TryInit()
         {
-            if (_initialized)
+            if (initialized)
                 return true;
             Init();
-            return _initialized;
+            return initialized;
         }
 
         private static void Init()
         {
-            if (_initialized)
+            if (initialized)
                 return;
 
             string gameVersion = Application.version;
             Debug.Log("[RadioNav] UBOAT version: " + gameVersion);
 
             var storyType = typeof(RadioStory).BaseType;
-            if (storyType == null)
+            if (storyType.IsNull())
             {
                 Debug.LogError("[RadioNav] RadioStory.BaseType is null \u2014 game types may have changed in v" + gameVersion);
                 return;
             }
 
-            _insertMethod = storyType.GetMethod("InsertDecision",
+            insertMethod = storyType.GetMethod("InsertDecision",
                 BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
-            if (_insertMethod != null)
-                _decisionType = _insertMethod.GetParameters()[1].ParameterType;
-            if (_decisionType == null)
+            if (insertMethod.IsNotNull())
+                decisionType = insertMethod.GetParameters()[1].ParameterType;
+            if (decisionType.IsNull())
             {
                 Debug.LogError("[RadioNav] Decision type not found \u2014 check game version " + gameVersion);
                 return;
             }
 
-            Debug.Log("[RadioNav] Decision type: " + _decisionType.FullName);
-            _localizationKeyProp = _decisionType.GetProperty("LocalizationKey");
+            Debug.Log("[RadioNav] Decision type: " + decisionType.FullName);
+            localizationKeyProp = decisionType.GetProperty("LocalizationKey");
 
-            foreach (var ctor in _decisionType.GetConstructors(BindingFlags.Public | BindingFlags.Instance))
+            foreach (var ctor in decisionType.GetConstructors(BindingFlags.Public | BindingFlags.Instance))
             {
                 var pars = ctor.GetParameters();
                 if (pars.Length < 6 || pars[0].ParameterType != typeof(string))
                     continue;
                 if (pars[3].ParameterType == typeof(Action))
                 {
-                    _decisionCtor = ctor;
+                    decisionCtor = ctor;
                     Debug.Log("[RadioNav] Decision ctor selected: " + pars.Length + " params");
                     break;
                 }
             }
 
-            if (_decisionCtor == null)
+            if (decisionCtor.IsNull())
             {
                 Debug.LogError("[RadioNav] No suitable Decision constructor found in v" + gameVersion);
                 return;
             }
 
-            _stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
+            stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
 
-            _decisionsProp = storyType.GetProperty("Decisions",
+            decisionsProp = storyType.GetProperty("Decisions",
                 BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
 
-            _onUpdatedMethod = storyType.GetMethod("OnUpdated",
+            onUpdatedMethod = storyType.GetMethod("OnUpdated",
                 BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance,
                 null, Type.EmptyTypes, null);
 
-            _languageProp = GetLanguageProperty();
+            languageProp = GetLanguageProperty();
 
-            _initialized = true;
+            initialized = true;
         }
 
         public static void InjectT3PLL38Decision(RadioStory __instance)
         {
             try
             {
-                if (!TryInit() || _decisionCtor == null || _stageField == null)
+                if (!TryInit() || decisionCtor.IsNull() || stageField.IsNull())
                 {
                     Debug.LogWarning("[RadioNav] Init failed, cannot inject T3PLL38");
                     return;
@@ -120,12 +120,12 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
 
                 var decisions = GetDecisions(__instance);
-                if (decisions == null)
+                if (decisions.IsNull())
                     return;
 
                 var decisionsList = decisions as System.Collections.IList;
                 int count = GetDecisionCount(decisions, decisionsList);
-                if (count < 0) return;
+                if (count.IsNegative()) return;
 
                 Debug.Log("[RadioNav] Decision count=" + count);
 
@@ -135,9 +135,9 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
 
-                int insertIndex = count > 0 ? count - 1 : 0;
+                int insertIndex = count.IsPositive() ? count - 1 : 0;
                 object decision = CreateDecision();
-                if (decision == null) return;
+                if (decision.IsNull()) return;
 
                 InsertDecision(__instance, insertIndex, decision);
                 NotifyUpdated(__instance);
@@ -150,31 +150,31 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static bool IsStageOne(RadioStory __instance)
         {
-            int stageValue = (int)_stageField.GetValue(__instance);
+            int stageValue = (int)stageField.GetValue(__instance);
             Debug.Log("[RadioNav] stage=" + stageValue + " (1=MainChoices)");
             return stageValue == 1;
         }
 
         private static object GetDecisions(RadioStory __instance)
         {
-            if (_decisionsProp == null)
+            if (decisionsProp.IsNull())
             {
                 Debug.LogError("[RadioNav] Decisions property not found");
                 return null;
             }
 
-            var decisions = _decisionsProp.GetValue(__instance);
-            if (decisions == null)
+            var decisions = decisionsProp.GetValue(__instance);
+            if (decisions.IsNull())
                 Debug.LogWarning("[RadioNav] Decisions is null");
             return decisions;
         }
 
         private static int GetDecisionCount(object decisions, System.Collections.IList list)
         {
-            if (list != null)
+            if (list.IsNotNull())
                 return list.Count;
 
-            if (decisions == null) return -1;
+            if (decisions.IsNull()) return -1;
             int count = (int)decisions.GetType().GetProperty("Count").GetValue(decisions);
             Debug.LogWarning("[RadioNav] Decisions does not implement IList, using reflection fallback");
             return count;
@@ -184,10 +184,10 @@ namespace UBOAT.Mods.RadioNavigation
         {
             for (int i = 0; i < count; i++)
             {
-                object item = list != null ? list[i] : decisions.GetType().GetProperty("Item")?.GetValue(decisions, new object[] { i });
-                if (item != null && _localizationKeyProp != null)
+                object item = list.IsNotNull() ? list[i] : decisions.GetType().GetProperty("Item")?.GetValue(decisions, new object[] { i });
+                if (item.IsNotNull() && localizationKeyProp.IsNotNull())
                 {
-                    string key = (string)_localizationKeyProp.GetValue(item);
+                    string key = (string)localizationKeyProp.GetValue(item);
 #if DEBUG
                     Debug.Log("[RadioNav]   Menu[" + i + "] key=" + key);
 #endif
@@ -200,7 +200,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static object CreateDecision()
         {
-            int paramCount = _decisionCtor.GetParameters().Length;
+            int paramCount = decisionCtor.GetParameters().Length;
             object[] ctorArgs = new object[paramCount];
             ctorArgs[0] = LocaleKey;
             ctorArgs[1] = null;
@@ -208,7 +208,7 @@ namespace UBOAT.Mods.RadioNavigation
             ctorArgs[3] = new Action(ToggleRadio);
             ctorArgs[4] = 0;
             ctorArgs[5] = null;
-            var ctorParams = _decisionCtor.GetParameters();
+            var ctorParams = decisionCtor.GetParameters();
             for (int i = 6; i < paramCount; i++)
             {
                 var paramType = ctorParams[i].ParameterType;
@@ -222,8 +222,8 @@ namespace UBOAT.Mods.RadioNavigation
                     ctorArgs[i] = null;
             }
 
-            object decision = _decisionCtor.Invoke(ctorArgs);
-            if (decision == null)
+            object decision = decisionCtor.Invoke(ctorArgs);
+            if (decision.IsNull())
                 Debug.LogWarning("[RadioNav] Decision creation returned null");
             return decision;
         }
@@ -232,7 +232,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                _insertMethod.Invoke(__instance, new object[] { index, decision });
+                insertMethod.Invoke(__instance, new object[] { index, decision });
                 Debug.Log("[RadioNav] Decision inserted at " + index);
             }
             catch (Exception ex)
@@ -243,11 +243,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void NotifyUpdated(RadioStory __instance)
         {
-            if (_onUpdatedMethod != null)
+            if (onUpdatedMethod.IsNotNull())
             {
                 try
                 {
-                    _onUpdatedMethod.Invoke(__instance, null);
+                    onUpdatedMethod.Invoke(__instance, null);
                     Debug.Log("[RadioNav] OnUpdated called");
                 }
                 catch (Exception ex)
@@ -282,7 +282,7 @@ namespace UBOAT.Mods.RadioNavigation
             try
             {
                 string lang = GetCurrentLanguage();
-                if (lang != null && LocaleLabels.TryGetValue(lang, out string label))
+                if (lang.IsNotNull() && LocaleLabels.TryGetValue(lang, out string label))
                     return label;
             }
             catch (Exception ex)
@@ -296,12 +296,12 @@ namespace UBOAT.Mods.RadioNavigation
         {
             var singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, com.uboat.game")
                 ?? Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, Assembly-CSharp");
-            if (singletonType == null) return null;
+            if (singletonType.IsNull()) return null;
             var loadSingleton = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
-            if (loadSingleton == null) return null;
+            if (loadSingleton.IsNull()) return null;
             var localeType = Type.GetType("UBOAT.Game.Core.Data.Locale, com.uboat.game")
                 ?? Type.GetType("UBOAT.Game.Core.Data.Locale, Assembly-CSharp");
-            if (localeType == null) return null;
+            if (localeType.IsNull()) return null;
             return localeType.GetProperty("Language", BindingFlags.Public | BindingFlags.Instance);
         }
 
@@ -309,19 +309,19 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                if (_languageProp == null)
+                if (languageProp.IsNull())
                     return "english";
                 var singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, com.uboat.game")
                     ?? Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, Assembly-CSharp");
-                if (singletonType == null) return "english";
+                if (singletonType.IsNull()) return "english";
                 var loadSingleton = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
-                if (loadSingleton == null) return "english";
+                if (loadSingleton.IsNull()) return "english";
                 var localeType = Type.GetType("UBOAT.Game.Core.Data.Locale, com.uboat.game")
                     ?? Type.GetType("UBOAT.Game.Core.Data.Locale, Assembly-CSharp");
-                if (localeType == null) return "english";
+                if (localeType.IsNull()) return "english";
                 object locale = loadSingleton.Invoke(null, new object[] { localeType });
-                if (locale == null) return "english";
-                string lang = _languageProp.GetValue(locale) as string;
+                if (locale.IsNull()) return "english";
+                string lang = languageProp.GetValue(locale) as string;
                 return lang?.ToLowerInvariant() ?? "english";
             }
             catch (Exception ex)
@@ -337,15 +337,15 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 if (!TryInit())
                     return AllowOriginal;
-                if (_localizationKeyProp == null)
+                if (localizationKeyProp.IsNull())
                     return AllowOriginal;
 
-                string key = (string)_localizationKeyProp.GetValue(decision);
+                string key = (string)localizationKeyProp.GetValue(decision);
 
                 if (key == LeaveStationKey)
                 {
                     Debug.Log("[RadioNav] LeaveStation - hiding T3PLL38 panel");
-                    if (RadioHandler.Instance != null)
+                    if (RadioHandler.Instance.IsNotNull())
                         RadioHandler.Instance.IsVisible = false;
                     return AllowOriginal;
                 }
@@ -368,13 +368,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void HideRadioOnStop()
         {
-            if (RadioHandler.Instance != null)
+            if (RadioHandler.Instance.IsNotNull())
                 RadioHandler.Instance.IsVisible = false;
         }
 
         private static void ToggleRadio()
         {
-            if (RadioHandler.Instance != null)
+            if (RadioHandler.Instance.IsNotNull())
                 RadioHandler.Instance.ToggleVisibility();
         }
     }

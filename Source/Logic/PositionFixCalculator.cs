@@ -24,7 +24,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static FixResult Calculate(List<Measurement> measurements)
         {
-            if (measurements == null || measurements.Count < 2)
+            if (measurements.IsNull() || measurements.Count < 2)
                 return new FixResult { Valid = false };
 
             var rawIntersections = new List<GeoPoint>();
@@ -43,7 +43,7 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
 
-            if (rawIntersections.Count == 0)
+            if (rawIntersections.Count.IsZero())
                 return new FixResult { Valid = false };
 
             float roughLat = 0f;
@@ -88,7 +88,7 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
 
-            if (weightedIntersections.Count == 0)
+            if (weightedIntersections.Count.IsZero())
                 return new FixResult { Valid = false };
 
             float totalLat = 0f;
@@ -158,22 +158,22 @@ namespace UBOAT.Mods.RadioNavigation
                               (Math.Sin(dist12) * Math.Cos(phi1));
             cosBrngA = Math.Max(-1.0, Math.Min(1.0, cosBrngA));
             double brngA = Math.Acos(cosBrngA);
-            if (Math.Sin(deltaLam) < 0)
+            if (Math.Sin(deltaLam).IsNegative())
                 brngA = 2.0 * Math.PI - brngA;
 
             double cosBrngB = (Math.Sin(phi1) - Math.Sin(phi2) * Math.Cos(dist12)) /
                               (Math.Sin(dist12) * Math.Cos(phi2));
             cosBrngB = Math.Max(-1.0, Math.Min(1.0, cosBrngB));
             double brngB = Math.Acos(cosBrngB);
-            if (Math.Sin(deltaLam) > 0)
+            if (Math.Sin(deltaLam).IsPositive())
                 brngB = 2.0 * Math.PI - brngB;
 
             double alpha1 = brng13 - brngA;
             double alpha2 = brngB - brng23;
 
-            if (Math.Sin(alpha1) == 0 && Math.Sin(alpha2) == 0)
+            if (Math.Sin(alpha1).IsZero() && Math.Sin(alpha2).IsZero())
                 return new GeoPoint { Valid = false };
-            if (Math.Sin(alpha1) * Math.Sin(alpha2) < 0)
+            if ((Math.Sin(alpha1) * Math.Sin(alpha2)).IsNegative())
                 return new GeoPoint { Valid = false };
 
             double alpha3 = Math.Acos(

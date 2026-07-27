@@ -4,8 +4,8 @@ namespace UBOAT.Mods.RadioNavigation
 {
     public static class MorseAlphabet
     {
-        private static readonly string[] _table = new string[128];
-        private static readonly Dictionary<string, char> _reverse = new Dictionary<string, char>();
+        private static readonly string[] table = new string[128];
+        private static readonly Dictionary<string, char> reverse = new Dictionary<string, char>();
 
         static MorseAlphabet()
         {
@@ -46,30 +46,30 @@ namespace UBOAT.Mods.RadioNavigation
             Define('8', "---..");
             Define('9', "----.");
 
-            for (int i = 0; i < _table.Length; i++)
-                if (_table[i] != null && _table[i].Length > 0 && !_reverse.ContainsKey(_table[i]))
-                    _reverse[_table[i]] = (char)i;
+            for (int i = 0; i < table.Length; i++)
+                if (table[i].IsNotNull() && table[i].Length.IsPositive() && !reverse.ContainsKey(table[i]))
+                    reverse[table[i]] = (char)i;
         }
 
         private static void Define(char c, string morse)
         {
-            _table[c] = morse;
+            table[c] = morse;
             if (c >= 'A' && c <= 'Z')
-                _table[c + 32] = morse;
+                table[c + 32] = morse;
         }
 
         public static string GetMorse(char c)
         {
-            if (c < 0 || c >= _table.Length)
+            if (c < 0 || c >= table.Length)
                 return "";
-            return _table[c] ?? "";
+            return table[c] ?? "";
         }
 
         public static char DecodeMorse(string sequence)
         {
             if (string.IsNullOrEmpty(sequence))
                 return '?';
-            return _reverse.TryGetValue(sequence, out char c) ? c : '?';
+            return reverse.TryGetValue(sequence, out char c) ? c : '?';
         }
 
         public static int GetElementCount(string text)
@@ -77,7 +77,7 @@ namespace UBOAT.Mods.RadioNavigation
             int total = 0;
             for (int i = 0; i < text.Length; i++)
             {
-                if (i > 0) total += 3;
+                if (i.IsPositive()) total += 3;
                 total += GetMorse(text[i]).Length;
             }
             return total;
@@ -92,7 +92,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i < text.Length; i++)
             {
-                if (i > 0)
+                if (i.IsPositive())
                 {
                     for (int g = 0; g < 3; g++)
                         elements.Add(false);

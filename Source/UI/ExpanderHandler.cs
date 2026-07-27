@@ -16,13 +16,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Start()
         {
-            if (transform.parent == null)
+            if (transform.parent.IsNull())
             {
                 Debug.LogError("[RadioNav][ExpanderHandler] parent is null \u2014 cannot get panel RectTransform");
                 return;
             }
             panelRect = transform.parent.GetComponent<RectTransform>();
-            if (panelRect == null)
+            if (panelRect.IsNull())
             {
                 Debug.LogError("[RadioNav][ExpanderHandler] parent has no RectTransform");
                 enabled = false;
@@ -32,7 +32,7 @@ namespace UBOAT.Mods.RadioNavigation
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
-            if (panelRect == null) return;
+            if (panelRect.IsNull()) return;
             isDragging = true;
             dragStartScale = panelRect.localScale;
             dragStartMouseX = eventData.position.x;

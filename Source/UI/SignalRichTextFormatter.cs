@@ -69,7 +69,7 @@ namespace UBOAT.Mods.RadioNavigation
         public static void TrimEntries(List<SignalEntry> entries, ref int morseCharCount)
         {
             while ((morseCharCount > MaxMorseChars || entries.Count > MaxSignalEntries)
-                && entries.Count > 0)
+                && entries.Count.IsPositive())
             {
                 if (entries[0].Type != SignalCharType.Separator)
                     morseCharCount--;

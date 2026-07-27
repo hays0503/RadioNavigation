@@ -18,7 +18,7 @@
         public int[] BearingTable { get; set; }
         public ConsolCycleConfig Config { get; set; }
 
-        private int _pauseTicksRemaining;
+        private int pauseTicksRemaining;
 
         public StationScheduler(string callsign)
         {
@@ -26,7 +26,7 @@
             Navigation = new NavigationPattern(new Group[0], 8);
             CurrentConsolPattern = null;
             CurrentPhase = Phase.Pause;
-            _pauseTicksRemaining = 1;
+            pauseTicksRemaining = 1;
         }
 
         public IKeySequence GetCurrentSequence()
@@ -59,23 +59,23 @@
             switch (CurrentPhase)
             {
                 case Phase.Pause:
-                    _pauseTicksRemaining--;
-                    if (_pauseTicksRemaining <= 0)
+                    pauseTicksRemaining--;
+                    if (pauseTicksRemaining.IsNonPositive())
                         CurrentPhase = Phase.Callsign;
                     break;
 
                 case Phase.PreNavPause:
-                    _pauseTicksRemaining--;
-                    if (_pauseTicksRemaining <= 0)
+                    pauseTicksRemaining--;
+                    if (pauseTicksRemaining.IsNonPositive())
                         CurrentPhase = Phase.Navigation;
                     break;
 
                 case Phase.PostNavSilence:
-                    _pauseTicksRemaining--;
-                    if (_pauseTicksRemaining <= 0)
+                    pauseTicksRemaining--;
+                    if (pauseTicksRemaining.IsNonPositive())
                     {
                         CurrentPhase = Phase.Pause;
-                        _pauseTicksRemaining = 1;
+                        pauseTicksRemaining = 1;
                     }
                     break;
             }
@@ -87,12 +87,12 @@
             {
                 case Phase.Callsign:
                     CurrentPhase = Phase.PreNavPause;
-                    _pauseTicksRemaining = ToTicks(Config.PreNavPauseMs);
+                    pauseTicksRemaining = ToTicks(Config.PreNavPauseMs);
                     break;
 
                 case Phase.Navigation:
                     CurrentPhase = Phase.PostNavSilence;
-                    _pauseTicksRemaining = ToTicks(Config.PostNavSilenceMs);
+                    pauseTicksRemaining = ToTicks(Config.PostNavSilenceMs);
                     break;
             }
         }
@@ -100,7 +100,7 @@
         public void Reset()
         {
             CurrentPhase = Phase.PostNavSilence;
-            _pauseTicksRemaining = ToTicks(Config.PostNavSilenceMs);
+            pauseTicksRemaining = ToTicks(Config.PostNavSilenceMs);
         }
 
         private static int ToTicks(float ms)

@@ -11,51 +11,49 @@ namespace UBOAT.Mods.RadioNavigation
         private const int SonneZoneIndex = 1;
         private const float BfoBase = 1000f;
 
-        private int _dominantStationIndex = -1;
-        private StationState[] _stations;
-        private StationScheduler[] _schedulers;
-        private MorseKeyer[] _keyers;
-        private CarrierGenerator[] _carriers;
-        private AudioSynthesisEngine _audioEngine;
+        private int dominantStationIndex = -1;
+        private StationState[] stations;
+        private StationScheduler[] schedulers;
+        private MorseKeyer[] keyers;
+        private CarrierGenerator[] carriers;
+        private AudioSynthesisEngine audioEngine;
 
-        private float _currentFrequencyKHz;
-        private int _currentZoneIndex;
-        private float _playerLatitude;
-        private float _playerLongitude;
-        private VolumeSpinnerHandler _volumeSpinner;
-        private FeedbackSpinnerHandler _feedbackSpinner;
+        private float currentFrequencyKHz;
+        private int currentZoneIndex;
+        private float playerLatitude;
+        private float playerLongitude;
+        private VolumeSpinnerHandler volumeSpinner;
+        private FeedbackSpinnerHandler feedbackSpinner;
 
-        private readonly List<SignalEntry> _signalEntries = new List<SignalEntry>();
-        private int _morseCharCount;
-        private readonly StringBuilder _morseDecoderBuffer = new StringBuilder();
-        private readonly StringBuilder _decodedText = new StringBuilder();
+        private readonly List<SignalEntry> signalEntries = new List<SignalEntry>();
+        private int morseCharCount;
+        private readonly StringBuilder morseDecoderBuffer = new StringBuilder();
+        private readonly StringBuilder decodedText = new StringBuilder();
 
-        private float _navUpdateTimer;
-        private float _tuningUpdateTimer;
+        private float navUpdateTimer;
+        private float tuningUpdateTimer;
         private const float NavUpdateInterval = 0.2f;
         private const float TuningUpdateInterval = 0.016f;
 
-        private readonly List<PositionFixCalculator.Measurement> _measurements = new List<PositionFixCalculator.Measurement>();
-        private PositionFixCalculator.FixResult _lastFix;
-        private bool _fixValid;
+        private readonly List<PositionFixCalculator.Measurement> measurements = new List<PositionFixCalculator.Measurement>();
+        private PositionFixCalculator.FixResult lastFix;
+        private bool fixValid;
 
         private void Awake()
         {
-            _audioEngine = new AudioSynthesisEngine();
+            audioEngine = new AudioSynthesisEngine();
 
             RadioHandler.OnFrequencyChanged += OnFrequencyChanged;
 
             var beaconStations = BeaconData.Stations;
-            _stations = new StationState[beaconStations.Length];
-            _schedulers = new StationScheduler[beaconStations.Length];
-            _keyers = new MorseKeyer[beaconStations.Length];
-            _carriers = new CarrierGenerator[beaconStations.Length];
+            stations = new StationState[beaconStations.Length];
+            schedulers = new StationScheduler[beaconStations.Length];
+            keyers = new MorseKeyer[beaconStations.Length];
+            carriers = new CarrierGenerator[beaconStations.Length];
 
             for (int i = 0; i < beaconStations.Length; i++)
             {
-                string callsign = beaconStations[i].History != null && beaconStations[i].History.Length > 0 && !string.IsNullOrEmpty(beaconStations[i].History[0].Callsign)
-                    ? beaconStations[i].History[0].Callsign
-                    : beaconStations[i].Name.Substring(0, Math.Min(2, beaconStations[i].Name.Length)).ToUpper();
+                TryGetCallsignFromHistory(beaconStations[i], out string callsign);
 
                 var config = ConsolCycleConfig.GetForCycleDuration(beaconStations[i].CycleDurationSeconds);
                 var bearingTable = SonneSignalGenerator.GenerateBearingTable(beaconStations[i]);
@@ -69,11 +67,11 @@ namespace UBOAT.Mods.RadioNavigation
                 var keyer = new MorseKeyer();
                 var carrier = new CarrierGenerator(AudioSynthesisEngine.SampleRate);
 
-                _schedulers[i] = scheduler;
-                _keyers[i] = keyer;
-                _carriers[i] = carrier;
+                schedulers[i] = scheduler;
+                keyers[i] = keyer;
+                carriers[i] = carrier;
 
-                _stations[i] = new StationState
+                stations[i] = new StationState
                 {
                     InBeam = false,
                     TransitionIndex = config.MaxNavigationCount,
@@ -96,35 +94,31 @@ namespace UBOAT.Mods.RadioNavigation
             audio.loop = true;
             audio.Play();
 
-            _volumeSpinner = GetComponentInChildren<VolumeSpinnerHandler>(true);
-            _feedbackSpinner = GetComponentInChildren<FeedbackSpinnerHandler>(true);
+            volumeSpinner = GetComponentInChildren<VolumeSpinnerHandler>(true);
+            feedbackSpinner = GetComponentInChildren<FeedbackSpinnerHandler>(true);
 
-            if (_volumeSpinner != null)
+            if (volumeSpinner.IsNotNull())
             {
-                _audioEngine.OutputVolume = Mathf.Clamp(_volumeSpinner.Angle / 140f, 0f, 1f);
-                _volumeSpinner.OnValueChanged += OnVolumeChanged;
+                audioEngine.OutputVolume = Mathf.Clamp(volumeSpinner.Angle / 140f, 0f, 1f);
+                volumeSpinner.OnValueChanged += OnVolumeChanged;
             }
 
-            if (_feedbackSpinner != null)
-                _feedbackSpinner.OnValueChanged += OnFeedbackChanged;
+            if (feedbackSpinner.IsNotNull())
+                feedbackSpinner.OnValueChanged += OnFeedbackChanged;
         }
 
         private void OnDestroy()
         {
             RadioHandler.OnFrequencyChanged -= OnFrequencyChanged;
-            if (_volumeSpinner != null)
-                _volumeSpinner.OnValueChanged -= OnVolumeChanged;
-            if (_feedbackSpinner != null)
-                _feedbackSpinner.OnValueChanged -= OnFeedbackChanged;
+            if (volumeSpinner.IsNotNull())
+                volumeSpinner.OnValueChanged -= OnVolumeChanged;
+            if (feedbackSpinner.IsNotNull())
+                feedbackSpinner.OnValueChanged -= OnFeedbackChanged;
         }
 
         private void OnStationElementCompleted(int stationIndex, NavigationElementType elemType, bool isCallsign)
         {
-            if (_currentZoneIndex != SonneZoneIndex)
-                return;
-            if (_stations[stationIndex].Gain < 0.001f)
-                return;
-            if (stationIndex != _dominantStationIndex)
+            if (!IsProcessingDominantStation(stationIndex))
                 return;
 
             SignalCharType type;
@@ -144,19 +138,19 @@ namespace UBOAT.Mods.RadioNavigation
                     c = '.';
                     break;
             }
-            _signalEntries.Add(new SignalEntry(c, type));
+            signalEntries.Add(new SignalEntry(c, type));
             if (type != SignalCharType.Separator)
-                _morseCharCount++;
-            SignalRichTextFormatter.TrimEntries(_signalEntries, ref _morseCharCount);
+                morseCharCount++;
+            SignalRichTextFormatter.TrimEntries(signalEntries, ref morseCharCount);
 
             if (isCallsign)
             {
                 if (elemType == NavigationElementType.Dot)
-                    _morseDecoderBuffer.Append('.');
+                    morseDecoderBuffer.Append('.');
                 else if (elemType == NavigationElementType.Dash)
-                    _morseDecoderBuffer.Append('-');
+                    morseDecoderBuffer.Append('-');
             }
-            else if (_morseDecoderBuffer.Length > 0)
+            else if (morseDecoderBuffer.Length.IsPositive())
             {
                 DecodeCallsignBuffer(stationIndex);
             }
@@ -164,32 +158,25 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnStationSequenceFinished(int stationIndex)
         {
-            if (_currentZoneIndex != SonneZoneIndex)
-                return;
-            if (_stations[stationIndex].Gain < 0.001f)
-                return;
-            if (stationIndex != _dominantStationIndex)
+            if (!IsProcessingDominantStation(stationIndex))
                 return;
 
-            _signalEntries.Add(new SignalEntry(' ', SignalCharType.Separator));
-            SignalRichTextFormatter.TrimEntries(_signalEntries, ref _morseCharCount);
+            signalEntries.Add(new SignalEntry(' ', SignalCharType.Separator));
+            SignalRichTextFormatter.TrimEntries(signalEntries, ref morseCharCount);
         }
 
         private void DecodeCallsignBuffer(int stationIndex)
         {
-            if (_morseDecoderBuffer.Length == 0)
+            if (morseDecoderBuffer.Length.IsZero())
                 return;
 
             string callsign = null;
             var station = BeaconData.Stations[stationIndex];
-            if (station.History != null && station.History.Length > 0 && !string.IsNullOrEmpty(station.History[0].Callsign))
-                callsign = station.History[0].Callsign;
-            if (string.IsNullOrEmpty(callsign))
-                callsign = station.Name.Substring(0, Math.Min(2, station.Name.Length)).ToUpper();
+            TryGetCallsignFromHistory(station, out callsign);
 
             if (string.IsNullOrEmpty(callsign))
             {
-                _morseDecoderBuffer.Clear();
+                morseDecoderBuffer.Clear();
                 return;
             }
 
@@ -197,34 +184,34 @@ namespace UBOAT.Mods.RadioNavigation
             foreach (char ch in callsign.ToUpperInvariant())
                 expectedLen += MorseAlphabet.GetMorse(ch).Length;
 
-            if (_morseDecoderBuffer.Length != expectedLen)
+            if (morseDecoderBuffer.Length != expectedLen)
             {
-                _morseDecoderBuffer.Clear();
+                morseDecoderBuffer.Clear();
                 return;
             }
 
-            if (_decodedText.Length > 0)
-                _decodedText.Append(' ');
+            if (decodedText.Length.IsPositive())
+                decodedText.Append(' ');
 
             int pos = 0;
             foreach (char ch in callsign.ToUpperInvariant())
             {
                 string mc = MorseAlphabet.GetMorse(ch);
-                if (mc.Length == 0 || pos + mc.Length > _morseDecoderBuffer.Length)
+                if (mc.Length.IsZero() || pos + mc.Length > morseDecoderBuffer.Length)
                     break;
 
-                string segment = _morseDecoderBuffer.ToString(pos, mc.Length);
-                _decodedText.Append(segment == mc ? ch : '?');
+                string segment = morseDecoderBuffer.ToString(pos, mc.Length);
+                decodedText.Append(segment == mc ? ch : '?');
                 pos += mc.Length;
             }
 
-            SignalRichTextFormatter.TrimDecodedText(_decodedText);
-            _morseDecoderBuffer.Clear();
+            SignalRichTextFormatter.TrimDecodedText(decodedText);
+            morseDecoderBuffer.Clear();
         }
 
         public string GetSignalRichText()
         {
-            return SignalRichTextFormatter.FormatRichText(_signalEntries);
+            return SignalRichTextFormatter.FormatRichText(signalEntries);
         }
 
         public string GetSignalBuffer()
@@ -234,15 +221,15 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void ClearSignalBuffer()
         {
-            _signalEntries.Clear();
-            _morseCharCount = 0;
-            _morseDecoderBuffer.Clear();
-            _decodedText.Clear();
+            signalEntries.Clear();
+            morseCharCount = 0;
+            morseDecoderBuffer.Clear();
+            decodedText.Clear();
         }
 
         public string GetDecodedText()
         {
-            return _decodedText.ToString();
+            return decodedText.ToString();
         }
 
         private void OnFrequencyChanged(float frequencyKHz, int zoneIndex)
@@ -252,38 +239,36 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnVolumeChanged(float angle)
         {
-            _audioEngine.OutputVolume = Mathf.Clamp(angle / 140f, 0f, 1f);
+            audioEngine.OutputVolume = Mathf.Clamp(angle / 140f, 0f, 1f);
         }
 
         private void OnFeedbackChanged(float angle)
         {
-            _audioEngine.ApplyFeedback(angle);
+            audioEngine.ApplyFeedback(angle);
             UpdateStationGains();
         }
 
         public void UpdateTuning(float frequencyKHz, int zoneIndex)
         {
-            _currentFrequencyKHz = frequencyKHz;
-            _currentZoneIndex = zoneIndex;
+            currentFrequencyKHz = frequencyKHz;
+            currentZoneIndex = zoneIndex;
             UpdateStationGains();
         }
 
-        public int StationCount => _stations != null ? _stations.Length : 0;
-        public int DominantStationIndex => _dominantStationIndex;
+        public int StationCount => stations.IsNotNull() ? stations.Length : 0;
+        public int DominantStationIndex => dominantStationIndex;
 
         public StationDiagnostics GetStationDiagnostics(int index)
         {
-            if (_stations == null || index < 0 || index >= _stations.Length)
+            if (IsInvalidStationIndex(index))
                 return new StationDiagnostics();
 
-            var s = _stations[index];
+            var s = stations[index];
             var station = BeaconData.Stations[index];
-            string callsign = station.History != null && station.History.Length > 0 && !string.IsNullOrEmpty(station.History[0].Callsign)
-                ? station.History[0].Callsign
-                : station.Name.Substring(0, Math.Min(2, station.Name.Length)).ToUpper();
+            TryGetCallsignFromHistory(station, out string callsign);
 
             float elapsed = 0f;
-            if (_schedulers[index].CurrentPhase == StationScheduler.Phase.Navigation && s.NavigationStartTime > 0f)
+            if (IsStationNavigating(index))
                 elapsed = Time.time - s.NavigationStartTime;
 
             return new StationDiagnostics
@@ -295,7 +280,7 @@ namespace UBOAT.Mods.RadioNavigation
                 BeatFrequency = s.BeatFrequency,
                 TransitionIndex = s.TransitionIndex,
                 Pattern = s.Pattern,
-                SchedulerPhase = _schedulers[index].CurrentPhase,
+                SchedulerPhase = schedulers[index].CurrentPhase,
                 DotCount = s.DotCount,
                 CurrentBearing = s.CurrentBearing,
                 NavigationElapsed = elapsed
@@ -319,68 +304,68 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void UpdatePosition(float latitude, float longitude)
         {
-            _playerLatitude = latitude;
-            _playerLongitude = longitude;
+            playerLatitude = latitude;
+            playerLongitude = longitude;
             UpdateStationNavigation();
         }
 
-        public bool HasFix => _fixValid;
-        public float FixLatitude => _lastFix.Latitude;
-        public float FixLongitude => _lastFix.Longitude;
-        public float FixErrorKm => _lastFix.ErrorKm;
-        public int MeasurementCount => _measurements.Count;
+        public bool HasFix => fixValid;
+        public float FixLatitude => lastFix.Latitude;
+        public float FixLongitude => lastFix.Longitude;
+        public float FixErrorKm => lastFix.ErrorKm;
+        public int MeasurementCount => measurements.Count;
 
         private void Update()
         {
-            _tuningUpdateTimer += Time.deltaTime;
-            if (_tuningUpdateTimer >= TuningUpdateInterval)
+            tuningUpdateTimer += Time.deltaTime;
+            if (tuningUpdateTimer >= TuningUpdateInterval)
             {
-                _tuningUpdateTimer = 0f;
+                tuningUpdateTimer = 0f;
                 UpdateStationGains();
             }
 
-            _navUpdateTimer += Time.deltaTime;
-            if (_navUpdateTimer >= NavUpdateInterval)
+            navUpdateTimer += Time.deltaTime;
+            if (navUpdateTimer >= NavUpdateInterval)
             {
-                _navUpdateTimer = 0f;
+                navUpdateTimer = 0f;
                 UpdateStationNavigation();
             }
         }
 
         private void UpdateStationGains()
         {
-            if (_currentZoneIndex != SonneZoneIndex)
+            if (!IsInSonneZone)
             {
-                for (int i = 0; i < _stations.Length; i++)
-                    _stations[i].Gain = 0f;
-                _dominantStationIndex = -1;
+                for (int i = 0; i < stations.Length; i++)
+                    stations[i].Gain = 0f;
+                dominantStationIndex = -1;
                 return;
             }
 
-            var stations = BeaconData.Stations;
+            var beaconStations = BeaconData.Stations;
             float maxGain = 0f;
             int maxIndex = -1;
-            float qf = _audioEngine.QualityFactor;
+            float qf = audioEngine.QualityFactor;
 
-            for (int i = 0; i < stations.Length; i++)
+            for (int i = 0; i < beaconStations.Length; i++)
             {
-                float? freq = stations[i].History?[0].FrequencyKHz;
-                if (freq == null)
+                float? freq = beaconStations[i].History?[0].FrequencyKHz;
+                if (freq.IsNull())
                 {
-                    _stations[i].Gain = 0f;
+                    stations[i].Gain = 0f;
                     continue;
                 }
 
                 float f0 = freq.Value * 1000f;
-                float f = _currentFrequencyKHz * 1000f;
+                float f = currentFrequencyKHz * 1000f;
                 float ratio = f / f0 - f0 / f;
                 float gain = 1f / (float)Math.Sqrt(1.0 + qf * qf * ratio * ratio);
 
-                _stations[i].Gain = gain;
+                stations[i].Gain = gain;
 
-                float offset = _currentFrequencyKHz - freq.Value;
-                _stations[i].BeatFrequency = Math.Max(300f, Math.Min(1800f, BfoBase + offset * 1000f));
-                _carriers[i].Frequency = _stations[i].BeatFrequency;
+                float offset = currentFrequencyKHz - freq.Value;
+                stations[i].BeatFrequency = Math.Max(300f, Math.Min(1800f, BfoBase + offset * 1000f));
+                carriers[i].Frequency = stations[i].BeatFrequency;
 
                 if (gain > maxGain)
                 {
@@ -389,75 +374,106 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
 
-            if (maxGain > 0.01f)
+            if (maxGain.IsSignificant(0.01f))
             {
-                if (maxIndex != _dominantStationIndex)
+                if (maxIndex != dominantStationIndex)
                 {
-                    _signalEntries.Clear();
-                    _morseCharCount = 0;
-                    _morseDecoderBuffer.Clear();
-                    _decodedText.Clear();
+                    signalEntries.Clear();
+                    morseCharCount = 0;
+                    morseDecoderBuffer.Clear();
+                    decodedText.Clear();
                 }
-                _dominantStationIndex = maxIndex;
+                dominantStationIndex = maxIndex;
             }
             else
             {
-                _dominantStationIndex = -1;
+                dominantStationIndex = -1;
             }
         }
 
         private void UpdateStationNavigation()
         {
-            var stations = BeaconData.Stations;
-            _measurements.Clear();
+            var beaconStations = BeaconData.Stations;
+            measurements.Clear();
 
-            for (int i = 0; i < stations.Length; i++)
+            for (int i = 0; i < beaconStations.Length; i++)
             {
                 float bearing = CalculateBearing(
-                    _playerLatitude, _playerLongitude,
-                    (float)stations[i].Latitude, (float)stations[i].Longitude);
+                    playerLatitude, playerLongitude,
+                    (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude);
 
-                var sector = SonneSignalGenerator.CalculateSector(bearing, stations[i].BaseAngle);
+                var sector = SonneSignalGenerator.CalculateSector(bearing, beaconStations[i].BaseAngle);
 
-                _stations[i].InBeam = true;
-                _stations[i].DotCount = sector.DotCount;
-                _stations[i].CurrentBearing = (int)((bearing + 360f) % 360f);
-                _stations[i].TransitionIndex = sector.DotCount;
+                stations[i].InBeam = true;
+                stations[i].DotCount = sector.DotCount;
+                stations[i].CurrentBearing = (int)((bearing + 360f) % 360f);
+                stations[i].TransitionIndex = sector.DotCount;
 
-                string callsign = stations[i].History != null && stations[i].History.Length > 0 && !string.IsNullOrEmpty(stations[i].History[0].Callsign)
-                    ? stations[i].History[0].Callsign
-                    : stations[i].Name.Substring(0, Math.Min(2, stations[i].Name.Length)).ToUpper();
+                string callsign;
+                TryGetCallsignFromHistory(beaconStations[i], out callsign);
 
-                var config = _stations[i].Config;
+                var config = stations[i].Config;
                 var consolPattern = SonneSignalGenerator.GenerateConsolPattern(
                     callsign, sector.DotCount, config);
 
-                if (!_keyers[i].IsActive ||
-                    _schedulers[i].CurrentPhase != StationScheduler.Phase.Navigation)
+                if (IsKeyerAvailableForPatternUpdate(i))
                 {
-                    _schedulers[i].CurrentConsolPattern = consolPattern;
+                    schedulers[i].CurrentConsolPattern = consolPattern;
                 }
 
-                _measurements.Add(new PositionFixCalculator.Measurement
+                measurements.Add(new PositionFixCalculator.Measurement
                 {
                     StationIndex = i,
-                    Latitude = (float)stations[i].Latitude,
-                    Longitude = (float)stations[i].Longitude,
+                    Latitude = (float)beaconStations[i].Latitude,
+                    Longitude = (float)beaconStations[i].Longitude,
                     Bearing = bearing,
                     Weight = 1f
                 });
             }
 
-            if (_measurements.Count >= 2)
+            if (HasEnoughMeasurementsForFix())
             {
-                _lastFix = PositionFixCalculator.Calculate(_measurements);
-                _fixValid = _lastFix.Valid;
+                lastFix = PositionFixCalculator.Calculate(measurements);
+                fixValid = lastFix.Valid;
             }
         }
 
         private void OnAudioFilterRead(float[] data, int channels)
         {
-            _audioEngine.ProcessAudio(data, channels, _stations, _schedulers, _keyers, _carriers, ToggleHandler.IsRadioOn, _currentZoneIndex, SonneZoneIndex);
+            audioEngine.ProcessAudio(data, channels, stations, schedulers, keyers, carriers, ToggleHandler.IsRadioOn, currentZoneIndex, SonneZoneIndex);
+        }
+
+        public bool IsInSonneZone => currentZoneIndex == SonneZoneIndex;
+
+        private bool IsInvalidStationIndex(int index) =>
+            stations.IsNull() || index.IsNegative() || index >= stations.Length;
+
+        private bool IsProcessingDominantStation(int stationIndex) =>
+            IsInSonneZone
+            && !stations[stationIndex].Gain.IsNegligible(0.001f)
+            && stationIndex == dominantStationIndex;
+
+        private bool IsStationNavigating(int index) =>
+            schedulers[index].CurrentPhase == StationScheduler.Phase.Navigation
+            && stations[index].NavigationStartTime.IsPositive();
+
+        private bool HasEnoughMeasurementsForFix() => measurements.Count >= 2;
+
+        private bool IsKeyerAvailableForPatternUpdate(int i) =>
+            !keyers[i].IsActive
+            || schedulers[i].CurrentPhase != StationScheduler.Phase.Navigation;
+
+        private static bool TryGetCallsignFromHistory(BeaconStation station, out string callsign)
+        {
+            if (station.History.IsNotNull()
+                && station.History.Length.IsPositive()
+                && !string.IsNullOrEmpty(station.History[0].Callsign))
+            {
+                callsign = station.History[0].Callsign;
+                return true;
+            }
+            callsign = station.Name.Substring(0, Math.Min(2, station.Name.Length)).ToUpper();
+            return false;
         }
 
         public static float CalculateBearing(float lat1, float lon1, float lat2, float lon2)

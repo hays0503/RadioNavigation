@@ -14,35 +14,35 @@ namespace UBOAT.Mods.RadioNavigation
 
         [SerializeField] private CanvasGroup canvasGroup;
 
-        private SonneController _sonneController;
-        private ZoneHandler _zoneHandler;
-        private float _currentAngle;
-        private int _currentZoneIndex;
+        private SonneController sonneController;
+        private ZoneHandler zoneHandler;
+        private float currentAngle;
+        private int currentZoneIndex;
 
-        private float _cursorAngle;
+        private float cursorAngle;
         public float CursorAngle
         {
-            get => _cursorAngle;
+            get => cursorAngle;
             set
             {
-                if (_cursorAngle == value)
+                if (cursorAngle == value)
                     return;
-                _cursorAngle = value;
-                if (OnCursorAngleChanged != null)
+                cursorAngle = value;
+                if (OnCursorAngleChanged.IsNotNull())
                     OnCursorAngleChanged(value);
                 EmitFrequency();
             }
         }
 
         [SerializeField]
-        private bool _isVisible;
+        private bool isVisible;
         public bool IsVisible
         {
-            get => _isVisible;
+            get => isVisible;
             set
             {
-                _isVisible = value;
-                if (canvasGroup == null)
+                isVisible = value;
+                if (canvasGroup.IsNull())
                 {
                     Debug.LogError("[RadioNav][RadioHandler] canvasGroup is null, cannot set visibility");
                     return;
@@ -50,14 +50,14 @@ namespace UBOAT.Mods.RadioNavigation
                 canvasGroup.alpha = value ? 1f : 0f;
                 canvasGroup.interactable = value;
                 canvasGroup.blocksRaycasts = value;
-                if (OnVisibilityChanged != null)
+                if (OnVisibilityChanged.IsNotNull())
                     OnVisibilityChanged(value);
             }
         }
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
+            if (Instance.IsNotNull() && Instance != this)
             {
                 Debug.LogWarning("[RadioNav][RadioHandler] Duplicate instance destroyed");
                 Destroy(gameObject);
@@ -74,14 +74,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Start()
         {
-            if (canvasGroup == null)
+            if (canvasGroup.IsNull())
                 canvasGroup = GetComponent<CanvasGroup>();
 
-            _sonneController = GetComponent<SonneController>();
-            _zoneHandler = GetComponentInChildren<ZoneHandler>(true);
+            sonneController = GetComponent<SonneController>();
+            zoneHandler = GetComponentInChildren<ZoneHandler>(true);
 
-            if (_zoneHandler != null)
-                _zoneHandler.OnZoneChanged += OnZoneChanged;
+            if (zoneHandler.IsNotNull())
+                zoneHandler.OnZoneChanged += OnZoneChanged;
 
             IsVisible = false;
         }
@@ -91,8 +91,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (!Input.GetKeyDown(KeyCode.Escape) || !IsVisible)
                 return;
 
-            if (UnityEngine.EventSystems.EventSystem.current != null &&
-                UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject != null)
+            if (UnityEngine.EventSystems.EventSystem.current.IsNotNull() &&
+                UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject.IsNotNull())
                 return;
 
             IsVisible = false;
@@ -105,16 +105,16 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnZoneChanged(int index)
         {
-            _currentZoneIndex = index;
+            currentZoneIndex = index;
             EmitFrequency();
         }
 
         private void EmitFrequency()
         {
-            _currentAngle = _cursorAngle + 90f;
-            float freq = DialConfig.AngleToFrequency(_currentAngle, _currentZoneIndex);
-            if (OnFrequencyChanged != null)
-                OnFrequencyChanged(freq, _currentZoneIndex);
+            currentAngle = cursorAngle + 90f;
+            float freq = DialConfig.AngleToFrequency(currentAngle, currentZoneIndex);
+            if (OnFrequencyChanged.IsNotNull())
+                OnFrequencyChanged(freq, currentZoneIndex);
         }
 
         public void NotifyCursorChanged()

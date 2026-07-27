@@ -33,7 +33,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i <= maxCount; i++)
             {
-                float ratio = maxCount > 0 ? (float)i / maxCount : 0f;
+                float ratio = maxCount.IsPositive() ? (float)i / maxCount : 0f;
                 float bearing = BeamHeadingDegTrue - BeamHalfWidthDeg + ratio * 2f * BeamHalfWidthDeg;
                 table[i] = (int)((bearing + 360f) % 360f);
             }

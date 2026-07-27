@@ -27,7 +27,7 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < ZoneNames.Length; i++)
             {
                 Transform t = transform.Find(ZoneNames[i]);
-                if (t != null)
+                if (t.IsNotNull())
                 {
                     zoneImages[i] = t.GetComponent<Image>();
                     SetupClickHandler(t.gameObject);
@@ -47,7 +47,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void SetupClickHandler(GameObject child)
         {
             EventTrigger trigger = child.GetComponent<EventTrigger>();
-            if (trigger == null)
+            if (trigger.IsNull())
                 trigger = child.AddComponent<EventTrigger>();
 
             EventTrigger.Entry leftClick = new EventTrigger.Entry
@@ -57,7 +57,7 @@ namespace UBOAT.Mods.RadioNavigation
             leftClick.callback.AddListener((data) =>
             {
                 PointerEventData ped = data as PointerEventData;
-                if (ped != null && ped.button == PointerEventData.InputButton.Left)
+                if (ped.IsNotNull() && ped.button == PointerEventData.InputButton.Left)
                 {
                     Debug.Log("[RadioNav][Zone] LMB click on " + child.name + " -> next");
                     NextZone();
@@ -72,7 +72,7 @@ namespace UBOAT.Mods.RadioNavigation
             rightClick.callback.AddListener((data) =>
             {
                 PointerEventData ped = data as PointerEventData;
-                if (ped != null && ped.button == PointerEventData.InputButton.Right)
+                if (ped.IsNotNull() && ped.button == PointerEventData.InputButton.Right)
                 {
                     Debug.Log("[RadioNav][Zone] RMB click on " + child.name + " -> previous");
                     PreviousZone();
@@ -88,7 +88,7 @@ namespace UBOAT.Mods.RadioNavigation
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex + 1) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
-            if (OnZoneChanged != null)
+            if (OnZoneChanged.IsNotNull())
                 OnZoneChanged(currentIndex);
 #if DEBUG
             Debug.Log("[RadioNav][Zone] switched to " + ZoneNames[currentIndex]);
@@ -102,7 +102,7 @@ namespace UBOAT.Mods.RadioNavigation
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex - 1 + ZoneNames.Length) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
-            if (OnZoneChanged != null)
+            if (OnZoneChanged.IsNotNull())
                 OnZoneChanged(currentIndex);
 #if DEBUG
             Debug.Log("[RadioNav][Zone] switched to " + ZoneNames[currentIndex]);
@@ -111,7 +111,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private bool CanSwitchZone()
         {
-            return parentTransform != null && ToggleHandler.IsInteractable;
+            return parentTransform.IsNotNull() && ToggleHandler.IsInteractable;
         }
 
         private void OnDestroy()
@@ -119,21 +119,24 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < ZoneNames.Length; i++)
             {
                 Transform t = transform.Find(ZoneNames[i]);
-                if (t != null)
+                if (t.IsNotNull())
                 {
                     var trigger = t.GetComponent<EventTrigger>();
-                    if (trigger != null)
+                    if (trigger.IsNotNull())
                         trigger.triggers.Clear();
                 }
             }
         }
 
+        private bool IsInvalidZoneIndex(int index) =>
+            zoneImages.IsNull() || index.IsNegative() || index >= zoneImages.Length;
+
         private void SetAlpha(int index, float alpha)
         {
-            if (zoneImages == null || index < 0 || index >= zoneImages.Length)
+            if (IsInvalidZoneIndex(index))
                 return;
             Image img = zoneImages[index];
-            if (img == null)
+            if (img.IsNull())
                 return;
 
             Color c = img.color;

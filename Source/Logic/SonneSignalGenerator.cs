@@ -60,7 +60,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i <= maxCount; i++)
             {
-                float ratio = maxCount > 0 ? (float)i / maxCount : 0f;
+                float ratio = maxCount.IsPositive() ? (float)i / maxCount : 0f;
                 float localAngle = ratio * SectorWidthDeg;
                 float bearing = station.BaseAngle + localAngle;
                 table[i] = (int)((bearing + 360f) % 360f);
@@ -71,7 +71,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static int LookupBearing(int dotCount, int[] bearingTable)
         {
-            if (bearingTable == null || bearingTable.Length == 0)
+            if (bearingTable.IsNull() || bearingTable.Length.IsZero())
                 return 0;
 
             dotCount = Math.Max(0, Math.Min(bearingTable.Length - 1, dotCount));
@@ -117,7 +117,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static int GetTransitionCount(NavigationElementType[] pattern)
         {
-            if (pattern == null)
+            if (pattern.IsNull())
                 return 0;
 
             int count = 0;

@@ -18,21 +18,21 @@ namespace UBOAT.Mods.RadioNavigation
     public class Main : IUserMod
     {
         [Inject] private static ResourceManager resourceManager;
-        [NonSerializedInGameState] private Harmony _harmony;
-        private static bool _loaded;
+        [NonSerializedInGameState] private Harmony harmony;
+        private static bool loaded;
 
         public void OnLoaded()
         {
             Debug.Log("[RadioNav][Main] RadioNavigation v" + Assembly.GetExecutingAssembly().GetName().Version + ", UBOAT " + Application.version);
 
-            if (_loaded)
+            if (loaded)
             {
-                _harmony?.UnpatchAll();
+                harmony?.UnpatchAll();
                 RadioStoryIntegration.ResetRuntimeState();
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
             }
 
-            _harmony = new Harmony("UBOAT.Mods.RadioNavigation");
+            harmony = new Harmony("UBOAT.Mods.RadioNavigation");
             var patchType = typeof(RadioStoryIntegration);
             var anyStatic = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
 
@@ -54,10 +54,10 @@ namespace UBOAT.Mods.RadioNavigation
             string missing = null;
             foreach (var t in targets)
             {
-                if (t.method == null)
+                if (t.method.IsNull())
                     missing = (missing ?? "") + t.name + ", ";
             }
-            if (missing != null)
+            if (missing.IsNotNull())
             {
                 Debug.LogError("[RadioNav] Pre-flight failed \u2014 target methods not found: " + missing.TrimEnd(',', ' '));
             }
@@ -68,14 +68,14 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     try
                     {
-                        _harmony.Patch(t.method, prefix: t.prefix, postfix: t.postfix);
+                        harmony.Patch(t.method, prefix: t.prefix, postfix: t.postfix);
                         Debug.Log("[RadioNav] Patched " + t.name);
                         applied++;
                     }
                     catch (Exception ex)
                     {
                         Debug.LogError("[RadioNav] Patch failed for " + t.name + ": " + ex.Message);
-                        _harmony.UnpatchAll();
+                        harmony.UnpatchAll();
                         Debug.Log("[RadioNav] All patches rolled back due to partial failure");
                         break;
                     }
@@ -88,12 +88,12 @@ namespace UBOAT.Mods.RadioNavigation
             SceneEventsListener.OnSceneStart += SceneEventsListener_OnSceneStart;
             SceneEventsListener.OnSceneAwake += SceneEventsListener_OnSceneAwake;
 
-            _loaded = true;
+            loaded = true;
 
             Debug.Log("[RadioNav][DIAG] version=" + Assembly.GetExecutingAssembly().GetName().Version +
                 " game=" + Application.version +
-                " di=" + (InjectionFramework.Instance != null ? "ok" : "null") +
-                " resourceManager=" + (resourceManager != null ? "ok" : "null"));
+                " di=" + (InjectionFramework.Instance.IsNotNull() ? "ok" : "null") +
+                " resourceManager=" + (resourceManager.IsNotNull() ? "ok" : "null"));
         }
 
 #if DEBUG
@@ -107,7 +107,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void SceneEventsListener_OnSceneAwake(Scene scene)
         {
-            if (InjectionFramework.Instance == null)
+            if (InjectionFramework.Instance.IsNull())
             {
                 Debug.LogError("[RadioNav][Main] InjectionFramework.Instance is null \u2014 DI not initialized. Ensure 'Injection' or 'Reflection' permission in Manifest.json");
                 return;
@@ -136,19 +136,19 @@ namespace UBOAT.Mods.RadioNavigation
                 }
 
                 Transform viewport = GameObject.Find("/GUI/Viewport")?.transform;
-                if (viewport == null)
+                if (viewport.IsNull())
                 {
                     Debug.LogWarning("[RadioNav][Main] '/GUI/Viewport' not found \u2014 GUI hierarchy may have changed in this UBOAT version");
                     return;
                 }
 
-                if (resourceManager == null)
+                if (resourceManager.IsNull())
                 {
                     Debug.LogError("[RadioNav][Main] ResourceManager not injected \u2014 DI failed");
                     return;
                 }
 
-                if (RadioHandler.Instance != null && RadioHandler.Instance.gameObject != null)
+                if (RadioHandler.Instance.IsNotNull() && RadioHandler.Instance.gameObject.IsNotNull())
                 {
                     Debug.Log("[RadioNav][Main] Reusing existing Radio panel");
                     return;
@@ -156,7 +156,7 @@ namespace UBOAT.Mods.RadioNavigation
 
                 Debug.Log("[RadioNav][Main] InstantiatePrefab(\"Radio\") from resourceManager \u2014 AssetBundle Bundles/testui expected to be loaded by game mod loader");
                 GameObject radio = resourceManager.InstantiatePrefab("Radio");
-                if (radio == null)
+                if (radio.IsNull())
                 {
                     Debug.LogError("[RadioNav][Main] Prefab 'Radio' not found in AssetBundle or InstantiatePrefab returned null. Check Bundles/testui");
                     return;
@@ -166,10 +166,10 @@ namespace UBOAT.Mods.RadioNavigation
                 var missing = new System.Collections.Generic.List<string>();
                 foreach (var path in requiredChildren)
                 {
-                    if (radio.transform.Find(path) == null)
+                    if (radio.transform.Find(path).IsNull())
                         missing.Add(path);
                 }
-                if (missing.Count > 0)
+                if (missing.Count.IsPositive())
                 {
                     Debug.LogError("[RadioNav][Main] Prefab structure validation FAILED. Missing: " + string.Join(", ", missing));
                     Object.Destroy(radio);
@@ -181,7 +181,7 @@ namespace UBOAT.Mods.RadioNavigation
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +
                     " radio=created handlers=" + hCount +
-                    " visible=" + (RadioHandler.Instance != null ? RadioHandler.Instance.IsVisible.ToString() : "no-instance"));
+                    " visible=" + (RadioHandler.Instance.IsNotNull() ? RadioHandler.Instance.IsVisible.ToString() : "no-instance"));
 
 #if DEBUG
                 DumpHierarchy(radio.transform, "[RadioNav][Main] Prefab hierarchy: ");

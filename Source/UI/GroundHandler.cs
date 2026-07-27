@@ -18,35 +18,35 @@ namespace UBOAT.Mods.RadioNavigation
 
         private string StateLog()
         {
-            RectTransform bgRt = bgImage != null ? bgImage.rectTransform : null;
+            RectTransform bgRt = bgImage.IsNotNull() ? bgImage.rectTransform : null;
             RectTransform grRt = GetComponent<RectTransform>();
-            GameObject bgGo = bgImage != null ? bgImage.gameObject : null;
+            GameObject bgGo = bgImage.IsNotNull() ? bgImage.gameObject : null;
 
             return "[Ground] active=" + gameObject.activeSelf
-                + " grPos=" + (grRt != null ? grRt.anchoredPosition.ToString() : "no-rt")
-                + " grSize=" + (grRt != null ? grRt.sizeDelta.ToString() : "no-rt")
+                + " grPos=" + (grRt.IsNotNull() ? grRt.anchoredPosition.ToString() : "no-rt")
+                + " grSize=" + (grRt.IsNotNull() ? grRt.sizeDelta.ToString() : "no-rt")
 
-                + " [Background] active=" + (bgGo != null ? bgGo.activeSelf.ToString() : "no-bg")
-                + " imgEnabled=" + (bgImage != null ? bgImage.enabled.ToString() : "no-img")
-                + " imgAlpha=" + (bgImage != null ? bgImage.color.a.ToString("F2") : "-")
-                + " imgR=" + (bgImage != null ? bgImage.color.r.ToString("F2") : "-")
-                + " imgG=" + (bgImage != null ? bgImage.color.g.ToString("F2") : "-")
-                + " imgB=" + (bgImage != null ? bgImage.color.b.ToString("F2") : "-")
-                + " raycast=" + (bgImage != null ? bgImage.raycastTarget.ToString() : "-")
-                + " pos=" + (bgRt != null ? bgRt.anchoredPosition.ToString() : "no-rt")
-                + " size=" + (bgRt != null ? bgRt.sizeDelta.ToString() : "no-rt")
+                + " [Background] active=" + (bgGo.IsNotNull() ? bgGo.activeSelf.ToString() : "no-bg")
+                + " imgEnabled=" + (bgImage.IsNotNull() ? bgImage.enabled.ToString() : "no-img")
+                + " imgAlpha=" + (bgImage.IsNotNull() ? bgImage.color.a.ToString("F2") : "-")
+                + " imgR=" + (bgImage.IsNotNull() ? bgImage.color.r.ToString("F2") : "-")
+                + " imgG=" + (bgImage.IsNotNull() ? bgImage.color.g.ToString("F2") : "-")
+                + " imgB=" + (bgImage.IsNotNull() ? bgImage.color.b.ToString("F2") : "-")
+                + " raycast=" + (bgImage.IsNotNull() ? bgImage.raycastTarget.ToString() : "-")
+                + " pos=" + (bgRt.IsNotNull() ? bgRt.anchoredPosition.ToString() : "no-rt")
+                + " size=" + (bgRt.IsNotNull() ? bgRt.sizeDelta.ToString() : "no-rt")
 
-                + " [GroundCheckmark] active=" + (groundCheckmark != null ? groundCheckmark.gameObject.activeSelf.ToString() : "null")
-                + " imgEnabled=" + (groundCheckmark != null ? groundCheckmark.enabled.ToString() : "-")
-                + " sprite=" + (groundCheckmark != null && groundCheckmark.sprite != null ? groundCheckmark.sprite.name : "no-sprite")
-                + " alpha=" + (groundCheckmark != null ? groundCheckmark.color.a.ToString("F2") : "-")
-                + " r=" + (groundCheckmark != null ? groundCheckmark.color.r.ToString("F2") : "-")
-                + " g=" + (groundCheckmark != null ? groundCheckmark.color.g.ToString("F2") : "-")
-                + " b=" + (groundCheckmark != null ? groundCheckmark.color.b.ToString("F2") : "-")
-                + " raycast=" + (groundCheckmark != null ? groundCheckmark.raycastTarget.ToString() : "-")
-                + " pos=" + (groundCheckmark != null ? groundCheckmark.rectTransform.anchoredPosition.ToString() : "-")
+                + " [GroundCheckmark] active=" + (groundCheckmark.IsNotNull() ? groundCheckmark.gameObject.activeSelf.ToString() : "null")
+                + " imgEnabled=" + (groundCheckmark.IsNotNull() ? groundCheckmark.enabled.ToString() : "-")
+                + " sprite=" + (groundCheckmark.IsNotNull() && groundCheckmark.sprite.IsNotNull() ? groundCheckmark.sprite.name : "no-sprite")
+                + " alpha=" + (groundCheckmark.IsNotNull() ? groundCheckmark.color.a.ToString("F2") : "-")
+                + " r=" + (groundCheckmark.IsNotNull() ? groundCheckmark.color.r.ToString("F2") : "-")
+                + " g=" + (groundCheckmark.IsNotNull() ? groundCheckmark.color.g.ToString("F2") : "-")
+                + " b=" + (groundCheckmark.IsNotNull() ? groundCheckmark.color.b.ToString("F2") : "-")
+                + " raycast=" + (groundCheckmark.IsNotNull() ? groundCheckmark.raycastTarget.ToString() : "-")
+                + " pos=" + (groundCheckmark.IsNotNull() ? groundCheckmark.rectTransform.anchoredPosition.ToString() : "-")
 
-                + " [Toggle] found=" + (radioToggle != null)
+                + " [Toggle] found=" + (radioToggle.IsNotNull())
                 + " interactable=" + (radioToggle?.interactable ?? false)
                 + " isOn=" + (radioToggle?.isOn ?? false);
         }
@@ -54,27 +54,27 @@ namespace UBOAT.Mods.RadioNavigation
         private void Start()
         {
             Transform bgT = transform.Find("Background");
-            bgImage = bgT != null ? bgT.GetComponent<Image>() : null;
-            if (bgImage == null)
+            bgImage = bgT.IsNotNull() ? bgT.GetComponent<Image>() : null;
+            if (bgImage.IsNull())
             {
                 Debug.LogError("[RadioNav][GroundHandler] Background Image not found, disabling");
                 enabled = false;
                 return;
             }
-            if (bgImage != null)
+            if (bgImage.IsNotNull())
             {
                 Color c = bgImage.color;
                 c.a = DimAlpha;
                 bgImage.color = c;
             }
 
-            if (bgT != null)
+            if (bgT.IsNotNull())
             {
                 Transform cm = bgT.Find("GroundCheckmark");
-                if (cm != null)
+                if (cm.IsNotNull())
                 {
                     groundCheckmark = cm.GetComponent<Image>();
-                    if (groundCheckmark != null)
+                    if (groundCheckmark.IsNotNull())
                     {
                         Color c = groundCheckmark.color;
                         c.a = 0f;
@@ -84,11 +84,11 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
 
-            if (transform.parent != null)
+            if (transform.parent.IsNotNull())
                 radioToggle = transform.parent.Find("Toggle")?.GetComponent<Toggle>();
             else
                 Debug.LogError("[RadioNav][GroundHandler] transform.parent is null");
-            if (radioToggle != null)
+            if (radioToggle.IsNotNull())
             {
                 radioToggle.isOn = false;
                 radioToggle.interactable = false;
@@ -100,36 +100,39 @@ namespace UBOAT.Mods.RadioNavigation
 #endif
         }
 
+        private bool IsGroundEffectivelyActive() =>
+            bgImage.IsNotNull() && bgImage.color.a > ActiveAlphaThreshold;
+
         public void OnPointerClick(PointerEventData eventData)
         {
-            bool isActive = bgImage != null && bgImage.color.a > ActiveAlphaThreshold;
+            bool isActive = IsGroundEffectivelyActive();
 
-            if (isActive && radioToggle != null && radioToggle.isOn)
+            if (isActive && radioToggle.IsNotNull() && radioToggle.isOn)
             {
                 radioToggle.isOn = false;
                 radioToggle.interactable = false;
             }
 
-            if (bgImage != null)
+            if (bgImage.IsNotNull())
             {
                 Color c = bgImage.color;
                 c.a = isActive ? DimAlpha : MaxAlpha;
                 bgImage.color = c;
             }
 
-            if (groundCheckmark != null)
+            if (groundCheckmark.IsNotNull())
             {
                 Color c = groundCheckmark.color;
                 c.a = isActive ? 0f : 1f;
                 groundCheckmark.color = c;
             }
 
-            if (radioToggle != null)
+            if (radioToggle.IsNotNull())
                 radioToggle.interactable = !isActive;
 
             ToggleHandler.SetGroundActive(!isActive);
 
-            if (OnValueChanged != null)
+            if (OnValueChanged.IsNotNull())
                 OnValueChanged(!isActive);
 
 #if DEBUG

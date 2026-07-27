@@ -10,19 +10,19 @@ namespace UBOAT.Mods.RadioNavigation
         [SerializeField] private TMP_Text beaconText;
         [SerializeField] private Slider slider;
 
-        private float _angle;
-        private bool _isUpdating;
+        private float angle;
+        private bool isUpdating;
 
         public float Angle
         {
-            get => _angle;
+            get => angle;
             set
             {
                 value = Mathf.Clamp(value, 0f, 360f);
-                if (Mathf.Approximately(_angle, value))
+                if (Mathf.Approximately(angle, value))
                     return;
-                _angle = value;
-                OnAngleChanged?.Invoke(_angle);
+                angle = value;
+                OnAngleChanged?.Invoke(angle);
                 UpdateUI();
             }
         }
@@ -34,12 +34,12 @@ namespace UBOAT.Mods.RadioNavigation
             beaconText = GetComponentInChildren<TMP_Text>(true);
             slider = GetComponentInChildren<Slider>(true);
 
-            if (beaconText == null)
+            if (beaconText.IsNull())
                 Debug.LogError("[RadioNav][DebugAngle] TMP_Text not found in children");
-            if (slider == null)
+            if (slider.IsNull())
                 Debug.LogError("[RadioNav][DebugAngle] Slider not found in children");
 
-            if (slider != null)
+            if (slider.IsNotNull())
                 slider.onValueChanged.AddListener(OnSliderChanged);
 
             Angle = 0f;
@@ -47,27 +47,27 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnSliderChanged(float value)
         {
-            if (_isUpdating)
+            if (isUpdating)
                 return;
             Angle = value;
         }
 
         private void UpdateUI()
         {
-            _isUpdating = true;
+            isUpdating = true;
 
-            if (beaconText != null)
-                beaconText.text = _angle.ToString("F1") + "\u00B0";
+            if (beaconText.IsNotNull())
+                beaconText.text = angle.ToString("F1") + "\u00B0";
 
-            if (slider != null)
-                slider.value = _angle;
+            if (slider.IsNotNull())
+                slider.value = angle;
 
-            _isUpdating = false;
+            isUpdating = false;
         }
 
         private void OnDestroy()
         {
-            if (slider != null)
+            if (slider.IsNotNull())
                 slider.onValueChanged.RemoveListener(OnSliderChanged);
         }
     }

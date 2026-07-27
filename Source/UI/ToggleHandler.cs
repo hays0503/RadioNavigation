@@ -12,11 +12,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static bool IsRadioOn { get; private set; }
         public static bool IsInteractable { get; private set; }
-        private static bool _groundActive;
+        private static bool groundActive;
 
         public static void SetGroundActive(bool active)
         {
-            _groundActive = active;
+            groundActive = active;
             IsInteractable = IsRadioOn && active;
         }
 
@@ -31,14 +31,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         private string DebugImg(GameObject go)
         {
-            if (go == null) return "null";
+            if (go.IsNull()) return "null";
             Image img = go.GetComponent<Image>();
-            string spriteName = (img != null && img.sprite != null) ? img.sprite.name : "no-sprite";
-            float alpha = (img != null) ? img.color.a : -1f;
-            bool imgEnabled = img != null && img.enabled;
+            string spriteName = (img.IsNotNull() && img.sprite.IsNotNull()) ? img.sprite.name : "no-sprite";
+            float alpha = (img.IsNotNull()) ? img.color.a : -1f;
+            bool imgEnabled = img.IsNotNull() && img.enabled;
             RectTransform rt = go.GetComponent<RectTransform>();
-            Vector2 size = rt != null ? rt.sizeDelta : Vector2.zero;
-            Vector2 anchoredPos = rt != null ? rt.anchoredPosition : Vector2.zero;
+            Vector2 size = rt.IsNotNull() ? rt.sizeDelta : Vector2.zero;
+            Vector2 anchoredPos = rt.IsNotNull() ? rt.anchoredPosition : Vector2.zero;
             return go.name
                 + " active=" + go.activeSelf
                 + " imgEnabled=" + imgEnabled
@@ -51,7 +51,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void Start()
         {
             toggleComp = GetComponent<Toggle>();
-            if (toggleComp == null)
+            if (toggleComp.IsNull())
             {
                 Debug.LogError("[RadioNav][ToggleHandler] Toggle component not found, disabling");
                 enabled = false;
@@ -60,7 +60,7 @@ namespace UBOAT.Mods.RadioNavigation
             toggleComp.graphic = null;
 
             toggleRect = GetComponent<RectTransform>();
-            if (toggleRect == null)
+            if (toggleRect.IsNull())
             {
                 Debug.LogError("[RadioNav][ToggleHandler] RectTransform not found, disabling");
                 enabled = false;
@@ -68,38 +68,38 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             Transform bg = transform.Find("Background");
-            if (bg != null)
+            if (bg.IsNotNull())
             {
                 onImage = bg.Find("on")?.gameObject;
                 offImage = bg.Find("off")?.gameObject;
             }
 
-            if (transform.parent == null)
+            if (transform.parent.IsNull())
             {
                 Debug.LogError("[RadioNav][ToggleHandler] transform.parent is null");
                 return;
             }
             Transform dial = transform.parent.Find("ciferbllat");
-            if (dial != null)
+            if (dial.IsNotNull())
             {
                 dialImage = dial.GetComponent<Image>();
-                if (dialImage != null)
+                if (dialImage.IsNotNull())
                     originalDialColor = dialImage.color;
             }
 
             Debug.Log("[RadioNav][Toggle] Start"
                 + " on=" + DebugImg(onImage)
                 + " off=" + DebugImg(offImage)
-                + " toggle.graphic=" + (toggleComp.graphic != null ? toggleComp.graphic.name : "null")
+                + " toggle.graphic=" + (toggleComp.graphic.IsNotNull() ? toggleComp.graphic.name : "null")
                 + " toggle.isOn=" + toggleComp.isOn
-                + " dialColor=" + (dialImage != null ? dialImage.color.ToString() : "no-dial"));
+                + " dialColor=" + (dialImage.IsNotNull() ? dialImage.color.ToString() : "no-dial"));
 
             toggleComp.onValueChanged.AddListener(OnToggleChanged);
 
             OnToggleChanged(toggleComp.isOn);
         }
 
-        private string ImgState(GameObject go) => go != null ? go.activeSelf.ToString() : "null";
+        private string ImgState(GameObject go) => go.IsNotNull() ? go.activeSelf.ToString() : "null";
 
         public void OnPointerClick(PointerEventData eventData)
         {
@@ -119,25 +119,25 @@ namespace UBOAT.Mods.RadioNavigation
         private void OnToggleChanged(bool isOn)
         {
             IsRadioOn = isOn;
-            IsInteractable = isOn && _groundActive;
+            IsInteractable = isOn && groundActive;
 
-            if (onImage != null)
+            if (onImage.IsNotNull())
             {
                 if (onImage.activeSelf != isOn)
                     onImage.SetActive(isOn);
             }
-            if (offImage != null)
+            if (offImage.IsNotNull())
             {
                 if (offImage.activeSelf == isOn)
                     offImage.SetActive(!isOn);
             }
 
-            if (dialImage != null)
+            if (dialImage.IsNotNull())
             {
                 dialImage.color = isOn ? DialActiveColor : originalDialColor;
             }
 
-            if (OnValueChanged != null)
+            if (OnValueChanged.IsNotNull())
                 OnValueChanged(isOn);
 
 #if DEBUG
@@ -145,13 +145,13 @@ namespace UBOAT.Mods.RadioNavigation
                 + " isOn=" + isOn
                 + " on=" + DebugImg(onImage)
                 + " off=" + DebugImg(offImage)
-                + " dialColor=" + (dialImage != null ? dialImage.color.ToString() : "no-dial"));
+                + " dialColor=" + (dialImage.IsNotNull() ? dialImage.color.ToString() : "no-dial"));
 #endif
         }
 
         private void OnDestroy()
         {
-            if (toggleComp != null)
+            if (toggleComp.IsNotNull())
                 toggleComp.onValueChanged.RemoveListener(OnToggleChanged);
         }
     }

@@ -10,31 +10,31 @@ namespace UBOAT.Mods.RadioNavigation
         private const float BfoMin = 300f;
         private const float BfoMax = 1800f;
 
-        private readonly Atmosphere _atmosphere;
-        private readonly ReceiverDsp _dsp;
-        private readonly float _ticksPerSample;
-        private float _tickAccumulator;
-        private float _outputVolume = 1f;
+        private readonly Atmosphere atmosphere;
+        private readonly ReceiverDsp dsp;
+        private readonly float ticksPerSample;
+        private float tickAccumulator;
+        private float outputVolume = 1f;
 
         public float OutputVolume
         {
-            get => _outputVolume;
-            set => _outputVolume = Mathf.Clamp(value, 0f, 1f);
+            get => outputVolume;
+            set => outputVolume = Mathf.Clamp(value, 0f, 1f);
         }
 
         public float QualityFactor { get; set; } = 20f;
         public float Feedback { get; private set; }
-        public Atmosphere Atmosphere => _atmosphere;
-        public ReceiverDsp Dsp => _dsp;
+        public Atmosphere Atmosphere => atmosphere;
+        public ReceiverDsp Dsp => dsp;
 
         public AudioSynthesisEngine()
         {
-            _atmosphere = new Atmosphere(Environment.TickCount);
-            _dsp = new ReceiverDsp(SampleRate);
+            atmosphere = new Atmosphere(Environment.TickCount);
+            dsp = new ReceiverDsp(SampleRate);
 
             float samplesPerMs = SampleRate / 1000f;
             float msPerTick = 50f;
-            _ticksPerSample = 1f / (samplesPerMs * msPerTick);
+            ticksPerSample = 1f / (samplesPerMs * msPerTick);
         }
 
         public void ApplyFeedback(float angle)
@@ -43,17 +43,17 @@ namespace UBOAT.Mods.RadioNavigation
 
             QualityFactor = 20f + Feedback * Feedback * 180f;
 
-            _atmosphere.NoiseFloor = Mathf.Lerp(0.004f, 0.0005f, Feedback);
-            _atmosphere.ImpulseProbability = Mathf.Lerp(0.002f, 0.0002f, Feedback);
+            atmosphere.NoiseFloor = Mathf.Lerp(0.004f, 0.0005f, Feedback);
+            atmosphere.ImpulseProbability = Mathf.Lerp(0.002f, 0.0002f, Feedback);
 
-            _dsp.WhistleLevel = Mathf.Clamp01((Feedback - 0.75f) / 0.2f);
+            dsp.WhistleLevel = Mathf.Clamp01((Feedback - 0.75f) / 0.2f);
         }
 
         public void UpdateStationBeats(StationState[] stations, CarrierGenerator[] carriers, float currentFrequencyKHz, int currentZoneIndex, int sonneZoneIndex)
         {
             for (int i = 0; i < stations.Length; i++)
             {
-                if (stations[i].Gain < 0.001f)
+                if (stations[i].Gain.IsNegligible(0.001f))
                     continue;
 
                 float offset = currentFrequencyKHz - (stations[i].BeatFrequency - BfoBase) / 1000f;
@@ -72,12 +72,12 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i < data.Length; i += channels)
             {
-                _tickAccumulator += _ticksPerSample;
-                while (_tickAccumulator >= 1f)
+                tickAccumulator += ticksPerSample;
+                while (tickAccumulator >= 1f)
                 {
                     for (int s = 0; s < stations.Length; s++)
                     {
-                        if (stations[s].Gain < 0.001f)
+                        if (stations[s].Gain.IsNegligible(0.001f))
                             continue;
 
                         if (!keyers[s].IsActive)
@@ -100,16 +100,16 @@ namespace UBOAT.Mods.RadioNavigation
                             }
 
                             var consolPattern = sched.GetCurrentConsolPattern();
-                            if (consolPattern != null && consolPattern.Length > 0)
+                            if (consolPattern.IsNotNull() && consolPattern.Length.IsPositive())
                             {
                                 keyers[s].LoadConsol(consolPattern, sched, stations[s].Config, stations[s].CallsignLength);
                             }
                             else
                             {
                                 var seq = sched.GetCurrentSequence();
-                                if (seq == null || seq.ElementCount == 0)
+                                if (seq.IsNull() || seq.ElementCount.IsZero())
                                 {
-                                    if (seq != null)
+                                    if (seq.IsNotNull())
                                         sched.OnSequenceFinished();
                                     sched.Tick();
                                 }
@@ -122,7 +122,7 @@ namespace UBOAT.Mods.RadioNavigation
 
                         keyers[s].Advance();
                     }
-                    _tickAccumulator -= 1f;
+                    tickAccumulator -= 1f;
                 }
 
                 if (!radioOn)
@@ -131,7 +131,7 @@ namespace UBOAT.Mods.RadioNavigation
                 float sample = 0f;
                 for (int s = 0; s < stations.Length; s++)
                 {
-                    if (stations[s].Gain < 0.001f)
+                    if (stations[s].Gain.IsNegligible(0.001f))
                         continue;
                     if (keyers[s].KeyOn)
                         sample += stations[s].Gain * carriers[s].NextSample();
@@ -139,11 +139,11 @@ namespace UBOAT.Mods.RadioNavigation
                         carriers[s].NextSample();
                 }
 
-                sample = _atmosphere.Apply(sample, SampleRate);
-                sample = _dsp.Process(sample, SampleRate);
+                sample = atmosphere.Apply(sample, SampleRate);
+                sample = dsp.Process(sample, SampleRate);
 
                 for (int c = 0; c < channels; c++)
-                    data[i + c] = sample * _outputVolume;
+                    data[i + c] = sample * outputVolume;
             }
         }
     }

@@ -28,20 +28,20 @@ namespace UBOAT.Mods.RadioNavigation
         protected virtual float ClampTargetAngle(float raw) => Mathf.Clamp(raw, minAngle, maxAngle);
         protected virtual bool HandleDragDirection(Vector2 dir)
         {
-            if (dir.y < 0)
+            if (dir.y.IsNegative())
                 return false;
             return true;
         }
         protected virtual void OnAngleUpdated(float angle)
         {
-            if (OnValueChanged != null)
+            if (OnValueChanged.IsNotNull())
                 OnValueChanged(angle);
         }
 
         protected virtual void Awake()
         {
             spinnerRect = GetComponent<RectTransform>();
-            if (spinnerRect == null)
+            if (spinnerRect.IsNull())
             {
                 Debug.LogError("[RadioNav][" + DebugTag + "] RectTransform not found, disabling");
                 enabled = false;
@@ -50,7 +50,7 @@ namespace UBOAT.Mods.RadioNavigation
             spinnerRect.pivot = new Vector2(0.5f, 0.5f);
 
             Image img = GetComponent<Image>();
-            if (img != null)
+            if (img.IsNotNull())
                 img.raycastTarget = true;
 
             currentAngle = Mathf.Clamp(startAngle, minAngle, maxAngle);
@@ -65,7 +65,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
             if (!ToggleHandler.IsInteractable) return;
-            if (spinnerRect == null)
+            if (spinnerRect.IsNull())
             {
                 Debug.LogError("[RadioNav][" + DebugTag + "] spinnerRect not initialized");
                 return;
@@ -74,9 +74,12 @@ namespace UBOAT.Mods.RadioNavigation
             activePointerId = eventData.pointerId;
         }
 
+        protected bool IsActiveDrag(PointerEventData eventData) =>
+            isDragging && eventData.pointerId == activePointerId;
+
         public void OnDrag(PointerEventData eventData)
         {
-            if (!isDragging || eventData.pointerId != activePointerId)
+            if (!IsActiveDrag(eventData))
                 return;
             if (!ToggleHandler.IsInteractable) return;
 
