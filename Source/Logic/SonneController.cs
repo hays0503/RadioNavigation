@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -10,6 +10,8 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private const int SonneZoneIndex = 1;
         private const float BfoBase = 1000f;
+
+        private static readonly AudioClip silentClip = AudioClip.Create("SonneSilent", AudioSynthesisEngine.SampleRate * 2, 1, AudioSynthesisEngine.SampleRate, false);
 
         private int dominantStationIndex = -1;
         private StationState[] stations;
@@ -90,7 +92,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             var audio = GetComponent<AudioSource>();
-            audio.clip = AudioClip.Create("SonneSilent", AudioSynthesisEngine.SampleRate * 2, 1, AudioSynthesisEngine.SampleRate, false);
+            audio.clip = silentClip;
             audio.loop = true;
             audio.Play();
 
