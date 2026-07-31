@@ -179,6 +179,31 @@
 | **F162** | BeaconData DotTable ignores parameter | **P3** | Data · BeaconData · API | ~3 |
 | **F163** | StationState mutable struct copy-divergence | **P3** | Data · StationState · Value Type | ~5 |
 | **F164** | ConsolCycleConfig GetForCycleDuration stub | **P3** | Data · ConsolCycleConfig · Stub | ~3 |
+| **F165** | MorseKeyer.Reset doesn't clear sequence | **P2** | Logic · MorseKeyer · State Management | ~10 |
+| **F166** | MorseAlphabet.TextToPattern ignores parameter | **P3** | Logic · MorseAlphabet · API | ~1 |
+| **F167** | StationScheduler.OnSequenceFinished missing phases | **P2** | Logic · StationScheduler · State Machine | ~12 |
+| **F168** | PositionFixCalculator.Calculate returns ErrorKm = 0 | **P2** | Logic · PositionFixCalculator · Algorithm | ~5 |
+| **F169** | CarrierGenerator phase drift from float precision | **P2** | Sound · DspPipeline · Numerical | ~10 |
+| **F170** | MorseAlphabet fixed table overflow | **P2** | Logic · MorseAlphabet · Data Structure | ~10 |
+| **F171** | GroundHandler.StateLog аллокация в DEBUG каждый кадр | **P3** | UI · GroundHandler · Performance | ~26 |
+| **F172** | SignalRichTextFormatter.TrimEntries O(n²) RemoveAt(0) | **P3** | UI · SignalRichTextFormatter · Performance | ~8 |
+| **F173** | InformationPanelHandler.CreateLabel fragile font loading | **P2** | UI · InformationPanelHandler · Portability | ~10 |
+| **F174** | NavigationPattern.GetElement negative index OOB | **P2** | Logic · NavigationPattern · Correctness | ~8 |
+| **F175** | MorseKeyer.AdvanceElement cross-type transition | **P2** | Logic · MorseKeyer · State Machine | ~40 |
+| **F176** | Main.cs GameObject.Find hardcoded hierarchy path | **P2** | Logic · Main · Performance | ~15 |
+| **F177** | DspPipeline deterministic radio noise generation | **P3** | Sound · DspPipeline · Architecture | ~5 |
+| **F178** | Repeated GetComponent lookups не кешируются | **P3** | UI · Hygiene | ~20 |
+| **F179** | Main.cs bootstrap объединяет несколько обязанностей | **P2** | Logic · Main · Architecture | ~35 |
+| **F180** | UI validation основана на строковых путях | **P2** | Logic · Main · Maintainability | ~20 |
+| **F181** | Main.cs избыточное диагностическое логирование | **P3** | Logic · Main · Logging | ~10 |
+| **F182** | `build.ps1` doesn't validate `$GamePath` existence before invoking `csc` | **P3** | Build · Scripting | ~10 |
+| **F183** | `MorseAlphabet.GetMorse` performs redundant `c < 0` check on unsigned `char` | **P3** | Logic · MorseAlphabet · Code Hygiene | ~5 |
+| **F184** | `MorseKeyer` duplicates pattern/sequence branching in multiple internal getters | **P3** | Logic · MorseKeyer · Duplication | ~15 |
+| **F185** | `InformationPanelHandler` hardcodes 6 pattern labels for 14 available stations | **P2** | UI · InformationPanelHandler · Data Representation | ~10 |
+| **F186** | `RadioStoryIntegration.Init` accesses `GetParameters()[1]` without length check | **P2** | Logic · RadioStoryIntegration · Reflection Fragility | ~5 |
+| **F187** | `PanelDragHandler.OnPointerExit` resets custom cursor while dragging outside panel bounds | **P3** | UI · PanelDragHandler · User Experience | ~5 |
+| **F188** | `RadioInstaller` hardcodes fixed initial local position `(300, 100, 0)` without resolution scaling | **P3** | UI · RadioInstaller · Layout | ~5 |
+| **F189** | Cross-thread data race on `signalEntries` / `morseDecoderBuffer` between Audio Thread and UI Thread | **P1** | Sound · UI · Thread Safety | ~15 |
 
 ---
 
@@ -335,6 +360,23 @@ F127 (GenHardcoded)  ──── связан с F55/F86, F35
 F128 (Antimeridian)  ──── связан с F80, F73, F16
 F129 (WordBoundary)  ──── связан с F53
 F130 (BandConfigMut) ──── связан с F20, F05
+F165 (ResetClear)  ──── связан с F65, F116, F113
+F166 (TextToPattern) ──── связан с F70
+F167 (SeqFinished)  ──── связан с F122, F135
+F168 (ErrorKm)     ──── связан с F16, F134, F80
+F169 (PhaseDrift)  ──── связан с F41, F94
+F170 (TableOverflow)─── связан с F53, F76, F129
+F171 (StateLog)    ──── связан с F31
+F172 (TrimEntries) ──── связан с F24, F108
+F173 (FontLoad)    ──── связан с F103
+F174 (NegIndex)    ──── связан с F114, F70
+F175 (CrossTrans)  ──── связан с F65, F113, F116, F165
+F176 (FindPath)    ──── независим
+F177 (DetRandom)   ──── независим
+F178 (GetComponent) ──── независим
+F179 (Bootstrap)   ──── независим
+F180 (StringPaths) ──── независим
+F181 (DiagNoise)   ──── независим
 ```
 
 ### Визуально (блокирующие → зависимые)
@@ -485,6 +527,23 @@ F161 ──► F20, F28
 F162 ──► F55, F86, F35
 F163 ──► F17, F130
 F164 ──► F55, F86, F92, F126
+F165 ──► F65, F116, F113
+F166 ──► F70
+F167 ──► F122, F135
+F168 ──► F16, F134, F80
+F169 ──► F41, F94
+F170 ──► F53, F76, F129
+F171 ──► F31
+F172 ──► F24, F108
+F173 ──► F103
+F174 ──► F114, F70
+F175 ──► F65, F113, F116, F165
+F176 ──► (none)
+F177 ──► (none)
+F178 ──► (none)
+F179 ──► (none)
+F180 ──► (none)
+F181 ──► (none)
 ```
 
 ---
@@ -658,13 +717,32 @@ F164 ──► F55, F86, F92, F126
 131. **F163** — StationState: сделать readonly struct или class. 15 мин.
 132. **F164** — ConsolCycleConfig: документировать что только 120s supported. 2 мин.
 
-**Итого:** ~95-125 часа + Фаза 0 (F22: 8-12 часов) + Фаза 1-2 (F77-F96: ~5-8 часов) + F97-F120 (~4-5 часов) + F121-F130 (~3-4 часа) + F131-F136 (~20 мин) + F137-F164 (~2-3 часа). Фаза 1: 65 quick wins (25 code + 8 documentation + 32 new F97-F164).
+### Фаза 3b: F165-F181 (дополнительные quick wins и архитектурные правки)
+133. **F165** — MorseKeyer.Reset: добавить `sequence = null`. 2 мин.
+134. **F167** — StationScheduler: добавить default case в OnSequenceFinished. 5 мин.
+135. **F169** — CarrierGenerator: нормализовать phase в [0, 1) для предотвращения дрифта. 15 мин.
+136. **F172** — SignalRichTextFormatter.TrimEntries: использовать RemoveRange вместо цикла RemoveAt(0). 15 мин.
+137. **F174** — NavigationPattern.GetElement: добавить проверку `index < 0` перед делением. 5 мин.
+138. **F168** — PositionFixCalculator: вычислить ErrorKm из разброса пересечений. 30 мин.
+139. **F170** — MorseAlphabet: добавить bounds check в Define() или перейти на Dictionary. 30 мин.
+140. **F173** — InformationPanelHandler: кешировать Font.CreateDynamicFontFromOSFont. 10 мин.
+141. **F175** — MorseKeyer.AdvanceElement: очищать consolPattern/sequence при cross-type переходе. 30 мин.
+142. **F166** — MorseAlphabet.TextToPattern: удалить или реализовать elementDurationTicks. 5 мин.
+143. **F171** — GroundHandler.StateLog: заменить string concatenation на StringBuilder. 10 мин.
+144. **F177** — DspPipeline: разделить детерминированный/тестовый/игровой RNG. 30 мин.
+145. **F178** — UI: кешировать GetComponent вызовы в Awake/Start. 15 мин.
+146. **F181** — Main.cs: добавить уровни логирования, подавлять в release. 15 мин.
+147. **F176** — Main.cs: кешировать GameObject.Find("/GUI/Viewport"). 30 мин.
+148. **F179** — Main.cs: разделить OnLoaded на PatchInstaller/EventRegistrar/BootstrapDiagnostics. 2-3 часа.
+149. **F180** — Main.cs: заменить строковые пути UI на типизированные ссылки. 30 мин.
+
+**Итого:** ~95-125 часа + Фаза 0 (F22: 8-12 часов) + Фаза 1-2 (F77-F96: ~5-8 часов) + F97-F120 (~4-5 часов) + F121-F130 (~3-4 часа) + F131-F136 (~20 мин) + F137-F164 (~2-3 часа) + F165-F181 (~6-8 часов). Фаза 1: 65 quick wins (25 code + 8 documentation + 32 new F97-F164). Фаза 3b: 17 дополнительных правок (5 код quick wins + 9 корректность/данные + 3 архитектурные).
 
 ---
 
 ## Cross-reference matrix
 
-_Maтрица охватывает F01-F52. F53-F76 не имеют перекрёстных зависимостей с предыдущими (кроме F61→F05, F71→F01). F77-F96 — перекрёстные ссылки в отдельных файлах. F97-F116 — перекрёстные ссылки: F104→F23/F68, F105→F01/F08/F13, F106→F13/F31, F107→F23/F68, F108→F01/F29, F109→F24/F01/F29, F110-F112→F01/F29, F113/F116→F65. F117-F120: F117→F14/F11, F118→(none), F119→F14/F30, F120→F08/F24. F121-F130: F121→(none), F122→(none), F123→F77/F01, F124→F68/F107/F23, F125→F53/F37, F126→F55/F92, F127→F55/F35, F128→F80/F73/F16, F129→F53, F130→F20/F05. F131-F136: F131→F38/F79/F99, F132→F98/F89/F01, F133→F60/F97, F134→F64/F73/F120, F135→F122/F98, F136→F126/F81. F137-F164: F137→F80/F73/F16, F138→F67/F07/F37, F139→F121/F83/F23, F140→F23/F68/F82, F141→F40/F41/F29, F142→F41/F13, F143→F142/F71, F144→F126/F129, F145→F113/F77/F65, F146→F134/F64/F99, F147→F72/F74, F148→F118/F85, F149→F118/F133, F150→F20/F130, F151→F20/F58/F150, F152→F69/F82/F106, F153→F71/F143, F154→F41/F25, F155→F102/F103, F156→F28/F71, F157→F23/F68/F104, F158→F06/F54, F159→F63, F160→F96/F32, F161→F20/F28, F162→F55/F86/F35, F163→F17/F130, F164→F55/F86/F92/F126._
+_Maтрица охватывает F01-F52. F53-F76 не имеют перекрёстных зависимостей с предыдущими (кроме F61→F05, F71→F01). F77-F96 — перекрёстные ссылки в отдельных файлах. F97-F116 — перекрёстные ссылки: F104→F23/F68, F105→F01/F08/F13, F106→F13/F31, F107→F23/F68, F108→F01/F29, F109→F24/F01/F29, F110-F112→F01/F29, F113/F116→F65. F117-F120: F117→F14/F11, F118→(none), F119→F14/F30, F120→F08/F24. F121-F130: F121→(none), F122→(none), F123→F77/F01, F124→F68/F107/F23, F125→F53/F37, F126→F55/F92, F127→F55/F35, F128→F80/F73/F16, F129→F53, F130→F20/F05. F131-F136: F131→F38/F79/F99, F132→F98/F89/F01, F133→F60/F97, F134→F64/F73/F120, F135→F122/F98, F136→F126/F81. F137-F164: F137→F80/F73/F16, F138→F67/F07/F37, F139→F121/F83/F23, F140→F23/F68/F82, F141→F40/F41/F29, F142→F41/F13, F143→F142/F71, F144→F126/F129, F145→F113/F77/F65, F146→F134/F64/F99, F147→F72/F74, F148→F118/F85, F149→F118/F133, F150→F20/F130, F151→F20/F58/F150, F152→F69/F82/F106, F153→F71/F143, F154→F41/F25, F155→F102/F103, F156→F28/F71, F157→F23/F68/F104, F158→F06/F54, F159→F63, F160→F96/F32, F161→F20/F28, F162→F55/F86/F35, F163→F17/F130, F164→F55/F86/F92/F126. F165-F181: F165→F65/F116/F113, F166→F70, F167→F122/F135, F168→F16/F134/F80, F169→F41/F94, F170→F53/F76/F129, F171→F31, F172→F24/F108, F173→F103, F174→F114/F70, F175→F65/F113/F116/F165, F176→(none), F177→(none), F178→(none), F179→(none), F180→(none), F181→(none). F182-F189: F182→(none), F183→(none), F184→(none), F185→F32, F186→F23, F187→(none), F188→(none), F189→F01/F120._
 
 ---
 
@@ -672,13 +750,13 @@ _Maтрица охватывает F01-F52. F53-F76 не имеют перекр
 
 | Метрика | Значение |
 |---------|----------|
-| Всего проблем | 164 (F01-F164) |
+| Всего проблем | 189 (F01-F189) |
 | P0 (Critical) | 12 (F01, F05, F13, F23, F29, F45, F46, F53, F65, F77, F78, F79) |
-| P1 (High) | 43 (F02, F03, F04, F07, F09, F11, F14, F16, F24, F25, F30, F34, F43, F47, F48, F52, F54, F55, F56, F57, F58, F66, F67, F68, F69, F70, F80, F81, F82, F83, F97, F98, F99, F109, F117, F119, F121, F122, F123, F132, **F137**, **F138**, **F139**) |
-| P2 (Medium) | 77 (F06, F08, F10, F12, F15, F17, F18, F20, F21, F22, F26, F27, F28, F31, F35, F36, F37, F38, F39, F40, F41, F42, F44, F49, F50, F51, F59, F60, F61, F62, F63, F64, F71, F72, F73, F74, F75, F84, F85, F86, F87, F88, F100, F101, F102, F103, F104, F105, F106, F107, F108, F110, F111, F118, F120, F124, F125, F126, F127, F128, F131, F133, **F140**, **F141**, **F142**, **F143**, **F144**, **F145**, **F146**, **F147**, **F148**, **F149**, **F150**, **F151**, **F152**) |
-| P3 (Low) | 32 (F19, F32, F33, F76, F89, F90, F91, F92, F93, F94, F95, F96, F112, F113, F114, F115, F116, F129, F130, F134, F135, F136, **F153**, **F154**, **F155**, **F156**, **F157**, **F158**, **F159**, **F160**, **F161**, **F162**, **F163**, **F164**) |
+| P1 (High) | 44 (F02, F03, F04, F07, F09, F11, F14, F16, F24, F25, F30, F34, F43, F47, F48, F52, F54, F55, F56, F57, F58, F66, F67, F68, F69, F70, F80, F81, F82, F83, F97, F98, F99, F109, F117, F119, F121, F122, F123, F132, F137, F138, F139, **F189**) |
+| P2 (Medium) | 88 (F06, F08, F10, F12, F15, F17, F18, F20, F21, F22, F26, F27, F28, F31, F35, F36, F37, F38, F39, F40, F41, F42, F44, F49, F50, F51, F59, F60, F61, F62, F63, F64, F71, F72, F73, F74, F75, F84, F85, F86, F87, F88, F100, F101, F102, F103, F104, F105, F106, F107, F108, F110, F111, F118, F120, F124, F125, F126, F127, F128, F131, F133, F140, F141, F142, F143, F144, F145, F146, F147, F148, F149, F150, F151, F152, F165, F167, F168, F169, F170, F173, F174, F175, F176, F179, F180, **F185**, **F186**) |
+| P3 (Low) | 45 (F19, F32, F33, F76, F89, F90, F91, F92, F93, F94, F95, F96, F112, F113, F114, F115, F116, F129, F130, F134, F135, F136, F153, F154, F155, F156, F157, F158, F159, F160, F161, F162, F163, F164, F166, F171, F172, F177, F178, F181, **F182**, **F183**, **F184**, **F187**, **F188**) |
 | Quick wins (Фаза 1) | 65 (25 code + 8 documentation + 32 new F97-F164) |
-| Оценочное время | ~95-125 часа + Фаза 0 (F22: 8-12 часов) + Фаза 1-2 (F77-F96: ~5-8 часов) + F97-F120 (~4-5 часов) + F121-F130 (~3-4 часа) + F131-F136 (~20 мин) + F137-F164 (~2-3 часа) |
+| Оценочное время | ~95-125 часа + Фаза 0 (F22: 8-12 часов) + Фаза 1-2 (F77-F96: ~5-8 часов) + F97-F120 (~4-5 часов) + F121-F130 (~3-4 часа) + F131-F136 (~20 мин) + F137-F164 (~2-3 часа) + F165-F181 (~6-8 часов) + F182-F189 (~1-2 часа) |
 
 ## История изменений
 
@@ -699,3 +777,5 @@ _Maтрица охватывает F01-F52. F53-F76 не имеют перекр
 | 2026-07-31 | Добавлены F121-F130 (10 незадокументированных проблем, аудит Harmony патчинга, state machine, reflection performance, Morse standard, DSP config, geography). F121-F123 (3 P1: Harmony.UnpatchAll global, StationScheduler.Reset wrong phase, NavigationStartTime not initialized), F124-F128 (5 P2: redundant Type.GetType, silent Morse failure, no timing validation, hardcoded cycle config, antimeridian handling), F129-F130 (2 P3: Morse word boundary, BandConfig mutable). Итого 130 проблем (F01-F130). |
 | 2026-07-31 | Добавлены F131-F136 (6 незадокументированных проблем, аудит position fix, audio engine, UI escape, API design, scheduler, Morse timing). F131 (P2: stations w/o frequency in position fix), F132 (P1: keyer/scheduler advance while radio off), F133 (P2: escape key blocked by child selection), F134-F136 (3 P3: Calculate mutates input, OnSequenceFinished no default, MorseTiming silence wrong). Итого 136 проблем (F01-F136). |
 | 2026-07-31 | Добавлены F137-F164 (28 незадокументированных проблем, полный аудит Sound/Logic/UI/Data/Main vs F01-F136). F137-F139 (3 P1: Acos NaN, History bounds crash, UnpatchAll global), F140-F152 (13 P2: patch method null, frequency clicks, DSP unclamped, Atmosphere unclamped, zero divide, first callsign cycle, mutate on failure, float equality, no button filter, multitouch leak, overlapping bands, missing interpolation, catch loses stacktrace), F153-F164 (12 P3: Box-Muller waste, constructor ignores param, filter alpha recompute, undocumented impulse, duplicate BindingFlags, dead field, SerializeField overwrite, duplicated state queries, inconsistent rounding, DotTable ignores param, mutable struct copy, stub GetForCycleDuration). Итого 164 проблемы (F01-F164). |
+| 2026-07-31 | Добавлены F165-F181 (17 незадокументированных проблем, финальный рескан: сканирование всех 34 source-файлов vs F01-F164 + проверка граничных случаев в state machine, DSP, UI validation, bootstrap). F165-F175: аудит MorseKeyer/StationScheduler/PositionFixCalculator/DspPipeline/MorseAlphabet/InformationPanelHandler/NavigationPattern + кросс-зависимости с F01-F164. F165 (P2: Reset не очищает sequence), F166 (P3: TextToPattern игнорирует param), F167 (P2: OnSequenceFinished missing phases), F168 (P2: ErrorKm всегда 0), F169 (P2: CarrierGenerator phase drift), F170 (P2: MorseAlphabet table overflow), F171 (P3: StateLog debug alloc), F172 (P3: TrimEntries O(n²)), F173 (P2: fragile font loading), F174 (P2: negative index OOB), F175 (P2: cross-type transition asymmetry). F176-F181: архитектурные проблемы Main.cs bootstrap (GameObject.Find, GetComponent кэш, ответственности, string paths, логирование) + DspPipeline RNG. F176 (P2: GameObject.Find), F177 (P3: deterministic noise), F178 (P3: repeated GetComponent), F179 (P2: bootstrap responsibilities), F180 (P2: string UI paths), F181 (P3: diagnostic noise). Итого 181 проблема (F01-F181). |
+| 2026-07-31 | Добавлены F182-F189 (8 незадокументированных проблем, аудит build.ps1, MorseAlphabet, MorseKeyer, InformationPanelHandler, RadioStoryIntegration, PanelDragHandler, RadioInstaller, SonneController audio thread race). Итого 189 проблем (F01-F189). |
