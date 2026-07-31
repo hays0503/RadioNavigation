@@ -1,5 +1,14 @@
 # Risk Assessment — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** Глобальный аудит выявил ~76 проблем (F1–F76). Добавлены критические риски и новые проблемы F65–F76:
+> - **F45 (P0):** SAD документирует 5 ADR как «Accepted» — ни один не реализован. Читатель SAD получает ложное представление о состоянии проекта
+> - **F46 (P0):** SAD описывает неверные Harmony patch targets — при обновлении UBOAT SAD не поможет найти правильные методы
+> - **F47 (P1):** 14+ несуществующих классов в SAD — документацию невозможно использовать как reliable reference
+> - **Cross-file (P1):** `AudioSynthesisEngine.UpdateStationBeats()` — 0 callers, 6 dead методов, 16/17 констант PrefabNames не используются
+>
+> **Итого:** ~76 проблем, 33 quick wins + 8 документационных, ~95–125 часов + тесты.
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`
+
 ## 1. Risk Overview
 
 | Category | High | Medium | Low | Total |

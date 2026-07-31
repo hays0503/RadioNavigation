@@ -1,5 +1,7 @@
 # Target Architecture — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** Этот документ описывает целевую архитектуру. Классы `StationManager`, `SignalDecoder`, `PositionTracker`, `AudioController`, `AudioPipeline`, `CarrierBank`, `TickScheduler`, `StationStateBuffer`, `GameReflectionCache`, `RadioContext`, `StationInfoDisplay`, `StationFinder`, `UIElementFactory` — proposed target, не реализованы (F47). ADR-002/003/004/005/007 changed «Accepted» → «Deferred» (F45, исправлено). Пропущены `RadioStoryIntegration`, `SonneSignalGenerator`, `SignalRichTextFormatter` (F52). Добавлены F65–F76 (всего 76 проблем). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+
 ## 1. Target Layer Architecture
 
 ```

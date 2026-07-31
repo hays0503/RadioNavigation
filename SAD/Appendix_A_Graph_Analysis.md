@@ -1,10 +1,19 @@
 # Appendix A: Graph Analysis — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** Анализ графа обновлён. Исправления:
+> - **F48:** Array sizes 4→14 (`StationScheduler[]`, `MorseKeyer[]`, `CarrierGenerator[]`)
+> - **F47:** Удалены несуществующие узлы: `GameStrings`, `TickScheduler`, `DspPipeline`, `UIElementFactory`, `StationFinder`, `StationInfoDisplay`
+> - **F49:** Community 2 (Data): 7 узлов (было 8, удалён `GameStrings`). Community 3 (Sound): 4 узла (было 6, удалены `DspPipeline`, `TickScheduler`)
+> - **F52:** Добавлен пропущенный узел: `SignalRichTextFormatter`
+> - **F51:** `AudioSynthesisEngine.ProcessAudio`: 9 params (не 3)
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`
+
 ## 1. Graph Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Nodes | ~40 |
+| Total Nodes | ~40 (34 source files + graph-only symbols) |
 | Total Edges | ~80 |
 | Communities | 4 |
 | Average Degree | 4.0 |
@@ -29,7 +38,7 @@ Community 0: UI Layer (12 nodes)
 ├── ExpanderHandler
 └── RadioInstaller
 
-Community 1: Logic Layer (14 nodes)
+Community 1: Logic Layer (15 nodes)
 ├── SonneController
 ├── StationScheduler
 ├── MorseKeyer
@@ -43,25 +52,23 @@ Community 1: Logic Layer (14 nodes)
 ├── NavigationElementType
 ├── SignalEntry
 ├── Group
-└── Measurement
+├── Measurement
+└── SignalRichTextFormatter
 
-Community 2: Data Layer (8 nodes)
+Community 2: Data Layer (7 nodes)
 ├── BeaconData
 ├── DialConfig
 ├── PrefabNames
-├── GameStrings
 ├── ComparisonExtensions
 ├── BeaconStation
 ├── FixResult
 └── ConsolCycleConfig
 
-Community 3: Sound Layer (6 nodes)
+Community 3: Sound Layer (4 nodes)
 ├── AudioSynthesisEngine
-├── DspPipeline
 ├── CarrierGenerator
 ├── Atmosphere
-├── ReceiverDsp
-└── TickScheduler
+└── ReceiverDsp
 
 Community 4: Integration (2 nodes)
 ├── Main
@@ -96,9 +103,9 @@ Community 4: Integration (2 nodes)
 
 ```
 Connections:
-├──► StationScheduler[] (4)
-├──► MorseKeyer[] (4)
-├──► CarrierGenerator[] (4)
+├──► StationScheduler[] (14)
+├──► MorseKeyer[] (14)
+├──► CarrierGenerator[] (14)
 ├──► AudioSynthesisEngine
 ├──► BeaconData
 ├──► DialConfig

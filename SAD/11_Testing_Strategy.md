@@ -1,5 +1,7 @@
 # Testing Strategy — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** ADR-007 имеет статус «Deferred» (был «Accepted» — F45, исправлено). **0 тестов существует** (F10). Проект использует `csc.exe` (не `dotnet build`), поэтому команда `dotnet test` не работает — нужна тестовая инфраструктура (F22). `StationManagerTests`/`SignalDecoderTests`/`PositionTrackerTests` относятся к несуществующим классам (F47). Добавлены F65–F76 (всего 76 проблем). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+
 ## 1. Testing Overview
 
 | Test Type | Coverage Target | Current | Priority |
@@ -31,10 +33,7 @@ Tests/
 │       └── MathExtensionsTests.cs
 │
 ├── Integration/
-│   ├── AudioPipelineTests.cs
-│   ├── StationManagerTests.cs
-│   ├── SignalDecoderTests.cs
-│   └── PositionTrackerTests.cs
+│   └── AudioPipelineTests.cs (proposed)
 │
 └── Manual/
     ├── AudioQualityTests.cs
@@ -330,28 +329,8 @@ public class AudioPipelineTests {
 ### 4.2 StationManagerTests.cs
 
 ```csharp
-[TestFixture]
-public class StationManagerTests {
-    [Test]
-    public void SetActiveStation_ValidIndex_SetsStation() {
-        var manager = new StationManager();
-        
-        manager.SetActiveStation(2);
-        
-        Assert.That(manager.ActiveStationIndex, Is.EqualTo(2));
-    }
-    
-    [Test]
-    public void UpdateStationGains_AllStations_ComputesGains() {
-        var manager = new StationManager();
-        
-        manager.UpdateStationGains();
-        
-        foreach (var station in manager.Stations) {
-            Assert.That(station.Gain, Is.InRange(0f, 1f));
-        }
-    }
-}
+// StationManager — несуществующий класс (F47). Тест добавлен как proposal.
+// Реальные станции управляются в SonneController.UpdateStationGains().
 ```
 
 ## 5. Manual Testing
@@ -452,21 +431,20 @@ public static class TestMeasurements {
 ### 8.1 Run All Tests
 
 ```bash
-dotnet test
+# ⚠ Проект использует csc.exe, не dotnet build. Нужна тестовая инфраструктура (F22).
+# Предлагаемый фреймворк: NUnit + .NET Framework test project с ссылками на DLL.
 ```
 
 ### 8.2 Run Specific Test Category
 
 ```bash
-dotnet test --filter "Category=Unit"
-dotnet test --filter "Category=Integration"
-dotnet test --filter "Category=Performance"
+# ⚠ Not applicable until test infrastructure is set up (F22)
 ```
 
 ### 8.3 Generate Coverage Report
 
 ```bash
-dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+# ⚠ Not applicable until test infrastructure is set up (F22)
 ```
 
 ## 9. Test Maintenance

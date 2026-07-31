@@ -19,12 +19,17 @@
 │  │VolumeSpinner│ │FeedbackSpin │ │ExpanderHdlr │                  │
 │  │ (Volume)    │ │ (Feedback)  │ │ (Expand)    │                  │
 │  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
+│         │               │               │                          │
+│  ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐                  │
+│  │SignalRich   │ │DebugAngle   │ │PrefabNames  │                  │
+│  │TextFmt      │ │Handler      │ │ (Constants) │                  │
+│  └─────────────┘ └─────────────┘ └─────────────┘                  │
 └─────────┼───────────────┼───────────────┼──────────────────────────┘
           │               │               │
 ┌─────────┼───────────────┼───────────────┼──────────────────────────┐
 │         │          Logic Layer            │                          │
 │  ┌──────┴───────────────┴───────────────┴───────┐                  │
-│  │              SonneController (506 lines)       │                  │
+│  │              SonneController (508 lines)       │                  │
 │  │  • Station Management                          │                  │
 │  │  • Navigation Calculation                      │                  │
 │  │  • Signal Decoding                             │                  │
@@ -41,6 +46,11 @@
 │  │NavPattern   │ │SonneSignal  │ │PositionFix  │                  │
 │  │ (Patterns)  │ │Generator    │ │Calculator   │                  │
 │  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
+│         │               │               │                          │
+│  ┌──────┴──────┐ ┌──────┴──────┐                                 │
+│  │RadioStory   │ │Comparison   │                                 │
+│  │Integration  │ │Extensions   │                                 │
+│  └─────────────┘ └─────────────┘                                 │
 └─────────┼───────────────┼───────────────┼──────────────────────────┘
           │               │               │
 ┌─────────┼───────────────┼───────────────┼──────────────────────────┐
@@ -50,39 +60,49 @@
 │  │ (Stations)  │ │ (Dial)      │ │Config       │                  │
 │  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
 │         │               │               │                          │
-│  ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐                  │
-│  │StationState │ │Navigation   │ │Callsign     │                  │
-│  │ (State)     │ │Pattern      │ │Pattern      │                  │
-│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
+│  ┌──────┴──────┐ ┌──────┴──────┐                                 │
+│  │StationState │ │Navigation   │                                 │
+│  │ (State)     │ │Pattern      │                                 │
+│  └──────┬──────┘ └──────┬──────┘                                 │
+│         │               │                                          │
+│  ┌──────┴──────┐ ┌──────┴──────┐                                 │
+│  │SignalTypes  │ │MorseTiming  │                                 │
+│  │ (Enums)     │ │ (Timing)    │                                 │
+│  └─────────────┘ └─────────────┘                                 │
 └─────────┼───────────────┼───────────────┼──────────────────────────┘
           │               │               │
 ┌─────────┼───────────────┼───────────────┼──────────────────────────┐
 │         │           Sound Layer            │                          │
-│  ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐                  │
-│  │AudioSynth   │ │DspPipeline  │ │CarrierGen   │                  │
-│  │Engine       │ │ (DSP)       │ │ (Carrier)   │                  │
-│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
-│         │               │               │                          │
-│  ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐                  │
-│  │Atmosphere   │ │ReceiverDsp  │ │SignalRich   │                  │
-│  │ (Noise)     │ │ (AGC/Filter)│ │TextFormat   │                  │
-│  └─────────────┘ └─────────────┘ └─────────────┘                  │
-└─────────────────────────────────────────────────────────────────────┘
+│  ┌──────┴──────┐ ┌──────┴──────┐                                 │
+│  │AudioSynth   │ │DspPipeline  │                                 │
+│  │Engine       │ │ (DSP)       │                                 │
+│  └──────┬──────┘ └──────┬──────┘                                 │
+│         │               │                                          │
+│         │        ┌──────┴──────┐                                  │
+│         │        │CarrierGen   │ (embedded in DspPipeline.cs)     │
+│         │        ├─────────────┤                                  │
+│         │        │Atmosphere   │ (embedded in DspPipeline.cs)     │
+│         │        ├─────────────┤                                  │
+│         │        │ReceiverDsp  │ (embedded in DspPipeline.cs)     │
+│         │        └─────────────┘                                  │
+└─────────┼───────────────┼───────────────┼──────────────────────────┘
 ```
 
 ## 2. File Statistics
 
+**NOTE**: Corrected from original SAD which had wrong counts (see F49).
+
 | Layer | Files | Total Lines | Avg Lines/File |
 |-------|-------|-------------|----------------|
-| UI | 12 | ~850 | ~71 |
-| Logic | 14 | ~1,800 | ~129 |
-| Data | 8 | ~950 | ~119 |
-| Sound | 6 | ~600 | ~100 |
-| **Total** | **40** | **~4,200** | **~105** |
+| UI | 15 | ~1,280 | ~85 |
+| Logic | 12 | ~2,340 | ~195 |
+| Data | 5 | ~660 | ~132 |
+| Sound | 2 | ~340 | ~170 |
+| **Total** | **34** | **~4,197** | **~123** |
 
 ## 3. Component Details
 
-### 3.1 UI Layer Components
+### 3.1 UI Layer Components (15 files)
 
 #### RadioHandler.cs (Radio UI)
 - **Lines**: ~120
@@ -130,12 +150,40 @@
 - **Responsibility**: Volume/feedback controls
 - **Issues**: Nearly identical — code duplication
 
-### 3.2 Logic Layer Components
+#### PanelDragHandler.cs (Panel Drag)
+- **Lines**: ~20
+- **Responsibility**: Drag radio panel
+- **Issues**: Static Texture2D never destroyed (F42)
+
+#### ExpanderHandler.cs (Expand/Collapse)
+- **Lines**: ~54
+- **Responsibility**: Panel expand/collapse
+
+#### DebugAngleHandler.cs (Debug)
+- **Lines**: ~50
+- **Responsibility**: Debug angle slider
+- **Issues**: Uses TMPro which may not be in all UBOOT builds
+
+#### SignalRichTextFormatter.cs (Formatting)
+- **Lines**: ~86
+- **Responsibility**: Rich text formatting for signal display
+
+#### PrefabNames.cs (Names)
+- **Lines**: ~34
+- **Responsibility**: Prefab path constants
+- **Issues**: 16/17 constants unused (F26)
+
+#### RadioInstaller.cs (Installation)
+- **Lines**: ~80
+- **Responsibility**: UI instantiation from prefab
+- **Issues**: AudioSource not ensured (F43)
+
+### 3.2 Logic Layer Components (12 files)
 
 #### SonneController.cs (Main Controller)
-- **Lines**: 506
-- **Methods**: 30+
-- **Fields**: 25+
+- **Lines**: 508
+- **Methods**: ~29
+- **Fields**: ~20
 - **Responsibility**: **God Class** — Station management, navigation, audio, decoding
 - **Issues**:
   - Thread safety violations
@@ -144,18 +192,18 @@
 
 #### StationScheduler.cs (Station Scheduler)
 - **Lines**: ~120
-- **Responsibility**: Station cycle management (Callsign → Navigation → Pause)
+- **Responsibility**: Station cycle management
 - **Pattern**: State Machine
-- **Issues**: Public setters, phase transitions logged externally
+- **Issues**: Public setters, BearingTable property never read (F60)
 
 #### MorseKeyer.cs (Morse Keyer)
-- **Lines**: ~150
+- **Lines**: 240
 - **Responsibility**: Morse code timing and element advancement
 - **Pattern**: State Machine
 - **Issues**: ~60 lines in AdvanceElement(), duplicated logic
 
 #### MorseAlphabet.cs (Morse Data)
-- **Lines**: ~80
+- **Lines**: 126
 - **Responsibility**: Morse code lookup tables
 - **Issues**: None — clean data class
 
@@ -165,36 +213,45 @@
 - **Issues**: String concatenation in loops, 4 types in one file
 
 #### SonneSignalGenerator.cs (Signal Generator)
-- **Lines**: ~90
+- **Lines**: 146
 - **Responsibility**: Generate bearing tables and signal data
-- **Issues**: Duplicates BeaconData.GetDotCountToBearingTable()
+- **Issues**: Duplicates BeaconData.GetDotCountToBearingTable(). BearingTable is dead code (F34/F35)
 
 #### PositionFixCalculator.cs (Position Calculator)
-- **Lines**: ~130
+- **Lines**: 224
 - **Responsibility**: Calculate position from bearing measurements
 - **Issues**: ErrorKm always returns 0, mutable struct measurements
 
 #### RadioStoryIntegration.cs (Game Integration)
 - **Lines**: 381
 - **Responsibility**: Harmony patches for story/locale injection
-- **Issues**: **Fragile** — 12 reflection handlers, version-dependent
+- **Issues**: **Fragile** — 8 reflection handlers, version-dependent
 
 #### ComparisonExtensions.cs (Extensions)
-- **Lines**: ~50
+- **Lines**: 34
 - **Responsibility**: Null/float comparison helpers
-- **Issues**: 34 methods that duplicate C# operators
+- **Issues**: 25 methods that duplicate C# operators
 
-### 3.3 Data Layer Components
+#### MorseTiming.cs
+- **Lines**: 46
+- **Responsibility**: Morse timing calculations
+- **Issues**: None significant
+
+#### NavigationElementType.cs
+- **Lines**: 12
+- **Responsibility**: Enum for Dot/Dash/Equisignal
+
+### 3.3 Data Layer Components (5 files)
 
 #### BeaconData.cs (Station Database)
 - **Lines**: ~373
-- **Responsibility**: Hardcoded beacon station data
-- **Issues**: Static array, no JSON support, duplicates bearing table logic
+- **Responsibility**: Hardcoded beacon station data (14 stations)
+- **Issues**: Static array, no JSON support, 6 null callsigns (F37), 1 null frequency (F38), 3 stations on 332.5 kHz (F39)
 
 #### DialConfig.cs (Dial Configuration)
-- **Lines**: ~184
-- **Responsibility**: Frequency dial calibration data
-- **Issues**: 184 lines of static initialization with magic numbers
+- **Lines**: 158
+- **Responsibility**: Frequency dial calibration data (5 bands)
+- **Issues**: Magic numbers, overlapping band ranges (F20)
 
 #### ConsolCycleConfig.cs (Cycle Configuration)
 - **Lines**: ~50
@@ -202,43 +259,35 @@
 - **Issues**: Dead parameter in GetForCycleDuration()
 
 #### StationState.cs (Station State)
-- **Lines**: ~30
+- **Lines**: 16
 - **Responsibility**: Runtime state for a beacon station
 - **Issues**: Mutable struct — copy semantics cause bugs
 
-### 3.4 Sound Layer Components
+#### SignalTypes.cs
+- **Lines**: 23
+- **Responsibility**: Signal entry types and enums
 
-#### AudioSynthesisEngine.cs (Audio Engine)
+### 3.4 Sound Layer Components (2 files, 5 classes)
+
+#### AudioSynthesisEngine.cs
 - **Lines**: ~150
 - **Responsibility**: Main audio processing loop
-- **Issues**: Debug.Log in audio thread, thread safety
+- **Issues**: Debug.Log in audio thread, thread safety, UpdateStationBeats() is dead code (F59)
 
-#### DspPipeline.cs (DSP Pipeline)
+#### DspPipeline.cs (5 classes in 1 file)
 - **Lines**: ~100
-- **Responsibility**: Digital signal processing
-- **Issues**: 3 classes in one file, phase accumulation anti-pattern
-
-#### CarrierGenerator.cs (Carrier Signal)
-- **Lines**: ~40
-- **Responsibility**: Generate sine wave carriers
-- **Issues**: Float precision issues in phase
-
-#### Atmosphere.cs (Atmosphere Noise)
-- **Lines**: ~60
-- **Responsibility**: Generate atmospheric noise
-- **Issues**: None significant
-
-#### ReceiverDsp.cs (Receiver DSP)
-- **Lines**: ~70
-- **Responsibility**: AGC, filtering, saturation
-- **Issues**: None significant
+- **Classes**:
+  - `CarrierGenerator` — Sine wave generation (~40 lines), float→double precision issue (F41)
+  - `Atmosphere` — Atmospheric noise (~60 lines)
+  - `ReceiverDsp` — AGC/filtering/saturation (~70 lines)
+- **Issues**: 3 classes in one file, CarrierGenerator.NextSample() frequency not clamped (F40)
 
 ## 4. Dependency Matrix
 
 ```
                     UI    Logic   Data   Sound
 UI                  -     High    Low    Low
-Logic               High  -       High   High
+Logic               High  -       High   Low
 Data                Low   High    -      Low
 Sound               Low   High    Low    -
 ```
@@ -247,7 +296,7 @@ Sound               Low   High    Low    -
 
 | Entry Point | Trigger | Flow |
 |-------------|---------|------|
-| `Main.OnLoaded()` | Game load complete | Harmony Postfix → RadioInstaller → SonneController |
+| `Main.OnLoaded()` | Game load complete | IUserMod interface → RadioInstaller → SonneController |
 | `SonneController.Update()` | Every frame | Update navigation, UI, signals |
 | `SonneController.OnAudioFilterRead()` | Audio callback | Process audio buffers |
 | `RadioHandler.OnFrequencyChanged()` | Dial rotation | Update active frequency |
@@ -272,3 +321,9 @@ Sound               Low   High    Low    -
 1. **Scattered State**: Radio state split across 4+ static locations
 2. **No Single Source of Truth**: Multiple places can modify same state
 3. **Untestable**: Static state cannot be mocked or isolated
+
+---
+
+*Document Version: 1.2*  
+*Last Updated: 2026-07-31*  
+*Corrections: Fixed file counts, LOC, removed non-existent classes, added missing classes, fixed Sound layer. See F45-F52. Added F65-F76 (total 76 issues).*

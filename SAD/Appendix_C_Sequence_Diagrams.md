@@ -1,5 +1,13 @@
 # Appendix C: Sequence Diagrams — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** Sequence diagrams используют несуществующие классы. Добавлены F65–F76 (всего 76 проблем):
+> - **F47:** `StationManager` (вместо `SonneController.UpdateStationGains()`), `SignalDecoder` (вместо `SonneController.DecodeCallsignBuffer()`), `PositionTracker` (вместо `SonneController.UpdatePosition()`), `StationStateBuffer` (не реализован), `GameReflectionCache` (вместо `RadioStoryIntegration`)
+> - **F52:** `SignalRichTextFormatter` не показан в диаграмме сигналов
+> - **F51:** Неверные сигнатуры методов в диаграммах
+> - **F45 (исправлено): ADR-002/003/004/005/007 статус changed «Accepted» → «Deferred»**
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`
+
 ## 1. System Initialization
 
 ```

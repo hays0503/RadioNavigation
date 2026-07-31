@@ -1,5 +1,16 @@
 # Appendix B: Class Diagrams — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** Диаграммы классов содержат критические расхождения, частично исправлены:
+> - **F47:** Несуществующие классы в target diagrams — помечены `⚠ proposed`. `GameStrings`, `TickScheduler`, `DspPipeline` удалены
+> - **F51 (исправлено):** `ProcessAudio` сигнатура исправлена на 9 params
+> - **F48:** Array sizes: 4→14. **F52:** Пропущен `SignalRichTextFormatter`
+> - Неисправлено: `Atmosphere.GenerateNoise(data)` реальность — `Apply(sample, sampleRate)`
+> - Неисправлено: `ReceiverDsp` — 3 метода, реальность — один `Process`
+> - Неисправлено: `RadioHandler.EmitFrequency(freq, zone)` — private, 0 params
+> - Неисправлено: `InformationPanelHandler.uiElements` — поле не существует
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`
+
 ## 1. Current Class Diagram
 
 ### 1.1 Core Classes
@@ -160,7 +171,10 @@
 │ - atmosphere: Atmosphere                                            │
 │ - receiverDsp: ReceiverDsp                                          │
 ├─────────────────────────────────────────────────────────────────────┤
-│ + ProcessAudio(data: float[], channels: int, stations: StationState[]): void│
+│ + ProcessAudio(data: float[], channels: int, stations: StationState[],  │
+│ │             schedulers: StationScheduler[], keyers: MorseKeyer[],     │
+│ │             carriers: CarrierGenerator[], radioOn: bool,              │
+│ │             currentZoneIndex: int, sonneZoneIndex: int): void         │
 │ + Initialize(sampleRate: int): void                                 │
 └─────────────────────────────────────────────────────────────────────┘
                               │

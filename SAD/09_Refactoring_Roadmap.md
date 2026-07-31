@@ -1,5 +1,7 @@
 # Refactoring Roadmap — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** Проведён тотальный перекрёстный аудит (SAD vs code, git, build/config, cross-file consistency). Итого ~76 проблем (F1–F76). Оценка времени ~95–125 часов + Фаза 0 (F22: 8–12 часов тестовой инфраструктуры). Quick wins: 33 + 8 документационных. Добавлены F65–F76.
+
 ## 1. Roadmap Overview
 
 ```

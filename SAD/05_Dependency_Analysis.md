@@ -1,5 +1,18 @@
 # Dependency Analysis — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** Этот документ содержит устаревшие данные. Полный перекрестный аудит (SAD vs code, git, build/config, cross-file) выявил ~94 проблемы. Ключевые расхождения:
+> - **F45:** ADR-002/003/004/005/007 имеют статус «Accepted» в SAD, но **0% реализованы** в коде (нет double-buffer, нет интерфейсов, нет Constants.cs, нет тестов)
+> - **F46:** Harmony patch targets в SAD неверны — `Game.OnLoaded` → реальность `RadioStory.ContinueStory` (5 патчей, а не 3)
+> - **F47:** SAD ссылается на 14+ несуществующих классов (`GameStrings`, `StationManager`, `SignalDecoder`, `PositionTracker`, `AudioController`, `AudioPipeline`, `CarrierBank`, `TickScheduler`, `StationStateBuffer`, `GameReflectionCache`, `FormatDiagnosticString`, `StationInfoDisplay`, `StationFinder`, `RadioContext`)
+> - **F48:** Array sizes 4 → 14 (stations, schedulers, keyers, carriers)
+> - **F49:** File counts по слоям неверны: 40→34 (UI 12→15, Logic 14→12, Data 8→5, Sound 6→2)
+> - **F50:** LOC неверны для 10+ файлов (MorseKeyer 150→240, PositionFix 130→224)
+> - **F52:** Диаграммы пропускают 3 реальных класса: `RadioStoryIntegration` (381 LOC), `SonneSignalGenerator` (146), `SignalRichTextFormatter` (86)
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`
+
+> **⚠️ Deep Scan Update (2026-07-31):** Добавлены F65–F76 (всего 76 проблем). Dependency metrics refer to real classes; non-existent classes (F47) removed from analysis. ADR-002/004 «Deferred» (F45, исправлено). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+
 ## 1. Dependency Overview
 
 ### 1.1 External Dependencies

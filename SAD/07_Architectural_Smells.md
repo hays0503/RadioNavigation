@@ -1,5 +1,15 @@
 # Architectural Smells — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-31):** Документ имеет 28 smells. Добавлены F65–F76 (всего 76 проблем). Ключевые исправления:
+> - **F45 (исправлено):** 5 ADR changed «Accepted» → «Deferred»
+> - **F46 (исправлено):** Harmony targets corrected (RadioStory, not Game)
+> - **F47:** 14+ несуществующих классов — annotated/removed
+> - **F48:** Array size 4→14 — все циклы итерируют 14 станций
+> - **F51:** ProcessAudio 3→9 params (исправлено в Appendix B)
+> - **F52:** Добавлен SignalRichTextFormatter в диаграммы
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+
 ## 1. Smell Categories
 
 | Category | Count | Severity |

@@ -1,16 +1,23 @@
 # Architecture Decisions — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** Полный аудит выявил критические расхождения между статусами ADR и реальностью. Добавлены проблемы F65–F76 (всего 76).
+> - **F45 (исправлено):** ADR-002/003/004/005/007 — статус changed «Accepted» → «Deferred»
+> - **F46 (исправлено):** ADR-001 пример кода — replaced with real Harmony imperative patching
+> - **F48:** ADR-003 упоминает 4 станции — реальность 14
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+
 ## 1. Decision Overview
 
 | ID | Decision | Status | Date |
 |----|----------|--------|------|
 | ADR-001 | Use Harmony for runtime patching | Accepted | 2026-07-26 |
-| ADR-002 | Implement double-buffer pattern for audio | Accepted | 2026-07-26 |
-| ADR-003 | Decompose God Classes | Accepted | 2026-07-26 |
-| ADR-004 | Interface-based integration | Accepted | 2026-07-26 |
-| ADR-005 | Centralize constants | Accepted | 2026-07-26 |
+| ADR-002 | Implement double-buffer pattern for audio | Deferred | 2026-07-26 |
+| ADR-003 | Decompose God Classes | Deferred | 2026-07-26 |
+| ADR-004 | Interface-based integration | Deferred | 2026-07-26 |
+| ADR-005 | Centralize constants | Deferred | 2026-07-26 |
 | ADR-006 | JSON configuration files | Proposed | 2026-07-26 |
-| ADR-007 | Unit testing strategy | Accepted | 2026-07-26 |
+| ADR-007 | Unit testing strategy | Deferred | 2026-07-26 |
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 
@@ -42,15 +49,16 @@ Use Harmony library for runtime method patching.
 ### Implementation
 
 ```csharp
-// Main.cs
-[HarmonyPatch]
-public static class Main {
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(Game), "OnLoaded")]
-    public static void OnLoaded() {
-        // Inject radio equipment
-    }
-}
+// Main.cs (OnSceneAwake)
+var harmony = new Harmony("UBOAT.RadioNavigation");
+harmony.Patch(
+    original: AccessTools.Method(typeof(RadioStory), "ContinueStory"),
+    prefix: new HarmonyMethod(typeof(Main), nameof(OnContinueStoryPrefix))
+);
+harmony.Patch(
+    original: AccessTools.Method(typeof(Locale), nameof(Locale.RetrieveString), new[] { typeof(string) }),
+    postfix: new HarmonyMethod(typeof(Main), nameof(OnRetrieveStringPostfix))
+);
 ```
 
 ### Alternatives Considered
@@ -64,7 +72,7 @@ public static class Main {
 ## 3. ADR-002: Implement Double-Buffer Pattern for Audio
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 Audio thread (`OnAudioFilterRead`) and main thread (`Update()`) share mutable `StationState[]` without synchronization. This causes race conditions and audio artifacts.
@@ -116,7 +124,7 @@ public class StationStateBuffer {
 ## 4. ADR-003: Decompose God Classes
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 Two God Classes exist:
@@ -173,7 +181,7 @@ Decompose God Classes into focused, single-responsibility classes.
 ## 5. ADR-004: Interface-Based Integration
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 Game integration uses reflection directly, making it fragile to game updates.
@@ -225,7 +233,7 @@ public class GameReflectionCache : IGameServices {
 ## 6. ADR-005: Centralize Constants
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 Magic numbers are scattered throughout the codebase (25+ unique values).
@@ -328,7 +336,7 @@ Move configuration data to JSON files.
 ## 8. ADR-007: Unit Testing Strategy
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 No unit tests exist (0% coverage). Bugs are discovered in production.
@@ -396,9 +404,9 @@ public class PositionFixCalculatorTests {
 | ADR | Review Date | Reviewer | Status |
 |-----|-------------|----------|--------|
 | ADR-001 | 2026-08-01 | Tech Lead | Active |
-| ADR-002 | 2026-08-01 | Audio Lead | Active |
-| ADR-003 | 2026-08-15 | Architect | Active |
-| ADR-004 | 2026-08-15 | Integration Lead | Active |
-| ADR-005 | 2026-08-01 | All | Active |
+| ADR-002 | 2026-08-01 | Audio Lead | Deferred |
+| ADR-003 | 2026-08-15 | Architect | Deferred |
+| ADR-004 | 2026-08-15 | Integration Lead | Deferred |
+| ADR-005 | 2026-08-01 | All | Deferred |
 | ADR-006 | 2026-08-15 | Data Lead | Proposed |
-| ADR-007 | 2026-08-01 | QA Lead | Active |
+| ADR-007 | 2026-08-01 | QA Lead | Deferred |

@@ -1,5 +1,7 @@
 # God Object Analysis — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-07-30):** Этот документ ссылается на несуществующие классы (F47: `StationManager`, `SignalDecoder`, `PositionTracker`, `AudioController`) в extraction plan. Реальные кандидаты на выделение: `RadioStoryIntegration` (381 LOC), `SonneSignalGenerator` (146), `SignalRichTextFormatter` (86). ADR-003 changed «Accepted» → «Deferred» (F45, исправлено). Добавлены F65–F76 (всего 76 проблем). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+
 ## 1. God Objects Identified
 
 | Class | Lines | Methods | Fields | Severity |
