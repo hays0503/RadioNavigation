@@ -3,65 +3,55 @@
 ## 1. Component Hierarchy
 
 ```
-RadioNavigation Mod
+RadioNavigation Mod (Source/)
 │
 ├─── Entry Point
-│    └── Main.cs (Harmony patches, mod initialization)
+│    └── Logic/Main.cs (Harmony patches, mod initialization)
 │
-├─── UI Components
-│    ├── RadioUI/
-│    │   ├── RadioHandler.cs (Main radio panel)
-│    │   ├── ToggleHandler.cs (Power switch)
-│    │   ├── ZoneHandler.cs (Zone selector)
-│    │   ├── GroundHandler.cs (Ground toggle)
-│    │   ├── CursorHandler.cs (Frequency dial)
-│    │   ├── PanelDragHandler.cs (Panel dragging)
-│    │   ├── ExpanderHandler.cs (Panel expand/collapse)
-│    │   ├── DebugAngleHandler.cs (Debug display)
-│    │   ├── InformationPanelHandler.cs (Info display)
-│    │   └── SignalRichTextFormatter.cs (Signal formatting)
-│    │
-│    ├── Spinners/
-│    │   ├── SpinnerHandlerBase.cs (Base class)
-│    │   ├── VolumeSpinnerHandler.cs (Volume control)
-│    │   └── FeedbackSpinnerHandler.cs (Feedback control)
-│    │
-│    └── Installation/
-│        ├── RadioInstaller.cs (UI instantiation)
-│        └── PrefabNames.cs (Prefab path constants)
+├─── UI Components (15 files — flat in Source/UI/)
+│    ├── RadioHandler.cs (Main radio panel)
+│    ├── ToggleHandler.cs (Power switch)
+│    ├── ZoneHandler.cs (Zone selector)
+│    ├── GroundHandler.cs (Ground toggle)
+│    ├── CursorHandler.cs (Frequency dial)
+│    ├── PanelDragHandler.cs (Panel dragging)
+│    ├── ExpanderHandler.cs (Panel expand/collapse)
+│    ├── DebugAngleHandler.cs (Debug display)
+│    ├── InformationPanelHandler.cs (Info display)
+│    ├── SignalRichTextFormatter.cs (Signal formatting)
+│    ├── SpinnerHandlerBase.cs (Base spinner class)
+│    ├── VolumeSpinnerHandler.cs (Volume control)
+│    ├── FeedbackSpinnerHandler.cs (Feedback control)
+│    ├── RadioInstaller.cs (UI instantiation)
+│    └── PrefabNames.cs (Prefab path constants)
 │
-├─── Logic Components
-│    ├── Core/
-│    │   ├── SonneController.cs (Main controller — God Class)
-│    │   ├── StationScheduler.cs (Station cycle state machine)
-│    │   └── MorseKeyer.cs (Morse timing state machine)
-│    │
-│    ├── Navigation/
-│    │   ├── NavigationPattern.cs (Consol patterns)
-│    │   ├── NavigationElementType.cs (Enum)
-│    │   ├── SonneSignalGenerator.cs (Signal generation)
-│    │   └── PositionFixCalculator.cs (Position calculation)
-│    │
-│    ├── Morse/
-│    │   ├── MorseAlphabet.cs (Morse code data)
-│    │   └── MorseTiming.cs (Timing calculations)
-│    │
-│    └── Integration/
-│        └── RadioStoryIntegration.cs (Game story/locale patches)
+├─── Logic Components (12 files — flat in Source/Logic/)
+│    ├── SonneController.cs (Main controller — God Class)
+│    ├── RadioStoryIntegration.cs (Game story/locale patches)
+│    ├── StationScheduler.cs (Station cycle state machine)
+│    ├── MorseKeyer.cs (Morse timing state machine)
+│    ├── NavigationPattern.cs (Consol patterns)
+│    ├── NavigationElementType.cs (Enum)
+│    ├── SonneSignalGenerator.cs (Signal generation)
+│    ├── PositionFixCalculator.cs (Position calculation)
+│    ├── MorseAlphabet.cs (Morse code data)
+│    ├── MorseTiming.cs (Timing calculations)
+│    ├── ComparisonExtensions.cs (Float comparison helpers)
+│    └── Main.cs (Harmony entry point — listed above as Entry Point)
 │
-├─── Data Components
+├─── Data Components (5 files — flat in Source/Data/)
 │    ├── BeaconData.cs (Station database — 14 stations)
 │    ├── DialConfig.cs (Dial calibration — 5 bands)
 │    ├── ConsolCycleConfig.cs (Cycle timing)
 │    ├── StationState.cs (Runtime state)
 │    └── SignalTypes.cs (Signal enums)
 │
-└─── Sound Components (2 files, 5 classes)
+└─── Sound Components (2 files, 5 classes — flat in Source/Sound/)
      ├── AudioSynthesisEngine.cs (Audio processing)
      └── DspPipeline.cs (DSP utilities — 3 classes: CarrierGenerator, Atmosphere, ReceiverDsp)
 ```
 
-**NOTE**: Removed non-existent classes: GameStrings, TickScheduler, StationManager, SignalDecoder, PositionTracker, AudioPipeline, CarrierBank, AudioController (see F47).
+**NOTE**: Physical directory structure is flat — files are organized by layer in `Source/{UI,Logic,Data,Sound}/` with no subfolders. Subfolder names in the original SAD (RadioUI/, Spinners/, Installation/, Integration/, Core/, Navigation/, Morse/) were conceptual groupings, not physical directories. Removed non-existent classes: GameStrings, TickScheduler, StationManager, SignalDecoder, PositionTracker, AudioPipeline, CarrierBank, AudioController (see F47).
 
 ## 2. Component Responsibilities
 
@@ -318,9 +308,8 @@ Audio Thread:
 
 **Note**: 0% test coverage (no test project exists). See F22, F45 (ADR-007 — changed to Deferred).
 
----
+----
 
 *Document Version: 1.2*  
-*Last Updated: 2026-07-31*  
-*Corrections: Fixed array sizes 4→14 (F48), file counts (F49), added missing classes (F52). See F65-F76 (total 76 issues).*  
-*Corrections: Fixed array sizes (4→14), removed non-existent classes, fixed ProcessAudio signature, fixed MorseKeyer methods, fixed LOC. See F45-F52.*
+*Last Updated: 2026-08-01*  
+*Corrections: Fixed component hierarchy (flat structure, added ComparisonExtensions), fixed array sizes 4→14 (F48), file counts (F49), added missing classes (F52). See F65–F199 (total 199 issues). See F45–F52 for SAD drift corrections.*

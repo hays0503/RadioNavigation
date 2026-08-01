@@ -1,27 +1,27 @@
 # God Object Analysis — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-07-30):** Этот документ ссылается на несуществующие классы (F47: `StationManager`, `SignalDecoder`, `PositionTracker`, `AudioController`) в extraction plan. Реальные кандидаты на выделение: `RadioStoryIntegration` (381 LOC), `SonneSignalGenerator` (146), `SignalRichTextFormatter` (86). ADR-003 changed «Accepted» → «Deferred» (F45, исправлено). Добавлены F65–F76 (всего 76 проблем). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+> **⚠️ Deep Scan Update (2026-08-01):** Этот документ ссылается на несуществующие классы (F47: `StationManager`, `SignalDecoder`, `PositionTracker`, `AudioController`, `UIElementFactory`, `StationInfoDisplay`, `StationFinder`) в extraction plan — отмечены `⚠ proposed`. Реальные кандидаты на выделение: `RadioStoryIntegration` (381 LOC), `SonneSignalGenerator` (146), `SignalRichTextFormatter` (86). ADR-003 changed «Accepted» → «Deferred» (F45, исправлено). Добавлены F65–F199 (всего 199 проблем). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
 
 ## 1. God Objects Identified
 
 | Class | Lines | Methods | Fields | Severity |
 |-------|-------|---------|--------|----------|
-| **SonneController** | 506 | 30+ | 25+ | **Critical** |
+| **SonneController** | 508 | 30+ | 25+ | **Critical** |
 | **InformationPanelHandler** | 474 | 20+ | 15+ | **Critical** |
-| **RadioStoryIntegration** | 381 | 15+ | 12+ | High |
+| **RadioStoryIntegration** | 381 | 15+ | 9 | High |
 
 ## 2. SonneController Analysis
 
 ### 2.1 Current Structure
 
 ```
-SonneController.cs (506 lines)
+SonneController.cs (508 lines) — Source/Logic/SonneController.cs
 │
 ├── Fields (25+)
-│   ├── stations[] (StationState)
-│   ├── schedulers[] (StationScheduler)
-│   ├── keyers[] (MorseKeyer)
-│   ├── carriers[] (CarrierGenerator)
+│   ├── stations[] (StationState[14])          (F48: 4→14)
+│   ├── schedulers[] (StationScheduler[14])
+│   ├── keyers[] (MorseKeyer[14])
+│   ├── carriers[] (CarrierGenerator[14])
 │   ├── atmosphere (Atmosphere)
 │   ├── receiverDsp (ReceiverDsp)
 │   ├── signalEntries (List<SignalEntry>)
@@ -35,7 +35,7 @@ SonneController.cs (506 lines)
 │   ├── silentClip (AudioClip)
 │   ├── ... and 10+ more
 │
-├── Methods (30+)
+├── Methods (~30)
 │   ├── Unity Lifecycle
 │   │   ├── Awake()
 │   │   ├── OnDestroy()
@@ -43,8 +43,8 @@ SonneController.cs (506 lines)
 │   │   └── OnAudioFilterRead()
 │   │
 │   ├── Station Management
-│   │   ├── UpdateStationGains()
-│   │   ├── UpdateStationNavigation()
+│   │   ├── UpdateStationGains()      (main thread)
+│   │   ├── UpdateStationNavigation() (main thread, F77)
 │   │   ├── SetActiveStation()
 │   │   └── GetStationDiagnostics()
 │   │
@@ -57,36 +57,41 @@ SonneController.cs (506 lines)
 │   │   └── ClearSignalBuffer()
 │   │
 │   ├── Audio
-│   │   ├── ProcessAudio()
+│   │   ├── ProcessAudio()             (audio thread, F13 Unity API)
 │   │   ├── InitializeAudio()
 │   │   └── CreateSilentClip()
 │   │
-│   └── Position
-│       ├── UpdatePosition()
-│       ├── CalculateBearing()
-│       └── GetPositionFix()
+│   ├── Position
+│   │   ├── UpdatePosition()
+│   │   ├── CalculateBearing()
+│   │   └── GetPositionFix()
+│   └── Navigation Pattern
+│       └── CurrentConsolPattern      (F145: pre-compute in Awake)
 │
-└── Responsibilities (Mixed)
+└── Responsibilities (Mixed — 9 total)
     ├── Station management
     ├── Navigation calculation
     ├── Signal decoding
     ├── Audio synthesis
     ├── Position tracking
     ├── UI coordination
-    └── Diagnostics
+    ├── Diagnostics
+    ├── Morse timing coordination
+    └── Phase state coordination
 ```
 
 ### 2.2 Responsibility Matrix
 
-| Responsibility | Lines | Methods | Can Extract? |
-|----------------|-------|---------|--------------|
-| Station Management | ~100 | 4 | ✅ → StationManager |
-| Navigation Calculation | ~80 | 3 | ✅ → NavigationProcessor |
-| Signal Decoding | ~90 | 5 | ✅ → SignalDecoder |
-| Audio Processing | ~120 | 3 | ✅ → AudioController |
-| Position Tracking | ~60 | 3 | ✅ → PositionTracker |
-| UI Coordination | ~40 | 2 | ⚠️ Keep in Controller |
-| Diagnostics | ~16 | 2 | ✅ → DiagnosticsCollector |
+| Responsibility | Lines | Methods | Can Extract? | F-ref |
+|----------------|-------|---------|--------------|-------|
+| Station Management | ~100 | 4 | ⚠ proposed (F02) | F02 |
+| Navigation Calculation | ~80 | 3 | ⚠ proposed (N/A) | F77 |
+| Signal Decoding | ~90 | 5 | ⚠ proposed (F02) | F02 |
+| Audio Processing | ~120 | 3 | ⚠ proposed (AudioController F47) | F02 |
+| Position Tracking | ~60 | 3 | ⚠ proposed (PositionTracker F47) | F02, F18 |
+| UI Coordination | ~40 | 2 | ⚠️ Keep in Controller | F02 |
+| Diagnostics | ~16 | 2 | ✅ DiagnosticsCollector | F02 |
+| Pattern Coordination | ~30 | 2 | ⚠️ Keep in Controller | F145 |
 
 ### 2.3 Thread Safety Issues
 
@@ -159,19 +164,18 @@ InformationPanelHandler.cs (474 lines)
 ### 4.1 Current Structure
 
 ```
-RadioStoryIntegration.cs (381 lines)
+RadioStoryIntegration.cs (381 lines) — Source/Logic/RadioStoryIntegration.cs
 │
-├── Reflection Handlers (12)
-│   ├── singletonType (Type)
-│   ├── singletonInstance (object)
-│   ├── injectDecisionMethod (MethodInfo)
-│   ├── decisionsField (FieldInfo)
-│   ├── updatedMethod (MethodInfo)
-│   ├── localeType (Type)
-│   ├── localeInstance (object)
-│   ├── getCurrentLanguageMethod (MethodInfo)
-│   ├── retrieveStringMethod (MethodInfo)
-│   ├── ... and 3 more
+├── Reflection Handlers (9 cached members)
+│   ├── storyType (Type)                   // typeof(RadioStory).BaseType
+│   ├── insertMethod (MethodInfo)          // storyType.GetMethod("InsertDecision")
+│   ├── decisionType (Type)                // insertMethod params[1]
+│   ├── decisionCtor (ConstructorInfo)     // 6+ params, pars[0]=string, pars[3]=Action
+│   ├── localizationKeyProp (PropertyInfo) // decisionType.GetProperty("LocalizationKey")
+│   ├── stageField (FieldInfo)             // typeof(RadioStory).GetField("stage")
+│   ├── decisionsProp (PropertyInfo)       // storyType.GetProperty("Decisions")
+│   ├── onUpdatedMethod (MethodInfo)       // storyType.GetMethod("OnUpdated")
+│   └── languageProp (PropertyInfo)        // typeof(Locale).GetProperty("CurrentLanguage")
 │
 ├── Methods
 │   ├── Init()
@@ -182,82 +186,87 @@ RadioStoryIntegration.cs (381 lines)
 │   ├── RetrieveString()
 │   └── NotifyUpdated()
 │
-└── Harmony Patches
-    ├── [HarmonyPatch("StoryManager", "InjectDecision")]
-    └── [HarmonyPatch("LocaleManager", "GetCurrentLanguage")]
+└── Harmony Patches (5 targets — Main.cs, lines 95-130)
+    ├── RadioStory.ContinueStory (prefix)
+    ├── Locale.RetrieveString(string) (postfix)
+    ├── Locale.RetrieveString(string, int) (postfix)
+    ├── RadioStory.OnDecisionSelected (prefix)
+    └── RadioStory.OnStopped (prefix)
 ```
 
 ### 4.2 Reflection Fragility
 
-| Reflection Call | Risk | Fallback |
-|-----------------|------|----------|
-| `Type.GetType("Game.StoryManager")` | Type renamed | Search Assembly-CSharp |
-| `type.GetConstructors()[0]` | Constructor changed | Guess by parameter count |
-| `type.GetField("singleton")` | Field renamed | Try "Instance" |
-| `type.GetMethod("InjectDecision")` | Method renamed | Search by parameters |
+| Reflection Call | Risk | Fallback | F-ref |
+|-----------------|------|----------|-------|
+| `typeof(RadioStory).BaseType` | BaseType null | Debug.LogError + return (F23) | F23 |
+| `storyType.GetMethod("InsertDecision")` | Method renamed | None — silent failure | F68 |
+| `decisionType.GetConstructors()` | Ctor changed | Param count + type matching | F68 |
+| `typeof(RadioStory).GetProperty("Decisions")` | Name changed | None | F23 |
+| `typeof(Locale).GetProperty("CurrentLanguage")` | Renamed | None | F23 |
 
 ## 5. Extraction Plan
 
-### 5.1 SonneController Decomposition
+### 5.1 SonneController Decomposition ⚠ proposed (F02)
 
 ```
-BEFORE: SonneController (506 lines)
+BEFORE: SonneController (508 lines) — Source/Logic/SonneController.cs
 │
-└──► AFTER:
-    ├── StationManager (~100 lines)
+└──► AFTER (⚠ proposed — F02):
+    ├── ⚠ StationManager (~100 lines)
     │   ├── stations[]
     │   ├── UpdateStationGains()
     │   ├── UpdateStationNavigation()
     │   └── SetActiveStation()
     │
-    ├── SignalDecoder (~90 lines)
+    ├── ⚠ SignalDecoder (~90 lines)
     │   ├── signalEntries
     │   ├── morseDecoderBuffer
     │   ├── OnStationElementCompleted()
     │   ├── DecodeCallsignBuffer()
     │   └── GetSignalRichText()
     │
-    ├── AudioController (~120 lines)
+    ├── ⚠ AudioController (~120 lines) [non-existent — F47]
     │   ├── ProcessAudio()
     │   ├── InitializeAudio()
     │   └── CreateSilentClip()
     │
-    ├── PositionTracker (~60 lines)
+    ├── ⚠ PositionTracker (~60 lines) [non-existent — F47]
     │   ├── measurements
     │   ├── lastFix
     │   ├── UpdatePosition()
     │   └── GetPositionFix()
     │
-    └── SonneController (~136 lines) — ORCHESTRATOR
+    └── SonneController (~200 lines) — ORCHESTRATOR
         ├── Awake()
         ├── Update()
         ├── OnDestroy()
+        ├── OnAudioFilterRead()
         └── Event coordination
 ```
 
-### 5.2 InformationPanelHandler Decomposition
+### 5.2 InformationPanelHandler Decomposition ⚠ proposed (F03)
 
 ```
-BEFORE: InformationPanelHandler (474 lines)
+BEFORE: InformationPanelHandler (474 lines) — Source/UI/InformationPanelHandler.cs
 │
-└──► AFTER:
-    ├── UIElementFactory (~150 lines)
+└──► AFTER (⚠ proposed — F03):
+    ├── ⚠ UIElementFactory (~150 lines)
     │   ├── CreateLabel()
     │   ├── CreateSeparator()
     │   ├── CreateImage()
     │   └── CreateText()
     │
-    ├── StationInfoDisplay (~120 lines)
+    ├── ⚠ StationInfoDisplay (~120 lines)
     │   ├── RefreshAll()
     │   ├── UpdateStationInfo()
     │   └── UpdatePatternDisplay()
     │
-    ├── StationFinder (~80 lines)
+    ├── ⚠ StationFinder (~80 lines)
     │   ├── FindClosestStation()
     │   ├── GetZoneIndex()
     │   └── IsGroundActive()
     │
-    └── InformationPanelHandler (~124 lines) — ORCHESTRATOR
+    └── InformationPanelHandler (~200 lines) — ORCHESTRATOR
         ├── Start()
         ├── RefreshAll()
         └── Event subscriptions
@@ -267,34 +276,40 @@ BEFORE: InformationPanelHandler (474 lines)
 
 ### 6.1 Testability
 
-| Before | After |
-|--------|-------|
-| Cannot test station logic without Unity | StationManager testable with mocks |
-| Cannot test signal decoding in isolation | SignalDecoder testable with unit tests |
-| Cannot test audio without game running | AudioController testable with mocks |
+| Before | After (⚠ proposed — F02/F03) |
+|--------|------------------------------|
+| Cannot test station logic without Unity | ⚠ StationManager testable with mocks |
+| Cannot test signal decoding in isolation | ⚠ SignalDecoder testable with unit tests |
+| Cannot test audio without game running | ⚠ AudioController testable with mocks |
 
 ### 6.2 Maintainability
 
-| Before | After |
-|--------|-------|
-| Change in station logic affects audio | Changes isolated to StationManager |
-| Change in UI affects navigation | Changes isolated to UIElementFactory |
+| Before | After (⚠ proposed — F02/F03) |
+|--------|------------------------------|
+| Change in station logic affects audio | Changes isolated to ⚠ StationManager |
+| Change in UI affects navigation | Changes isolated to ⚠ UIElementFactory |
 | Hard to find specific functionality | Clear responsibility per class |
 
 ### 6.3 Reusability
 
-| Before | After |
-|--------|-------|
-| Station logic tied to SonneController | StationManager reusable |
-| UI creation tied to InformationPanel | UIElementFactory reusable |
-| Position logic tied to SonneController | PositionTracker reusable |
+| Before | After (⚠ proposed — F02/F03) |
+|--------|------------------------------|
+| Station logic tied to SonneController | ⚠ StationManager reusable |
+| UI creation tied to InformationPanel | ⚠ UIElementFactory reusable |
+| Position logic tied to SonneController | ⚠ PositionTracker reusable |
 
 ## 7. Metrics Comparison
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| Max lines per class | 506 | ~150 | **70% reduction** |
-| Max methods per class | 30+ | ~10 | **67% reduction** |
-| Max fields per class | 25+ | ~8 | **68% reduction** |
+| Metric | Before | After (⚠ proposed — F02/F03) | Improvement |
+|--------|--------|------|-------------|
+| Max lines per class | 508 | ~200 | **61% reduction** |
+| Max methods per class | 30+ | ~12 | **60% reduction** |
+| Max fields per class | 25+ | ~10 | **60% reduction** |
 | Testability | Low | High | **Significant** |
 | Coupling | Very High | Medium | **Significant** |
+
+---
+
+*Document Version: 2.0*  
+*Last Updated: 2026-08-01*  
+*Corrected: LOC 506→508 (F50), Harmony targets StoryManager→RadioStory.ContinueStory (F46), Reflection chain matches actual code (F23/F68). Phantom extraction classes annotated `⚠ proposed` (F47). Updated for 199 problems (F65–F199).*

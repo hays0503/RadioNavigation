@@ -25,15 +25,7 @@ double alpha3 = Math.Acos(
 
 **Результат:** `alpha3 = NaN` → `dist13 = NaN` → `phi3 = NaN` → `lam3 = NaN` → `FixResult.Latitude/Longitude = NaN`. Метод возвращает `Valid = true` с NaN координатами.
 
-Это **отдельный** вектор NaN от F80 (Haversine `Math.Asin` в строке 149), который уже имеет clamp:
-
-```csharp
-// Строка 159: F80 исправлен — clamp перед Math.Acos
-cosBrngA = Math.Max(-1.0, Math.Min(1.0, cosBrngA));
-double brngA = Math.Acos(cosBrngA);  // ← безопасно
-```
-
-Но строка 179 **не имеет** такого clamp.
+Это **отдельный** вектор NaN от F190 (`Math.Asin` в строке 149), у которого также **нет clamp** (F190 документирует и исправление). И F191 (`Math.Asin` в строке 187 для `phi3`), также без clamp. F80 покрывает `Math.Sqrt(1.0 - a)` в `GetDistanceKm` — другом методе.
 
 ## Корневая причина
 
@@ -50,6 +42,16 @@ double alpha3 = Math.Acos(cosAlpha3);
 
 ## Зависимости
 
-- Связан с F80 (Haversine NaN) — тот же файл, другой NaN-вектор, исправлен clamp'ом
-- Связан с F73 (Duplicated Haversine) — общая проблема численной стабильности
-- Связан с F16 (ErrorKm = 0) — NaN в координатах не отражается в ошибке
+- Связан с F190 (Asin NaN в `FindIntersection:149`) — аналогичный NaN-вектор в том же методе, также без clamp.
+- Связан с F191 (Asin NaN в `FindIntersection:187`, `phi3`) — третий NaN-вектор в том же методе.
+- Связан с F80 (Haversine NaN в `GetDistanceKm`) — другой метод, другой NaN-вектор.
+- Связан с F73 (Duplicated Haversine) — общая проблема численной стабильности.
+- Связан с F16 (ErrorKm = 0) — NaN в координатах не отражается в ошибке.
+
+---
+
+## Acceptance Criteria
+
+- [ ] Аргумент `Math.Acos` на строке 179 clamp'ится к [-1, 1] перед вызовом
+- [ ] `alpha3` никогда не равен NaN для валидных входных данных
+- [ ] См. также F190 (Asin line 149) и F191 (Asin line 187) — те же NaN-векторы в `FindIntersection`

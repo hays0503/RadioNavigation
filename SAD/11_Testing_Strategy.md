@@ -1,6 +1,6 @@
 # Testing Strategy — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-07-30):** ADR-007 имеет статус «Deferred» (был «Accepted» — F45, исправлено). **0 тестов существует** (F10). Проект использует `csc.exe` (не `dotnet build`), поэтому команда `dotnet test` не работает — нужна тестовая инфраструктура (F22). `StationManagerTests`/`SignalDecoderTests`/`PositionTrackerTests` относятся к несуществующим классам (F47). Добавлены F65–F76 (всего 76 проблем). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+> **⚠️ Deep Scan Update (2026-08-01):** ADR-007 имеет статус «Deferred» (был «Accepted» — F45, исправлено). **0 тестов существует** (F10). Проект использует `csc.exe` (не `dotnet build`), поэтому команда `dotnet test` не работает — нужна тестовая инфраструктура (F22). `StationManagerTests`/`SignalDecoderTests`/`PositionTrackerTests`/`AudioPipelineTests` относятся к несуществующим классам (F47) — annotated `⚠ proposed`. Всего **199 проблем** (F01–F199). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
 
 ## 1. Testing Overview
 
@@ -14,7 +14,7 @@
 ## 2. Test Architecture
 
 ```
-Tests/
+Tests/  [⚠ proposed — F22: no test project exists yet]
 ├── Unit/
 │   ├── Data/
 │   │   ├── BeaconDataTests.cs
@@ -30,15 +30,16 @@ Tests/
 │   │   └── StationSchedulerTests.cs
 │   │
 │   └── Extensions/
-│       └── MathExtensionsTests.cs
+│       └── ComparisonExtensionsTests.cs
 │
 ├── Integration/
-│   └── AudioPipelineTests.cs (proposed)
+│   ├── ⚠ DspPipelineTests.cs  [⚠ proposed — tests CarrierGenerator/Atmosphere/ReceiverDsp nested classes]
+│   └── ⚠ AudioPipelineTests.cs [⚠ proposed — AudioPipeline doesn't exist, F47]
 │
 └── Manual/
-    ├── AudioQualityTests.cs
-    ├── UITests.cs
-    └── GameIntegrationTests.cs
+    ├── AudioQualityTests.md  [manual checklist, not .cs]
+    ├── UITests.md           [manual checklist, not .cs]
+    └── GameIntegrationTests.md [manual checklist, not .cs]
 ```
 
 ## 3. Unit Tests
@@ -68,8 +69,9 @@ public class BeaconDataTests {
     [Test]
     public void Stations_EachHasValidBearingTable() {
         foreach (var station in BeaconData.Stations) {
-            Assert.That(station.BearingTable, Is.Not.Null);
-            Assert.That(station.BearingTable.Length, Is.EqualTo(61));
+            var table = station.GetDotCountToBearingTable();
+            Assert.That(table, Is.Not.Null);
+            Assert.That(table.Length, Is.EqualTo(61));
         }
     }
 }
@@ -289,49 +291,63 @@ public class DspPipelineTests {
 
 ## 4. Integration Tests
 
-### 4.1 AudioPipelineTests.cs
+### 4.1 DspPipelineTests.cs ⚠ proposed (F22)
 
 ```csharp
+// ⚠ proposed — CarrierGenerator, Atmosphere, ReceiverDsp are nested classes in DspPipeline.cs
 [TestFixture]
-public class AudioPipelineTests {
+public class DspPipelineTests {
     [Test]
-    public void ProcessAudio_WithStations_ProducesOutput() {
-        var pipeline = new AudioPipeline();
-        var stations = CreateTestStations();
-        float[] data = new float[1024 * 2]; // stereo
-        
-        pipeline.ProcessAudio(data, 2, stations);
-        
-        Assert.That(data.Any(d => d != 0), Is.True);
+    public void GenerateCarrier_SineWave_CorrectFrequency() {
+        var carrier = new CarrierGenerator(440f, 44100);
+        float sample = carrier.NextSample();
+        Assert.That(sample, Is.InRange(-1f, 1f));
     }
     
     [Test]
-    public void ProcessAudio_VolumeControl_RespectsVolume() {
-        var pipeline = new AudioPipeline();
-        var stations = CreateTestStations();
-        float[] data1 = new float[1024 * 2];
-        float[] data2 = new float[1024 * 2];
+    public void ApplyAGC_LoudSignal_ReduceGain() {
+        var dsp = new ReceiverDsp();
+        float[] data = new float[1024];
+        for (int i = 0; i < data.Length; i++) {
+            data[i] = 0.9f;
+        }
         
-        pipeline.OutputVolume = 0.5f;
-        pipeline.ProcessAudio(data1, 2, stations);
+        // ⚠ Actual API: ReceiverDsp has 1 Process method, not ApplyAGC (F51)
+        dsp.Process(data);  // Corrected — actual ReceiverDsp.Process() (F47)
         
-        pipeline.OutputVolume = 1.0f;
-        pipeline.ProcessAudio(data2, 2, stations);
+        Assert.That(data[0], Is.LessThan(0.9f));
+    }
+    
+    [Test]
+    public void Atmosphere_Noise_BoundedOutput() {
+        var atmosphere = new Atmosphere();
+        float[] data = new float[1024];
         
-        float avg1 = data1.Average(Math.Abs);
-        float avg2 = data2.Average(Math.Abs);
+        // ⚠ Actual API: Apply(sample, sampleRate), not GenerateNoise(data) (F47)
+        atmosphere.Apply(data, 44100);  // Corrected signature
         
-        Assert.That(avg2, Is.GreaterThan(avg1));
+        foreach (var sample in data) {
+            Assert.That(sample, Is.InRange(-1f, 1f));
+        }
     }
 }
 ```
 
-### 4.2 StationManagerTests.cs
+### 4.2 StationManagerTests.cs ⚠ proposed (F47)
 
 ```csharp
-// StationManager — несуществующий класс (F47). Тест добавлен как proposal.
-// Реальные станции управляются в SonneController.UpdateStationGains().
+// ⚠ proposed — StationManager doesn't exist (F47). Tests apply to SonneController instead.
+// Real test target: SonneController.UpdateStationGains(), StationScheduler.Tick()
 ```
+
+### 4.3 Integration Test Gap
+
+| Test File | Status | Notes |
+|-----------|--------|-------|
+| AudioPipelineTests.cs | ⚠ proposed (F47) | AudioPipeline doesn't exist |
+| StationManagerTests.cs | ⚠ proposed (F47) | StationManager doesn't exist |
+| SignalDecoderTests.cs | ⚠ proposed (F47) | SignalDecoder doesn't exist |
+| PositionTrackerTests.cs | ⚠ proposed (F47) | PositionTracker doesn't exist |
 
 ## 5. Manual Testing
 
@@ -428,17 +444,26 @@ public static class TestMeasurements {
 
 ## 8. Test Execution
 
-### 8.1 Run All Tests
+### 8.1 Test Infrastructure Setup (F22)
 
 ```bash
-# ⚠ Проект использует csc.exe, не dotnet build. Нужна тестовая инфраструктура (F22).
-# Предлагаемый фреймворк: NUnit + .NET Framework test project с ссылками на DLL.
+# ⚠ No test infrastructure exists yet (F22, F10)
+# Project uses csc.exe (not dotnet build)
+# Proposed: NUnit + .NET Framework test project with CSC-compiled references
+
+# Example build+test command (proposed):
+# csc.exe /target:library /out:Tests/bin/RadioNavigation.Tests.dll \
+#   Tests/*.cs Source/Logic/*.cs Source/Data/*.cs \
+#   -r:"path/to/Assembly-CSharp.dll" -r:"path/to/UnityEngine.dll" \
+#   -r:"path/to/Harmony.dll" -r:"path/to/nunit.framework.dll"
 ```
 
 ### 8.2 Run Specific Test Category
 
 ```bash
 # ⚠ Not applicable until test infrastructure is set up (F22)
+# Run specific category: nunit-console /where="TestCategory=Unit" Tests/bin/RadioNavigation.Tests.dll
+# Generate coverage: OpenCover + ReportGenerator
 ```
 
 ### 8.3 Generate Coverage Report
@@ -464,3 +489,9 @@ public static class TestMeasurements {
 | Add integration tests | Medium | 3-4h |
 | Add performance tests | Medium | 2-3h |
 | Update manual test cases | Low | 1-2h |
+
+---
+
+*Document Version: 2.0*  
+*Last Updated: 2026-08-01*  
+*Updated: 199 problems cataloged (F01–F199). Test files referencing non-existent classes annotated `⚠ proposed` (F47). Build/run commands updated for `csc.exe` workflow. Actual nested class APIs documented (CarrierGenerator/Atmosphere/ReceiverDsp in DspPipeline.cs).*

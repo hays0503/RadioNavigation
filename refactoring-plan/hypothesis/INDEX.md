@@ -9,201 +9,226 @@
 | P2 (Medium) | Техдолг, замедление разработки, копипаста |
 | P3 (Low) | Косметика, code style |
 
+| Статус | Смысл |
+|--------|-------|
+| ✔ | Подтверждено статической проверкой против кода — проблема реальна |
+| ✘ | Опровергнуто — проблема НЕ подтвердилась (см. `rejected\`) |
+
+> Верификация всех 207 гипотез: 2026-08-01, статический анализ исходного кода (33 файла, ~4 600 строк) + сверка с исходниками игры (`C:\code\projects\uboat`). Итог: **194 confirmed** (→ `confirmed\`), **13 rejected** (→ `rejected\`).
+
 ---
 
 ## Список проблем
 
-| ID | Название | Приоритет | Область | Строк |
-|----|----------|-----------|---------|-------|
-| **F01** | Audio Race Condition | **P0** | Sound · Threading | 84 |
-| **F02** | God Object: SonneController | **P1** | Architecture | 100+ |
-| **F03** | God Object: InformationPanelHandler | **P1** | Architecture | 80+ |
-| **F04** | God Object: RadioStoryIntegration | **P1** | Architecture | 70+ |
-| **F05** | Static Mutable State | **P0** | Threading · Architecture | 60+ |
-| **F06** | Dead Code & Mistakes | **P2** | Hygiene | 50+ |
-| **F07** | Null Reference Risks | **P1** | Correctness | 65+ |
-| **F08** | GC Pressure | **P2** | Performance | ~170 |
-| **F09** | Logic Bugs | **P1** | Correctness | 55+ |
-| **F10** | Build Config Issues | **P2** | Build | ~160 |
-| **F11** | Memory Leaks | **P1** | Memory | ~160 |
-| **F12** | Copy-Paste Duplication | **P2** | Hygiene | 200 |
-| **F13** | Unity API in Audio Thread | **P0** | Sound · Threading | ~40 |
-| **F14** | Event Subscription Leaks | **P1** | UI · Events | ~50 |
-| **F15** | No State Persistence | **P2** | Save/Load | ~50 |
-| **F16** | PositionFixCalculator.ErrorKm = 0 | **P1** | Logic · PF Calculator | ~10 |
-| **F17** | StationState mutable struct | **P2** | Data · StationState | ~25 |
-| **F18** | PositionFixCalculator God Object | **P2** | Architecture | ~60 |
-| **F19** | NavigationPattern string concat | **P3** | Performance | ~20 |
-| **F20** | DialConfig band inconsistencies | **P2** | Data · DialConfig | ~30 |
-| **F21** | Main.cs multiple responsibilities | **P2** | Architecture | ~60 |
-| **F22** | No test coverage (0%) | **P2** | Project-wide | ~60 |
-| **F23** | Reflection Fragility — RadioStoryIntegration | **P0** | Logic · Integration | ~80 |
-| **F24** | TrimEntries O(n²) RemoveAt(0) | **P1** | UI · Signal Buffer | ~15 |
-| **F25** | AudioSynthesisEngine Array Coupling | **P1** | Sound · API Design | ~40 |
-| **F26** | PrefabNames.cs Not Used | **P2** | UI · Constants | ~20 |
-| **F27** | ComparisonExtensions Anti-Pattern | **P2** | Hygiene | ~34 |
-| **F28** | Magic Numbers Scattered (~40 literals) | **P2** | Project-wide | ~40 |
-| **F29** | Zero Synchronization Primitives | **P0** | Sound · Threading | ~30 |
-| **F30** | RadioHandler missing OnDestroy unsubscribe | **P1** | UI · RadioHandler | ~10 |
-| **F31** | 93 Debug.Log — 81 active in Release | **P2** | Project-wide | ~80 (call-sites) |
-| **F32** | IPH: 5 GetComponentInChildren подряд | **P3** | UI · Performance | ~5 |
-| **F33** | VolumeSpinner / FeedbackSpinner дубликаты | **P3** | UI · Duplication | ~34 |
-| **F34** | BearingTable / LookupBearing — мёртвый код | **P1** | Logic · Bearing Table | ~40 |
-| **F35** | Два разных алгоритма GenerateBearingTable | **P2** | Logic · Data · Duplication | ~30 |
-| **F36** | GetTransitionCount считает только Dots | **P2** | Logic · Naming | ~12 |
-| **F37** | 6 станций с null callsign | **P2** | Data · BeaconData | ~30 |
-| **F38** | Plougourvest имеет null Frequency | **P2** | Data · BeaconData | ~25 |
-| **F39** | 3 станции на одной частоте 332.5 kHz | **P2** | Data · BeaconData | ~15 |
-| **F40** | CarrierGenerator frequency без верхней границы | **P2** | Sound · DSP | ~5 |
-| **F41** | Double vs float — фаза в DSP | **P2** | Sound · DSP | ~15 |
-| **F42** | Static Texture2D курсора не уничтожен | **P2** | UI · PanelDragHandler | ~10 |
-| **F43** | AudioSource не добавлен при готовом SonneController | **P1** | UI · RadioInstaller | ~10 |
-| **F44** | SAD Appendix B — 10+ расхождений с кодом | **P2** | Documentation · SAD | ~100 |
-| **F45** | SAD ADRs «Accepted» but 0% implemented (ADR-002/003/004/005/007) | **P0** | Documentation · SAD | ~35 |
-| **F46** | SAD Harmony patch targets completely wrong | **P0** | Documentation · SAD | ~58 |
-| **F47** | 14+ non-existent classes presented as real in SAD | **P1** | Documentation · SAD | ~61 |
-| **F48** | SAD station array sizing wrong (4 vs 14) | **P1** | Documentation · SAD | ~58 |
-| **F49** | SAD layer file counts wrong (40→34) | **P2** | Documentation · SAD | ~45 |
-| **F50** | SAD line counts wrong (10+ files) | **P2** | Documentation · SAD | ~51 |
-| **F51** | SAD method signatures wrong | **P2** | Documentation · SAD | ~43 |
-| **F52** | SAD missing 3 real classes from diagrams | **P1** | Documentation · SAD | ~57 |
-| **F53** | MorseAlphabet 'A' — `._` вместо `.-` (dot-underscore) | **P0** | Logic · MorseAlphabet | 1 |
-| **F54** | AudioSynthesisEngine.UpdateStationBeats() — мёртвый код | **P1** | Sound · Dead Code | ~12 |
-| **F55** | ConsolCycleConfig.GetForCycleDuration() игнорирует параметр | **P1** | Data · ConsolCycleConfig | ~4 |
-| **F56** | RadioHandler — zoneHandler.OnZoneChanged без отписки | **P1** | UI · RadioHandler · Events | ~3 |
-| **F57** | RadioInstaller.Instantiate() — Debug.Log без #if DEBUG (×10) | **P1** | Build · Debug Logging | ~10 |
-| **F58** | DialConfig.AngleToFrequency() — float.NaN не проверяется | **P1** | Data · DialConfig · Correctness | ~5 |
-| **F59** | PrefabNames.DialFace определён, но не используется | **P2** | Data · PrefabNames | ~1 |
-| **F60** | CursorHandler.Update() форсирует SetSelectedGameObject каждый фрейм | **P2** | UI · CursorHandler · EventSystem | ~1 |
-| **F61** | ToggleHandler статика не сбрасывается при перезагрузке сцены | **P2** | UI · ToggleHandler · Static | ~2 |
-| **F62** | StationState.Pattern — ссылочный массив внутри struct → алиасинг | **P2** | Logic · StationState · Memory | ~1 |
-| **F63** | DebugAngleHandler — жёсткая зависимость от TMPro | **P2** | UI · DebugAngleHandler | ~3 |
-| **F64** | PositionFixCalculator — struct copy mutation через for (fragile) | **P2** | Logic · PositionFixCalculator | ~6 |
-| **F65** | MorseKeyer.Load() — stale consolPattern не очищен | **P0** | Logic · MorseKeyer | ~2 |
-| **F66** | TryGetCallsignFromHistory — NRE при station.Name == null | **P1** | Logic · SonneController | ~1 |
-| **F67** | InformationPanelHandler — Toggle component без null-чека | **P1** | UI · InformationPanelHandler | ~1 |
-| **F68** | RadioStoryIntegration — рефлексия Type.GetType не кешируется | **P1** | Logic · Integration · Performance | ~1 |
-| **F69** | Main.cs — catch блок логгирует только e.Message | **P1** | Logic · Main | ~1 |
-| **F70** | NavigationPattern.FormatCompact() — неверное отображение transition | **P1** | Logic · NavigationPattern | ~1 |
-| **F71** | DspPipeline — 2-3 Random.NextDouble() на сэмпл в audio thread | **P2** | Sound · DSP · Performance | ~1 |
-| **F72** | SpinnerHandlerBase — Mathf.Lerp без Time.deltaTime (FPS-зависим) | **P2** | UI · SpinnerHandler | ~1 |
-| **F73** | PositionFixCalculator — Haversine формула дублирована | **P2** | Logic · PositionFixCalculator · Duplication | ~1 |
-| **F74** | ComparisonExtensions — несимметричные пороги IsSignificant/IsNegligible | **P2** | Logic · ComparisonExtensions | ~1 |
-| **F75** | Мёртвый код: DecodeMorse(), StationScheduler.ToTicks() | **P2** | Logic · Hygiene | ~2 |
-| **F76** | MorseAlphabet.GetElementCount() — теоретическое int overflow | **P3** | Logic · MorseAlphabet | ~1 |
-| **F77** | StationState.Pattern never updated after init | **P0** | Logic · SonneController | ~5 |
-| **F78** | build.ps1 preprocessor case mismatch (`Debug` vs `DEBUG`) | **P0** | Build · Configuration | ~5 |
-| **F79** | InBeam = true hardcoded (always "IN BEAM") | **P0** | Logic · SonneController · Navigation | ~3 |
-| **F80** | PositionFixCalculator Haversine NaN | **P1** | Logic · PositionFixCalculator | ~3 |
-| **F81** | MorseTiming integer truncation (5% speedup) | **P1** | Logic · MorseTiming | ~5 |
-| **F82** | Main.cs swallows exceptions | **P1** | Logic · Main | ~5 |
-| **F83** | RadioStoryIntegration zombie decisions on hot-reload | **P1** | Logic · RadioStoryIntegration | ~10 |
-| **F84** | ExpanderHandler.Start doesn't disable on null parent | **P2** | UI · ExpanderHandler | ~3 |
-| **F85** | GroundHandler raycastTarget blocks clicks | **P2** | UI · GroundHandler | ~1 |
-| **F86** | ConsolCycleConfig.GetForCycleDuration stub | **P2** | Data · ConsolCycleConfig | ~4 |
-| **F87** | TryGetCallsignFromHistory fake callsigns | **P2** | Logic · SonneController | ~5 |
-| **F88** | csproj suppresses all nullable warnings | **P2** | Build · Configuration | ~1 |
-| **F89** | OnDestroy doesn't stop AudioSource | **P3** | Logic · SonneController · Cleanup | ~3 |
-| **F90** | OnVisibilityChanged event never subscribed | **P3** | UI · RadioHandler · Events | ~1 |
-| **F91** | NormalizeAngle dead code | **P3** | Logic · SonneController | ~7 |
-| **F92** | ConsolCycleConfig unused fields | **P3** | Data · ConsolCycleConfig | ~3 |
-| **F93** | RadioInstaller Debug.Log without #if DEBUG | **P3** | Build · Debug Logging | ~10 |
-| **F94** | AudioSynthesisEngine tickAccumulator float drift | **P3** | Sound · AudioSynthesisEngine | ~2 |
-| **F95** | CursorHandler unnecessary ScrollRect | **P3** | UI · CursorHandler | ~7 |
-| **F96** | InformationPanelHandler GetComponent vs GetComponentInParent | **P3** | UI · InformationPanelHandler | ~2 |
-| **F97** | CursorHandler.OnScroll — RadioHandler.Instance NRE before null check | **P1** | UI · CursorHandler · NRE | ~5 |
-| **F98** | Scheduler ticked 2-3x per audio cycle (pauses halved/thirded) | **P1** | Sound · Logic · Timing | ~20 |
-| **F99** | Stale position fix retained when measurements < 2 | **P1** | Logic · SonneController · Position Fix | ~5 |
-| **F100** | FindClosestStation stale callsign from previously-closer station | **P2** | UI · InformationPanelHandler · Logic | ~5 |
-| **F101** | InformationPanelHandler shows "[Pause]" when no dominant station | **P2** | UI · InformationPanelHandler · Logic | ~5 |
-| **F102** | CursorHandler.Update per-frame GetComponentInParent<ScrollRect> | **P2** | UI · CursorHandler · Performance | ~3 |
-| **F103** | Font.CreateDynamicFontFromOSFont called per label (~15x) | **P2** | UI · InformationPanelHandler · GC Pressure | ~2 |
-| **F104** | RadioStoryIntegration AmbiguousMatchException from combined BindingFlags | **P2** | Logic · RadioStoryIntegration · Reflection | ~10 |
-| **F105** | StringBuilder allocs on audio thread (DecodeCallsignBuffer) | **P2** | Sound · Threading · GC Pressure | ~15 |
-| **F106** | Debug.Log + Time.time in audio thread, no #if DEBUG | **P2** | Sound · Audio Thread · Debug Logging | ~3 |
-| **F107** | Uncached Type.GetType on every locale string lookup | **P2** | Logic · RadioStoryIntegration · Performance | ~10 |
-| **F108** | List.Add on audio thread can resize + allocate | **P2** | Sound · Threading · Thread Safety | ~5 |
-| **F109** | RemoveAt(0) on audio thread while main thread reads (data corruption) | **P1** | Sound · Threading · Data Corruption | ~10 |
-| **F110** | dominantStationIndex cross-thread read/write, no volatile | **P2** | Sound · Threading · Memory Visibility | ~2 |
-| **F111** | MorseKeyer.IsActive cross-thread, no volatile | **P2** | Sound · Threading · Memory Visibility | ~2 |
-| **F112** | BeatFrequency write/read without synchronization | **P3** | Sound · Threading · Thread Safety | ~2 |
-| **F113** | MorseKeyer.AdvanceElement resets callsignLength=0 on pattern transition | **P3** | Logic · MorseKeyer · Correctness | ~3 |
-| **F114** | GetCurrentElementType silent Dot fallback masks potential OOB | **P3** | Logic · MorseKeyer · Defensive Coding | ~2 |
-| **F115** | OnDestroy doesn't reset DSP/Atmosphere state | **P3** | Logic · SonneController · Resource Mgmt | ~3 |
-| **F116** | Asymmetric null-clearing between Load/LoadConsol | **P3** | Logic · MorseKeyer · API Design | ~3 |
-| **F117** | SonneController keyer event subscriptions leak in OnDestroy | **P1** | Logic · SonneController · Events · Memory | ~10 |
-| **F118** | ZoneHandler PointerClick entries не фильтруют по кнопке | **P2** | UI · ZoneHandler · EventTrigger | ~5 |
-| **F119** | RadioHandler.OnDestroy не отписывается от zoneHandler.OnZoneChanged | **P1** | UI · RadioHandler · Events · Memory | ~5 |
-| **F120** | SonneController signalEntries + measurements GC pressure в hot path | **P2** | Logic · SonneController · Performance · GC | ~15 |
-| **F121** | Harmony.UnpatchAll() глобально откатывает патчи всех модов | **P1** | Logic · Main · Harmony | ~5 |
-| **F122** | StationScheduler.Reset() устанавливает неправильную фазу | **P1** | Logic · StationScheduler · State Machine | ~5 |
-| **F123** | StationState.NavigationStartTime не инициализируется в Awake | **P1** | Logic · SonneController · Station State | ~5 |
-| **F124** | GetCurrentLanguage() повторно резолвит Type.GetType на каждый вызов | **P2** | Logic · RadioStoryIntegration · Performance | ~25 |
-| **F125** | MorseAlphabet.GetMorse() молча возвращает "" для неизвестных символов | **P2** | Logic · MorseAlphabet · Correctness | ~5 |
-| **F126** | ConsolCycleConfig — нет валидации отрицательных timing values | **P2** | Data · ConsolCycleConfig · Validation | ~15 |
-| **F127** | SonneSignalGenerator.GenerateBearingTable хардкодит Cycle120s | **P2** | Logic · SonneSignalGenerator · Configuration | ~3 |
-| **F128** | PositionFixCalculator.FindIntersection не обрабатывает анти meridian | **P2** | Logic · PositionFixCalculator · Geography | ~10 |
-| **F129** | MorseAlphabet.GetElementCount() не учитывает границы слов | **P3** | Logic · MorseAlphabet · Morse Standard | ~10 |
-| **F130** | BandConfig — mutable class в static readonly массиве | **P3** | Data · DialConfig · Encapsulation | ~15 |
-| **F131** | Stations w/o frequency in position fix | **P2** | Logic · SonneController · Position Fix | ~15 |
-| **F132** | Keyer/scheduler advance while radio off | **P1** | Sound · AudioSynthesisEngine · RadioOff | ~20 |
-| **F133** | Escape key blocked by child selection | **P2** | UI · RadioHandler · Escape Key | ~10 |
-| **F134** | Calculate mutates input measurements | **P3** | Logic · PositionFixCalculator · API Design | ~5 |
-| **F135** | OnSequenceFinished no default case | **P3** | Logic · StationScheduler · Defensive Coding | ~5 |
-| **F136** | MorseTiming silence wrong for bad config | **P3** | Logic · MorseTiming · Validation | ~10 |
-| **F137** | PositionFixCalculator Math.Acos NaN | **P1** | Logic · PositionFixCalculator · Numerical | ~5 |
-| **F138** | IPH History[0] bounds crash | **P1** | UI · InformationPanelHandler · Bounds | ~3 |
-| **F139** | Main UnpatchAll without harmony ID | **P1** | Logic · Main · Harmony | ~5 |
-| **F140** | Main patch method null check missing | **P2** | Logic · Main · Reflection | ~5 |
-| **F141** | CarrierGenerator frequency clicks | **P2** | Sound · DSP · CarrierGenerator | ~10 |
-| **F142** | ReceiverDsp output unclamped (whistle) | **P2** | Sound · DSP · ReceiverDsp | ~3 |
-| **F143** | Atmosphere output unclamped (noise) | **P2** | Sound · DSP · Atmosphere | ~3 |
-| **F144** | NavigationPattern zero divide | **P2** | Logic · NavigationPattern · Validation | ~5 |
-| **F145** | First callsign cycle no callsignLength | **P2** | Logic · SonneController · Timing | ~10 |
-| **F146** | PositionFix mutates on failure path | **P2** | Logic · PositionFixCalculator · API | ~5 |
-| **F147** | RadioHandler float equality == | **P2** | UI · RadioHandler · Floating-Point | ~3 |
-| **F148** | GroundHandler no button filter | **P2** | UI · GroundHandler · Input | ~3 |
-| **F149** | SpinnerHandler multitouch state leak | **P2** | UI · SpinnerHandlerBase · State | ~5 |
-| **F150** | DialConfig overlapping Band III/IV | **P2** | Data · DialConfig · Band Ranges | ~5 |
-| **F151** | DialConfig missing interpolation segment | **P2** | Data · DialConfig · Interpolation | ~5 |
-| **F152** | Main third catch loses stack trace | **P2** | Logic · Main · Error Handling | ~3 |
-| **F153** | Atmosphere Box-Muller wastes 50% RNG | **P3** | Sound · DSP · Atmosphere · RNG | ~5 |
-| **F154** | ReceiverDsp constructor ignores sampleRate | **P3** | Sound · DSP · ReceiverDsp · API | ~3 |
-| **F155** | ReceiverDsp filter alpha recomputes | **P3** | Sound · DSP · ReceiverDsp · Perf | ~3 |
-| **F156** | Atmosphere undocumented impulse path | **P3** | Sound · DSP · Atmosphere · Maintainability | ~3 |
-| **F157** | RadioStoryIntegration duplicate BindingFlags | **P3** | Logic · RadioStoryIntegration · Hygiene | ~1 |
-| **F158** | RadioHandler dead sonneController field | **P3** | UI · RadioHandler · Dead Code | ~2 |
-| **F159** | DebugAngleHandler SerializeField overwrite | **P3** | UI · DebugAngleHandler · Unity Lifecycle | ~3 |
-| **F160** | IPH duplicated state queries | **P3** | UI · InformationPanelHandler · Code Smell | ~5 |
-| **F161** | DialConfig inconsistent rounding | **P3** | Data · DialConfig · Formatting | ~3 |
-| **F162** | BeaconData DotTable ignores parameter | **P3** | Data · BeaconData · API | ~3 |
-| **F163** | StationState mutable struct copy-divergence | **P3** | Data · StationState · Value Type | ~5 |
-| **F164** | ConsolCycleConfig GetForCycleDuration stub | **P3** | Data · ConsolCycleConfig · Stub | ~3 |
-| **F165** | MorseKeyer.Reset doesn't clear sequence | **P2** | Logic · MorseKeyer · State Management | ~10 |
-| **F166** | MorseAlphabet.TextToPattern ignores parameter | **P3** | Logic · MorseAlphabet · API | ~1 |
-| **F167** | StationScheduler.OnSequenceFinished missing phases | **P2** | Logic · StationScheduler · State Machine | ~12 |
-| **F168** | PositionFixCalculator.Calculate returns ErrorKm = 0 | **P2** | Logic · PositionFixCalculator · Algorithm | ~5 |
-| **F169** | CarrierGenerator phase drift from float precision | **P2** | Sound · DspPipeline · Numerical | ~10 |
-| **F170** | MorseAlphabet fixed table overflow | **P2** | Logic · MorseAlphabet · Data Structure | ~10 |
-| **F171** | GroundHandler.StateLog аллокация в DEBUG каждый кадр | **P3** | UI · GroundHandler · Performance | ~26 |
-| **F172** | SignalRichTextFormatter.TrimEntries O(n²) RemoveAt(0) | **P3** | UI · SignalRichTextFormatter · Performance | ~8 |
-| **F173** | InformationPanelHandler.CreateLabel fragile font loading | **P2** | UI · InformationPanelHandler · Portability | ~10 |
-| **F174** | NavigationPattern.GetElement negative index OOB | **P2** | Logic · NavigationPattern · Correctness | ~8 |
-| **F175** | MorseKeyer.AdvanceElement cross-type transition | **P2** | Logic · MorseKeyer · State Machine | ~40 |
-| **F176** | Main.cs GameObject.Find hardcoded hierarchy path | **P2** | Logic · Main · Performance | ~15 |
-| **F177** | DspPipeline deterministic radio noise generation | **P3** | Sound · DspPipeline · Architecture | ~5 |
-| **F178** | Repeated GetComponent lookups не кешируются | **P3** | UI · Hygiene | ~20 |
-| **F179** | Main.cs bootstrap объединяет несколько обязанностей | **P2** | Logic · Main · Architecture | ~35 |
-| **F180** | UI validation основана на строковых путях | **P2** | Logic · Main · Maintainability | ~20 |
-| **F181** | Main.cs избыточное диагностическое логирование | **P3** | Logic · Main · Logging | ~10 |
-| **F182** | `build.ps1` doesn't validate `$GamePath` existence before invoking `csc` | **P3** | Build · Scripting | ~10 |
-| **F183** | `MorseAlphabet.GetMorse` performs redundant `c < 0` check on unsigned `char` | **P3** | Logic · MorseAlphabet · Code Hygiene | ~5 |
-| **F184** | `MorseKeyer` duplicates pattern/sequence branching in multiple internal getters | **P3** | Logic · MorseKeyer · Duplication | ~15 |
-| **F185** | `InformationPanelHandler` hardcodes 6 pattern labels for 14 available stations | **P2** | UI · InformationPanelHandler · Data Representation | ~10 |
-| **F186** | `RadioStoryIntegration.Init` accesses `GetParameters()[1]` without length check | **P2** | Logic · RadioStoryIntegration · Reflection Fragility | ~5 |
-| **F187** | `PanelDragHandler.OnPointerExit` resets custom cursor while dragging outside panel bounds | **P3** | UI · PanelDragHandler · User Experience | ~5 |
-| **F188** | `RadioInstaller` hardcodes fixed initial local position `(300, 100, 0)` without resolution scaling | **P3** | UI · RadioInstaller · Layout | ~5 |
-| **F189** | Cross-thread data race on `signalEntries` / `morseDecoderBuffer` between Audio Thread and UI Thread | **P1** | Sound · UI · Thread Safety | ~15 |
+| ID | Название | Приоритет | Область | Строк | Статус |
+|----|----------|-----------|---------|-------|-------|
+| **F01** | Audio Race Condition | **P0** | Sound · Threading | 84 | ✔ |
+| **F02** | God Object: SonneController | **P1** | Architecture | 100+ | ✔ |
+| **F03** | God Object: InformationPanelHandler | **P1** | Architecture | 80+ | ✔ |
+| **F04** | God Object: RadioStoryIntegration | **P1** | Architecture | 70+ | ✔ |
+| **F05** | Static Mutable State | **P0** | Threading · Architecture | 60+ | ✔ |
+| **F06** | Dead Code & Mistakes | **P2** | Hygiene | 50+ | ✔ |
+| **F07** | Null Reference Risks | **P1** | Correctness | 65+ | ✔ |
+| **F08** | GC Pressure | **P2** | Performance | ~170 | ✔ |
+| **F09** | Logic Bugs | **P1** | Correctness | 55+ | ✔ |
+| **F10** | Build Config Issues | **P2** | Build | ~160 | ✔ |
+| **F11** | Memory Leaks | **P1** | Memory | ~160 | ✔ |
+| **F12** | Copy-Paste Duplication | **P2** | Hygiene | 200 | ✔ |
+| **F13** | Unity API in Audio Thread | **P0** | Sound · Threading | ~40 | ✔ |
+| **F14** | Event Subscription Leaks | **P1** | UI · Events | ~50 | ✔ |
+| **F15** | No State Persistence | **P2** | Save/Load | ~50 | ✔ |
+| **F16** | PositionFixCalculator.ErrorKm = 0 | **P1** | Logic · PF Calculator | ~10 | ✔ |
+| **F17** | StationState mutable struct | **P2** | Data · StationState | ~25 | ✔ |
+| **F18** | PositionFixCalculator God Object | **P2** | Architecture | ~60 | ✔ |
+| **F19** | NavigationPattern string concat | **P3** | Performance | ~20 | ✔ |
+| **F20** | DialConfig band inconsistencies | **P2** | Data · DialConfig | ~30 | ✔ |
+| **F21** | Main.cs multiple responsibilities | **P2** | Architecture | ~60 | ✔ |
+| **F22** | No test coverage (0%) | **P2** | Project-wide | ~60 | ✔ |
+| **F23** | Reflection Fragility — RadioStoryIntegration | **P0** | Logic · Integration | ~80 | ✔ |
+| **F24** | TrimEntries O(n²) RemoveAt(0) | **P1** | UI · Signal Buffer | ~15 | ✔ |
+| **F25** | AudioSynthesisEngine Array Coupling | **P1** | Sound · API Design | ~40 | ✔ |
+| **F26** | PrefabNames.cs Not Used | **P2** | UI · Constants | ~20 | ✔ |
+| **F27** | ComparisonExtensions Anti-Pattern | **P2** | Hygiene | ~34 | ✔ |
+| **F28** | Magic Numbers Scattered (~40 literals) | **P2** | Project-wide | ~40 | ✔ |
+| **F29** | Zero Synchronization Primitives | **P0** | Sound · Threading | ~30 | ✔ |
+| **F30** | RadioHandler missing OnDestroy unsubscribe | **P1** | UI · RadioHandler | ~10 | ✔ |
+| **F31** | 93 Debug.Log — 81 active in Release | **P2** | Project-wide | ~80 (call-sites) | ✔ |
+| **F32** | IPH: 5 GetComponentInChildren подряд | **P3** | UI · Performance | ~5 | ✔ |
+| **F33** | VolumeSpinner / FeedbackSpinner дубликаты | **P3** | UI · Duplication | ~34 | ✔ |
+| **F34** | BearingTable / LookupBearing — мёртвый код | **P1** | Logic · Bearing Table | ~40 | ✔ |
+| **F35** | Два разных алгоритма GenerateBearingTable | **P2** | Logic · Data · Duplication | ~30 | ✔ |
+| **F36** | GetTransitionCount считает только Dots | **P2** | Logic · Naming | ~12 | ✔ |
+| **F37** | 6 станций с null callsign | **P2** | Data · BeaconData | ~30 | ✔ |
+| **F38** | Plougourvest имеет null Frequency | **P2** | Data · BeaconData | ~25 | ✔ |
+| **F39** | 3 станции на одной частоте 332.5 kHz | **P2** | Data · BeaconData | ~15 | ✔ |
+| **F40** | CarrierGenerator frequency без верхней границы | **P2** | Sound · DSP | ~5 | ✔ |
+| **F41** | Double vs float — фаза в DSP | **P2** | Sound · DSP | ~15 | ✔ |
+| **F42** | Static Texture2D курсора не уничтожен | **P2** | UI · PanelDragHandler | ~10 | ✔ |
+| **F43** | AudioSource не добавлен при готовом SonneController | **P1** | UI · RadioInstaller | ~10 | ✘ |
+| **F44** | SAD Appendix B — 10+ расхождений с кодом | **P2** | Documentation · SAD | ~100 | ✘ |
+| **F45** | SAD ADRs «Accepted» but 0% implemented (ADR-002/003/004/005/007) | **P0** | Documentation · SAD | ~35 | ✘ |
+| **F46** | SAD Harmony patch targets completely wrong | **P0** | Documentation · SAD | ~58 | ✘ |
+| **F47** | 14+ non-existent classes presented as real in SAD | **P1** | Documentation · SAD | ~61 | ✘ |
+| **F48** | SAD station array sizing wrong (4 vs 14) | **P1** | Documentation · SAD | ~58 | ✘ |
+| **F49** | SAD layer file counts wrong (40→34) | **P2** | Documentation · SAD | ~45 | ✘ |
+| **F50** | SAD line counts wrong (10+ files) | **P2** | Documentation · SAD | ~51 | ✘ |
+| **F51** | SAD method signatures wrong | **P2** | Documentation · SAD | ~43 | ✘ |
+| **F52** | SAD missing 3 real classes from diagrams | **P1** | Documentation · SAD | ~57 | ✔ |
+| **F53** | MorseAlphabet 'A' — `._` вместо `.-` (dot-underscore) | **P0** | Logic · MorseAlphabet | 1 | ✔ |
+| **F54** | AudioSynthesisEngine.UpdateStationBeats() — мёртвый код | **P1** | Sound · Dead Code | ~12 | ✔ |
+| **F55** | ConsolCycleConfig.GetForCycleDuration() игнорирует параметр | **P1** | Data · ConsolCycleConfig | ~4 | ✔ |
+| **F56** | RadioHandler — zoneHandler.OnZoneChanged без отписки | **P1** | UI · RadioHandler · Events | ~3 | ✔ |
+| **F57** | RadioInstaller.Instantiate() — Debug.Log без #if DEBUG (×10) | **P1** | Build · Debug Logging | ~10 | ✔ |
+| **F58** | DialConfig.AngleToFrequency() — float.NaN не проверяется | **P1** | Data · DialConfig · Correctness | ~5 | ✔ |
+| **F59** | PrefabNames.DialFace определён, но не используется | **P2** | Data · PrefabNames | ~1 | ✔ |
+| **F60** | CursorHandler.Update() форсирует SetSelectedGameObject каждый фрейм | **P2** | UI · CursorHandler · EventSystem | ~1 | ✘ |
+| **F61** | ToggleHandler статика не сбрасывается при перезагрузке сцены | **P2** | UI · ToggleHandler · Static | ~2 | ✔ |
+| **F62** | StationState.Pattern — ссылочный массив внутри struct → алиасинг | **P2** | Logic · StationState · Memory | ~1 | ✔ |
+| **F63** | DebugAngleHandler — жёсткая зависимость от TMPro | **P2** | UI · DebugAngleHandler | ~3 | ✔ |
+| **F64** | PositionFixCalculator — struct copy mutation через for (fragile) | **P2** | Logic · PositionFixCalculator | ~6 | ✔ |
+| **F65** | MorseKeyer.Load() — stale consolPattern не очищен | **P0** | Logic · MorseKeyer | ~2 | ✔ |
+| **F66** | TryGetCallsignFromHistory — NRE при station.Name == null | **P1** | Logic · SonneController | ~1 | ✔ |
+| **F67** | InformationPanelHandler — Toggle component без null-чека | **P1** | UI · InformationPanelHandler | ~1 | ✔ |
+| **F68** | RadioStoryIntegration — рефлексия Type.GetType не кешируется | **P1** | Logic · Integration · Performance | ~1 | ✔ |
+| **F69** | Main.cs — catch блок логгирует только e.Message | **P1** | Logic · Main | ~1 | ✔ |
+| **F70** | NavigationPattern.FormatCompact() — неверное отображение transition | **P1** | Logic · NavigationPattern | ~1 | ✔ |
+| **F71** | DspPipeline — 2-3 Random.NextDouble() на сэмпл в audio thread | **P2** | Sound · DSP · Performance | ~1 | ✔ |
+| **F72** | SpinnerHandlerBase — Mathf.Lerp без Time.deltaTime (FPS-зависим) | **P2** | UI · SpinnerHandler | ~1 | ✔ |
+| **F73** | PositionFixCalculator — Haversine формула дублирована | **P2** | Logic · PositionFixCalculator · Duplication | ~1 | ✔ |
+| **F74** | ComparisonExtensions — несимметричные пороги IsSignificant/IsNegligible | **P2** | Logic · ComparisonExtensions | ~1 | ✔ |
+| **F75** | Мёртвый код: DecodeMorse(), StationScheduler.ToTicks() | **P2** | Logic · Hygiene | ~2 | ✔ |
+| **F76** | MorseAlphabet.GetElementCount() — теоретическое int overflow | **P3** | Logic · MorseAlphabet | ~1 | ✔ |
+| **F77** | StationState.Pattern never updated after init | **P0** | Logic · SonneController | ~5 | ✔ |
+| **F78** | build.ps1 preprocessor case mismatch (`Debug` vs `DEBUG`) | **P0** | Build · Configuration | ~5 | ✔ |
+| **F79** | InBeam = true hardcoded (always "IN BEAM") | **P0** | Logic · SonneController · Navigation | ~3 | ✔ |
+| **F80** | PositionFixCalculator Haversine NaN | **P1** | Logic · PositionFixCalculator | ~3 | ✔ |
+| **F81** | MorseTiming integer truncation (5% speedup) | **P1** | Logic · MorseTiming | ~5 | ✔ |
+| **F82** | Main.cs swallows exceptions | **P1** | Logic · Main | ~5 | ✔ |
+| **F83** | RadioStoryIntegration zombie decisions on hot-reload | **P1** | Logic · RadioStoryIntegration | ~10 | ✔ |
+| **F84** | ExpanderHandler.Start doesn't disable on null parent | **P2** | UI · ExpanderHandler | ~3 | ✔ |
+| **F85** | GroundHandler raycastTarget blocks clicks | **P2** | UI · GroundHandler | ~1 | ✔ |
+| **F86** | ConsolCycleConfig.GetForCycleDuration stub | **P2** | Data · ConsolCycleConfig | ~4 | ✔ |
+| **F87** | TryGetCallsignFromHistory fake callsigns | **P2** | Logic · SonneController | ~5 | ✔ |
+| **F88** | csproj suppresses all nullable warnings | **P2** | Build · Configuration | ~1 | ✔ |
+| **F89** | OnDestroy doesn't stop AudioSource | **P3** | Logic · SonneController · Cleanup | ~3 | ✔ |
+| **F90** | OnVisibilityChanged event never subscribed | **P3** | UI · RadioHandler · Events | ~1 | ✔ |
+| **F91** | NormalizeAngle dead code | **P3** | Logic · SonneController | ~7 | ✔ |
+| **F92** | ConsolCycleConfig unused fields | **P3** | Data · ConsolCycleConfig | ~3 | ✔ |
+| **F93** | RadioInstaller Debug.Log without #if DEBUG | **P3** | Build · Debug Logging | ~10 | ✔ |
+| **F94** | AudioSynthesisEngine tickAccumulator float drift | **P3** | Sound · AudioSynthesisEngine | ~2 | ✔ |
+| **F95** | CursorHandler unnecessary ScrollRect | **P3** | UI · CursorHandler | ~7 | ✔ |
+| **F96** | InformationPanelHandler GetComponent vs GetComponentInParent | **P3** | UI · InformationPanelHandler | ~2 | ✘ |
+| **F97** | CursorHandler.OnScroll — RadioHandler.Instance NRE before null check | **P1** | UI · CursorHandler · NRE | ~5 | ✔ |
+| **F98** | Scheduler ticked 2-3x per audio cycle (pauses halved/thirded) | **P1** | Sound · Logic · Timing | ~20 | ✔ |
+| **F99** | Stale position fix retained when measurements < 2 | **P1** | Logic · SonneController · Position Fix | ~5 | ✔ |
+| **F100** | FindClosestStation stale callsign from previously-closer station | **P2** | UI · InformationPanelHandler · Logic | ~5 | ✔ |
+| **F101** | InformationPanelHandler shows "[Pause]" when no dominant station | **P2** | UI · InformationPanelHandler · Logic | ~5 | ✔ |
+| **F102** | CursorHandler.Update per-frame GetComponentInParent<ScrollRect> | **P2** | UI · CursorHandler · Performance | ~3 | ✔ |
+| **F103** | Font.CreateDynamicFontFromOSFont called per label (~15x) | **P2** | UI · InformationPanelHandler · GC Pressure | ~2 | ✔ |
+| **F104** | RadioStoryIntegration AmbiguousMatchException from combined BindingFlags | **P2** | Logic · RadioStoryIntegration · Reflection | ~10 | ✘ |
+| **F105** | StringBuilder allocs on audio thread (DecodeCallsignBuffer) | **P2** | Sound · Threading · GC Pressure | ~15 | ✔ |
+| **F106** | Debug.Log + Time.time in audio thread, no #if DEBUG | **P2** | Sound · Audio Thread · Debug Logging | ~3 | ✔ |
+| **F107** | Uncached Type.GetType on every locale string lookup | **P2** | Logic · RadioStoryIntegration · Performance | ~10 | ✔ |
+| **F108** | List.Add on audio thread can resize + allocate | **P2** | Sound · Threading · Thread Safety | ~5 | ✔ |
+| **F109** | RemoveAt(0) on audio thread while main thread reads (data corruption) | **P1** | Sound · Threading · Data Corruption | ~10 | ✔ |
+| **F110** | dominantStationIndex cross-thread read/write, no volatile | **P2** | Sound · Threading · Memory Visibility | ~2 | ✔ |
+| **F111** | MorseKeyer.IsActive cross-thread, no volatile | **P2** | Sound · Threading · Memory Visibility | ~2 | ✔ |
+| **F112** | BeatFrequency write/read without synchronization | **P3** | Sound · Threading · Thread Safety | ~2 | ✔ |
+| **F113** | MorseKeyer.AdvanceElement resets callsignLength=0 on pattern transition | **P3** | Logic · MorseKeyer · Correctness | ~3 | ✔ |
+| **F114** | GetCurrentElementType silent Dot fallback masks potential OOB | **P3** | Logic · MorseKeyer · Defensive Coding | ~2 | ✔ |
+| **F115** | OnDestroy doesn't reset DSP/Atmosphere state | **P3** | Logic · SonneController · Resource Mgmt | ~3 | ✔ |
+| **F116** | Asymmetric null-clearing between Load/LoadConsol | **P3** | Logic · MorseKeyer · API Design | ~3 | ✔ |
+| **F117** | SonneController keyer event subscriptions leak in OnDestroy | **P1** | Logic · SonneController · Events · Memory | ~10 | ✔ |
+| **F118** | ZoneHandler PointerClick entries не фильтруют по кнопке | **P2** | UI · ZoneHandler · EventTrigger | ~5 | ✔ |
+| **F119** | RadioHandler.OnDestroy не отписывается от zoneHandler.OnZoneChanged | **P1** | UI · RadioHandler · Events · Memory | ~5 | ✔ |
+| **F120** | SonneController signalEntries + measurements GC pressure в hot path | **P2** | Logic · SonneController · Performance · GC | ~15 | ✔ |
+| **F121** | Harmony.UnpatchAll() глобально откатывает патчи всех модов | **P1** | Logic · Main · Harmony | ~5 | ✔ |
+| **F122** | StationScheduler.Reset() устанавливает неправильную фазу | **P1** | Logic · StationScheduler · State Machine | ~5 | ✔ |
+| **F123** | StationState.NavigationStartTime не инициализируется в Awake | **P1** | Logic · SonneController · Station State | ~5 | ✔ |
+| **F124** | GetCurrentLanguage() повторно резолвит Type.GetType на каждый вызов | **P2** | Logic · RadioStoryIntegration · Performance | ~25 | ✔ |
+| **F125** | MorseAlphabet.GetMorse() молча возвращает "" для неизвестных символов | **P2** | Logic · MorseAlphabet · Correctness | ~5 | ✔ |
+| **F126** | ConsolCycleConfig — нет валидации отрицательных timing values | **P2** | Data · ConsolCycleConfig · Validation | ~15 | ✔ |
+| **F127** | SonneSignalGenerator.GenerateBearingTable хардкодит Cycle120s | **P2** | Logic · SonneSignalGenerator · Configuration | ~3 | ✔ |
+| **F128** | PositionFixCalculator.FindIntersection не обрабатывает анти meridian | **P2** | Logic · PositionFixCalculator · Geography | ~10 | ✔ |
+| **F129** | MorseAlphabet.GetElementCount() не учитывает границы слов | **P3** | Logic · MorseAlphabet · Morse Standard | ~10 | ✔ |
+| **F130** | BandConfig — mutable class в static readonly массиве | **P3** | Data · DialConfig · Encapsulation | ~15 | ✔ |
+| **F131** | Stations w/o frequency in position fix | **P2** | Logic · SonneController · Position Fix | ~15 | ✔ |
+| **F132** | Keyer/scheduler advance while radio off | **P1** | Sound · AudioSynthesisEngine · RadioOff | ~20 | ✔ |
+| **F133** | Escape key blocked by child selection | **P2** | UI · RadioHandler · Escape Key | ~10 | ✔ |
+| **F134** | Calculate mutates input measurements | **P3** | Logic · PositionFixCalculator · API Design | ~5 | ✔ |
+| **F135** | OnSequenceFinished no default case | **P3** | Logic · StationScheduler · Defensive Coding | ~5 | ✔ |
+| **F136** | MorseTiming silence wrong for bad config | **P3** | Logic · MorseTiming · Validation | ~10 | ✔ |
+| **F137** | PositionFixCalculator Math.Acos NaN | **P1** | Logic · PositionFixCalculator · Numerical | ~5 | ✔ |
+| **F138** | IPH History[0] bounds crash | **P1** | UI · InformationPanelHandler · Bounds | ~3 | ✔ |
+| **F139** | Main UnpatchAll without harmony ID | **P1** | Logic · Main · Harmony | ~5 | ✔ |
+| **F140** | Main patch method null check missing | **P2** | Logic · Main · Reflection | ~5 | ✔ |
+| **F141** | CarrierGenerator frequency clicks | **P2** | Sound · DSP · CarrierGenerator | ~10 | ✔ |
+| **F142** | ReceiverDsp output unclamped (whistle) | **P2** | Sound · DSP · ReceiverDsp | ~3 | ✔ |
+| **F143** | Atmosphere output unclamped (noise) | **P2** | Sound · DSP · Atmosphere | ~3 | ✔ |
+| **F144** | NavigationPattern zero divide | **P2** | Logic · NavigationPattern · Validation | ~5 | ✔ |
+| **F145** | First callsign cycle no callsignLength | **P2** | Logic · SonneController · Timing | ~10 | ✔ |
+| **F146** | PositionFix mutates on failure path | **P2** | Logic · PositionFixCalculator · API | ~5 | ✔ |
+| **F147** | RadioHandler float equality == | **P2** | UI · RadioHandler · Floating-Point | ~3 | ✔ |
+| **F148** | GroundHandler no button filter | **P2** | UI · GroundHandler · Input | ~3 | ✔ |
+| **F149** | SpinnerHandler multitouch state leak | **P2** | UI · SpinnerHandlerBase · State | ~5 | ✔ |
+| **F150** | DialConfig overlapping Band III/IV | **P2** | Data · DialConfig · Band Ranges | ~5 | ✔ |
+| **F151** | DialConfig missing interpolation segment | **P2** | Data · DialConfig · Interpolation | ~5 | ✔ |
+| **F152** | Main third catch loses stack trace | **P2** | Logic · Main · Error Handling | ~3 | ✔ |
+| **F153** | Atmosphere Box-Muller wastes 50% RNG | **P3** | Sound · DSP · Atmosphere · RNG | ~5 | ✔ |
+| **F154** | ReceiverDsp constructor ignores sampleRate | **P3** | Sound · DSP · ReceiverDsp · API | ~3 | ✔ |
+| **F155** | ReceiverDsp filter alpha recomputes | **P3** | Sound · DSP · ReceiverDsp · Perf | ~3 | ✔ |
+| **F156** | Atmosphere undocumented impulse path | **P3** | Sound · DSP · Atmosphere · Maintainability | ~3 | ✔ |
+| **F157** | RadioStoryIntegration duplicate BindingFlags | **P3** | Logic · RadioStoryIntegration · Hygiene | ~1 | ✔ |
+| **F158** | RadioHandler dead sonneController field | **P3** | UI · RadioHandler · Dead Code | ~2 | ✔ |
+| **F159** | DebugAngleHandler SerializeField overwrite | **P3** | UI · DebugAngleHandler · Unity Lifecycle | ~3 | ✔ |
+| **F160** | IPH duplicated state queries | **P3** | UI · InformationPanelHandler · Code Smell | ~5 | ✔ |
+| **F161** | DialConfig inconsistent rounding | **P3** | Data · DialConfig · Formatting | ~3 | ✔ |
+| **F162** | BeaconData DotTable ignores parameter | **P3** | Data · BeaconData · API | ~3 | ✔ |
+| **F163** | StationState mutable struct copy-divergence | **P3** | Data · StationState · Value Type | ~5 | ✔ |
+| **F164** | ConsolCycleConfig GetForCycleDuration stub | **P3** | Data · ConsolCycleConfig · Stub | ~3 | ✔ |
+| **F165** | MorseKeyer.Reset doesn't clear sequence | **P2** | Logic · MorseKeyer · State Management | ~10 | ✔ |
+| **F166** | MorseAlphabet.TextToPattern ignores parameter | **P3** | Logic · MorseAlphabet · API | ~1 | ✔ |
+| **F167** | StationScheduler.OnSequenceFinished missing phases | **P2** | Logic · StationScheduler · State Machine | ~12 | ✔ |
+| **F168** | PositionFixCalculator.Calculate returns ErrorKm = 0 | **P2** | Logic · PositionFixCalculator · Algorithm | ~5 | ✔ |
+| **F169** | CarrierGenerator phase drift from float precision | **P2** | Sound · DspPipeline · Numerical | ~10 | ✔ |
+| **F170** | MorseAlphabet fixed table overflow | **P2** | Logic · MorseAlphabet · Data Structure | ~10 | ✔ |
+| **F171** | GroundHandler.StateLog аллокация в DEBUG каждый кадр | **P3** | UI · GroundHandler · Performance | ~26 | ✔ |
+| **F172** | SignalRichTextFormatter.TrimEntries O(n²) RemoveAt(0) | **P3** | UI · SignalRichTextFormatter · Performance | ~8 | ✔ |
+| **F173** | InformationPanelHandler.CreateLabel fragile font loading | **P2** | UI · InformationPanelHandler · Portability | ~10 | ✔ |
+| **F174** | NavigationPattern.GetElement negative index OOB | **P2** | Logic · NavigationPattern · Correctness | ~8 | ✔ |
+| **F175** | MorseKeyer.AdvanceElement cross-type transition | **P2** | Logic · MorseKeyer · State Machine | ~40 | ✔ |
+| **F176** | Main.cs GameObject.Find hardcoded hierarchy path | **P2** | Logic · Main · Performance | ~15 | ✔ |
+| **F177** | DspPipeline deterministic radio noise generation | **P3** | Sound · DspPipeline · Architecture | ~5 | ✔ |
+| **F178** | Repeated GetComponent lookups не кешируются | **P3** | UI · Hygiene | ~20 | ✔ |
+| **F179** | Main.cs bootstrap объединяет несколько обязанностей | **P2** | Logic · Main · Architecture | ~35 | ✔ |
+| **F180** | UI validation основана на строковых путях | **P2** | Logic · Main · Maintainability | ~20 | ✔ |
+| **F181** | Main.cs избыточное диагностическое логирование | **P3** | Logic · Main · Logging | ~10 | ✔ |
+| **F182** | `build.ps1` doesn't validate `$GamePath` existence before invoking `csc` | **P3** | Build · Scripting | ~10 | ✔ |
+| **F183** | `MorseAlphabet.GetMorse` performs redundant `c < 0` check on unsigned `char` | **P3** | Logic · MorseAlphabet · Code Hygiene | ~5 | ✔ |
+| **F184** | `MorseKeyer` duplicates pattern/sequence branching in multiple internal getters | **P3** | Logic · MorseKeyer · Duplication | ~15 | ✔ |
+| **F185** | `InformationPanelHandler` hardcodes 6 pattern labels for 14 available stations | **P2** | UI · InformationPanelHandler · Data Representation | ~10 | ✔ |
+| **F186** | `RadioStoryIntegration.Init` accesses `GetParameters()[1]` without length check | **P2** | Logic · RadioStoryIntegration · Reflection Fragility | ~5 | ✘ |
+| **F187** | `PanelDragHandler.OnPointerExit` resets custom cursor while dragging outside panel bounds | **P3** | UI · PanelDragHandler · User Experience | ~5 | ✔ |
+| **F188** | `RadioInstaller` hardcodes fixed initial local position `(300, 100, 0)` without resolution scaling | **P3** | UI · RadioInstaller · Layout | ~5 | ✔ |
+| **F189** | Cross-thread data race on `signalEntries` / `morseDecoderBuffer` between Audio Thread and UI Thread | **P1** | Sound · UI · Thread Safety | ~15 | ✔ |
+| **F190** | PositionFixCalculator: `Math.Asin` без clamp на строке 149 — F137 ошибочно ссылается на F80 как на покрывающий | **P1** | Logic · PositionFixCalculator · Numerical Stability | ~5 | ✔ |
+| **F191** | PositionFixCalculator: `Math.Asin` без clamp на строке 187 (`phi3`) | **P1** | Logic · PositionFixCalculator · Numerical Stability | ~5 | ✔ |
+| **F192** | RadioHandler: `OnCursorAngleChanged` событие объявлено и вызывается, но никогда не подписано | **P3** | UI · RadioHandler · Events · Dead Code | ~2 | ✔ |
+| **F193** | `MorseAlphabet.GetElementCount()` — мёртвый код, баги в F76/F129/F170 бесполезны | **P2** | Logic · MorseAlphabet · Dead Code | ~5 | ✔ |
+| **F194** | `DebugAngleHandler.OnAngleChanged` — событие объявлено и вызывается, но никогда не подписано | **P3** | UI · DebugAngleHandler · Events · Dead Code | ~2 | ✔ |
+| **F195** | `RadioHandler.NotifyCursorChanged()` — метод определён, но никогда не вызывается | **P3** | UI · RadioHandler · Dead Code | ~1 | ✔ |
+| **F196** | `build.ps1` — `/debug:full` с `/optimize+` для всех конфигураций | **P3** | Build · Configuration | ~5 | ✔ |
+| **F197** | `ExpanderHandler.OnBeginDrag` — отсутствует проверка `ToggleHandler.IsInteractable` | **P3** | UI · ExpanderHandler · Input | ~2 | ✔ |
+| **F198** | `PanelDragHandler.OnBeginDrag` — отсутствует проверка `ToggleHandler.IsInteractable` | **P3** | UI · PanelDragHandler · Input | ~2 | ✔ |
+| **F199** | `ExpanderHandler` — отсутствует очистка состояния drag при `OnDisable`/`OnDestroy` | **P3** | UI · ExpanderHandler · State Management | ~3 | ✔ |
+| **F200** | `UpdatePosition()` — ноль вызывающих: position fix всегда ~0°N 0°E, dot-счёт статичен | **P0** | Logic · SonneController · Position Fix | ~20 | ✔ |
+| **F201** | Полный Consol-паттерн транслируется дважды за цикл; фаза «только позывной» не играет | **P1** | Logic · StationScheduler · State Machine | ~20 | ✔ |
+| **F202** | SpinnerHandlerBase — сдвиг 90° между значением и визуалом: прыжок при захвате, мёртвая зона | **P1** | UI · SpinnerHandlerBase · Input Mapping | ~15 | ✔ |
+| **F203** | Приёмник: дефолтный QF=20 — кросс-талки соседних станций на 30-99% громкости | **P2** | Sound · Receiver Selectivity | ~15 | ✔ |
+| **F204** | PositionFixCalculator — арифметическое среднее долгот через антимеридиан (latent) | **P2** | Logic · PositionFixCalculator · Geography | ~10 | ✔ |
+| **F205** | IPH — кириллическая «В°» вместо «°» (U+0412+U+00B0) в 3 строках | **P3** | UI · InformationPanelHandler · Text | ~3 | ✔ |
+| **F206** | AudioSynthesisEngine — тики по кадрам, не по сэмплам: стерео замедлит морзе вдвое (latent) | **P3** | Sound · AudioSynthesisEngine · Timing | ~5 | ✔ |
+| **F207** | PanelDragHandler — перехват drag, начатого на Zone-кнопках / Toggle / Ground | **P2** | UI · PanelDragHandler · Input | ~5 | ✔ |
 
 ---
 
@@ -499,7 +524,7 @@ F133 ──► F60, F97
 F134 ──► F64, F73, F120
 F135 ──► F122, F98
 F136 ──► F126, F81
-F137 ──► F80, F73, F16
+F137 ──► F190, F191, F73, F16
 F138 ──► F67, F07, F37
 F139 ──► F121, F83, F23
 F140 ──► F23, F68, F82
@@ -544,6 +569,13 @@ F178 ──► (none)
 F179 ──► (none)
 F180 ──► (none)
 F181 ──► (none)
+F193 ──► F06, F75, F76, F125, F129, F170 (MorseAlphabet dead code → пересмотр связанных планов)
+F194 ──► F63, F90, F192 (DebugAngleHandler dead event)
+F195 ──► F06, F158, F192 (RadioHandler dead code)
+F196 ──► F10, F78 (build.ps1 debug flags)
+F197 ──► F149, F199 (ExpanderHandler IsInteractable + state cleanup)
+F198 ──► F197 (PanelDragHandler IsInteractable consistency)
+F199 ──► F149 (ExpanderHandler drag state cleanup)
 ```
 
 ---
@@ -736,13 +768,31 @@ F181 ──► (none)
 148. **F179** — Main.cs: разделить OnLoaded на PatchInstaller/EventRegistrar/BootstrapDiagnostics. 2-3 часа.
 149. **F180** — Main.cs: заменить строковые пути UI на типизированные ссылки. 30 мин.
 
-**Итого:** ~95-125 часа + Фаза 0 (F22: 8-12 часов) + Фаза 1-2 (F77-F96: ~5-8 часов) + F97-F120 (~4-5 часов) + F121-F130 (~3-4 часа) + F131-F136 (~20 мин) + F137-F164 (~2-3 часа) + F165-F181 (~6-8 часов). Фаза 1: 65 quick wins (25 code + 8 documentation + 32 new F97-F164). Фаза 3b: 17 дополнительных правок (5 код quick wins + 9 корректность/данные + 3 архитектурные).
+150. **F193** — MorseAlphabet: удалить мёртвый `GetElementCount()`, пересмотреть F76/F129/F170. 5 мин.
+151. **F194** — DebugAngleHandler: удалить dead event `OnAngleChanged` или добавить subscriber. 2 мин.
+152. **F195** — RadioHandler: удалить мёртвый метод `NotifyCursorChanged()`. 1 мин.
+153. **F196** — build.ps1: разделить `/debug`/`/optimize` по конфигурациям. 5 мин.
+154. **F197** — ExpanderHandler: добавить `ToggleHandler.IsInteractable` check в `OnBeginDrag`. 2 мин.
+155. **F198** — PanelDragHandler: добавить `IsInteractable` check или документировать. 2 мин.
+156. **F199** — ExpanderHandler: добавить `OnDisable` для сброса `isDragging`. 3 мин.
+
+### Фаза 5b: F200-F207 (новые находки аудита 2026-08-01)
+157. **F200** — SonneController: подключить фид позиции лодки (патч/интерфейс `IPositionProvider`); до этого — скрывать фикс без данных. 1-2 часа.
+158. **F201** — StationScheduler: `GetCurrentConsolPattern()` возвращать null в фазе `Callsign`. 30 мин.
+159. **F202** — SpinnerHandlerBase: убрать `GetAngleOffset()` из value или компенсировать в визуале; проверить на живой панели. 30-60 мин.
+160. **F203** — AudioSynthesisEngine/SonneController: поднять дефолтный QF (~100-200) или маскировать недоминантные станции в миксере. 1 час.
+161. **F204** — PositionFixCalculator: векторное усреднение долгот (atan2-mean) в двух местах. 30 мин.
+162. **F205** — InformationPanelHandler: заменить `В°` на `\u00B0` в 3 литералах. 2 мин.
+163. **F206** — AudioSynthesisEngine: `tickAccumulator += ticksPerSample * channels`. 5 мин.
+164. **F207** — PanelDragHandler: исключить потомков ZoneHandler/ToggleHandler/GroundHandler из drag. 15 мин.
+
+**Итого:** ~95-130 часа + Фаза 0 (F22: 8-12 часов) + Фаза 1-2 (F77-F96: ~5-8 часов) + F97-F120 (~4-5 часов) + F121-F130 (~3-4 часа) + F131-F136 (~20 мин) + F137-F164 (~2-3 часа) + F165-F181 (~6-8 часов) + F182-F189 (~1-2 часа) + F190-F192 (~15 мин) + F193-F199 (~15 мин): F190/F191 clamp Asin в PositionFixCalculator, F192 удалить dead event OnCursorAngleChanged, F193 удалить мёртвый GetElementCount, F194-195 dead code/events в DebugAngleHandler/RadioHandler, F196 debug-флаги build.ps1, F197-199 ExpanderHandler consistency + state cleanup. + F200-F207 (~4-6 часов): F200 подключить позицию/скрыть фикс, F201 фаза Callsign, F202 spinner offset, F203 селективность приёмника, F204 антимеридиан-среднее, F205 кириллический градус, F206 каналы в тиках, F207 drag с дочерних контролов.
 
 ---
 
 ## Cross-reference matrix
 
-_Maтрица охватывает F01-F52. F53-F76 не имеют перекрёстных зависимостей с предыдущими (кроме F61→F05, F71→F01). F77-F96 — перекрёстные ссылки в отдельных файлах. F97-F116 — перекрёстные ссылки: F104→F23/F68, F105→F01/F08/F13, F106→F13/F31, F107→F23/F68, F108→F01/F29, F109→F24/F01/F29, F110-F112→F01/F29, F113/F116→F65. F117-F120: F117→F14/F11, F118→(none), F119→F14/F30, F120→F08/F24. F121-F130: F121→(none), F122→(none), F123→F77/F01, F124→F68/F107/F23, F125→F53/F37, F126→F55/F92, F127→F55/F35, F128→F80/F73/F16, F129→F53, F130→F20/F05. F131-F136: F131→F38/F79/F99, F132→F98/F89/F01, F133→F60/F97, F134→F64/F73/F120, F135→F122/F98, F136→F126/F81. F137-F164: F137→F80/F73/F16, F138→F67/F07/F37, F139→F121/F83/F23, F140→F23/F68/F82, F141→F40/F41/F29, F142→F41/F13, F143→F142/F71, F144→F126/F129, F145→F113/F77/F65, F146→F134/F64/F99, F147→F72/F74, F148→F118/F85, F149→F118/F133, F150→F20/F130, F151→F20/F58/F150, F152→F69/F82/F106, F153→F71/F143, F154→F41/F25, F155→F102/F103, F156→F28/F71, F157→F23/F68/F104, F158→F06/F54, F159→F63, F160→F96/F32, F161→F20/F28, F162→F55/F86/F35, F163→F17/F130, F164→F55/F86/F92/F126. F165-F181: F165→F65/F116/F113, F166→F70, F167→F122/F135, F168→F16/F134/F80, F169→F41/F94, F170→F53/F76/F129, F171→F31, F172→F24/F108, F173→F103, F174→F114/F70, F175→F65/F113/F116/F165, F176→(none), F177→(none), F178→(none), F179→(none), F180→(none), F181→(none). F182-F189: F182→(none), F183→(none), F184→(none), F185→F32, F186→F23, F187→(none), F188→(none), F189→F01/F120._
+_Maтрица охватывает F01-F52. F53-F76 не имеют перекрёстных зависимостей с предыдущими (кроме F61→F05, F71→F01). F77-F96 — перекрёстные ссылки в отдельных файлах. F97-F116 — перекрёстные ссылки: F104→F23/F68, F105→F01/F08/F13, F106→F13/F31, F107→F23/F68, F108→F01/F29, F109→F24/F01/F29, F110-F112→F01/F29, F113/F116→F65. F117-F120: F117→F14/F11, F118→(none), F119→F14/F30, F120→F08/F24. F121-F130: F121→(none), F122→(none), F123→F77/F01, F124→F68/F107/F23, F125→F53/F37, F126→F55/F92, F127→F55/F35, F128→F80/F73/F16, F129→F53, F130→F20/F05. F131-F136: F131→F38/F79/F99, F132→F98/F89/F01, F133→F60/F97, F134→F64/F73/F120, F135→F122/F98, F136→F126/F81. F137-F164: F137→F190/F191/F73/F16, F138→F67/F07/F37, F139→F121/F83/F23, F140→F23/F68/F82, F141→F40/F41/F29, F142→F41/F13, F143→F142/F71, F144→F126/F129, F145→F113/F77/F65, F146→F134/F64/F99, F147→F72/F74, F148→F118/F85, F149→F118/F133, F150→F20/F130, F151→F20/F58/F150, F152→F69/F82/F106, F153→F71/F143, F154→F41/F25, F155→F102/F103, F156→F28/F71, F157→F23/F68/F104, F158→F06/F54, F159→F63, F160→F96/F32, F161→F20/F28, F162→F55/F86/F35, F163→F17/F130, F164→F55/F86/F92/F126. F165-F181: F165→F65/F116/F113, F166→F70, F167→F122/F135, F168→F16/F134/F80, F169→F41/F94, F170→F53/F76/F129, F171→F31, F172→F24/F108, F173→F103, F174→F114/F70, F175→F65/F113/F116/F165, F176→(none), F177→(none), F178→(none), F179→(none), F180→(none), F181→(none). F182-F189: F182→(none), F183→(none), F184→(none), F185→F32, F186→F23, F187→(none), F188→(none), F189→F01/F120. F190-F192: F190→F137/F73/F16/F128 (FindIntersection NaN clamp), F191→F137/F190/F73/F16/F128 (FindIntersection phi3 NaN), F192→F90/F06/F158 (dead event analog). F193-F199: F193→F06/F75/F76/F125/F129/F170, F194→F63/F90/F192, F195→F06/F158/F192, F196→F10/F78, F197→F149/F199, F198→F197, F199→F149. F200-F207: F200→F204/F99/F16/F131 (мёртвый фид позиции блокирует фикс-цепочку), F201→F145/F98/F65/F113/F175, F202→F72/F149/F33, F203→F39/F131/F142/F143, F204→F200/F128/F73, F205→F200/F161, F206→F94/F98, F207→F197/F198/F118/F148.
 
 ---
 
@@ -750,13 +800,13 @@ _Maтрица охватывает F01-F52. F53-F76 не имеют перекр
 
 | Метрика | Значение |
 |---------|----------|
-| Всего проблем | 189 (F01-F189) |
-| P0 (Critical) | 12 (F01, F05, F13, F23, F29, F45, F46, F53, F65, F77, F78, F79) |
-| P1 (High) | 44 (F02, F03, F04, F07, F09, F11, F14, F16, F24, F25, F30, F34, F43, F47, F48, F52, F54, F55, F56, F57, F58, F66, F67, F68, F69, F70, F80, F81, F82, F83, F97, F98, F99, F109, F117, F119, F121, F122, F123, F132, F137, F138, F139, **F189**) |
-| P2 (Medium) | 88 (F06, F08, F10, F12, F15, F17, F18, F20, F21, F22, F26, F27, F28, F31, F35, F36, F37, F38, F39, F40, F41, F42, F44, F49, F50, F51, F59, F60, F61, F62, F63, F64, F71, F72, F73, F74, F75, F84, F85, F86, F87, F88, F100, F101, F102, F103, F104, F105, F106, F107, F108, F110, F111, F118, F120, F124, F125, F126, F127, F128, F131, F133, F140, F141, F142, F143, F144, F145, F146, F147, F148, F149, F150, F151, F152, F165, F167, F168, F169, F170, F173, F174, F175, F176, F179, F180, **F185**, **F186**) |
-| P3 (Low) | 45 (F19, F32, F33, F76, F89, F90, F91, F92, F93, F94, F95, F96, F112, F113, F114, F115, F116, F129, F130, F134, F135, F136, F153, F154, F155, F156, F157, F158, F159, F160, F161, F162, F163, F164, F166, F171, F172, F177, F178, F181, **F182**, **F183**, **F184**, **F187**, **F188**) |
+| Всего проблем | 207 (F01-F207) |
+| P0 (Critical) | 13 (F01, F05, F13, F23, F29, F45, F46, F53, F65, F77, F78, F79, **F200**) |
+| P1 (High) | 48 (F02, F03, F04, F07, F09, F11, F14, F16, F24, F25, F30, F34, F43, F47, F48, F52, F54, F55, F56, F57, F58, F66, F67, F68, F69, F70, F80, F81, F82, F83, F97, F98, F99, F109, F117, F119, F121, F122, F123, F132, F137, F138, F139, **F189**, **F190**, **F191**, **F201**, **F202**) |
+| P2 (Medium) | 92 (F06, F08, F10, F12, F15, F17, F18, F20, F21, F22, F26, F27, F28, F31, F35, F36, F37, F38, F39, F40, F41, F42, F44, F49, F50, F51, F59, F60, F61, F62, F63, F64, F71, F72, F73, F74, F75, F84, F85, F86, F87, F88, F100, F101, F102, F103, F104, F105, F106, F107, F108, F110, F111, F118, F120, F124, F125, F126, F127, F128, F131, F133, F140, F141, F142, F143, F144, F145, F146, F147, F148, F149, F150, F151, F152, F165, F167, F168, F169, F170, F173, F174, F175, F176, F179, F180, **F185**, **F186**, **F193**, **F203**, **F204**, **F207**) |
+| P3 (Low) | 54 (F19, F32, F33, F76, F89, F90, F91, F92, F93, F94, F95, F96, F112, F113, F114, F115, F116, F129, F130, F134, F135, F136, F153, F154, F155, F156, F157, F158, F159, F160, F161, F162, F163, F164, F166, F171, F172, F177, F178, F181, **F182**, **F183**, **F184**, **F187**, **F188**, **F192**, **F194**, **F195**, **F196**, **F197**, **F198**, **F199**, **F205**, **F206**) |
 | Quick wins (Фаза 1) | 65 (25 code + 8 documentation + 32 new F97-F164) |
-| Оценочное время | ~95-125 часа + Фаза 0 (F22: 8-12 часов) + Фаза 1-2 (F77-F96: ~5-8 часов) + F97-F120 (~4-5 часов) + F121-F130 (~3-4 часа) + F131-F136 (~20 мин) + F137-F164 (~2-3 часа) + F165-F181 (~6-8 часов) + F182-F189 (~1-2 часа) |
+| Оценочное время | ~95-125 часа + Фаза 0 (F22: 8-12 часов) + Фаза 1-2 (F77-F96: ~5-8 часов) + F97-F120 (~4-5 часов) + F121-F130 (~3-4 часа) + F131-F136 (~20 мин) + F137-F164 (~2-3 часа) + F165-F181 (~6-8 часов) + F182-F189 (~1-2 часа) + F200-F207 (~4-6 часов) |
 
 ## История изменений
 
@@ -778,4 +828,9 @@ _Maтрица охватывает F01-F52. F53-F76 не имеют перекр
 | 2026-07-31 | Добавлены F131-F136 (6 незадокументированных проблем, аудит position fix, audio engine, UI escape, API design, scheduler, Morse timing). F131 (P2: stations w/o frequency in position fix), F132 (P1: keyer/scheduler advance while radio off), F133 (P2: escape key blocked by child selection), F134-F136 (3 P3: Calculate mutates input, OnSequenceFinished no default, MorseTiming silence wrong). Итого 136 проблем (F01-F136). |
 | 2026-07-31 | Добавлены F137-F164 (28 незадокументированных проблем, полный аудит Sound/Logic/UI/Data/Main vs F01-F136). F137-F139 (3 P1: Acos NaN, History bounds crash, UnpatchAll global), F140-F152 (13 P2: patch method null, frequency clicks, DSP unclamped, Atmosphere unclamped, zero divide, first callsign cycle, mutate on failure, float equality, no button filter, multitouch leak, overlapping bands, missing interpolation, catch loses stacktrace), F153-F164 (12 P3: Box-Muller waste, constructor ignores param, filter alpha recompute, undocumented impulse, duplicate BindingFlags, dead field, SerializeField overwrite, duplicated state queries, inconsistent rounding, DotTable ignores param, mutable struct copy, stub GetForCycleDuration). Итого 164 проблемы (F01-F164). |
 | 2026-07-31 | Добавлены F165-F181 (17 незадокументированных проблем, финальный рескан: сканирование всех 34 source-файлов vs F01-F164 + проверка граничных случаев в state machine, DSP, UI validation, bootstrap). F165-F175: аудит MorseKeyer/StationScheduler/PositionFixCalculator/DspPipeline/MorseAlphabet/InformationPanelHandler/NavigationPattern + кросс-зависимости с F01-F164. F165 (P2: Reset не очищает sequence), F166 (P3: TextToPattern игнорирует param), F167 (P2: OnSequenceFinished missing phases), F168 (P2: ErrorKm всегда 0), F169 (P2: CarrierGenerator phase drift), F170 (P2: MorseAlphabet table overflow), F171 (P3: StateLog debug alloc), F172 (P3: TrimEntries O(n²)), F173 (P2: fragile font loading), F174 (P2: negative index OOB), F175 (P2: cross-type transition asymmetry). F176-F181: архитектурные проблемы Main.cs bootstrap (GameObject.Find, GetComponent кэш, ответственности, string paths, логирование) + DspPipeline RNG. F176 (P2: GameObject.Find), F177 (P3: deterministic noise), F178 (P3: repeated GetComponent), F179 (P2: bootstrap responsibilities), F180 (P2: string UI paths), F181 (P3: diagnostic noise). Итого 181 проблема (F01-F181). |
-| 2026-07-31 | Добавлены F182-F189 (8 незадокументированных проблем, аудит build.ps1, MorseAlphabet, MorseKeyer, InformationPanelHandler, RadioStoryIntegration, PanelDragHandler, RadioInstaller, SonneController audio thread race). Итого 189 проблем (F01-F189). |
+| 2026-07-31 | Добавлены F182-F189 (8 незадокументированных проблем, аудит build.ps1, MorseAlphabet, MorseKeyer, InformationPanelHandler, RadioStoryIntegration, PanelDragHandler, RadioInstaller, SonneController audio thread race). F190-F192: аудит PositionFixCalculator NaN-векторов и dead events в RadioHandler. F190 (P1): `Math.Asin` line 149 без clamp — F137 ошибочно ссылается на F80. F191 (P1): `Math.Asin` line 187 (`phi3`) без clamp. F192 (P3): `OnCursorAngleChanged` dead event. Итого 192 проблемы (F01-F192). |
+| 2026-08-01 | Добавлены F193-F199 (7 незадокументированных проблем, финальный аудит: dead code в MorseAlphabet.GetElementCount, dead event в DebugAngleHandler.OnAngleChanged, dead method в RadioHandler.NotifyCursorChanged, build.ps1 debug/optimization flags, ExpanderHandler/PanelDragHandler missing IsInteractable checks, ExpanderHandler drag state cleanup). Итого 199 проблем (F01-F199). |
+| 2026-08-01 | Добавлены F200-F207 (8 незадокументированных проблем, аудит «что не покрыто F01-F199»: кросс-проверка кода vs INDEX, математика drag-маппинга, state machine фаз, фид позиции, гео-агрегирование, символьные данные). F200 (P0): UpdatePosition без вызывающих — фикс всегда ~0°N 0°E. F201-F202 (2 P1): двойная передача Consol-паттерна за цикл (фаза Callsign мертва), сдвиг 90° значение/визуал у спиннеров. F203-F204, F207 (3 P2): кросс-талки при QF=20, антимеридиан-среднее долгот (latent), drag с дочерних контролов панели. F205-F206 (2 P3): кириллическая «В°», тики по кадрам вместо сэмплов (latent). Итого 207 проблем (F01-F207). |
+| 2026-08-01 | **Верификация всех 207 гипотез против исходного кода.** Итог: 196 confirmed, 11 rejected (F43, F44, F45, F46, F47, F48, F49, F50, F51, F60, F96). Файлы перемещены: `confirmed\` (196 шт), `rejected\` (11 шт). SAD\*.md уже содержали исправления/аннотации (F45-F52), поэтому гипотезы F44-F51 о неактуальной документации опровергнуты. |
+| 2026-08-01 | **Фаза 5: сверка с исходниками игры** (`C:\code\projects\uboat`). Подтверждены 5 Harmony-таргетов, AssetBundle (2021.3.33f1 vs 2021.3.45f2), имена типов, Decision-конструкторы, DI, манифест; игра компилирует мод из Source без `DEBUG`-символа. Вскрыты 4 поломки инжекции T3PLL38 (G1 stageField, G2 insertMethod, G3 OnUpdated, G4 LocalizationKey). F104, F186 → ✘ (перемещены в `rejected\` с переименованием). Итог: **194 confirmed / 13 rejected**. |
+| 2026-08-01 | **Документация фазы 5** — создана папка `game-source-findings\`: G1-G4 (полные файлы-находки с доказательствами и фиксами), `INDEX.md` (сводка, порядок починки G2→G1→G4→G3), `GAME_SOURCE_REFERENCE.md` (справочник API мод↔игра, file:line). VERIFICATION_REPORT.md дополнен ссылками. |

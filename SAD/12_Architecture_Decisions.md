@@ -1,9 +1,10 @@
 # Architecture Decisions — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-07-30):** Полный аудит выявил критические расхождения между статусами ADR и реальностью. Добавлены проблемы F65–F76 (всего 76).
+> **⚠️ Deep Scan Update (2026-08-01):** Полный аудит выявил критические расхождения между статусами ADR и реальностью. Всего **199 проблем** (F01–F199).
 > - **F45 (исправлено):** ADR-002/003/004/005/007 — статус changed «Accepted» → «Deferred»
 > - **F46 (исправлено):** ADR-001 пример кода — replaced with real Harmony imperative patching
-> - **F48:** ADR-003 упоминает 4 станции — реальность 14
+> - **F47:** Implementation examples reference proposed/non-existent classes (annotated `⚠ proposed`)
+> - **F48:** ADR-003 упоминает 4 станции — реальность 14 (annotated)
 >
 > Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
 
@@ -96,6 +97,8 @@ Implement double-buffer pattern with lock-free ring buffer for command passing.
 ### Implementation
 
 ```csharp
+// ⚠ proposed — StationStateBuffer not yet implemented (F47)
+// Actual implementation: StationState[] mutated directly without sync (F01, F29)
 public class StationStateBuffer {
     private StationState[] readBuffer;   // Audio thread reads
     private StationState[] writeBuffer;  // Main thread writes
@@ -128,7 +131,7 @@ Deferred
 
 ### Context
 Two God Classes exist:
-- `SonneController` (506 lines, 30+ methods)
+- `SonneController` (508 lines, 30+ methods)
 - `InformationPanelHandler` (474 lines, 20+ methods)
 
 These are hard to test, maintain, and understand.
@@ -151,24 +154,24 @@ Decompose God Classes into focused, single-responsibility classes.
 
 ### Implementation
 
-**SonneController Decomposition**:
+**SonneController Decomposition** (⚠ proposed — classes not yet implemented, F47):
 
-| New Class | Responsibility | Lines |
-|-----------|----------------|-------|
-| StationManager | Station management | ~100 |
-| SignalDecoder | Signal processing | ~90 |
-| PositionTracker | Position calculation | ~60 |
-| DiagnosticsCollector | Diagnostics | ~30 |
-| SonneController | Orchestration | ~136 |
+| New Class | Responsibility | Lines | Status |
+|-----------|----------------|-------|--------|
+| ⚠ StationManager | Station management | ~100 | Proposed |
+| ⚠ SignalDecoder | Signal processing | ~90 | Proposed |
+| ⚠ PositionTracker | Position calculation | ~60 | Proposed |
+| DiagnosticsCollector | Diagnostics | ~30 | Existing (inline) |
+| SonneController | Orchestration | ~136 | Existing (508 LOC) |
 
-**InformationPanelHandler Decomposition**:
+**InformationPanelHandler Decomposition** (⚠ proposed — classes not yet implemented, F47):
 
-| New Class | Responsibility | Lines |
-|-----------|----------------|-------|
-| UIElementFactory | UI creation | ~150 |
-| StationInfoDisplay | Data display | ~120 |
-| StationFinder | Business logic | ~80 |
-| InformationPanelHandler | Orchestration | ~124 |
+| New Class | Responsibility | Lines | Status |
+|-----------|----------------|-------|--------|
+| ⚠ UIElementFactory | UI creation | ~150 | Proposed |
+| ⚠ StationInfoDisplay | Data display | ~120 | Proposed |
+| ⚠ StationFinder | Business logic | ~80 | Proposed |
+| InformationPanelHandler | Orchestration | ~124 | Existing (474 LOC) |
 
 ### Alternatives Considered
 
@@ -205,6 +208,10 @@ Create interfaces for all game integrations with fallback implementations.
 ### Implementation
 
 ```csharp
+// ⚠ proposed — GameReflectionCache not yet implemented (F47)
+// Actual implementation: RadioStoryIntegration (381 LOC) uses Type.GetType/FieldInfo directly
+// Interfaces (IGameServices, etc.) not yet created (F04, ADR-004 Deferred)
+
 // Interfaces
 public interface IGameServices {
     string GetCurrentLanguage();
@@ -256,6 +263,8 @@ Centralize all constants in `Data/Constants.cs`.
 ### Implementation
 
 ```csharp
+// ⚠ proposed — Data/Constants.cs not yet implemented (F47)
+// Actual: magic numbers scattered across all files (~40 unique values, F05)
 public static class Constants {
     // Audio
     public const float BfoBaseFrequency = 1000f;

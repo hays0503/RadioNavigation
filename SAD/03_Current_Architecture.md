@@ -162,7 +162,7 @@
 #### DebugAngleHandler.cs (Debug)
 - **Lines**: ~50
 - **Responsibility**: Debug angle slider
-- **Issues**: Uses TMPro which may not be in all UBOOT builds
+- **Issues**: Uses TMPro which may not be in all UBOAT builds
 
 #### SignalRichTextFormatter.cs (Formatting)
 - **Lines**: ~86
@@ -225,7 +225,7 @@
 #### RadioStoryIntegration.cs (Game Integration)
 - **Lines**: 381
 - **Responsibility**: Harmony patches for story/locale injection
-- **Issues**: **Fragile** — 8 reflection handlers, version-dependent
+- **Issues**: **Fragile** — 9 reflection handlers, version-dependent (F23, F68)
 
 #### ComparisonExtensions.cs (Extensions)
 - **Lines**: 34
@@ -324,6 +324,6 @@ Sound               Low   High    Low    -
 
 ---
 
-*Document Version: 1.2*  
-*Last Updated: 2026-07-31*  
-*Corrections: Fixed file counts, LOC, removed non-existent classes, added missing classes, fixed Sound layer. See F45-F52. Added F65-F76 (total 76 issues).*
+*Document Version: 2.0*  
+*Last Updated: 2026-08-01*  
+*Corrections: Fixed UBOOT→UBOAT, reflection handler count 8→9, updated footer to 199 problems. See F45-F52, F65-F199.*
