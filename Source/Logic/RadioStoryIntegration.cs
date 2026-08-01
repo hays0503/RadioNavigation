@@ -10,6 +10,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const string LocaleKey = "Radio/OpenT3PLL38";
         private const string LeaveStationKey = "Radio/LeaveStation";
         private const string LocalePrefix = "Stories/";
+        private const string StageFieldName = "stage";
         private const bool AllowOriginal = true;
         private const bool PreventOriginal = false;
 
@@ -17,6 +18,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static ConstructorInfo decisionCtor;
         private static FieldInfo localizationKeyField;
         private static PropertyInfo localizationKeyProp;
+        private static FieldInfo stageField;
         private static PropertyInfo decisionsProp;
         private static MethodInfo insertMethod;
         private static MethodInfo onUpdatedMethod;
@@ -30,6 +32,7 @@ namespace UBOAT.Mods.RadioNavigation
             decisionCtor = null;
             localizationKeyField = null;
             localizationKeyProp = null;
+            stageField = null;
             decisionsProp = null;
             insertMethod = null;
             onUpdatedMethod = null;
@@ -108,6 +111,11 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            // G1 corrected: "stage" EXISTS (RadioStory.cs:83) but is typed
+            // RadioStoryStage (enum), not int. The old (int) cast threw
+            // InvalidCastException on the boxed enum, killing injection.
+            stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
+
             decisionsProp = storyType.GetProperty("Decisions",
                 BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
 
@@ -122,15 +130,15 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                if (!TryInit() || decisionCtor.IsNull())
+                if (!TryInit() || decisionCtor.IsNull() || stageField.IsNull())
                 {
                     Debug.LogWarning("[RadioNav] Init failed, cannot inject T3PLL38");
                     return;
                 }
 
-                // G1: no "stage" field exists in RadioStory/GenericStory/Story.
-                // RadioStory builds its decisions on every ContinueStory call;
-                // duplicate protection is DecisionAlreadyExists below.
+                if (!IsStageMainChoices(__instance))
+                    return;
+
                 var decisions = GetDecisions(__instance);
                 if (decisions.IsNull())
                     return;
@@ -158,6 +166,15 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Debug.LogError("[RadioNav] InjectT3PLL38Decision error: " + ex);
             }
+        }
+
+        private static bool IsStageMainChoices(RadioStory __instance)
+        {
+            // Convert.ToInt32 works on boxed enums ((int) would throw
+            // InvalidCastException). RadioStoryStage: Unknown=0, MainChoices=1.
+            int stageValue = Convert.ToInt32(stageField.GetValue(__instance));
+            Debug.Log("[RadioNav] stage=" + stageValue + " (1=MainChoices)");
+            return stageValue == 1;
         }
 
         private static object GetDecisions(RadioStory __instance)
