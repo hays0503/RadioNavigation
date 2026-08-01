@@ -93,8 +93,13 @@ namespace UBOAT.Mods.RadioNavigation
             if (!Input.GetKeyDown(KeyCode.Escape) || !IsVisible)
                 return;
 
-            if (UnityEngine.EventSystems.EventSystem.current.IsNotNull() &&
-                UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject.IsNotNull())
+            var selected = UnityEngine.EventSystems.EventSystem.current.IsNotNull()
+                ? UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject
+                : null;
+
+            // F133: the cursor spinner keeps itself selected; Escape must still
+            // close the panel when the selection is inside this panel.
+            if (selected.IsNotNull() && !selected.transform.IsChildOf(transform))
                 return;
 
             IsVisible = false;

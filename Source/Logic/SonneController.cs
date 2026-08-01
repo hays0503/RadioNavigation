@@ -466,14 +466,19 @@ namespace UBOAT.Mods.RadioNavigation
 
                 stations[i].Pattern = SonneSignalGenerator.ToNavigationPattern(consolPattern); // F77: diagnostics Pattern was never updated after init
 
-                measurements.Add(new PositionFixCalculator.Measurement
+                // F131: a station without a receivable frequency (History
+                // empty or no value) must not contribute phantom bearings.
+                if (HasStationFrequency(beaconStations[i]))
                 {
-                    StationIndex = i,
-                    Latitude = (float)beaconStations[i].Latitude,
-                    Longitude = (float)beaconStations[i].Longitude,
-                    Bearing = bearing,
-                    Weight = 1f
-                });
+                    measurements.Add(new PositionFixCalculator.Measurement
+                    {
+                        StationIndex = i,
+                        Latitude = (float)beaconStations[i].Latitude,
+                        Longitude = (float)beaconStations[i].Longitude,
+                        Bearing = bearing,
+                        Weight = 1f
+                    });
+                }
             }
 
             if (HasEnoughMeasurementsForFix())
@@ -512,8 +517,7 @@ namespace UBOAT.Mods.RadioNavigation
             !keyers[i].IsActive
             || schedulers[i].CurrentPhase != StationScheduler.Phase.Navigation;
 
-        private static bool TryGetCallsignFromHistory(BeaconStation station, out string callsign)
-        {
+        private static bool TryGetCallsignFromHistory(BeaconStation station, out string callsign)        {
             if (station.History.IsNotNull()
                 && station.History.Length.IsPositive()
                 && !string.IsNullOrEmpty(station.History[0].Callsign))
@@ -523,6 +527,13 @@ namespace UBOAT.Mods.RadioNavigation
             }
             callsign = station.Name.Substring(0, Math.Min(2, station.Name.Length)).ToUpper();
             return false;
+        }
+
+        private static bool HasStationFrequency(BeaconStation station)
+        {
+            return station.History.IsNotNull()
+                && station.History.Length.IsPositive()
+                && station.History[0].FrequencyKHz.IsNotNull();
         }
 
         public static float CalculateBearing(float lat1, float lon1, float lat2, float lon2)

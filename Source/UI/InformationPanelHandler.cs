@@ -455,8 +455,7 @@ namespace UBOAT.Mods.RadioNavigation
                     bestFreq = stationFreq.Value;
                     bestName = stations[i].Name;
                     string cs = history[0].Callsign;
-                    if (!string.IsNullOrEmpty(cs))
-                        bestCallsign = cs;
+                    bestCallsign = string.IsNullOrEmpty(cs) ? null : cs;
                 }
             }
 
