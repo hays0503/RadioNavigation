@@ -1,0 +1,68 @@
+using System;
+using System.Collections.Generic;
+using TMPro;
+using UBOAT.Game.Sandbox;
+using UBOAT.Game.Scene.Environment;
+using UnityEngine;
+
+namespace UBOAT.Mods.RadioNavigation
+{
+    // Debug overlay for the map opened with M. It uses the same world-space
+    // layer as the game's MapRenderer, so markers pan and zoom with the map.
+    public sealed class StationMapOverlay : MonoBehaviour
+    {
+        private const int DebugStationCount = 6;
+        private const float MapLabelHeight = 1100f;
+        private const float LabelScale = 0.8f;
+        private readonly List<GameObject> markers = new List<GameObject>();
+
+        private void Start()
+        {
+            MapRenderer mapRenderer = FindObjectOfType<MapRenderer>();
+            if (mapRenderer.IsNull() || mapRenderer.VectorTerrainsUIContainer.IsNull())
+            {
+                Debug.LogWarning("[RadioNav][Map] MapRenderer/vector label container not found");
+                return;
+            }
+
+            int count = Math.Min(DebugStationCount, BeaconData.Stations.Length);
+            for (int i = 0; i < count; i++)
+                CreateMarker(mapRenderer.VectorTerrainsUIContainer.transform, BeaconData.Stations[i], i);
+
+            Debug.Log("[RadioNav][Map] station markers created=" + count);
+        }
+
+        private void CreateMarker(Transform parent, BeaconStation station, int index)
+        {
+            Vector2 worldPosition = Coordinates.ToWorldPosition(station.Latitude, station.Longitude);
+            var marker = new GameObject("RadioNavStation" + index);
+            marker.transform.SetParent(parent, false);
+            marker.transform.position = new Vector3(
+                worldPosition.x * 1000f,
+                MapLabelHeight,
+                worldPosition.y * 1000f);
+            marker.transform.localScale = Vector3.one * LabelScale;
+            marker.transform.localEulerAngles = new Vector3(90f, 0f, 0f);
+
+            var label = marker.AddComponent<TextMeshPro>();
+            label.font = TMP_Settings.defaultFontAsset;
+            label.fontSize = 36f;
+            label.color = new Color(1f, 0.82f, 0.15f, 1f);
+            label.alignment = TextAlignmentOptions.Left;
+            label.text = "● " + station.Name;
+            label.raycastTarget = false;
+
+            markers.Add(marker);
+        }
+
+        private void OnDestroy()
+        {
+            for (int i = 0; i < markers.Count; i++)
+            {
+                if (markers[i].IsNotNull())
+                    Destroy(markers[i]);
+            }
+            markers.Clear();
+        }
+    }
+}

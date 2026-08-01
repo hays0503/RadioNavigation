@@ -197,6 +197,8 @@ namespace UBOAT.Mods.RadioNavigation
                 }
 
                 RadioInstaller.Instantiate(radio, viewport);
+                if (radio.GetComponent<StationMapOverlay>().IsNull())
+                    radio.AddComponent<StationMapOverlay>();
 
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +
