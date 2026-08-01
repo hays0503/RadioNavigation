@@ -45,6 +45,22 @@ namespace UBOAT.Mods.RadioNavigation
             return initialized;
         }
 
+        // GetMethod does NOT trace base types for NonPublic members, but InsertDecision
+        // (Story.cs:377) and OnUpdated (Story.cs:438) are declared two levels above
+        // RadioStory. Walk the whole hierarchy instead (G2/G3).
+        private static MethodInfo FindMethodDeep(Type start, string name, Type[] argTypes)
+        {
+            for (Type t = start; t.IsNotNull(); t = t.BaseType)
+            {
+                var m = argTypes == null
+                    ? t.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)
+                    : t.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance, null, argTypes, null);
+                if (m.IsNotNull())
+                    return m;
+            }
+            return null;
+        }
+
         private static void Init()
         {
             if (initialized)
@@ -60,8 +76,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            insertMethod = storyType.GetMethod("InsertDecision",
-                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
+            insertMethod = FindMethodDeep(typeof(RadioStory), "InsertDecision", null);
             if (insertMethod.IsNotNull())
                 decisionType = insertMethod.GetParameters()[1].ParameterType;
             if (decisionType.IsNull())
