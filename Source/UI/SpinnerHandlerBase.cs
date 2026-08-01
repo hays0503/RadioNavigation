@@ -74,6 +74,14 @@ namespace UBOAT.Mods.RadioNavigation
             activePointerId = eventData.pointerId;
         }
 
+        // F149: if the object (or a parent) is disabled mid-drag, OnEndDrag
+        // never fires and the stale pointer id would lock out future drags.
+        protected virtual void OnEnable()
+        {
+            isDragging = false;
+            activePointerId = -1;
+        }
+
         protected bool IsActiveDrag(PointerEventData eventData) =>
             isDragging && eventData.pointerId == activePointerId;
 
@@ -91,7 +99,12 @@ namespace UBOAT.Mods.RadioNavigation
             float targetAngle = ClampTargetAngle(angle);
 
             if (UseSmoothing())
-                currentAngle = Mathf.Lerp(currentAngle, targetAngle, sensitivity);
+            {
+                // F72: frame-rate independent smoothing factor; raw Lerp(t)
+                // per frame is ~2x faster at 60 FPS than at 30 FPS.
+                float t = 1f - Mathf.Exp(-sensitivity * Time.deltaTime * 60f);
+                currentAngle = Mathf.Lerp(currentAngle, targetAngle, t);
+            }
             else
                 currentAngle = targetAngle;
 

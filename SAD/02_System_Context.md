@@ -63,20 +63,24 @@
 
 ### 2.2 Assembly-CSharp Usage Points
 
-| Class | Method Patched | Purpose |
-|-------|----------------|---------|
-| `Main` | `OnLoaded` | Inject radio equipment after game loads |
-| `RadioStoryIntegration` | `InjectDecision` | Override story decisions |
-| `RadioStoryIntegration` | `GetCurrentLanguage` | Override locale strings |
-| `RadioStoryIntegration` | `Init` | Initialize radio state |
+**IMPORTANT**: This section was corrected from the original SAD which listed wrong targets (Game.OnLoaded, StoryManager.InjectDecision, LocaleManager.GetCurrentLanguage). Actual targets:
+
+| Class | Method Patched | Patch Type | Purpose |
+|-------|----------------|------------|---------|
+| `RadioStory` | `ContinueStory` | Prefix (Main.cs:39) | Lock radio story state during processing |
+| `Locale` | `RetrieveString` (2 overloads) | Postfix + Prefix (Main.cs:40-41) | Override locale strings with mod names |
+| `RadioStory` | `OnDecisionSelected` | Postfix (Main.cs:42) | Handle custom decision selection |
+| `RadioStory` | `OnStopped` | Postfix (Main.cs:43) | Hide radio when story stops |
+
+**Total**: 5 patches (2 prefix, 3 postfix) on 2 classes using imperative `harmony.Patch()` API.
 
 ### 2.3 Runtime Environment
 
 ```
 Target Platform: Windows (x64)
-Framework: .NET Framework 4.x (Unity Mono)
-Unity Version: 2020.x (UBOAT)
-Game Version: 2025/2026
+Framework: .NET Standard 2.0 (Unity Mono)
+Build: csc.exe / Roslyn via PowerShell (not dotnet build)
+Game Version: 2026.1
 ```
 
 ## 3. Data Flow Context
@@ -86,7 +90,7 @@ Game Version: 2025/2026
 │                        External Systems                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  [Game Save System] ──────► [Mod State Persistence]             │
+│  [Game Save System] (no state persistence — see F15)            │
 │                                                                 │
 │  [Player Input] ──────────► [UI Handlers]                       │
 │                              │                                  │
@@ -95,10 +99,10 @@ Game Version: 2025/2026
 │                              │                                  │
 │              ┌───────────────┼───────────────┐                  │
 │              ▼               ▼               ▼                  │
-│     [StationManager] [AudioEngine] [PositionTracker]            │
+│     [StationScheduler] [AudioSynthesisEngine] [FixCalculator]   │
 │              │               │               │                  │
 │              ▼               ▼               ▼                  │
-│     [BeaconData]    [DspPipeline]  [FixCalculator]             │
+│     [BeaconData]    [DspPipeline]  [PositionFixCalculator]      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -108,13 +112,29 @@ Game Version: 2025/2026
 ### 4.1 Harmony Patch Points
 
 ```csharp
-// Main.cs — Entry point
-Harmony.PatchAll();  // Patches all [HarmonyPatch] attributes
-
-// Patch targets:
-// 1. Game.OnLoaded() — Inject radio equipment
-// 2. StoryManager.InjectDecision() — Override story choices
-// 3. LocaleManager.GetCurrentLanguage() — Override locale
+// Main.cs — Entry point (imperative API, NOT attributes)
+private void PatchHarmony() {
+    harmony.Patch(
+        typeof(RadioStory).GetMethod("ContinueStory"),
+        prefix: new HarmonyMethod(typeof(Main), nameof(RadioStoryContinueStoryPrefix))
+    );
+    harmony.Patch(
+        typeof(Locale).GetMethod("RetrieveString", new[] { typeof(string) }),
+        postfix: new HarmonyMethod(typeof(Main), nameof(LocaleRetrieveStringPostfix))
+    );
+    harmony.Patch(
+        typeof(Locale).GetMethod("RetrieveString", new[] { typeof(string), typeof(string) }),
+        prefix: new HarmonyMethod(typeof(Main), nameof(LocaleRetrieveString2Prefix))
+    );
+    harmony.Patch(
+        typeof(RadioStory).GetMethod("OnDecisionSelected"),
+        postfix: new HarmonyMethod(typeof(Main), nameof(RadioStoryOnDecisionSelectedPostfix))
+    );
+    harmony.Patch(
+        typeof(RadioStory).GetMethod("OnStopped"),
+        postfix: new HarmonyMethod(typeof(Main), nameof(RadioStoryOnStoppedPostfix))
+    );
+}
 ```
 
 ### 4.2 Unity Lifecycle Integration
@@ -123,17 +143,17 @@ Harmony.PatchAll();  // Patches all [HarmonyPatch] attributes
 Game Start
     │
     ▼
-Main.OnLoaded() [Harmony Postfix]
+Main.OnLoaded() [IUserMod interface method, NOT a patch]
     │
     ├─► RadioInstaller.Instantiate()
     │       │
-    │       ├─► Create Canvas
-    │       ├─► Create Radio Panel
-    │       └─► Attach UI Handlers
+    │       ├─► Instantiate prefab
+    │       │   (Canvas + Panel already in prefab)
+    │       └─► Attach UI Handlers to prefab children
     │
     └─► SonneController.Awake()
             │
-            ├─► Initialize Stations
+            ├─► Initialize Stations (14)
             ├─► Create Silent Audio Clip
             └─► Start Navigation Loop
 ```
@@ -148,12 +168,10 @@ OnAudioFilterRead(float[] data, int channels)
     │
     └─► AudioSynthesisEngine.ProcessAudio()
             │
-            ├─► For each station:
-            │       ├─► Generate Carrier Signal
-            │       ├─► Apply Atmosphere Noise
-            │       └─► Apply Receiver DSP
-            │
-            └─► Mix all stations
+            └─► Single loop: per-sample mix across all stations
+                    ├─► Generate Carrier Signal
+                    ├─► Apply Atmosphere Noise
+                    └─► Apply Receiver DSP
 ```
 
 ## 5. Constraints
@@ -162,17 +180,17 @@ OnAudioFilterRead(float[] data, int channels)
 
 | Constraint | Impact | Mitigation |
 |------------|--------|------------|
-| Unity Main Thread Only | UI updates, state changes must be on main thread | Double-buffer pattern for audio data |
+| Unity Main Thread Only | UI updates, state changes must be on main thread | Double-buffer pattern for audio data (not implemented) |
 | No Native Plugins | Pure C# mod, no native code | Work within Unity's managed runtime |
-| Assembly-CSharp Reference | Direct reference to game assembly | Interface-based integration layer |
+| Assembly-CSharp Reference | Direct reference to game assembly | Interface-based integration layer (not implemented) |
 | Harmony Patching | Runtime method interception | Fallback handling for version mismatches |
 
 ### 5.2 Game Version Constraints
 
 | Game Version | Support Status | Notes |
 |--------------|----------------|-------|
-| 2025.x | ✅ Supported | Current target |
-| 2026.x | ⚠️ Experimental | Requires version-gate validation |
+| 2025.x | ❌ Unknown | Not tested |
+| 2026.x | ✅ Supported (2026.1) | Version-gate validation not implemented |
 | Earlier | ❌ Not Supported | API incompatible |
 
 ## 6. Deployment Context
@@ -182,10 +200,16 @@ Installation Path:
   Steam/steamapps/common/UBOAT/Mods/RadioNavigation/
 
 Build Output:
-  radionavigation.dll → UBOAT/Mods/RadioNavigation/
+  radionavigation.dll → UBOOT/Mods/RadioNavigation/
 
 Dependencies:
   radionavigation.deps.json
-  Assets/ (prefabs, textures)
-  Config/ (beacons.json — future)
+  Bundles/testui (46 MB Unity AssetBundle)
+  Config/ (beacons.json — future, not implemented)
 ```
+
+---
+
+*Document Version: 1.2*  
+*Last Updated: 2026-07-31*  
+*Corrections: Fixed Harmony targets (F46), patch count, Installer flow, audio thread diagram. See F45-F52, F65-F76.*

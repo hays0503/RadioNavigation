@@ -1,15 +1,12 @@
-﻿using System.Collections.Generic;
-
-namespace UBOAT.Mods.RadioNavigation
+﻿namespace UBOAT.Mods.RadioNavigation
 {
     public static class MorseAlphabet
     {
         private static readonly string[] table = new string[128];
-        private static readonly Dictionary<string, char> reverse = new Dictionary<string, char>();
 
         static MorseAlphabet()
         {
-            Define('A', "._");
+            Define('A', ".-");
             Define('B', "-...");
             Define('C', "-.-.");
             Define('D', "-..");
@@ -45,45 +42,34 @@ namespace UBOAT.Mods.RadioNavigation
             Define('7', "--...");
             Define('8', "---..");
             Define('9', "----.");
-
-            for (int i = 0; i < table.Length; i++)
-                if (table[i].IsNotNull() && table[i].Length.IsPositive() && !reverse.ContainsKey(table[i]))
-                    reverse[table[i]] = (char)i;
         }
 
         private static void Define(char c, string morse)
         {
+            // F170: defensive bounds check — the table is ASCII-only.
+            if (c >= table.Length)
+                return;
             table[c] = morse;
-            if (c >= 'A' && c <= 'Z')
+            if (c >= 'A' && c <= 'Z' && c + 32 < table.Length)
                 table[c + 32] = morse;
         }
 
         public static string GetMorse(char c)
         {
-            if (c < 0 || c >= table.Length)
+            // F183: char is unsigned in C# - the c < 0 check was always false
+            // (CS0472); only the upper bound matters.
+            if (c >= table.Length)
                 return "";
             return table[c] ?? "";
         }
 
-        public static char DecodeMorse(string sequence)
-        {
-            if (string.IsNullOrEmpty(sequence))
-                return '?';
-            return reverse.TryGetValue(sequence, out char c) ? c : '?';
-        }
+        // F75: DecodeMorse and its reverse dictionary were dead code —
+        // decoding lives in SonneController.DecodeCallsignBuffer, which
+        // compares against the alphabet table directly.
 
-        public static int GetElementCount(string text)
-        {
-            int total = 0;
-            for (int i = 0; i < text.Length; i++)
-            {
-                if (i.IsPositive()) total += 3;
-                total += GetMorse(text[i]).Length;
-            }
-            return total;
-        }
-
-        public static NavigationPattern TextToPattern(string text, int elementDurationTicks = 1)
+        // F166: elementDurationTicks was accepted but never used — element
+        // timing lives in MorseTiming, not in the pattern; removed.
+        public static NavigationPattern TextToPattern(string text)
         {
             if (string.IsNullOrEmpty(text))
                 return new NavigationPattern(new Group[0], 1);
@@ -92,9 +78,13 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i < text.Length; i++)
             {
-                if (i.IsPositive())
+                // F129: mirror GetElementCount — 7-element inter-word pause
+                // after a space, 3-element inter-character pause otherwise;
+                // a space itself contributes only silence.
+                if (i.IsPositive() && text[i] != ' ')
                 {
-                    for (int g = 0; g < 3; g++)
+                    int pause = text[i - 1] == ' ' ? 7 : 3;
+                    for (int g = 0; g < pause; g++)
                         elements.Add(false);
                 }
 

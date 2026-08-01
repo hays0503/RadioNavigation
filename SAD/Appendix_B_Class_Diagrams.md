@@ -1,5 +1,19 @@
 # Appendix B: Class Diagrams — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-08-01):** Диаграммы классов содержат расхождения, частично исправлены:
+> - **F47:** ⚠ proposed классы в target diagrams
+> - **F51 (исправлено):** `Atmosphere.Apply(sample, sampleRate)` (было `GenerateNoise`)
+> - **F51 (исправлено):** `ReceiverDsp.Process()` (было 3 метода: ApplyAGC/ApplyFilter/ApplySaturation)
+> - **F51 (исправлено):** `ProcessAudio` сигнатура: 9 params
+> - **F51 (частично):** `RadioHandler.EmitFrequency` — private, 0 params
+> - **F48:** Array sizes: 4→14
+> - **F50:** LOC: SonneController 506→508
+> - **F52:** Добавлен `SignalRichTextFormatter`
+> - **F158:** `RadioHandler.sonneController` — dead field (marked)
+> - **F160:** `InformationPanelHandler.uiElements` — не существует (marked)
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
+
 ## 1. Current Class Diagram
 
 ### 1.1 Core Classes
@@ -32,20 +46,23 @@
 │ + SetVolume(vol: float): void                                       │
 │ - UpdateStationGains(): void                                        │
 │ - UpdateStationNavigation(): void                                   │
-│ - ProcessAudio(data: float[], channels: int): void                 │
+│ - ProcessAudio(data: float[], channels: int,                        │
+│   StationState[] stations, StationScheduler[] schedulers,          │
+│   MorseKeyer[] keyers, CarrierGenerator[] carriers,                │
+│   bool radioOn, int currentZoneIndex, int sonneZoneIndex): void    │
 │ - InitializeAudio(): void                                           │
 │ - CreateSilentClip(): AudioClip                                     │
-│ - UpdatePosition(): void                                            │
-│ - CalculateBearing(station: BeaconStation): float                   │
-│ - GetPositionFix(): FixResult                                       │
-│ - OnStationElementCompleted(station: int, element: int): void      │
-│ - OnStationSequenceFinished(station: int): void                     │
-│ - DecodeCallsignBuffer(): string                                    │
+│ - UpdatePosition(latitude: float, longitude: float): void           │
+│ - CalculateBearing(lat1: float, lon1: float,                       │
+│   lat2: float, lon2: float): float [static]                        │
+│ - OnStationElementCompleted(stationIndex: int,                     │
+│   elemType: NavigationElementType, isCallsign: bool): void         │
+│ - OnStationSequenceFinished(stationIndex: int): void                │
+│ - DecodeCallsignBuffer(stationIndex: int): void                    │
 │ - GetSignalRichText(): string                                       │
 │ - GetDecodedText(): string                                          │
 │ - ClearSignalBuffer(): void                                         │
-│ - GetStationDiagnostics(): string                                   │
-│ - FormatDiagnosticString(): string                                  │
+│ + GetStationDiagnostics(index: int): StationDiagnostics             │
 └─────────────────────────────────────────────────────────────────────┘
                               │
                               │ uses
@@ -160,7 +177,10 @@
 │ - atmosphere: Atmosphere                                            │
 │ - receiverDsp: ReceiverDsp                                          │
 ├─────────────────────────────────────────────────────────────────────┤
-│ + ProcessAudio(data: float[], channels: int, stations: StationState[]): void│
+│ + ProcessAudio(data: float[], channels: int, stations: StationState[],  │
+│ │             schedulers: StationScheduler[], keyers: MorseKeyer[],     │
+│ │             carriers: CarrierGenerator[], radioOn: bool,              │
+│ │             currentZoneIndex: int, sonneZoneIndex: int): void         │
 │ + Initialize(sampleRate: int): void                                 │
 └─────────────────────────────────────────────────────────────────────┘
                               │
@@ -178,23 +198,22 @@
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        Atmosphere                                   │
+│                        Atmosphere  (nested class)                    │
 ├─────────────────────────────────────────────────────────────────────┤
 │ - random: System.Random                                             │
 ├─────────────────────────────────────────────────────────────────────┤
-│ + GenerateNoise(data: float[]): void                                │
+│ + Apply(data: float[], sampleRate: int): void  [F51: was GenerateNoise]│
 │ + GenerateImpulse(): float                                          │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       ReceiverDsp                                   │
+│                       ReceiverDsp  (nested class)                    │
 ├─────────────────────────────────────────────────────────────────────┤
 │ - agcGain: float                                                    │
 │ - filterState: float                                                │
 ├─────────────────────────────────────────────────────────────────────┤
-│ + ApplyAGC(data: float[]): void                                     │
-│ + ApplyFilter(data: float[]): void                                  │
-│ + ApplySaturation(data: float[]): void                              │
+│ + Process(data: float[], sampleRate: int): void  [F51: was ApplyAGC/ApplyFilter/ApplySaturation]│
+│ + EnsureInitialized(sampleRate: int): void                          │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -205,11 +224,11 @@
 │                       RadioHandler                                  │
 ├─────────────────────────────────────────────────────────────────────┤
 │ - currentFrequency: float                                           │
-│ - sonneController: SonneController                                  │
+│ ⚠ - sonneController: SonneController  [DEAD — unused, F158]        │
 ├─────────────────────────────────────────────────────────────────────┤
 │ + static OnFrequencyChanged: Action<float, int>                    │
 │ + SetFrequency(freq: float): void                                   │
-│ + EmitFrequency(freq: float, zone: int): void                      │
+│ ⚠ private EmitFrequency(): void  [F51: was (freq: float, zone: int), 2 params → 0 params]│
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -239,7 +258,7 @@
 │ - sonneController: SonneController                                  │
 │ - zoneHandler: ZoneHandler                                          │
 │ - groundHandler: GroundHandler                                      │
-│ - uiElements: Dictionary<string, GameObject>                        │
+│ ⚠ - uiElements: Dictionary<string, GameObject>  [DOES NOT EXIST — F160]  │
 ├─────────────────────────────────────────────────────────────────────┤
 │ + Start(): void                                                     │
 │ + RefreshAll(): void                                                │
@@ -277,19 +296,19 @@
 └─────────────────┘                     └─────────────────────┘
 ```
 
-## 2. Target Class Diagram
+## 2. Target Class Diagram ⚠ proposed (NOT implemented — ADR-002/003 Deferred, F02/F03/F04)
 
-### 2.1 Decomposed SonneController
+### 2.1 Decomposed SonneController ⚠ proposed (F02)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       RadioController                               │
+│                       ⚠ RadioController [NOT created]               │
 ├─────────────────────────────────────────────────────────────────────┤
-│ - stationManager: StationManager                                    │
-│ - signalDecoder: SignalDecoder                                      │
-│ - positionTracker: PositionTracker                                  │
-│ - audioController: AudioController                                  │
-│ - radioContext: IRadioState                                         │
+│ - ⚠ stationManager: StationManager     [NOT created]                │
+│ - ⚠ signalDecoder: SignalDecoder     [NOT created]                │
+│ - ⚠ positionTracker: PositionTracker  [NOT created]                │
+│ - ⚠ audioController: AudioController   [NOT created]                │
+│ - radioContext: IRadioState           [⚠ proposed]                  │
 ├─────────────────────────────────────────────────────────────────────┤
 │ + Awake(): void                                                     │
 │ + Update(): void                                                    │
@@ -301,10 +320,12 @@
         │           │           │           │
         ▼           ▼           ▼           ▼
 ┌───────────────┐ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-│StationManager │ │SignalDecoder  │ │PositionTracker│ │AudioController│
+│⚠ StationManager│ │⚠ SignalDecoder │ │⚠ PositionTrk │ │⚠ AudioCtrlr   │
+│ [NOT created] │ │ [NOT created] │ │ [NOT created] │ │ [NOT created] │
+│ (F02, F47)     │ │ (F02, F47)    │ │ (F02, F47)     │ │ (F02, F47)    │
 ├───────────────┤ ├───────────────┤ ├───────────────┤ ├───────────────┤
-│- stations[]   │ │- signalEntries│ │- measurements │ │- audioPipeline│
-│- config       │ │- decoderBuffer│ │- lastFix      │ │- sampleRate   │
+│- stations[]   │ │- signalEntries│ │- measurements │ │- audioOutput  │
+│- config       │ │- decoderBuffer│ │- lastFix      │ │- config       │
 ├───────────────┤ ├───────────────┤ ├───────────────┤ ├───────────────┤
 │+ UpdateGains()│ │+ OnElement()  │ │+ Update()     │ │+ Process()    │
 │+ UpdateNav()  │ │+ Decode()     │ │+ GetFix()     │ │+ Initialize() │
@@ -312,11 +333,11 @@
 └───────────────┘ └───────────────┘ └───────────────┘ └───────────────┘
 ```
 
-### 2.2 Service Interfaces
+### 2.2 Service Interfaces ⚠ proposed (NOT implemented — ADR-004 Deferred, F04)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       IRadioState                                   │
+│                       ⚠ IRadioState [NOT created]                   │
 ├─────────────────────────────────────────────────────────────────────┤
 │ + IsRadioOn: bool { get; }                                         │
 │ + IsInteractable: bool { get; }                                    │
@@ -328,17 +349,17 @@
 │ + event OnFrequencyChanged: Action<float, int>                     │
 │ + event OnZoneChanged: Action<int>                                 │
 └─────────────────────────────────────────────────────────────────────┘
-                              ▲
-                              │ implements
-                              │
+                               ▲  [⚠ proposed, not implemented]
+                               │ implements
+                               │
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       RadioContext                                  │
+│                       ⚠ RadioContext [NOT created]                  │
 ├─────────────────────────────────────────────────────────────────────┤
-│ - isRadioOn: bool                                                  │
-│ - isInteractable: bool                                             │
-│ - groundActive: bool                                               │
-│ - currentFrequency: float                                          │
-│ - currentZone: int                                                 │
+│ - isRadioOn: bool (actual: ToggleHandler static)                   │
+│ - isInteractable: bool (actual: ToggleHandler static)              │
+│ - groundActive: bool (actual: GroundHandler static)                │
+│ - currentFrequency: float (actual: RadioHandler instance)            │
+│ - currentZone: int (actual: ZoneHandler private)                   │
 ├─────────────────────────────────────────────────────────────────────┤
 │ + SetRadioOn(on: bool): void                                       │
 │ + SetInteractable(interactable: bool): void                        │
@@ -348,59 +369,61 @@
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     IStationDataSource                              │
+│                       ⚠ IStationDataSource [NOT created]            │
 ├─────────────────────────────────────────────────────────────────────┤
 │ + GetAll(): BeaconStation[]                                         │
 │ + GetByName(name: string): BeaconStation?                          │
 │ + GetByIndex(index: int): BeaconStation?                           │
 └─────────────────────────────────────────────────────────────────────┘
-                              ▲
-                              │ implements
-                              │
-        ┌─────────────────────┴─────────────────────┐
-        │                                           │
-┌───────┴───────────────┐             ┌─────────────┴─────────────┐
-│HardcodedStationRepo   │             │JsonStationRepository      │
-├───────────────────────┤             ├───────────────────────────┤
-│+ GetAll(): Station[]  │             │+ GetAll(): Station[]      │
-│+ GetByName(): Station?│             │+ GetByName(): Station?    │
-│+ GetByIndex(): Station│             │+ GetByIndex(): Station    │
-└───────────────────────┘             └───────────────────────────┘
+                               ▲  [⚠ proposed, not implemented]
+                               │ implements
+                               │
+         ┌─────────────────────┴─────────────────────┐
+         │                                           │
+┌───────────────┐ ┌─────────────────────────────┐
+│⚠ Hardcoded  │ │⚠ JsonStationRepository        │
+│StationRepo   │ │ [NOT created]                 │
+│[NOT created] │ │                             │
+├───────────────┤ ├─────────────────────────────┤
+│+ GetAll()    │ │+ GetAll()                    │
+│+ GetByName() │ │+ GetByName()                 │
+│+ GetByIndex()│ │+ GetByIndex()                │
+└───────────────┘ └─────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       IAudioOutput                                  │
+│                       ⚠ IAudioOutput [NOT created]                  │
 ├─────────────────────────────────────────────────────────────────────┤
 │ + OutputVolume: float { get; set; }                                │
 │ + FeedbackVolume: float { get; set; }                              │
-│ + ProcessAudio(data: float[], channels: int, stations: StationState[]): void│
+│ + ProcessAudio(data: float[], channels: int, StationState[]): void│
 └─────────────────────────────────────────────────────────────────────┘
-                              ▲
-                              │ implements
-                              │
+                               ▲  [⚠ proposed, not implemented]
+                               │ implements
+                               │
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       AudioPipeline                                 │
+│                       ⚠ AudioPipeline [NOT created]                  │
 ├─────────────────────────────────────────────────────────────────────┤
-│ - carrierBank: CarrierBank                                          │
-│ - atmosphere: Atmosphere                                            │
-│ - receiverDsp: ReceiverDsp                                          │
+│ - ⚠ carrierBank: CarrierBank [NOT created]                         │
+│ - ⚠ atmosphere: Atmosphere (exists as nested)                      │
+│ - ⚠ receiverDsp: ReceiverDsp (exists as nested)                  │
 ├─────────────────────────────────────────────────────────────────────┤
-│ + ProcessAudio(data: float[], channels: int, stations: StationState[]): void│
-│ + Initialize(sampleRate: int): void                                 │
+│ + ProcessAudio(...): void                                          │
+│ + Initialize(sampleRate: int): void                                │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       IGameServices                                 │
+│                       ⚠ IGameServices [NOT created]                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │ + GetCurrentLanguage(): string                                      │
 │ + RetrieveString(key: string): string                               │
-│ + InjectDecision(story: object, index: int, decision: object): void│
-│ + NotifyUpdated(story: object): void                                │
+│ + InjectDecision(story, index, decision): void                      │
+│ + NotifyUpdated(story): void                                        │
 └─────────────────────────────────────────────────────────────────────┘
-                              ▲
-                              │ implements
-                              │
+                               ▲  [⚠ proposed, not implemented]
+                               │ implements
+                               │
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     GameReflectionCache                             │
+│                       ⚠ GameReflectionCache [NOT created]            │
 ├─────────────────────────────────────────────────────────────────────┤
 │ - cache: TypeCache                                                  │
 │ - localeType: Type                                                  │
@@ -408,23 +431,23 @@
 ├─────────────────────────────────────────────────────────────────────┤
 │ + GetCurrentLanguage(): string                                      │
 │ + RetrieveString(key: string): string                               │
-│ + InjectDecision(story: object, index: int, decision: object): void│
-│ + NotifyUpdated(story: object): void                                │
+│ + InjectDecision(story, index, decision): void                      │
+│ + NotifyUpdated(story: void): void                                  │
 │ - InitializeCache(): void                                           │
 │ - FallbackReflection(): void                                        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.3 Decomposed InformationPanelHandler
+### 2.3 Decomposed InformationPanelHandler ⚠ proposed (F03)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    InformationPanelHandler                          │
+│                    ⚠ InformationPanelHandler (reduced)              │
 ├─────────────────────────────────────────────────────────────────────┤
-│ - uiElementFactory: UIElementFactory                                │
-│ - stationInfoDisplay: StationInfoDisplay                            │
-│ - stationFinder: StationFinder                                      │
-│ - radioContext: IRadioState                                         │
+│ ⚠ - uiElementFactory: UIElementFactory [NOT created]              │
+│ ⚠ - stationInfoDisplay: StationInfoDisplay [NOT created]          │
+│ ⚠ - stationFinder: StationFinder [NOT created]                    │
+│ - radioContext: IRadioState [⚠ proposed]                          │
 ├─────────────────────────────────────────────────────────────────────┤
 │ + Start(): void                                                     │
 │ + RefreshAll(): void                                                │
@@ -435,7 +458,9 @@
         │           │           │
         ▼           ▼           ▼
 ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-│UIElementFactory│ │StationInfoDisp│ │StationFinder  │
+│⚠ UIElementFac│ │⚠ StationInfo  │ │⚠ StationFinder│
+│ [NOT created] │ │ [NOT created] │ │ [NOT created] │
+│ (F03, F47)     │ │ (F03, F47)    │ │ (F03, F47)     │
 ├───────────────┤ ├───────────────┤ ├───────────────┤
 │- gameObject   │ │- sonneCtrl    │ │- stationData  │
 ├───────────────┤ ├───────────────┤ ├───────────────┤
@@ -481,40 +506,46 @@ CursorHandler ────────────┬──── uses ───
                           └──── uses ──── ToggleHandler (static)
 ```
 
-### 3.2 Target Relationships
+### 3.2 Target Relationships (⚠ proposed — not implemented, F47)
 
 ```
-RadioController ────────┬──── uses ──── StationManager
-                        │
-                        ├──── uses ──── SignalDecoder
-                        │
-                        ├──── uses ──── PositionTracker
-                        │
-                        ├──── uses ──── AudioController
-                        │
-                        └──── uses ──── IRadioState
+⚠ RadioController [NOT created] ───────────┬──── uses ──── ⚠ StationManager [NOT created]
+                         │
+                         ├──── uses ──── ⚠ SignalDecoder [NOT created]
+                         │
+                         ├──── uses ──── ⚠ PositionTracker [NOT created]
+                         │
+                         ├──── uses ──── ⚠ AudioController [NOT created]
+                         │
+                         └──── uses ──── IRadioState
 
-StationManager ─────────┬──── uses ──── IStationDataSource
-                        │
-                        └──── uses ──── StationScheduler
+⚠ StationManager [NOT created] ───────┬──── uses ──── IStationDataSource
+                         │
+                         └──── uses ──── StationScheduler
 
-SignalDecoder ──────────┬──── uses ──── MorseKeyer
-                        │
-                        └──── uses ──── MorseAlphabet
+⚠ SignalDecoder [NOT created] ────────┬──── uses ──── MorseKeyer
+                         │
+                         └──── uses ──── MorseAlphabet
 
-PositionTracker ────────┬──── uses ──── PositionFixCalculator
-                        │
-                        └──── uses ──── IStationDataSource
+⚠ PositionTracker [NOT created] ──────┬──── uses ──── PositionFixCalculator
+                         │
+                         └──── uses ──── IStationDataSource
 
-AudioController ────────┬──── uses ──── IAudioOutput
-                        │
-                        └──── uses ──── CarrierBank
+⚠ AudioController [NOT created] ──────┬──── uses ──── IAudioOutput
+                         │
+                         └──── uses ──── ⚠ CarrierBank [NOT created]
 
-InformationPanelHandler ┬──── uses ──── UIElementFactory
-                        │
-                        ├──── uses ──── StationInfoDisplay
-                        │
-                        ├──── uses ──── StationFinder
-                        │
-                        └──── uses ──── IRadioState
+InformationPanelHandler ──┬──── uses ──── ⚠ UIElementFactory [NOT created]
+                         │
+                         ├──── uses ──── ⚠ StationInfoDisplay [NOT created]
+                         │
+                         ├──── uses ──── ⚠ StationFinder [NOT created]
+                         │
+                         └──── uses ──── IRadioState
 ```
+
+---
+
+*Document Version: 2.0*  
+*Last Updated: 2026-08-01*  
+*Updated: All target/proposed classes annotated `⚠ NOT created` (F47). API signatures corrected: `Atmosphere.Apply(sample, sampleRate)` (F51), `ReceiverDsp.Process()` (F51), `RadioHandler.EmitFrequency` private 0-params (F51). Dead fields marked (F158, F160). LOC corrected 506→508 (F50). All target diagrams updated to reflect actual current API.*

@@ -91,8 +91,24 @@ namespace UBOAT.Mods.RadioNavigation
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
 
-            if (expander.IsNotNull() && eventData.pointerPress.IsNotNull() &&
-                eventData.pointerPress.transform.IsChildOf(expander.transform))
+            // F198: match CursorHandler/SpinnerHandlerBase/ExpanderHandler —
+            // no panel movement while the radio is off or ground is inactive.
+            if (!ToggleHandler.IsInteractable)
+                return;
+
+            // F207: child controls without their own IBeginDragHandler
+            // (Zone buttons, Toggle, Ground) resolve to this panel root;
+            // dragging them must not move the panel.
+            Transform press = eventData.pointerPress.IsNotNull()
+                ? eventData.pointerPress.transform
+                : null;
+            if (press.IsNull())
+                return;
+
+            if ((expander.IsNotNull() && press.IsChildOf(expander.transform))
+                || press.GetComponentInParent<ZoneHandler>() != null
+                || press.GetComponentInParent<ToggleHandler>() != null
+                || press.GetComponentInParent<GroundHandler>() != null)
                 return;
 
             isDragging = true;
@@ -128,7 +144,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            if (!moveCursorActive)
+            // F187: while dragging, the cursor may leave the panel bounds
+            // (fast drag); OnEndDrag resets the cursor via OnPointerExit
+            // semantics below - keep the move cursor until the drag ends.
+            if (!moveCursorActive || isDragging)
                 return;
 
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
@@ -137,11 +156,29 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDisable()
         {
+            // F149: reset drag state on disable so a mid-drag disable (which
+            // skips OnEndDrag) cannot lock out future drags.
+            isDragging = false;
+            activePointerId = -1;
+
             if (!moveCursorActive)
                 return;
 
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
             moveCursorActive = false;
+        }
+
+        private void OnDestroy()
+        {
+            // F42: the cached cursor texture is a GPU resource; Application.quitting
+            // only fires on game exit, so a mod reload used to leak it until
+            // restart. A single panel is the expected deployment (RadioInstaller
+            // instantiates one), so destroying the cache here is safe.
+            if (cachedCursorTexture.IsNotNull())
+            {
+                Object.Destroy(cachedCursorTexture);
+                cachedCursorTexture = null;
+            }
         }
     }
 }

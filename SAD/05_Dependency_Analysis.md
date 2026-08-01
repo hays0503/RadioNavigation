@@ -1,5 +1,16 @@
 # Dependency Analysis — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-08-01):** Проведён тотальный перекрёстный аудит (SAD vs code, git, build/config, cross-file consistency). Всего **199 проблем** (F01–F199).
+> - **F45:** ADR-002/003/004/005/007 статус «Deferred» (был «Accepted» — 0% реализовано)
+> - **F46:** Harmony patch targets исправлены — `Game.OnLoaded` → реальность `RadioStory.ContinueStory` (5 патчей)
+> - **F47:** 14+ несуществующих классов помечены `⚠ proposed` в секциях реализации, удалены из анализа зависимостей
+> - **F48:** Array sizes 4 → 14
+> - **F49:** File counts по слоям исправлены
+> - **F50:** LOC неверны для 10+ файлов
+> - **F52:** Добавлены пропущенные классы: `RadioStoryIntegration`, `SonneSignalGenerator`, `SignalRichTextFormatter`
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
+
 ## 1. Dependency Overview
 
 ### 1.1 External Dependencies
@@ -74,22 +85,27 @@ AudioSynthesisEngine         SonneController
 ### 2.2 Reflection Chain
 
 ```
-RadioStoryIntegration.Init()
-     │
-     ├──► Type.GetType("Game.StoryManager")
-     │    └──► Fallback: Assembly-CSharp
-     │
-     ├──► ConstructorInfo = type.GetConstructors()[0]
-     │    └──► Guess by Action parameter count
-     │
-     ├──► FieldInfo = type.GetField("singleton")
-     │    └──► Fallback: "Instance"
-     │
-     └──► MethodInfo = type.GetMethod("InjectDecision")
-          └──► Fallback: search by parameter count
+RadioStoryIntegration.Init() [RadioStoryIntegration.cs:48-107]
+      │
+      ├──► typeof(RadioStory).BaseType               // storyType (F23/F68 — uncached reflection)
+      │    └──► Debug.Log if null (F13 — Unity API in audio-safe context)
+      │
+      ├──► storyType.GetMethod("InsertDecision",      // insertMethod (F68)
+      │    │    BindingFlags.NonPublic | BindingFlags.Instance)
+      │    └──► decisionType = insertMethod.GetParameters()[1].ParameterType
+      │
+      ├──► decisionType.GetProperty("LocalizationKey")  // localizationKeyProp (F68)
+      │
+      ├──► decisionType.GetConstructors()               // decisionCtor selection (F68)
+      │    └──► Match: ≥6 params, pars[0]=string, pars[3]=Action
+      │
+      ├──► typeof(RadioStory).GetField("stage")         // stageField
+      │
+      └──► storyType.GetProperty("Decisions", ...)       // decisionsProp
+           └──► storyType.GetMethod("OnUpdated", ...)     // onUpdatedMethod
 ```
 
-**Risk**: Game update breaks mod → no warning
+**Risk**: Game update breaks mod → no warning (F23, F68)
 
 ### 2.3 Static Coupling Chain
 
@@ -188,10 +204,11 @@ CursorHandler
 
 | Dependency | Risk | Impact | Mitigation |
 |------------|------|--------|------------|
-| Assembly-CSharp.dll | Game update breaks mod | **Critical** | Interface-based integration |
-| Harmony Library | Patch target changes | High | Fallback handling |
-| Unity Main Thread | Thread safety violations | **Critical** | Double-buffer pattern |
-| Static Singletons | Untestable code | High | DI container |
+| Assembly-CSharp.dll | Game update breaks mod | **Critical** | GameApiCompatibilityChecker fail-fast (F23) |
+| Harmony Library | Patch target changes | High | Fallback handling, UnpatchSelf (F121/F139) |
+| Unity Main Thread | Thread safety violations | **Critical** | Double-buffer pattern (F01), sync primitives (F29) |
+| Static Singletons | Untestable code | High | Instance-based state (F05) |
+| Reflection APIs | Type changes, no caching | High | Cache Type lookups (F68) |
 
 ### 5.2 Medium-Risk Dependencies
 
@@ -210,8 +227,8 @@ CursorHandler
 stations[s].gain = computedGain;  // Audio thread
 float g = stations[s].gain;      // Main thread
 
-// AFTER (safe)
-// Double-buffer pattern
+// AFTER (safe — ⚠ proposed, F01/F02)
+// Double-buffer pattern with StationStateBuffer
 private StationState[] readBuffer;   // Audio thread reads
 private StationState[] writeBuffer;  // Main thread writes
 private volatile bool swapRequested;
@@ -223,7 +240,7 @@ private volatile bool swapRequested;
 // BEFORE (static)
 public static bool IsInteractable { get; set; }
 
-// AFTER (instance)
+// AFTER (instance — ⚠ proposed, F05)
 public class RadioContext : MonoBehaviour {
     public bool IsInteractable { get; set; }
 }
@@ -236,19 +253,27 @@ public class RadioContext : MonoBehaviour {
 // BEFORE (concrete)
 BeaconData.Stations  // Static array
 
-// AFTER (abstract)
+// AFTER (abstract — ⚠ proposed, F04/ADR-004)
 public interface IStationDataSource {
     BeaconStation[] GetAll();
 }
-// Implementations: HardcodedStationRepository, JsonStationRepository
+// Implementations: ⚠ HardcodedStationRepository, ⚠ JsonStationRepository (not yet created)
 ```
 
 ## 7. Dependency Inversion Opportunities
 
-| Current | Proposed | Benefit |
-|---------|----------|---------|
-| `SonneController` → `StationScheduler` | `IScheduler` interface | Testable scheduling |
-| `SonneController` → `MorseKeyer` | `IKeyer` interface | Testable Morse logic |
-| `AudioSynthesisEngine` → `CarrierGenerator` | `ICarrierGenerator` | Testable audio |
-| `InformationPanelHandler` → `ZoneHandler` | `IZoneProvider` | Testable UI |
-| `RadioStoryIntegration` → Unity API | `IGameServices` | Testable integration |
+| Dependency Inversion | Current | Proposed Abstraction | Status |
+|---------------------|---------|---------------------|--------|
+| Station data | `BeaconData.Stations` | `IStationDataSource` | ⚠ proposed (F04) |
+| Radio state | `RadioHandler.Instance` | `IRadioState` | ⚠ proposed (F05) |
+| Interactable state | `ToggleHandler.IsInteractable` | `IRadioContext` | ⚠ proposed (F05) |
+| Audio output | `AudioSynthesisEngine.ProcessAudio` | `IAudioOutput` | ⚠ proposed (ADR-002 Deferred) |
+| Game integration | Direct reflection | `IGameServices` | ⚠ proposed (F04/ADR-004 Deferred) |
+| Position calc | `PositionFixCalculator` | `IPositionCalculator` | ⚠ proposed (F18) |
+| Morse decoder | `MorseKeyer`/`MorseAlphabet` | `IMorseDecoder` | ⚠ proposed (F04) |
+
+---
+
+*Document Version: 2.0*  
+*Last Updated: 2026-08-01*  
+*Updated: 199 problems cataloged (F01–F199). Reflection chain corrected to match actual code. Phantom classes annotated `⚠ proposed`. Harmony targets corrected (F46).*

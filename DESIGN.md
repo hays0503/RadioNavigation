@@ -1,4 +1,4 @@
-﻿# RadioNavigation вЂ” Design Specification
+﻿# RadioNavigation  Design Specification
 
 > Project: UBOAT Mod "RadioNavigation"  
 > Type: Historical naval radio navigation instrument panel  
@@ -7,9 +7,9 @@
 
 ---
 
-## В§1 Objective
+## 1 Objective
 
-Design a period-authentic Consol/Sonne radio navigation beacon panel that integrates seamlessly into UBOAT's WW2-era submarine simulator UI while providing functional audio synthesis and position-fixing capabilities. The design must feel indistinguishable from native UBOAT instrumentation вЂ” no anachronisms, no "mod signature" styling.
+Design a period-authentic Consol/Sonne radio navigation beacon panel that integrates seamlessly into UBOAT's WW2-era submarine simulator UI while providing functional audio synthesis and position-fixing capabilities. The design must feel indistinguishable from native UBOAT instrumentation  no anachronisms, no "mod signature" styling.
 
 **Scope includes:**  
 - Main panel: zone selection dial, cursor spinner, frequency display, toggle controls  
@@ -17,22 +17,22 @@ Design a period-authentic Consol/Sonne radio navigation beacon panel that integr
 
 ---
 
-## В§2 Product Context
+## 2 Product Context
 
-RadioNavigation adds a historically grounded naval navigation tool to UBOAT. The Consol (Consolensystem) and Sonne radio beacon systems were primary navigation aids for Nazi Germany's naval operations during WW2 вЂ” exactly the context of UBOAT gameplay. This is **not** a utility overlay or modern dashboard; it is an in-universal instrument panel that functions *within* the game's established UI language.
+RadioNavigation adds a historically grounded naval navigation tool to UBOAT. The Consol (Consolensystem) and Sonne radio beacon systems were primary navigation aids for Nazi Germany's naval operations during WW2  exactly the context of UBOAT gameplay. This is **not** a utility overlay or modern dashboard; it is an in-universal instrument panel that functions *within* the game's established UI language.
 
 The mod occupies a niche between:  
 - The submarine's internal cockpit/radome instruments (compact, monochrome/green, vibration-hardened)  
 - Bridge navigation tables (static maps, paper-based)  
 
-This is the **cockpit instrument** category вЂ” portable, functional, always present during relevant gameplay sessions.
+This is the **cockpit instrument** category  portable, functional, always present during relevant gameplay sessions.
 
 ---
 
-## В§3 Visual Foundations
+## 3 Visual Foundations
 
 ### Color Palette
-Ultramarine green with amber backlighting вЂ” matching period Consol/Sonne radio console aesthetics. Avoid pure green (#00FF00) or pure amber; historical equipment used filtered glass/glass-illuminated panels.
+Ultramarine green with amber backlighting  matching period Consol/Sonne radio console aesthetics. Avoid pure green (#00FF00) or pure amber; historical equipment used filtered glass/glass-illuminated panels.
 
 ```
 --panel-bg:         #1a1d1e        // Dark brushed steel / submarine hull interior
@@ -44,7 +44,7 @@ Ultramarine green with amber backlighting вЂ” matching period Consol/Sonne r
 --accent-ground-bad:#c62828        // Degraded signal (red used sparingly)
 --dial-face:        #1e2325        // Dial background, slightly darker than panel
 --dial-ring:        #3a403f        // Dial outer ring / scale markings
---cursor-color:     #f0c040        // Cursor needle вЂ” bright amber always visible
+--cursor-color:     #f0c040        // Cursor needle  bright amber always visible
 ```
 
 ### Typography
@@ -59,55 +59,55 @@ Mono-spaced number display for frequencies and coordinates. Sans-serif body text
 | Info/labels | 10px | Regular | Left / Uppercase tracking |
 
 ### Layout Grid
-Fixed-width panel: **380вЂ“420px** wide. No fluid resizing вЂ” instruments have fixed physical proportions in the source period equipment. Content stacks vertically with consistent **8px gutters**.
+Fixed-width panel: **380420px** wide. No fluid resizing  instruments have fixed physical proportions in the source period equipment. Content stacks vertically with consistent **8px gutters**.
 
 Sub-panels within the main UI follow a **card-like stacking order**:  
-1. Zone selector (top) вЂ” horizontal dial band, left-aligned  
-2. Cursor angle control (middle-left) вЂ” vertically centered spinner/dial  
-3. Frequency output + status strip (right edge) вЂ” always visible next to cursor  
-4. Expandable Information Panel (bottom/below toggle) вЂ” Morse decode history, nav position
+1. Zone selector (top)  horizontal dial band, left-aligned  
+2. Cursor angle control (middle-left)  vertically centered spinner/dial  
+3. Frequency output + status strip (right edge)  always visible next to cursor  
+4. Expandable Information Panel (bottom/below toggle)  Morse decode history, nav position
 
 ### Motion & Feedback
 - **Dial rotation:** smooth angular interpolation matched to user drag speed; angular snap zones at each of the 8 frequency bands  
 - **Cursor needle:** continuous real-time update synced to zone selection + angle input  
-- **'Ground check' indicator:** binary pass/fail with brief color flash (transition duration ~200ms) вЂ” mirrors actual Consol audio discrimination  
+- **'Ground check' indicator:** binary pass/fail with brief color flash (transition duration ~200ms)  mirrors actual Consol audio discrimination  
 
 No decorative animations. Every motion serves instrument-legibility or operational feedback only.
 
 ---
 
-## В§4 Accessibility
+## 4 Accessibility
 
 ### Contrast Requirements
-- Primary text on panel bg: **в‰Ґ 4.5:1** minimum в†’ `#7ec86c` on `#1a1d1e` achieves ~5.2:1  
+- Primary text on panel bg: ** 4.5:1** minimum  `#7ec86c` on `#1a1d1e` achieves ~5.2:1  
 - Secondary/labels: meets AA at smaller sizes via bold letterform, not color lift  
 
 ### Color Independence
 **Ground check must never be communicated by color alone.** Accompany with a shape/state indicator (checkmark icon, label text: "GROUND: OK / BAD") and brightness change. Every status needs a redundant non-color channel.
 
 ### Keyboard/Mouse Mapping
-Escape key toggles panel visibility. All numeric inputs respond via drag or direct wheel input вЂ” no reliance on keyboard-only entry for submarine environment (user may lack physical keyboard access in UBOAT). Provide Escape-based close convention consistent with native UBOAT panels.
+Escape key toggles panel visibility. All numeric inputs respond via drag or direct wheel input  no reliance on keyboard-only entry for submarine environment (user may lack physical keyboard access in UBOAT). Provide Escape-based close convention consistent with native UBOAT panels.
 
 ---
 
-## В§5 Voice & Tone
+## 5 Voice & Tone
 
 All UI text is **technical, terse, signal-report style**. No explanatory prose inside the instrument itself; all instructions live outside (in-game help, mod README).
 
 **Label conventions:**  
 - Use uppercase, reduced spacing: `CURSOR` not "Cursor Angle" in tight slots  
-- Numeric-only zones where possible: `ZONE 1` в†’ just `Z1` if space is constrained, or full word only when layout allows  
+- Numeric-only zones where possible: `ZONE 1`  just `Z1` if space is constrained, or full word only when layout allows  
 - No sentences. Status indicators carry their own meaning via visual state.
 
 **Morse decode output:** Uppercase plain text. No punctuation except what Decoded Morse audio actually contains (historically rare). Timestamp-free; latest readings scroll upward for efficiency. Readout format: `STATION  CALLSIGN  SIGNAL_RATING`
 
 ---
 
-## В§6 Implementation Practices
+## 6 Implementation Practices
 
 ### uGUI Architecture
 - **One prefab root** loaded via AssetBundle (`Bundles/testui`, prefab name `"Radio"`)  
-- Panel hierarchy validated against hardcoded child paths at runtime (Main.cs:165) вЂ” maintain strict naming: `CursorSpinner`, `Toggle`, `Ground`, `Ground/Background/GroundCheckmark`, `Expander`, `RadioZone`, `VolumeSpinner`, `FeedbackSpinner`  
+- Panel hierarchy validated against hardcoded child paths at runtime (Main.cs:165)  maintain strict naming: `CursorSpinner`, `Toggle`, `Ground`, `Ground/Background/GroundCheckmark`, `Expander`, `RadioZone`, `VolumeSpinner`, `FeedbackSpinner`  
 - **Do NOT add new top-level children** to the validated hierarchy; extend via sibling placement or nested child objects with stable paths  
 
 ### Component Boundaries
@@ -117,32 +117,32 @@ Each prefabricated uGUI element maps one-to-one to a C# `MonoBehaviour` handler.
 - UBOAT lifecycle bridge  
 
 ### Threading Discipline
-Audio callback operates at 44.1kHz without Unity engine access. **Zero Debug.Log() calls** or UnityEngine API inside the DSP path вЂ” this is a hard constraint regardless of build type. Use buffered debug output flushed on next Update().
+Audio callback operates at 44.1kHz without Unity engine access. **Zero Debug.Log() calls** or UnityEngine API inside the DSP path  this is a hard constraint regardless of build type. Use buffered debug output flushed on next Update().
 
 ---
 
-## В§7 Anti-Patterns
+## 7 Anti-Patterns
 
 ### What This Design Is NOT
-- **No modern flat design:** Avoid the "SaaS product card" aesthetic (rounded corners, soft shadows, blue accent). The UI must be angular/correct вЂ” physical instruments have straight mechanical geometry.  
+- **No modern flat design:** Avoid the "SaaS product card" aesthetic (rounded corners, soft shadows, blue accent). The UI must be angular/correct  physical instruments have straight mechanical geometry.  
 - **No gradients for illumination:** Real Consol/Sonne consoles had backlit glass panels with uniform phosphor-green light. Use solid fills or very subtle single-stop shading only.  
-- **No emoji or decorative glyphs anywhere.** All icons are geometric/schematic. A ground check is a filled rectangle, not "вњ“".  
+- **No emoji or decorative glyphs anywhere.** All icons are geometric/schematic. A ground check is a filled rectangle, not "".  
 - **No responsive/floating layout:** Panel position on screen is fixed by design (lower-right quadrant when visible). No center-screen alerts or modals.  
 - **No "dark mode toggle" or theme system.** This instrument exists in one state: submarine interior, dim lighting with green illumination  
 
 ### Critical Anti-Patterns
 | Pattern | Why it's wrong here | Correct approach |  
 |---|---|---|  
-| Rounded corners (8px+) on panel elements | Contradicts period hardware вЂ” instruments are machined metal/steel | Sharp 2вЂ“4 px radii only where the source equipment had physical rounding  
+| Rounded corners (8px+) on panel elements | Contradicts period hardware  instruments are machined metal/steel | Sharp 24 px radii only where the source equipment had physical rounding  
 | Glossy/drop-shadow depth effects | 1940s radio consoles were flat-screened, not glass-faced smartphones | Flat fills with edge-bevel or rim-light sim via adjacent panel element |  
 | Animated background grid/tech patterns | Distracts from instrument-readings which are the sole purpose of this UI | Solid or near-solid backgrounds only; no "data-driven" motion decoration |    
 
 ---
 
-## В§8 Decision-Making
+## 8 Decision-Making
 
 ### When Choosing Between Options
-Every design decision in RadioNavigation must satisfy one question: **"Would a 1940s naval radio operator on an U-boat feel comfortable touching this?"** If a control looks like it belongs on modern software, refactor вЂ” even if the code works perfectly.
+Every design decision in RadioNavigation must satisfy one question: **"Would a 1940s naval radio operator on an U-boat feel comfortable touching this?"** If a control looks like it belongs on modern software, refactor  even if the code works perfectly.
 
 ### Override Authority
 UBOAT's native UI language takes precedence over period authenticity where they conflict and cannot be reconciled (e.g., missing uGUI primitives that would need to simulate historical hardware). In those cases: match UBOAT's visual vocabulary first, then inject period flavor through color/typography only.
@@ -152,14 +152,14 @@ Any modification to the prefab hierarchy (`Main.cs` line 165 validation array) r
 
 ---
 
-## В§9 Workflow
+## 9 Workflow
 
 ### Iteration Order
 When developing or modifying anything visual, follow:  
-1. **Prototype state machines** first вЂ” toggle on/off, zone cycling, cursor rotation with no audio connected  
-2. **Attach Info Panel content** (Morse decode, ground check signals) вЂ” verify data flow to display handlers  
-3. **Visual styling pass** (color, type, layout refinement) вЂ” after the component has all its behaviors wired  
-4. **Audio integration** last вЂ” audio verification is a gameplay/testing concern handled separately  
+1. **Prototype state machines** first  toggle on/off, zone cycling, cursor rotation with no audio connected  
+2. **Attach Info Panel content** (Morse decode, ground check signals)  verify data flow to display handlers  
+3. **Visual styling pass** (color, type, layout refinement)  after the component has all its behaviors wired  
+4. **Audio integration** last  audio verification is a gameplay/testing concern handled separately  
 
 ### Deliverables Checklist
 - [ ] Prefab root with validated child hierarchy  
@@ -170,69 +170,69 @@ When developing or modifying anything visual, follow:
 
 ---
 
-## В§10 Structure вЂ” Artifact Layout (Main Panel)
+## 10 Structure  Artifact Layout (Main Panel)
 
 The following describes the main panel artifact as a single reading-order flow from top to bottom. Each element maps directly to an existing Unity prefab hierarchy node and its corresponding C# handler.
 
 ```
-в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ Parent: "Radio" GameObject в”Ђв”Ђ Fixed width 380-420px, anchored lower-right viewport
-в”‚                                            в”‚  
-в”‚   ZONE SELECTOR ROW                        в”‚ Child #7: RadioZone (horizontal strip, Zones A through I)
-в”‚                                             Active button в†’ amber highlight (#f0c040), inactive в†’ secondary text only  
-в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”¬в”Ђв”¬в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ         в”‚    
-в”‚ [Z1]  в”‚ [Z2 ] в”‚[Z3]   ...в”‚ в”‚ [ZI]    в”‚         в”‚ 
-в”‚ Zone-A в”‚ Zone-Bв”‚ Zone-C... в”‚ в”‚ Zone-I     в”‚ Child #7: ZoneHandler.cs вЂ” maps zone index (1..8) to frequency range via DialConfig.Bands[] в”Ђв”Ђ active state toggled visually
-в”‚ Frequency Strip (right edge of Row)        в”‚    
-в”‚   в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ                           в”‚    
-в”‚    72.4 kHz                               в”‚ Size: inheritable with Mono typeface, right-aligned  
-                                             в”‚ Child #? (implicit): "FrequencyDisplay" text вЂ” needs constant in PrefabNames.cs for handler binding
-в”‚                                            в”‚       Cursor Dial              Ground Check Strip          в”‚ Top-Row children: child #1 "CursorSpinner", child #8 "Volume Spinner" (right-adjacent to freq) в”Ђв”Ђв”Ђ 
-в”‚ в—„                                   в–€     в”‚    
-в”‚ в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ    в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ             в”‚    
-в”‚ в”‚  SPINNER      в”‚    в”‚ GROUND  в”‚ Child, center: CursorHandler.cs вЂ” drag rotates cursor needle over the 360deg dial arc, angle в†’ freq via DailConfig.AngleToFrequency() в”Ђв”Ђ smooth interpolation (no angular snap)     в”‚ в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”    в”‚ STATUS   в”‚ Ground check is a narrow vertical strip next to dial binary OK/BAD indicator вЂ” Green (#7ec86c) or Red (#c42828) with matching label text  
-в”‚              в”Њв”Ђв”ґв”ђ               в”‚ Child : GroundHandler.cs, ZoneHandler.cs вЂ” subscription pair updates .IsGrounded flag every cycle, drives visual fill of Ground image element        
-в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв” в””в”Ђв”Ђв” в”•в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”™             в”‚    
-                                             в”‚ Expand/Collapse Toggle  
-в”‚    [в–ј EXPAND в–ј]                             в”‚ Child #5: Expander.cs вЂ” expand/collapse animation for secondary Info panel region below
-в”‚                                            в”‚                                            в”‚    INFO PANEL (collapsible)        в”‚    
-в”‚ DECODED TEXT STREAM                        в”‚      
-в”‚ BEAUVALS  R   ----                          в”‚ Height: expands downward when toggled вЂ” max visible lines в‰€6; content scrolls with newest entry at bottom                                        в”‚ SIGNAL OK                            в”‚ Child #4 (implied): "Ground" GameObject contains Background + GroundCheckmark child в”Ђв”Ђ image element fill
-                                             в”‚ Position Fix: fixed-width number pair | Child #3 implied: "InfoPanel" or "InfoGroup" under parent "Radio" with its own Canvas Group.  Must add to Main.cs line 165 requiredChildren[] if not already present                                        в”‚ POSITION 48N07E                      в”‚
-                                             в”‚ Expandable Info Panel structure                                       в”‚в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”                                            в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+ Parent: "Radio" GameObject  Fixed width 380-420px, anchored lower-right viewport
+                                              
+   ZONE SELECTOR ROW                         Child #7: RadioZone (horizontal strip, Zones A through I)
+                                             Active button  amber highlight (#f0c040), inactive  secondary text only  
+             
+ [Z1]   [Z2 ] [Z3]   ...  [ZI]              
+ Zone-A  Zone-B Zone-C...   Zone-I      Child #7: ZoneHandler.cs  maps zone index (1..8) to frequency range via DialConfig.Bands[]  active state toggled visually
+ Frequency Strip (right edge of Row)            
+                                  
+    72.4 kHz                                Size: inheritable with Mono typeface, right-aligned  
+                                              Child #? (implicit): "FrequencyDisplay" text  needs constant in PrefabNames.cs for handler binding
+                                                   Cursor Dial              Ground Check Strip           Top-Row children: child #1 "CursorSpinner", child #8 "Volume Spinner" (right-adjacent to freq)  
+                                             
+                      
+   SPINNER           GROUND   Child, center: CursorHandler.cs  drag rotates cursor needle over the 360deg dial arc, angle  freq via DailConfig.AngleToFrequency()  smooth interpolation (no angular snap)           STATUS    Ground check is a narrow vertical strip next to dial binary OK/BAD indicator  Green (#7ec86c) or Red (#c42828) with matching label text  
+                              Child : GroundHandler.cs, ZoneHandler.cs  subscription pair updates .IsGrounded flag every cycle, drives visual fill of Ground image element        
+                   
+                                              Expand/Collapse Toggle  
+    [ EXPAND ]                              Child #5: Expander.cs  expand/collapse animation for secondary Info panel region below
+                                                                                            INFO PANEL (collapsible)            
+ DECODED TEXT STREAM                              
+ BEAUVALS  R   ----                           Height: expands downward when toggled  max visible lines 6; content scrolls with newest entry at bottom                                         SIGNAL OK                             Child #4 (implied): "Ground" GameObject contains Background + GroundCheckmark child  image element fill
+                                              Position Fix: fixed-width number pair | Child #3 implied: "InfoPanel" or "InfoGroup" under parent "Radio" with its own Canvas Group.  Must add to Main.cs line 165 requiredChildren[] if not already present                                         POSITION 48N07E                      
+                                              Expandable Info Panel structure                                                                                   
 ```
 
-### Element Crosswalk (Prefab в†’ Handler в†’ Behavior)
+### Element Crosswalk (Prefab  Handler  Behavior)
 
 | Prefab Node | C# Handler | Role |
 |---|---|---|
-| CursorSpinner | `CursorHandler` | Draggable dial В±90В° from zone center; drives `SonneController.EmitFrequency()` |
-| RadioZone | `ZoneHandler` | Zone AвЂ“I band selection; maps index в†’ frequency range via `DialConfig.Bands[]` |
+| CursorSpinner | `CursorHandler` | Draggable dial 90 from zone center; drives `SonneController.EmitFrequency()` |
+| RadioZone | `ZoneHandler` | Zone AI band selection; maps index  frequency range via `DialConfig.Bands[]` |
 | Toggle (child #3) | `ToggleHandler` | Panel open/close + info panel expand/collapse state |
 | Ground/Background/GroundCheckmark | `GroundHandler` | Binary OK/BAD signal decode indicator driven by ground detection logic |
-| RadioZone strip | Various zone scripts | Horizontal band selector strip, zone AвЂ“I visual toggle active/inactive state |
-| VolumeSpinner (child #8) | `VolumeSpinnerHandler` | Receiver gain volume level вЂ” same spinner archetype as feedback, injected `DebugTag` differs |
+| RadioZone strip | Various zone scripts | Horizontal band selector strip, zone AI visual toggle active/inactive state |
+| VolumeSpinner (child #8) | `VolumeSpinnerHandler` | Receiver gain volume level  same spinner archetype as feedback, injected `DebugTag` differs |
 | FeedbackSpinner (child #9) | `FeedbackSpinnerHandler` | Receiver sensitivity/bias feedback control |
 | Expander (child #5) | `ExpanderHandler` | Expand/collapse animation for Info Panel region; nested Canvas Group |
-| **MISSING** | *FrequencyDisplay?* | Live frequency readout with zone label вЂ” NOT in `requiredChildren[]`; must add to Main.cs:165 before any refactoring |
+| **MISSING** | *FrequencyDisplay?* | Live frequency readout with zone label  NOT in `requiredChildren[]`; must add to Main.cs:165 before any refactoring |
 
 ---
 
 ### Critical Missing Element Note
 
-The current `requiredChildren[]` array in `Main.cs` line 165 does not include a dedicated container for the **Information Panel itself** вЂ” only "Expander" (the toggle button). The info panel region that holds decoded text + position data either:
+The current `requiredChildren[]` array in `Main.cs` line 165 does not include a dedicated container for the **Information Panel itself**  only "Expander" (the toggle button). The info panel region that holds decoded text + position data either:
 - Is an implicit sibling of Radio with no named path check, or
 - Hangs under Expander as unnamed child, or  
 - Exists in a separate prefab entirely.
 
-This must be resolved before implementing any info-panel expansion вЂ” **P2.M3_HardcodedPrefabPaths** already documents this fragility.
+This must be resolved before implementing any info-panel expansion  **P2.M3_HardcodedPrefabPaths** already documents this fragility.
 
 ---
 
-## В§11 Decision Trace
+## 11 Decision Trace
 
 Each entry records a non-obvious design choice in JSON format, with rationale tied to brief details (not just "looks better"), real alternatives rejected, and genuine tradeoffs.
 
-### D1 вЂ” Period-authentic over modern-interpretation
+### D1  Period-authentic over modern-interpretation
 ```json
 {
   "id": "D1",
@@ -241,17 +241,17 @@ Each entry records a non-obvious design choice in JSON format, with rationale ti
   "alternatives": [
     "Clean modernist military design (NATO-era control interface look with blue-white palette)",
     "Retro-modern: vintage hardware silhouette rendered in polished contemporary graphic style",
-    "Mixed approach вЂ” historic skeleton, modern UI polish"
+    "Mixed approach  historic skeleton, modern UI polish"
   ],
   "tradeoff": "Harder to implement exact period look using only Unity uGUI primitives. Requires custom sprite sheets or texture baking for panel edge bevel simulation."
 }
 ```
 
-### D2 вЂ” Fixed-width non-responsive panel
+### D2  Fixed-width non-responsive panel
 ```json
 {
   "id": "D2",
-  "decision": "Panel has a fixed width (380вЂ“420px) with no fluid responsiveness or window resizing support",
+  "decision": "Panel has a fixed width (380420px) with no fluid responsiveness or window resizing support",
   "reason": "Period naval hardware does not resize dynamically; the mod simulates touching real dials on metal console. UBOAT's own panels use fixed positions rather than fluid adaptability.",
   "alternatives": [
     "Fully responsive layout scaling across resolutions and aspect ratios",
@@ -261,7 +261,7 @@ Each entry records a non-obvious design choice in JSON format, with rationale ti
 }
 ```
 
-### D3 вЂ” Green/amber dual-hue instead of monochrome or blue-white CRT
+### D3  Green/amber dual-hue instead of monochrome or blue-white CRT
 ```json
 {
   "id": "D3",
@@ -276,7 +276,7 @@ Each entry records a non-obvious design choice in JSON format, with rationale ti
 }
 ```
 
-### D4 вЂ” No decorative animations or transition polish
+### D4  No decorative animations or transition polish
 ```json
 {
   "id": "D4",
@@ -290,21 +290,21 @@ Each entry records a non-obvious design choice in JSON format, with rationale ti
 }
 ```
 
-### D5 вЂ” Ground check is never color-only
+### D5  Ground check is never color-only
 ```json
 {
   "id": "D5",
-  "decision": "Ground OK/BAD communicated via shape fill (green or red square) + explicit label text ('OK'/'BAD') вЂ” never color alone in any state where the user must act on it",
+  "decision": "Ground OK/BAD communicated via shape fill (green or red square) + explicit label text ('OK'/'BAD')  never color alone in any state where the user must act on it",
   "reason": "In submarine conditions (night shifts, sick bay lighting), pure color discrimination is unreliable. Period operators relied on shape and signal tone as primary channels.",
   "alternatives": [
-    "Color-only indicator with semantic green/red dots вЂ” minimal space overhead",
-    "Shape only without color variation (a checkmark square or X) вЂ” safest accessibility but loses immediate readability"
+    "Color-only indicator with semantic green/red dots  minimal space overhead",
+    "Shape only without color variation (a checkmark square or X)  safest accessibility but loses immediate readability"
   ],
   "tradeoff": "Slightly more visual real estate than a simple dot; text labels consume space on the fixed-width panel."
 }
 ```
 
-### D6 вЂ” Info Panel as expandable inline region, not separate floating window
+### D6  Info Panel as expandable inline region, not separate floating window
 ```json
 {
   "id": "D6",
@@ -318,7 +318,7 @@ Each entry records a non-obvious design choice in JSON format, with rationale ti
 }
 ```
 
-### D7 вЂ” Mono-spaced numeric display overriding proportional sans-serif
+### D7  Mono-spaced numeric display overriding proportional sans-serif
 ```json
 {
   "id": "D7",
@@ -326,20 +326,20 @@ Each entry records a non-obvious design choice in JSON format, with rationale ti
   "reason": "Single-column alignment of numbers is critical for operator readability on naval consoles where users scan across rows. Pitch-based number layout matches period instrument faces which used fixed-width stamped numerals.",
   "alternatives": [
     "Unified proportional font with tabular figure sizing",
-    "Full mono everywhere вЂ” typewriter aesthetic throughout panel"
+    "Full mono everywhere  typewriter aesthetic throughout panel"
   ],
   "tradeoff": "Requires Unity uGUI to handle mixed-font rendering within a single Text element, which may need separate child text objects for number vs label."
 }
 ```
 
-### D8 вЂ” Hardcoded prefab validation enforces hierarchy integrity
+### D8  Hardcoded prefab validation enforces hierarchy integrity
 ```json
 {
   "id": "D8",
   "decision": "Prefab children validated against hardcoded paths in Main.cs:165 requiredChildren[] array; any missing child triggers silent destroy-and-skip rather than graceful degradation.",
   "reason": "Broken partial instantiation produces inconsistent runtime errors downstream (e.g., CursorHandler attached but no Child transform for angle mapping).",
   "alternatives": [
-    "Null-check each child at handler Start вЂ” fail silently per-component, continue panel load",
+    "Null-check each child at handler Start  fail silently per-component, continue panel load",
     "Soft degrade where missing UI just means nonfunctional button without destroying the entire panel"
   ],
   "tradeoff": "If UBOAT updates its GUI scene hierarchy and reorders children, this validation causes silent asset bundle failures (exactly P0.C4_ReflectionFragility.md flag). Hard to recover from once AssetBundle is missing the prefab."

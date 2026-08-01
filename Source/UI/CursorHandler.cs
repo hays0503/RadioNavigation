@@ -16,6 +16,9 @@ namespace UBOAT.Mods.RadioNavigation
         private bool isHovering;
         private int activePointerId = -1;
         private RectTransform cursorRect;
+        // F102: ScrollRect is static after setup; cache instead of walking
+        // the hierarchy every frame while scrolling.
+        private ScrollRect cachedScrollRect;
 
         private void Start()
         {
@@ -34,13 +37,10 @@ namespace UBOAT.Mods.RadioNavigation
             else
                 Debug.LogError("[RadioNav][CursorHandler] Image component not found, drag may not work");
 
-            if (GetComponent<ScrollRect>().IsNull())
-            {
-                ScrollRect sr = gameObject.AddComponent<ScrollRect>();
-                sr.horizontal = false;
-                sr.vertical = false;
-                sr.movementType = ScrollRect.MovementType.Unrestricted;
-            }
+            // F95: no need for a disabled-axes ScrollRect — IScrollHandler
+            // already consumes scroll events via eventData.Use() and the
+            // parent ScrollRect is stopped in Update (StopMovement).
+            cachedScrollRect = GetComponentInParent<ScrollRect>();
         }
 
         public void OnBeginDrag(PointerEventData eventData)
@@ -105,14 +105,18 @@ namespace UBOAT.Mods.RadioNavigation
                 ? ScrollStepFine
                 : ScrollStepNormal;
 
+            // F97: RadioHandler.Instance must be resolved before it is
+            // dereferenced — a null Instance previously threw on the line
+            // computing newAngle while the null guard only ran afterwards.
+            if (RadioHandler.Instance.IsNull())
+                return;
+
             float newAngle = Mathf.Clamp(
                 RadioHandler.Instance.CursorAngle + delta * step,
                 MinAngle, MaxAngle);
 
             cursorRect.localRotation = Quaternion.Euler(0, 0, -newAngle);
-
-            if (RadioHandler.Instance.IsNotNull())
-                RadioHandler.Instance.CursorAngle = newAngle;
+            RadioHandler.Instance.CursorAngle = newAngle;
 
             eventData.Use();
         }
@@ -127,9 +131,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (EventSystem.current.IsNotNull() && EventSystem.current.currentSelectedGameObject != gameObject)
                 EventSystem.current.SetSelectedGameObject(gameObject);
 
-            ScrollRect scrollRect = GetComponentInParent<ScrollRect>();
-            if (scrollRect.IsNotNull())
-                scrollRect.StopMovement();
+            if (cachedScrollRect.IsNotNull())
+                cachedScrollRect.StopMovement();
         }
     }
 }

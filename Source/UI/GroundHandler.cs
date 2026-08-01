@@ -53,7 +53,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Start()
         {
-            Transform bgT = transform.Find("Background");
+            Transform bgT = transform.Find(PrefabNames.Background);
             bgImage = bgT.IsNotNull() ? bgT.GetComponent<Image>() : null;
             if (bgImage.IsNull())
             {
@@ -70,7 +70,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (bgT.IsNotNull())
             {
-                Transform cm = bgT.Find("GroundCheckmark");
+                Transform cm = bgT.Find(PrefabNames.GroundCheckmark);
                 if (cm.IsNotNull())
                 {
                     groundCheckmark = cm.GetComponent<Image>();
@@ -79,13 +79,13 @@ namespace UBOAT.Mods.RadioNavigation
                         Color c = groundCheckmark.color;
                         c.a = 0f;
                         groundCheckmark.color = c;
-                        groundCheckmark.raycastTarget = true;
+                        groundCheckmark.raycastTarget = false; // F85: decorative child Image must not block clicks
                     }
                 }
             }
 
             if (transform.parent.IsNotNull())
-                radioToggle = transform.parent.Find("Toggle")?.GetComponent<Toggle>();
+                radioToggle = transform.parent.Find(PrefabNames.Toggle)?.GetComponent<Toggle>();
             else
                 Debug.LogError("[RadioNav][GroundHandler] transform.parent is null");
             if (radioToggle.IsNotNull())
@@ -100,11 +100,17 @@ namespace UBOAT.Mods.RadioNavigation
 #endif
         }
 
-        private bool IsGroundEffectivelyActive() =>
+        // F160: exposed so InformationPanelHandler reads the handler state
+        // instead of duplicating the alpha heuristic with transform.Find.
+        internal bool IsGroundEffectivelyActive() =>
             bgImage.IsNotNull() && bgImage.color.a > ActiveAlphaThreshold;
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            // F148: right/middle clicks must not toggle the ground state.
+            if (eventData.button != PointerEventData.InputButton.Left)
+                return;
+
             bool isActive = IsGroundEffectivelyActive();
 
             if (isActive && radioToggle.IsNotNull() && radioToggle.isOn)

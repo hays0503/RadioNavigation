@@ -4,6 +4,19 @@ param(
     [string]$OutputDir = "."
 )
 
+# F182: fail with a clear message before csc spews 15+ missing-reference
+# errors when the game path is wrong.
+if (-not (Test-Path $GamePath)) {
+    Write-Error "[RadioNavigation] GamePath does not exist: $GamePath"
+    exit 1
+}
+
+$coreRef = Join-Path $GamePath "UBOAT_Data\Managed\Assembly-CSharp.dll"
+if (-not (Test-Path $coreRef)) {
+    Write-Error "[RadioNavigation] Missing game managed DLLs at: $coreRef"
+    exit 1
+}
+
 $srcDir = Join-Path $PSScriptRoot "Source"
 $refs = @(
     "$GamePath\UBOAT_Data\Managed\Assembly-CSharp.dll",
@@ -28,11 +41,20 @@ $srcFiles = Get-ChildItem $srcDir -Filter "*.cs" -Recurse | ForEach-Object { "`"
 
 $outPath = Join-Path $OutputDir "radionavigation.dll"
 
+# F78: C# preprocessor symbols are case-sensitive; /define:Debug would not
+# match #if DEBUG. Map the Configuration to an UPPERCASE symbol.
+$defineSymbol = if ($Configuration -eq "Debug") { "DEBUG" } else { "RELEASE" }
+
+# F196: /debug:full + /optimize+ combined break step-through debugging
+# (optimizer removes locals); split the flags per configuration.
+$debugFlag = if ($Configuration -eq "Debug") { "/debug:full" } else { "/debug:pdbonly" }
+$optimizeFlag = if ($Configuration -eq "Debug") { "/optimize-" } else { "/optimize+" }
+
 csc /target:library `
     /out:$outPath `
-    /debug:full `
-    /optimize+ `
-    /define:$Configuration `
+    $debugFlag `
+    $optimizeFlag `
+    /define:$defineSymbol `
     $refArgs `
     $srcFiles
 

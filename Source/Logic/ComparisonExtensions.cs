@@ -28,6 +28,10 @@ namespace UBOAT.Mods.RadioNavigation
         public static bool IsNonNegative(this double value) => value >= 0.0;
         public static bool IsNonPositive(this double value) => value <= 0.0;
 
+        // F74: thresholds are intentionally asymmetric — IsSignificant (1e-3)
+        // guards a perceptibility/CPU cut-off in the audio thread (DspPipeline
+        // whistle), IsNegligible (1e-9) is a float "zero" clamp. Callers pass
+        // explicit thresholds where the default does not fit.
         public static bool IsSignificant(this float value, float threshold = 0.001f) => value > threshold;
         public static bool IsNegligible(this float value, float threshold = 1e-9f) => Math.Abs(value) < threshold;
     }

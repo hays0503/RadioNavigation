@@ -5,7 +5,8 @@ namespace UBOAT.Mods.RadioNavigation
 {
     public static class SignalRichTextFormatter
     {
-        private const int MaxSignalEntries = 60;
+        // F120: public so SonneController can pre-size its entry list.
+        public const int MaxSignalEntries = 60;
         private const int MaxMorseChars = 20;
         private const int MaxDecodedChars = 30;
 
@@ -68,13 +69,18 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void TrimEntries(List<SignalEntry> entries, ref int morseCharCount)
         {
-            while ((morseCharCount > MaxMorseChars || entries.Count > MaxSignalEntries)
-                && entries.Count.IsPositive())
+            // F120: RemoveAt(0) is O(n) per call — collapse the trim into a
+            // single RemoveRange when multiple entries must go.
+            int removeCount = 0;
+            while (removeCount < entries.Count &&
+                (morseCharCount > MaxMorseChars || entries.Count - removeCount > MaxSignalEntries))
             {
-                if (entries[0].Type != SignalCharType.Separator)
+                if (entries[removeCount].Type != SignalCharType.Separator)
                     morseCharCount--;
-                entries.RemoveAt(0);
+                removeCount++;
             }
+            if (removeCount > 0)
+                entries.RemoveRange(0, removeCount);
         }
 
         public static void TrimDecodedText(StringBuilder decodedText)

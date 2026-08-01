@@ -1,13 +1,26 @@
 # Risk Assessment — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-08-01):** Глобальный аудит выявил **199 проблем** (F01–F199). Добавлены критические риски из F65–F199:
+> - **F45 (P0):** SAD документирует 5 ADR как «Accepted» — ни один не реализован
+> - **F46 (P0):** SAD описывает неверные Harmony patch targets
+> - **F47 (P1):** 14+ несуществующих классов в SAD — документацию невозможно использовать как reference
+> - **F65-F76:** 12 новых проблем (stale consolPattern, NRE, unchached reflection, etc.)
+> - **F77-F199:** 122 дополнительных проблем (NaN clamping, truncation, dead code, missing default cases, event leaks)
+> - **Cross-file:** 6 dead методов в AudioSynthesisEngine, 16/17 констант PrefabNames не используются
+> - **F200-F207 (новое 2026-08-01):** 8 дополнительных проблем. F200 (P0): `UpdatePosition()` без вызывающих — position fix всегда ≈0°N 0°E. F201-F202 (P1): двойная передача Consol-паттерна за цикл; сдвиг 90° у спиннеров. F203/F204/F207 (P2): кросс-талки при QF=20; антимеридиан-среднее долгот; перехват drag с дочерних контролов. F205-F206 (P3): кириллическая «В°»; тики по кадрам. Итого **207 проблем**.
+>
+> **Итого:** 207 проблем, ~95-130 часов рефакторинга + тестовая инфраструктура (F22: 8-12 часов) + F200-F207 (~4-6 часов).
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`, `F200.md`..`F207.md`.
+
 ## 1. Risk Overview
 
 | Category | High | Medium | Low | Total |
 |----------|------|--------|-----|-------|
-| Technical | 3 | 4 | 3 | 10 |
+| Technical | 5 | 6 | 4 | 15 |
 | Process | 2 | 3 | 2 | 7 |
 | External | 2 | 2 | 1 | 5 |
-| **Total** | **7** | **9** | **6** | **22** |
+| Documentation | 1 | 2 | 3 | 6 |
+| **Total** | **10** | **13** | **10** | **33** |
 
 ## 2. High-Risk Items
 
@@ -45,10 +58,11 @@ Audio thread (`OnAudioFilterRead`) and main thread (`Update()`) share mutable `S
 **Severity**: **Critical**
 
 **Description**:
-`RadioStoryIntegration` uses 12 reflection handlers that depend on game internals. Any game update can break:
-- Constructor discovery
-- Field access
-- Method invocation
+Deals with this — 9 reflection members, not 12 (F50). Any game update can break:
+- Type resolution (`typeof(RadioStory).BaseType`)
+- Constructor discovery (filtered by param count)
+- Property access (`LocalizationKey`, `Decisions`)
+- Method invocation (`InsertDecision`, `OnUpdated`)
 
 **Affected Components**:
 - `RadioStoryIntegration.cs`
@@ -70,7 +84,7 @@ Audio thread (`OnAudioFilterRead`) and main thread (`Update()`) share mutable `S
 **Severity**: **High**
 
 **Description**:
-Decomposing `SonneController` (506 lines) into 4-5 classes risks:
+Decomposing `SonneController` (508 lines — F50: was 506) into 4-5 classes risks:
 - Breaking existing functionality
 - Missing dependencies
 - Integration issues
@@ -352,14 +366,118 @@ Impact
 3. Fix decomposition plan
 4. Redo extraction with fixes
 
+### 8.4 NaN / Math Domain Errors in Position Fix
+
+**Risk ID**: TECH-007
+**Probability**: High
+**Impact**: High
+**Severity**: **High**
+
+**Description**:
+`PositionFixCalculator` has unprotected `Math.Acos`, `Math.Asin` calls that produce NaN when arguments exceed [-1, 1] (F137, F190, F191). Also mutates input `measurements` list (F134).
+
+**Affected Components**:
+- `PositionFixCalculator.cs`
+- `StationState.cs`
+
+**Mitigation**:
+- Clamp arguments before Math.Acos/Asin (F137, F190, F191)
+- Work on copy of measurements list (F134)
+- Normalize delta longitude to [-PI, PI] (F128)
+
+**Effort**: 1-2 hours
+**Owner**: Logic Team
+
+### 8.5 Position Feed Never Connected (F200)
+
+**Risk ID**: TECH-010
+**Probability**: High (0 callers in codebase)
+**Impact**: Critical (core feature)
+**Severity**: **Critical**
+
+**Description**:
+`SonneController.UpdatePosition()` has zero call sites — the submarine position is never fed into the mod. `UpdateStationNavigation()` computes all bearings from (0,0): the position fix always resolves to ≈0°N 0°E with `ErrorKm = 0` (green), and dot counts are static regardless of movement. The mod's core navigation feature is non-functional and the UI presents a bogus confident fix.
+
+**Affected Components**:
+- `SonneController.cs`
+- `InformationPanelHandler.cs` (fix display)
+- `PositionFixCalculator.cs` (chain: F204 becomes reachable)
+
+**Mitigation**:
+- Wire a position provider (patch on game navigation API or `IPositionProvider` interface)
+- Until then, hide the fix display when no position data is available (F200)
+
+**Effort**: 1-2 hours (provider) / 15 min (data guard)
+**Owner**: Logic Team
+
+### 8.6 Event Subscription Leaks
+
+**Risk ID**: TECH-008
+**Probability**: High
+**Impact**: Medium
+**Severity**: **Medium**
+
+**Description**:
+UI handlers subscribe to events but don't unsubscribe in `OnDestroy` (F14, F30, F117, F119). SonneController doesn't unsubscribe from keyer events (F117). RadioHandler doesn't unsubscribe from ZoneHandler (F119).
+
+**Affected Components**:
+- `RadioHandler.cs`, `ZoneHandler.cs`, `SonneController.cs`
+
+**Mitigation**:
+- Add unsubscribe in all `OnDestroy()` methods
+- Use weak event pattern or explicit lifecycle management
+
+**Effort**: 1-2 hours
+**Owner**: UI Team
+
+### 8.7 Dead Code in Audio Pipeline
+
+**Risk ID**: TECH-009
+**Probability**: Medium
+**Impact**: Low
+**Severity**: **Low**
+
+**Description**:
+`AudioSynthesisEngine.UpdateStationBeats()` — 0 callers (F54 dead code). `BearingTable` dead code in StationScheduler/SonneSignalGenerator (F34). Many `PrefabNames` constants unused (16/17).
+
+**Affected Components**:
+- `AudioSynthesisEngine.cs`, `SonneController.cs`, `PrefabNames.cs`
+
+**Mitigation**:
+- Remove dead code (F91-F96), unused methods (F34)
+- Clean up PrefabNames constants
+
+**Effort**: 1-2 hours
+**Owner**: All
+
+### 8.8 Build Configuration Conflict
+
+**Risk ID**: PROC-005
+**Probability**: Medium
+**Impact**: Medium
+**Severity**: **Medium**
+
+**Description**:
+`build.ps1` uses `/debug:full` + `/optimize+` simultaneously (F196). Debug symbols with optimizations causes issues with debugging and potential codegen differences.
+
+**Affected Components**:
+- `build.ps1`
+
+**Mitigation**:
+- Separate Debug (`--debug:full`, no optimize) and Release (`--optimize+`, no debug) configurations (F196)
+
+**Effort**: 5 min
+**Owner**: Build Team
+
 ## 9. Risk Budget
 
 | Category | Hours | Budget |
 |----------|-------|--------|
-| Technical risk mitigation | 20-25 | High |
-| Process risk mitigation | 5-8 | Medium |
+| Technical risk mitigation | 35-45 | High |
+| Process risk mitigation | 6-9 | Medium |
 | External risk mitigation | 4-6 | Medium |
-| **Total** | **29-39** | — |
+| Documentation | 8-12 | Medium |
+| **Total** | **53-72** | — |
 
 ## 10. Risk Acceptance
 
@@ -368,5 +486,13 @@ Impact
 | TECH-001 (Thread Safety) | Must be fixed before release |
 | TECH-002 (Reflection) | Must be fixed before release |
 | TECH-003 (Decomposition) | Can be deferred if critical |
+| TECH-007 (NaN/Math) | Must be fixed before release |
+| TECH-010 (Position Feed) | Must be fixed before release (or hide fix without data) |
 | EXT-001 (Game Version) | Must be monitored continuously |
 | All others | Acceptable with mitigation |
+
+---
+
+*Document Version: 2.0*  
+*Last Updated: 2026-08-01*  
+*Updated: Risk catalog expanded from 22 to 33 items. Added TECH-007 (NaN), TECH-008 (event leaks), TECH-009 (dead code), PROC-005 (build config). Risk budget increased to 53-72 hours. Documentation category added.*

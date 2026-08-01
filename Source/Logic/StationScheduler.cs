@@ -17,6 +17,9 @@
         public Phase CurrentPhase { get; private set; }
         public int[] BearingTable { get; set; }
         public ConsolCycleConfig Config { get; set; }
+        // F113: the morse element count of the callsign — survives pattern
+        // transitions inside MorseKeyer.AdvanceElement.
+        public int CallsignElementCount { get; private set; }
 
         private int pauseTicksRemaining;
 
@@ -25,8 +28,22 @@
             Callsign = new CallsignPattern(callsign);
             Navigation = new NavigationPattern(new Group[0], 8);
             CurrentConsolPattern = null;
-            CurrentPhase = Phase.Pause;
-            pauseTicksRemaining = 1;
+            CallsignElementCount = SonneSignalGenerator.GetCallsignElementCount(callsign);
+            // F87: with no callsign elements (unknown callsign) the Callsign
+            // phase would never finish — MorseKeyer stays idle on an empty
+            // sequence and the cycle would stall forever. Skip straight to
+            // the pre-navigation pause (one tick; Config.PreNavPauseMs would
+            // need Config, which is assigned after construction).
+            if (CallsignElementCount.IsZero())
+            {
+                CurrentPhase = Phase.PreNavPause;
+                pauseTicksRemaining = 1;
+            }
+            else
+            {
+                CurrentPhase = Phase.Pause;
+                pauseTicksRemaining = 1;
+            }
         }
 
         public IKeySequence GetCurrentSequence()
@@ -42,16 +59,15 @@
             }
         }
 
+        // F201: the full consol pattern must only play during Navigation;
+        // in the Callsign phase GetCurrentSequence() provides the short
+        // callsign pattern, otherwise the pattern would be transmitted twice
+        // per cycle and the callsign-only phase would never be heard.
         public NavigationElementType[] GetCurrentConsolPattern()
         {
-            switch (CurrentPhase)
-            {
-                case Phase.Callsign:
-                case Phase.Navigation:
-                    return CurrentConsolPattern;
-                default:
-                    return null;
-            }
+            if (CurrentPhase != Phase.Navigation)
+                return null;
+            return CurrentConsolPattern;
         }
 
         public void Tick()
@@ -94,13 +110,17 @@
                     CurrentPhase = Phase.PostNavSilence;
                     pauseTicksRemaining = ToTicks(Config.PostNavSilenceMs);
                     break;
+
+                default:
+                    UnityEngine.Debug.LogWarning("[RadioNav][StationScheduler] OnSequenceFinished called during " + CurrentPhase + ", ignoring");
+                    break;
             }
         }
 
         public void Reset()
         {
-            CurrentPhase = Phase.PostNavSilence;
-            pauseTicksRemaining = ToTicks(Config.PostNavSilenceMs);
+            CurrentPhase = Phase.Pause;
+            pauseTicksRemaining = 1;
         }
 
         private static int ToTicks(float ms)

@@ -17,6 +17,9 @@ namespace UBOAT.Mods.RadioNavigation
     [NonSerializedInGameState]
     public class Main : IUserMod
     {
+        // F176: single source of truth for the game UI container lookup.
+        private const string MainSceneViewportPath = "/GUI/Viewport";
+
         [Inject] private static ResourceManager resourceManager;
         [NonSerializedInGameState] private Harmony harmony;
         private static bool loaded;
@@ -27,7 +30,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (loaded)
             {
-                harmony?.UnpatchAll();
+                harmony?.UnpatchAll(harmony.Id); // F139: bare UnpatchAll() removes other mods' patches; 0Harmony 2.2.2 has no UnpatchSelf
                 RadioStoryIntegration.ResetRuntimeState();
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
             }
@@ -42,24 +45,38 @@ namespace UBOAT.Mods.RadioNavigation
             var onDecision = typeof(RadioStory).GetMethod("OnDecisionSelected", BindingFlags.NonPublic | BindingFlags.Instance);
             var onStopped = typeof(RadioStory).GetMethod("OnStopped", BindingFlags.NonPublic | BindingFlags.Instance);
 
+            var injectT3PLL38 = patchType.GetMethod("InjectT3PLL38Decision", anyStatic);
+            var overrideLocale = patchType.GetMethod("OverrideLocaleKey", anyStatic);
+            var handleDecisions = patchType.GetMethod("HandleCustomDecisions", anyStatic);
+            var hideOnStop = patchType.GetMethod("HideRadioOnStop", anyStatic);
+
             var targets = new[]
             {
-                new { method = continueStory, prefix = (HarmonyMethod)null, postfix = new HarmonyMethod(patchType.GetMethod("InjectT3PLL38Decision", anyStatic)), name = "RadioStory.ContinueStory" },
-                new { method = retrieveString1, prefix = new HarmonyMethod(patchType.GetMethod("OverrideLocaleKey", anyStatic)), postfix = (HarmonyMethod)null, name = "Locale.RetrieveString" },
-                new { method = retrieveString2, prefix = new HarmonyMethod(patchType.GetMethod("OverrideLocaleKey", anyStatic)), postfix = (HarmonyMethod)null, name = "Locale.RetrieveString(string,string)" },
-                new { method = onDecision, prefix = new HarmonyMethod(patchType.GetMethod("HandleCustomDecisions", anyStatic)), postfix = (HarmonyMethod)null, name = "RadioStory.OnDecisionSelected" },
-                new { method = onStopped, prefix = (HarmonyMethod)null, postfix = new HarmonyMethod(patchType.GetMethod("HideRadioOnStop", anyStatic)), name = "RadioStory.OnStopped" },
+                new { method = continueStory, prefix = (HarmonyMethod)null, postfix = injectT3PLL38.IsNotNull() ? new HarmonyMethod(injectT3PLL38) : null, name = "RadioStory.ContinueStory" },
+                new { method = retrieveString1, prefix = overrideLocale.IsNotNull() ? new HarmonyMethod(overrideLocale) : null, postfix = (HarmonyMethod)null, name = "Locale.RetrieveString" },
+                new { method = retrieveString2, prefix = overrideLocale.IsNotNull() ? new HarmonyMethod(overrideLocale) : null, postfix = (HarmonyMethod)null, name = "Locale.RetrieveString(string,string)" },
+                new { method = onDecision, prefix = handleDecisions.IsNotNull() ? new HarmonyMethod(handleDecisions) : null, postfix = (HarmonyMethod)null, name = "RadioStory.OnDecisionSelected" },
+                new { method = onStopped, prefix = (HarmonyMethod)null, postfix = hideOnStop.IsNotNull() ? new HarmonyMethod(hideOnStop) : null, name = "RadioStory.OnStopped" },
             };
 
             string missing = null;
+            string missingPatches = null;
             foreach (var t in targets)
             {
                 if (t.method.IsNull())
                     missing = (missing ?? "") + t.name + ", ";
+                if (t.prefix.IsNotNull() && t.prefix.method.IsNull())
+                    missingPatches = (missingPatches ?? "") + t.name + " (prefix), ";
+                if (t.postfix.IsNotNull() && t.postfix.method.IsNull())
+                    missingPatches = (missingPatches ?? "") + t.name + " (postfix), ";
             }
             if (missing.IsNotNull())
             {
                 Debug.LogError("[RadioNav] Pre-flight failed \u2014 target methods not found: " + missing.TrimEnd(',', ' '));
+            }
+            else if (missingPatches.IsNotNull())
+            {
+                Debug.LogError("[RadioNav] Pre-flight failed \u2014 patch methods not found: " + missingPatches.TrimEnd(',', ' '));
             }
             else
             {
@@ -75,8 +92,8 @@ namespace UBOAT.Mods.RadioNavigation
                     catch (Exception ex)
                     {
                         Debug.LogError("[RadioNav] Patch failed for " + t.name + ": " + ex.Message);
-                        harmony.UnpatchAll();
-                        Debug.Log("[RadioNav] All patches rolled back due to partial failure");
+                        harmony.UnpatchAll(harmony.Id); // F121: bare UnpatchAll() would roll back other mods' patches too
+                        Debug.Log("[RadioNav] RadioNavigation patches rolled back due to partial failure");
                         break;
                     }
                 }
@@ -135,10 +152,13 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
 
-                Transform viewport = GameObject.Find("/GUI/Viewport")?.transform;
+                // F176: the GUI hierarchy path is a single source of truth
+                // here; keep it in one constant and fail loudly if the game
+                // renames the container.
+                Transform viewport = GameObject.Find(MainSceneViewportPath)?.transform;
                 if (viewport.IsNull())
                 {
-                    Debug.LogWarning("[RadioNav][Main] '/GUI/Viewport' not found \u2014 GUI hierarchy may have changed in this UBOAT version");
+                    Debug.LogWarning("[RadioNav][Main] '" + MainSceneViewportPath + "' not found \u2014 GUI hierarchy may have changed in this UBOAT version");
                     return;
                 }
 
@@ -190,6 +210,7 @@ namespace UBOAT.Mods.RadioNavigation
             catch (Exception e)
             {
                 Debug.LogError("[RadioNav][Main] Error: " + e.Message);
+                Debug.LogException(e);
             }
         }
     }

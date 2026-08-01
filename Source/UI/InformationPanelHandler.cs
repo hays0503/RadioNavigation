@@ -19,6 +19,9 @@ namespace UBOAT.Mods.RadioNavigation
         private Text fixText;
 
         private ToggleHandler toggleHandler;
+        // F178: RefreshAll runs on a timer; cache the Toggle instead of
+        // GetComponent on every refresh.
+        private UnityEngine.UI.Toggle cachedToggle;
         private GroundHandler groundHandler;
         private ZoneHandler zoneHandler;
         private VolumeSpinnerHandler volumeSpinner;
@@ -65,7 +68,9 @@ namespace UBOAT.Mods.RadioNavigation
             CreateSeparator(content, "Sep2");
             CreateLabel(content, "PatternsHeader", "--- Signal Patterns ---");
 
-            patternTexts = new Text[6];
+            // F185: 6 hardcoded labels hid stations 7-14; size the panel for
+            // the full station database.
+            patternTexts = new Text[BeaconData.Stations.Length];
             for (int i = 0; i < patternTexts.Length; i++)
                 patternTexts[i] = CreateLabel(content, "Pattern" + i, "");
 
@@ -118,6 +123,10 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        // F103: create the Arial font once and reuse it for every label
+        // instead of calling Font.CreateDynamicFontFromOSFont per label.
+        private static Font cachedArialFont;
+
         private static Text CreateLabel(Transform parent, string name, string defaultText)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
@@ -131,7 +140,9 @@ namespace UBOAT.Mods.RadioNavigation
 
             var text = go.AddComponent<Text>();
             text.text = defaultText;
-            text.font = Font.CreateDynamicFontFromOSFont("Arial", 14);
+            if (cachedArialFont.IsNull())
+                cachedArialFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
+            text.font = cachedArialFont;
             text.fontSize = 14;
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleLeft;
@@ -153,6 +164,8 @@ namespace UBOAT.Mods.RadioNavigation
         private void FindHandlers()
         {
             toggleHandler = GetComponentInChildren<ToggleHandler>(true);
+            // F178: cache once; RefreshAll reads it on a timer.
+            cachedToggle = toggleHandler.IsNotNull() ? toggleHandler.GetComponent<UnityEngine.UI.Toggle>() : null;
             groundHandler = GetComponentInChildren<GroundHandler>(true);
             zoneHandler = GetComponentInChildren<ZoneHandler>(true);
             volumeSpinner = GetComponentInChildren<VolumeSpinnerHandler>(true);
@@ -203,8 +216,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void RefreshAll()
         {
-            if (toggleHandler.IsNotNull())
-                OnToggleChanged(toggleHandler.GetComponent<Toggle>().isOn);
+            if (cachedToggle.IsNotNull())
+                OnToggleChanged(cachedToggle.isOn);
             if (groundHandler.IsNotNull())
                 OnGroundChanged(IsGroundActive());
             if (zoneHandler.IsNotNull())
@@ -217,28 +230,13 @@ namespace UBOAT.Mods.RadioNavigation
                 OnFrequencyChanged(DialConfig.AngleToFrequency(radioHandler.CursorAngle + 90f, GetZoneIndex()), GetZoneIndex());
         }
 
-        private bool IsGroundActive()
-        {
-            Transform bgT = transform.Find("Ground/Background");
-            if (bgT.IsNull()) return false;
-            Image bgImage = bgT.GetComponent<Image>();
-            return bgImage.IsNotNull() && bgImage.color.a > GroundHandler.ActiveAlphaThreshold;
-        }
+        // F160: read the handler state instead of duplicating alpha-based
+        // heuristics with transform.Find string paths.
+        private bool IsGroundActive() =>
+            groundHandler.IsNotNull() && groundHandler.IsGroundEffectivelyActive();
 
-        private int GetZoneIndex()
-        {
-            Transform radioZone = transform.Find("RadioZone");
-            if (radioZone.IsNull()) return 0;
-            for (int i = 0; i < 5; i++)
-            {
-                Transform t = radioZone.Find("Zone" + (i + 1));
-                if (t.IsNull()) continue;
-                Image img = t.GetComponent<Image>();
-                if (img.IsNotNull() && img.color.a > 0.5f)
-                    return i;
-            }
-            return 0;
-        }
+        private int GetZoneIndex() =>
+            zoneHandler.IsNotNull() ? zoneHandler.CurrentIndex : 0;
 
         private void OnToggleChanged(bool isOn)
         {
@@ -307,19 +305,30 @@ namespace UBOAT.Mods.RadioNavigation
             if (stationText.IsNotNull() && sonneController.StationCount.IsPositive())
             {
                 int domIdx = sonneController.DominantStationIndex;
-                var diag = sonneController.GetStationDiagnostics(domIdx);
-                string phase = diag.SchedulerPhase.ToString();
-                string suffix = " [" + phase + "]";
-                if (diag.NavigationElapsed.IsPositive())
-                    suffix += " " + FormatTime(diag.NavigationElapsed);
-                stationText.text = stationBaseText + suffix;
+                // F101: no dominant station (-1) must not show the default
+                // diagnostics phase ("[Pause]") of a non-existent station.
+                if (domIdx < 0)
+                {
+                    stationText.text = stationBaseText;
+                }
+                else
+                {
+                    var diag = sonneController.GetStationDiagnostics(domIdx);
+                    string phase = diag.SchedulerPhase.ToString();
+                    string suffix = " [" + phase + "]";
+                    if (diag.NavigationElapsed.IsPositive())
+                        suffix += " " + FormatTime(diag.NavigationElapsed);
+                    stationText.text = stationBaseText + suffix;
 
 #if DEBUG
-                Debug.Log("[RadioNav][PANEL] domIdx=" + domIdx +
-                    " phase=" + phase +
-                    " navElapsed=" + diag.NavigationElapsed.ToString("F1") +
-                    " stationText=[" + stationText.text + "]");
+                    // F88: phase/diag are scoped to the else branch; the log
+                    // block used to live outside it and broke DEBUG builds.
+                    Debug.Log("[RadioNav][PANEL] domIdx=" + domIdx +
+                        " phase=" + phase +
+                        " navElapsed=" + diag.NavigationElapsed.ToString("F1") +
+                        " stationText=[" + stationText.text + "]");
 #endif
+                }
             }
 
             int displayIndex = 0;
@@ -339,7 +348,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (diag.NavigationElapsed.IsPositive())
                     line += " " + FormatTime(diag.NavigationElapsed);
                 if (diag.InBeam)
-                    line += "\n  Dots:" + diag.DotCount + " Bearing:" + diag.CurrentBearing + "В°";
+                    line += "\n  Dots:" + diag.DotCount + " Bearing:" + diag.CurrentBearing + "\u00B0";
 
                 patternTexts[displayIndex].text = line;
 
@@ -379,8 +388,8 @@ namespace UBOAT.Mods.RadioNavigation
             string lonDir = lon.IsNonNegative() ? "E" : "W";
 
             fixText.text = "--- Position Fix ---\n" +
-                "Fix: " + Math.Abs(lat).ToString("F4") + "В° " + latDir +
-                " " + Math.Abs(lon).ToString("F4") + "В° " + lonDir + "\n" +
+                "Fix: " + Math.Abs(lat).ToString("F4") + "\u00B0 " + latDir +
+                " " + Math.Abs(lon).ToString("F4") + "\u00B0 " + lonDir + "\n" +
                 "Beacons: " + meas + " | Error: " + err.ToString("F1") + " km";
             fixText.color = err < 15f ? Color.green : (err < 35f ? Color.yellow : Color.red);
         }
@@ -443,7 +452,9 @@ namespace UBOAT.Mods.RadioNavigation
             var stations = BeaconData.Stations;
             for (int i = 0; i < stations.Length; i++)
             {
-                float? stationFreq = stations[i].History?[0].FrequencyKHz;
+                var history = stations[i].History;
+                if (history.IsNull() || history.Length.IsZero()) continue;
+                float? stationFreq = history[0].FrequencyKHz;
                 if (stationFreq.IsNull()) continue;
 
                 float delta = Math.Abs(freqKHz - stationFreq.Value);
@@ -452,9 +463,8 @@ namespace UBOAT.Mods.RadioNavigation
                     bestDelta = delta;
                     bestFreq = stationFreq.Value;
                     bestName = stations[i].Name;
-                    string cs = stations[i].History?[0].Callsign;
-                    if (!string.IsNullOrEmpty(cs))
-                        bestCallsign = cs;
+                    string cs = history[0].Callsign;
+                    bestCallsign = string.IsNullOrEmpty(cs) ? null : cs;
                 }
             }
 

@@ -3,23 +3,36 @@ using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
+    // F01/F29: ProcessAudio runs on the Unity audio thread and must not
+    // mutate shared state. The scheduler/keyer state machine is advanced on
+    // the main thread via UpdateStations; the audio thread only reads
+    // volatile flags (MorseKeyer.KeyOn/IsActive) and generates samples.
     public class AudioSynthesisEngine
     {
         public const int SampleRate = 44100;
-        private const float BfoBase = 1000f;
-        private const float BfoMin = 300f;
-        private const float BfoMax = 1800f;
+        private const float TickIntervalSeconds = 0.05f; // 50 ms per logical tick
 
         private readonly Atmosphere atmosphere;
         private readonly ReceiverDsp dsp;
-        private readonly float ticksPerSample;
-        private float tickAccumulator;
+        // F94: double accumulator — float drift over hours of gameplay could
+        // shift the 50 ms tick tempo.
+        private double tickAccumulator;
         private float outputVolume = 1f;
 
         public float OutputVolume
         {
             get => outputVolume;
             set => outputVolume = Mathf.Clamp(value, 0f, 1f);
+        }
+
+        // F115: clear accumulated DSP state (QSB phase, AGC gain, filter
+        // state) when the controller is destroyed; a recreated engine must
+        // start from a clean state.
+        public void Reset()
+        {
+            atmosphere.Reset();
+            dsp.Reset();
+            tickAccumulator = 0.0;
         }
 
         public float QualityFactor { get; set; } = 20f;
@@ -31,10 +44,6 @@ namespace UBOAT.Mods.RadioNavigation
         {
             atmosphere = new Atmosphere(Environment.TickCount);
             dsp = new ReceiverDsp(SampleRate);
-
-            float samplesPerMs = SampleRate / 1000f;
-            float msPerTick = 50f;
-            ticksPerSample = 1f / (samplesPerMs * msPerTick);
         }
 
         public void ApplyFeedback(float angle)
@@ -49,20 +58,78 @@ namespace UBOAT.Mods.RadioNavigation
             dsp.WhistleLevel = Mathf.Clamp01((Feedback - 0.75f) / 0.2f);
         }
 
-        public void UpdateStationBeats(StationState[] stations, CarrierGenerator[] carriers, float currentFrequencyKHz, int currentZoneIndex, int sonneZoneIndex)
+        // Main thread: advance the scheduler/keyer state machines at 50 ms
+        // logical ticks. radioOn gate (F132): no simulation while the radio is
+        // off. currentTime stamps NavigationStartTime on the PreNavPause ->
+        // Navigation transition (F13 design: never Time.time on the audio
+        // thread; here everything already runs on the main thread).
+        public void UpdateStations(float deltaSeconds, float currentTime, StationState[] stations, StationScheduler[] schedulers, MorseKeyer[] keyers, bool radioOn)
         {
-            for (int i = 0; i < stations.Length; i++)
-            {
-                if (stations[i].Gain.IsNegligible(0.001f))
-                    continue;
+            if (!radioOn)
+                return;
 
-                float offset = currentFrequencyKHz - (stations[i].BeatFrequency - BfoBase) / 1000f;
-                stations[i].BeatFrequency = Mathf.Clamp(stations[i].BeatFrequency, BfoMin, BfoMax);
-                carriers[i].Frequency = stations[i].BeatFrequency;
+            tickAccumulator += deltaSeconds;
+            while (tickAccumulator >= TickIntervalSeconds)
+            {
+                tickAccumulator -= TickIntervalSeconds;
+
+                for (int s = 0; s < stations.Length; s++)
+                {
+                    if (stations[s].Gain.IsNegligible(0.001f))
+                        continue;
+
+                    var sched = schedulers[s];
+                    var phaseBefore = sched.CurrentPhase;
+
+                    if (!keyers[s].IsActive)
+                    {
+                        bool phaseChanged = false;
+
+                        var consolPattern = sched.GetCurrentConsolPattern();
+                        if (consolPattern.IsNotNull() && consolPattern.Length.IsPositive())
+                        {
+                            keyers[s].LoadConsol(consolPattern, sched, stations[s].Config, stations[s].CallsignLength);
+                        }
+                        else
+                        {
+                            var seq = sched.GetCurrentSequence();
+                            if (seq.IsNull() || seq.ElementCount.IsZero())
+                            {
+                                if (seq.IsNotNull())
+                                {
+                                    sched.OnSequenceFinished();
+                                    phaseChanged = true;
+                                }
+                            }
+                            else
+                            {
+                                keyers[s].Load(seq, sched, stations[s].Config);
+                            }
+                        }
+
+                        // F98: exactly one scheduler tick per logical tick.
+                        // The phase block above is not the tick — the idle
+                        // keyer's scheduler advances here.
+                        if (!phaseChanged)
+                            sched.Tick();
+                    }
+                    else
+                    {
+                        keyers[s].Advance();
+                    }
+
+                    if (phaseBefore == StationScheduler.Phase.PreNavPause &&
+                        sched.CurrentPhase == StationScheduler.Phase.Navigation)
+                    {
+                        stations[s].NavigationStartTime = currentTime;
+                    }
+                }
             }
         }
 
-        public void ProcessAudio(float[] data, int channels, StationState[] stations, StationScheduler[] schedulers, MorseKeyer[] keyers, CarrierGenerator[] carriers, bool radioOn, int currentZoneIndex, int sonneZoneIndex)
+        // Audio thread: read-only. Only volatile MorseKeyer flags are sampled;
+        // no scheduler/keyer mutations, no UnityEngine API.
+        public void ProcessAudio(float[] data, int channels, StationState[] stations, MorseKeyer[] keyers, CarrierGenerator[] carriers, bool radioOn, int currentZoneIndex, int sonneZoneIndex)
         {
             if (currentZoneIndex != sonneZoneIndex)
             {
@@ -70,64 +137,14 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            if (!radioOn)
+            {
+                Array.Clear(data, 0, data.Length);
+                return;
+            }
+
             for (int i = 0; i < data.Length; i += channels)
             {
-                tickAccumulator += ticksPerSample;
-                while (tickAccumulator >= 1f)
-                {
-                    for (int s = 0; s < stations.Length; s++)
-                    {
-                        if (stations[s].Gain.IsNegligible(0.001f))
-                            continue;
-
-                        if (!keyers[s].IsActive)
-                        {
-                            var sched = schedulers[s];
-
-                            if (sched.CurrentPhase == StationScheduler.Phase.Pause ||
-                                sched.CurrentPhase == StationScheduler.Phase.PreNavPause ||
-                                sched.CurrentPhase == StationScheduler.Phase.PostNavSilence)
-                            {
-                                var prevPhase = sched.CurrentPhase;
-                                sched.Tick();
-                                if (prevPhase == StationScheduler.Phase.PreNavPause &&
-                                    sched.CurrentPhase == StationScheduler.Phase.Navigation)
-                                {
-                                    stations[s].NavigationStartTime = Time.time;
-                                    Debug.Log("[RadioNav][NAV] PreNavPause->Navigation st=" + s +
-                                        " NavStartTime=" + Time.time.ToString("F2"));
-                                }
-                            }
-
-                            var consolPattern = sched.GetCurrentConsolPattern();
-                            if (consolPattern.IsNotNull() && consolPattern.Length.IsPositive())
-                            {
-                                keyers[s].LoadConsol(consolPattern, sched, stations[s].Config, stations[s].CallsignLength);
-                            }
-                            else
-                            {
-                                var seq = sched.GetCurrentSequence();
-                                if (seq.IsNull() || seq.ElementCount.IsZero())
-                                {
-                                    if (seq.IsNotNull())
-                                        sched.OnSequenceFinished();
-                                    sched.Tick();
-                                }
-                                else
-                                {
-                                    keyers[s].Load(seq, sched, stations[s].Config);
-                                }
-                            }
-                        }
-
-                        keyers[s].Advance();
-                    }
-                    tickAccumulator -= 1f;
-                }
-
-                if (!radioOn)
-                    continue;
-
                 float sample = 0f;
                 for (int s = 0; s < stations.Length; s++)
                 {

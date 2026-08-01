@@ -11,6 +11,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private RectTransform panelRect;
         private bool isDragging;
+        private int activePointerId = -1;
         private Vector3 dragStartScale;
         private float dragStartMouseX;
 
@@ -19,6 +20,9 @@ namespace UBOAT.Mods.RadioNavigation
             if (transform.parent.IsNull())
             {
                 Debug.LogError("[RadioNav][ExpanderHandler] parent is null \u2014 cannot get panel RectTransform");
+                // F84: without a parent the panel RectTransform can never be
+                // resolved; keep the handler disabled instead of idling active.
+                enabled = false;
                 return;
             }
             panelRect = transform.parent.GetComponent<RectTransform>();
@@ -32,15 +36,20 @@ namespace UBOAT.Mods.RadioNavigation
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            // F197: mirror CursorHandler/SpinnerHandlerBase — no scaling while
+            // the radio is off or ground is inactive.
+            if (!ToggleHandler.IsInteractable) return;
             if (panelRect.IsNull()) return;
             isDragging = true;
+            activePointerId = eventData.pointerId;
             dragStartScale = panelRect.localScale;
             dragStartMouseX = eventData.position.x;
         }
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (!isDragging) return;
+            // F199: only the drag that started this interaction may scale.
+            if (!isDragging || eventData.pointerId != activePointerId) return;
             float diff = (eventData.position.x - dragStartMouseX) * Sensitivity;
             float newScale = Mathf.Clamp(dragStartScale.x + diff, MinScale, MaxScale);
             panelRect.localScale = Vector3.one * newScale;
@@ -48,7 +57,17 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            if (eventData.pointerId != activePointerId) return;
             isDragging = false;
+            activePointerId = -1;
+        }
+
+        private void OnDisable()
+        {
+            // F199: a mid-drag disable (which skips OnEndDrag) must not lock
+            // the expander out of future drags.
+            isDragging = false;
+            activePointerId = -1;
         }
     }
 }

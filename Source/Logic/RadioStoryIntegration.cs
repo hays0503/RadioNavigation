@@ -16,6 +16,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static Type decisionType;
         private static ConstructorInfo decisionCtor;
+        private static FieldInfo localizationKeyField;
         private static PropertyInfo localizationKeyProp;
         private static FieldInfo stageField;
         private static PropertyInfo decisionsProp;
@@ -23,18 +24,23 @@ namespace UBOAT.Mods.RadioNavigation
         private static MethodInfo onUpdatedMethod;
         private static bool initialized;
         private static PropertyInfo languageProp;
+        private static MethodInfo loadSingletonMethod;
+        private static Type localeType;
 
         internal static void ResetRuntimeState()
         {
             initialized = false;
             decisionType = null;
             decisionCtor = null;
+            localizationKeyField = null;
             localizationKeyProp = null;
             stageField = null;
             decisionsProp = null;
             insertMethod = null;
             onUpdatedMethod = null;
             languageProp = null;
+            loadSingletonMethod = null;
+            localeType = null;
         }
 
         private static bool TryInit()
@@ -43,6 +49,22 @@ namespace UBOAT.Mods.RadioNavigation
                 return true;
             Init();
             return initialized;
+        }
+
+        // GetMethod does NOT trace base types for NonPublic members, but InsertDecision
+        // (Story.cs:377) and OnUpdated (Story.cs:438) are declared two levels above
+        // RadioStory. Walk the whole hierarchy instead (G2/G3).
+        private static MethodInfo FindMethodDeep(Type start, string name, Type[] argTypes)
+        {
+            for (Type t = start; t.IsNotNull(); t = t.BaseType)
+            {
+                var m = argTypes == null
+                    ? t.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)
+                    : t.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance, null, argTypes, null);
+                if (m.IsNotNull())
+                    return m;
+            }
+            return null;
         }
 
         private static void Init()
@@ -60,8 +82,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            insertMethod = storyType.GetMethod("InsertDecision",
-                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
+            insertMethod = FindMethodDeep(typeof(RadioStory), "InsertDecision", null);
             if (insertMethod.IsNotNull())
                 decisionType = insertMethod.GetParameters()[1].ParameterType;
             if (decisionType.IsNull())
@@ -71,7 +92,9 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             Debug.Log("[RadioNav] Decision type: " + decisionType.FullName);
-            localizationKeyProp = decisionType.GetProperty("LocalizationKey");
+            localizationKeyField = decisionType.GetField("LocalizationKey", BindingFlags.Public | BindingFlags.Instance);
+            if (localizationKeyField.IsNull())
+                localizationKeyProp = decisionType.GetProperty("LocalizationKey");
 
             foreach (var ctor in decisionType.GetConstructors(BindingFlags.Public | BindingFlags.Instance))
             {
@@ -92,15 +115,17 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            // G1 corrected: "stage" EXISTS (RadioStory.cs:83) but is typed
+            // RadioStoryStage (enum), not int. The old (int) cast threw
+            // InvalidCastException on the boxed enum, killing injection.
             stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
 
             decisionsProp = storyType.GetProperty("Decisions",
                 BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
 
-            onUpdatedMethod = storyType.GetMethod("OnUpdated",
-                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance,
-                null, Type.EmptyTypes, null);
+            onUpdatedMethod = FindMethodDeep(typeof(RadioStory), "OnUpdated", Type.EmptyTypes);
 
+            ResolveRuntimeTypes();
             languageProp = GetLanguageProperty();
 
             initialized = true;
@@ -116,7 +141,7 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
 
-                if (!IsStageOne(__instance))
+                if (!IsStageMainChoices(__instance))
                     return;
 
                 var decisions = GetDecisions(__instance);
@@ -148,9 +173,11 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private static bool IsStageOne(RadioStory __instance)
+        private static bool IsStageMainChoices(RadioStory __instance)
         {
-            int stageValue = (int)stageField.GetValue(__instance);
+            // Convert.ToInt32 works on boxed enums ((int) would throw
+            // InvalidCastException). RadioStoryStage: Unknown=0, MainChoices=1.
+            int stageValue = Convert.ToInt32(stageField.GetValue(__instance));
             Debug.Log("[RadioNav] stage=" + stageValue + " (1=MainChoices)");
             return stageValue == 1;
         }
@@ -185,9 +212,9 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < count; i++)
             {
                 object item = list.IsNotNull() ? list[i] : decisions.GetType().GetProperty("Item")?.GetValue(decisions, new object[] { i });
-                if (item.IsNotNull() && localizationKeyProp.IsNotNull())
+                if (item.IsNotNull())
                 {
-                    string key = (string)localizationKeyProp.GetValue(item);
+                    string key = GetLocalizationKey(item);
 #if DEBUG
                     Debug.Log("[RadioNav]   Menu[" + i + "] key=" + key);
 #endif
@@ -196,6 +223,17 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
             return false;
+        }
+
+        // G4: Decision.LocalizationKey is a public readonly FIELD (Story.cs:24),
+        // not a property. Prefer field, keep property as fallback.
+        private static string GetLocalizationKey(object decision)
+        {
+            if (localizationKeyField.IsNotNull())
+                return localizationKeyField.GetValue(decision) as string;
+            if (localizationKeyProp.IsNotNull())
+                return localizationKeyProp.GetValue(decision) as string;
+            return null;
         }
 
         private static object CreateDecision()
@@ -292,16 +330,23 @@ namespace UBOAT.Mods.RadioNavigation
             return "T3PLL38 on-board radio receiver for very long and long waves";
         }
 
+        private static Type ResolveType(string typeName)
+        {
+            return Type.GetType(typeName + ", com.uboat.game")
+                ?? Type.GetType(typeName + ", Assembly-CSharp");
+        }
+
+        private static void ResolveRuntimeTypes()
+        {
+            var singletonType = ResolveType("DWS.Common.InjectionFramework.ScriptableObjectSingleton");
+            if (singletonType.IsNotNull())
+                loadSingletonMethod = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
+            localeType = ResolveType("UBOAT.Game.Core.Data.Locale");
+        }
+
         private static PropertyInfo GetLanguageProperty()
         {
-            var singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, com.uboat.game")
-                ?? Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, Assembly-CSharp");
-            if (singletonType.IsNull()) return null;
-            var loadSingleton = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
-            if (loadSingleton.IsNull()) return null;
-            var localeType = Type.GetType("UBOAT.Game.Core.Data.Locale, com.uboat.game")
-                ?? Type.GetType("UBOAT.Game.Core.Data.Locale, Assembly-CSharp");
-            if (localeType.IsNull()) return null;
+            if (loadSingletonMethod.IsNull() || localeType.IsNull()) return null;
             return localeType.GetProperty("Language", BindingFlags.Public | BindingFlags.Instance);
         }
 
@@ -309,17 +354,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                if (languageProp.IsNull())
+                if (loadSingletonMethod.IsNull() || localeType.IsNull() || languageProp.IsNull())
                     return "english";
-                var singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, com.uboat.game")
-                    ?? Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, Assembly-CSharp");
-                if (singletonType.IsNull()) return "english";
-                var loadSingleton = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
-                if (loadSingleton.IsNull()) return "english";
-                var localeType = Type.GetType("UBOAT.Game.Core.Data.Locale, com.uboat.game")
-                    ?? Type.GetType("UBOAT.Game.Core.Data.Locale, Assembly-CSharp");
-                if (localeType.IsNull()) return "english";
-                object locale = loadSingleton.Invoke(null, new object[] { localeType });
+                object locale = loadSingletonMethod.Invoke(null, new object[] { localeType });
                 if (locale.IsNull()) return "english";
                 string lang = languageProp.GetValue(locale) as string;
                 return lang?.ToLowerInvariant() ?? "english";
@@ -337,10 +374,10 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 if (!TryInit())
                     return AllowOriginal;
-                if (localizationKeyProp.IsNull())
+                if (localizationKeyField.IsNull() && localizationKeyProp.IsNull())
                     return AllowOriginal;
 
-                string key = (string)localizationKeyProp.GetValue(decision);
+                string key = GetLocalizationKey(decision);
 
                 if (key == LeaveStationKey)
                 {

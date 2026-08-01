@@ -21,7 +21,8 @@ namespace UBOAT.Mods.RadioNavigation
             EnsureComponent<CanvasGroup>(radio);
             EnsureComponent<PanelDragHandler>(radio);
 
-            Transform cursor = radio.transform.Find("CursorSpinner");
+            // F26: prefab child names centralized in PrefabNames.
+            Transform cursor = radio.transform.Find(PrefabNames.Cursor);
             if (cursor.IsNull())
                 cursor = radio.transform.Find("Cursor");
             if (cursor.IsNotNull())
@@ -29,13 +30,14 @@ namespace UBOAT.Mods.RadioNavigation
             else
                 Debug.LogError("[RadioNav][Main] Cursor child not found (tried 'CursorSpinner' and 'Cursor')");
 
-            Transform toggle = radio.transform.Find("Toggle");
+            Transform toggle = radio.transform.Find(PrefabNames.Toggle);
             if (toggle.IsNotNull())
                 EnsureComponent<ToggleHandler>(toggle.gameObject);
 
-            Transform ground = radio.transform.Find("Ground");
-            Transform groundBg = ground?.Find("Background");
-            Transform groundCm = groundBg?.Find("GroundCheckmark");
+            Transform ground = radio.transform.Find(PrefabNames.Ground);
+            Transform groundBg = ground?.Find(PrefabNames.Background);
+            Transform groundCm = groundBg?.Find(PrefabNames.GroundCheckmark);
+#if DEBUG
             Image cmImg = groundCm?.GetComponent<Image>();
             Debug.Log("[RadioNav][Main] Ground exists=" + (ground.IsNotNull())
                 + " Background exists=" + (groundBg.IsNotNull())
@@ -47,22 +49,23 @@ namespace UBOAT.Mods.RadioNavigation
                 + " sprite=" + (cmImg.IsNotNull() && cmImg.sprite.IsNotNull() ? cmImg.sprite.name : "no-sprite")
                 + " imgEnabled=" + (cmImg.IsNotNull() ? cmImg.enabled.ToString() : "no-img")
                 + " imgAlpha=" + (cmImg.IsNotNull() ? cmImg.color.a.ToString("F2") : "-"));
+#endif
             if (ground.IsNotNull())
                 EnsureComponent<GroundHandler>(ground.gameObject);
 
-            Transform expander = radio.transform.Find("Expander");
+            Transform expander = radio.transform.Find(PrefabNames.Expander);
             if (expander.IsNotNull())
                 EnsureComponent<ExpanderHandler>(expander.gameObject);
 
-            Transform radioZone = radio.transform.Find("RadioZone");
+            Transform radioZone = radio.transform.Find(PrefabNames.RadioZone);
             if (radioZone.IsNotNull())
                 EnsureComponent<ZoneHandler>(radioZone.gameObject);
 
-            Transform volumeSpinner = radio.transform.Find("VolumeSpinner");
+            Transform volumeSpinner = radio.transform.Find(PrefabNames.VolumeSpinner);
             if (volumeSpinner.IsNotNull())
                 EnsureComponent<VolumeSpinnerHandler>(volumeSpinner.gameObject);
 
-            Transform feedbackSpinner = radio.transform.Find("FeedbackSpinner");
+            Transform feedbackSpinner = radio.transform.Find(PrefabNames.FeedbackSpinner);
             if (feedbackSpinner.IsNotNull())
                 EnsureComponent<FeedbackSpinnerHandler>(feedbackSpinner.gameObject);
 
@@ -79,7 +82,9 @@ namespace UBOAT.Mods.RadioNavigation
                 EnsureComponent<DebugAngleHandler>(debugAnglePanel.gameObject);
 
             radio.transform.SetParent(viewport, false);
-            radio.transform.localPosition = new Vector3(300f, 100f, 0f);
+            // F188: (300, 100) in pixels pushed the panel off-screen on low
+            // resolutions; center it so it is visible on any viewport.
+            radio.transform.localPosition = Vector3.zero;
             radio.SetActive(true);
 
             return radio;

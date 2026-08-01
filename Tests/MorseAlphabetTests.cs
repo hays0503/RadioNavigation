@@ -1,0 +1,105 @@
+﻿using Xunit;
+
+namespace UBOAT.Mods.RadioNavigation.Tests
+{
+    public class MorseAlphabetTests
+    {
+        [Theory]
+        [InlineData('B', "-...")]
+        [InlineData('C', "-.-.")]
+        [InlineData('5', ".....")]
+        [InlineData('O', "---")]
+        [InlineData('T', "-")]
+        [InlineData('A', ".-")]
+        public void GetMorse_Upper_ReturnsExpected(char c, string expected)
+        {
+            Assert.Equal(expected, MorseAlphabet.GetMorse(c));
+        }
+
+        [Fact]
+        public void GetMorse_Lowercase_SameAsUppercase()
+        {
+            Assert.Equal(MorseAlphabet.GetMorse('B'), MorseAlphabet.GetMorse('b'));
+        }
+
+        [Fact]
+        public void GetMorse_UnknownChar_ReturnsEmpty()
+        {
+            Assert.Equal("", MorseAlphabet.GetMorse('?'));
+            Assert.Equal("", MorseAlphabet.GetMorse((char)0));
+            Assert.Equal("", MorseAlphabet.GetMorse('{'));
+        }
+
+        [Fact]
+        public void TextToPattern_SingleChar_FirstElementIsDashForDashLetters()
+        {
+            var p = MorseAlphabet.TextToPattern("B");
+            Assert.Equal(8, p.ElementsPerGroup);
+            Assert.True(p.GetElement(0));
+            Assert.False(p.GetElement(1));
+            Assert.False(p.GetElement(2));
+            Assert.False(p.GetElement(3));
+        }
+
+        [Fact]
+        public void TextToPattern_Empty_NoGroups()
+        {
+            var p = MorseAlphabet.TextToPattern("");
+            Assert.Empty(p.Groups);
+        }
+
+        [Fact]
+        public void TextToPattern_MultiChar_PadsToGroupSize()
+        {
+            var p = MorseAlphabet.TextToPattern("MNO");
+            Assert.Equal(16, p.ElementCount);
+            Assert.True(p.GetElement(0));
+            Assert.True(p.GetElement(1));
+        }
+
+        // F125/F129: unknown characters must not throw; they encode as an
+        // inter-character gap (3 silent elements), while a space is an
+        // inter-word gap (7). "AB?C" = 2+3+4+3+0+3+4 = 19 raw elements.
+        [Fact]
+        public void TextToPattern_UnknownCharacter_ActsAsGap()
+        {
+            var withUnknown = MorseAlphabet.TextToPattern("AB?C");
+            var withLetter = MorseAlphabet.TextToPattern("ABCD");
+            Assert.Equal(3, withUnknown.Groups.Length);
+            Assert.Equal(withLetter.ElementCount, withUnknown.ElementCount);
+            Assert.Equal(24, withUnknown.ElementCount);
+        }
+
+        [Fact]
+        public void TextToPattern_OnlyUnknownCharacters_NoThrow()
+        {
+            var p = MorseAlphabet.TextToPattern("???");
+            Assert.NotNull(p.Groups);
+        }
+
+        // F129: inter-word pause is 7 elements, inter-character is 3.
+        // A = ".-" (2), B = "-..." (4).
+        [Fact]
+        public void TextToPattern_InterWordPause_IsSeven()
+        {
+            var p = MorseAlphabet.TextToPattern("A B");
+            Assert.Equal(2, p.Groups.Length);
+            Assert.False(p.GetElement(0));
+            Assert.True(p.GetElement(1));
+            Assert.False(p.GetElement(8));
+            Assert.True(p.GetElement(9));
+        }
+
+        // F193: TextToPattern pauses were verified against the removed
+        // GetElementCount oracle; keep the pause contract pinned here.
+        [Fact]
+        public void TextToPattern_InterCharacterPause_IsThree()
+        {
+            var p = MorseAlphabet.TextToPattern("AB");
+            Assert.Equal(2, p.Groups.Length);
+            Assert.False(p.GetElement(2)); // pause after 'A'
+            Assert.False(p.GetElement(3));
+            Assert.False(p.GetElement(4));
+        }
+    }
+}

@@ -1,16 +1,24 @@
 # Architecture Decisions — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-08-01):** Полный аудит выявил критические расхождения между статусами ADR и реальностью. Всего **199 проблем** (F01–F199).
+> - **F45 (исправлено):** ADR-002/003/004/005/007 — статус changed «Accepted» → «Deferred»
+> - **F46 (исправлено):** ADR-001 пример кода — replaced with real Harmony imperative patching
+> - **F47:** Implementation examples reference proposed/non-existent classes (annotated `⚠ proposed`)
+> - **F48:** ADR-003 упоминает 4 станции — реальность 14 (annotated)
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+
 ## 1. Decision Overview
 
 | ID | Decision | Status | Date |
 |----|----------|--------|------|
 | ADR-001 | Use Harmony for runtime patching | Accepted | 2026-07-26 |
-| ADR-002 | Implement double-buffer pattern for audio | Accepted | 2026-07-26 |
-| ADR-003 | Decompose God Classes | Accepted | 2026-07-26 |
-| ADR-004 | Interface-based integration | Accepted | 2026-07-26 |
-| ADR-005 | Centralize constants | Accepted | 2026-07-26 |
+| ADR-002 | Implement double-buffer pattern for audio | Deferred | 2026-07-26 |
+| ADR-003 | Decompose God Classes | Deferred | 2026-07-26 |
+| ADR-004 | Interface-based integration | Deferred | 2026-07-26 |
+| ADR-005 | Centralize constants | Deferred | 2026-07-26 |
 | ADR-006 | JSON configuration files | Proposed | 2026-07-26 |
-| ADR-007 | Unit testing strategy | Accepted | 2026-07-26 |
+| ADR-007 | Unit testing strategy | Deferred | 2026-07-26 |
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 
@@ -42,15 +50,16 @@ Use Harmony library for runtime method patching.
 ### Implementation
 
 ```csharp
-// Main.cs
-[HarmonyPatch]
-public static class Main {
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(Game), "OnLoaded")]
-    public static void OnLoaded() {
-        // Inject radio equipment
-    }
-}
+// Main.cs (OnSceneAwake)
+var harmony = new Harmony("UBOAT.RadioNavigation");
+harmony.Patch(
+    original: AccessTools.Method(typeof(RadioStory), "ContinueStory"),
+    prefix: new HarmonyMethod(typeof(Main), nameof(OnContinueStoryPrefix))
+);
+harmony.Patch(
+    original: AccessTools.Method(typeof(Locale), nameof(Locale.RetrieveString), new[] { typeof(string) }),
+    postfix: new HarmonyMethod(typeof(Main), nameof(OnRetrieveStringPostfix))
+);
 ```
 
 ### Alternatives Considered
@@ -64,7 +73,7 @@ public static class Main {
 ## 3. ADR-002: Implement Double-Buffer Pattern for Audio
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 Audio thread (`OnAudioFilterRead`) and main thread (`Update()`) share mutable `StationState[]` without synchronization. This causes race conditions and audio artifacts.
@@ -88,6 +97,8 @@ Implement double-buffer pattern with lock-free ring buffer for command passing.
 ### Implementation
 
 ```csharp
+// ⚠ proposed — StationStateBuffer not yet implemented (F47)
+// Actual implementation: StationState[] mutated directly without sync (F01, F29)
 public class StationStateBuffer {
     private StationState[] readBuffer;   // Audio thread reads
     private StationState[] writeBuffer;  // Main thread writes
@@ -116,11 +127,11 @@ public class StationStateBuffer {
 ## 4. ADR-003: Decompose God Classes
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 Two God Classes exist:
-- `SonneController` (506 lines, 30+ methods)
+- `SonneController` (508 lines, 30+ methods)
 - `InformationPanelHandler` (474 lines, 20+ methods)
 
 These are hard to test, maintain, and understand.
@@ -143,24 +154,24 @@ Decompose God Classes into focused, single-responsibility classes.
 
 ### Implementation
 
-**SonneController Decomposition**:
+**SonneController Decomposition** (⚠ proposed — classes not yet implemented, F47):
 
-| New Class | Responsibility | Lines |
-|-----------|----------------|-------|
-| StationManager | Station management | ~100 |
-| SignalDecoder | Signal processing | ~90 |
-| PositionTracker | Position calculation | ~60 |
-| DiagnosticsCollector | Diagnostics | ~30 |
-| SonneController | Orchestration | ~136 |
+| New Class | Responsibility | Lines | Status |
+|-----------|----------------|-------|--------|
+| ⚠ StationManager | Station management | ~100 | Proposed |
+| ⚠ SignalDecoder | Signal processing | ~90 | Proposed |
+| ⚠ PositionTracker | Position calculation | ~60 | Proposed |
+| DiagnosticsCollector | Diagnostics | ~30 | Existing (inline) |
+| SonneController | Orchestration | ~136 | Existing (508 LOC) |
 
-**InformationPanelHandler Decomposition**:
+**InformationPanelHandler Decomposition** (⚠ proposed — classes not yet implemented, F47):
 
-| New Class | Responsibility | Lines |
-|-----------|----------------|-------|
-| UIElementFactory | UI creation | ~150 |
-| StationInfoDisplay | Data display | ~120 |
-| StationFinder | Business logic | ~80 |
-| InformationPanelHandler | Orchestration | ~124 |
+| New Class | Responsibility | Lines | Status |
+|-----------|----------------|-------|--------|
+| ⚠ UIElementFactory | UI creation | ~150 | Proposed |
+| ⚠ StationInfoDisplay | Data display | ~120 | Proposed |
+| ⚠ StationFinder | Business logic | ~80 | Proposed |
+| InformationPanelHandler | Orchestration | ~124 | Existing (474 LOC) |
 
 ### Alternatives Considered
 
@@ -173,7 +184,7 @@ Decompose God Classes into focused, single-responsibility classes.
 ## 5. ADR-004: Interface-Based Integration
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 Game integration uses reflection directly, making it fragile to game updates.
@@ -197,6 +208,10 @@ Create interfaces for all game integrations with fallback implementations.
 ### Implementation
 
 ```csharp
+// ⚠ proposed — GameReflectionCache not yet implemented (F47)
+// Actual implementation: RadioStoryIntegration (381 LOC) uses Type.GetType/FieldInfo directly
+// Interfaces (IGameServices, etc.) not yet created (F04, ADR-004 Deferred)
+
 // Interfaces
 public interface IGameServices {
     string GetCurrentLanguage();
@@ -225,7 +240,7 @@ public class GameReflectionCache : IGameServices {
 ## 6. ADR-005: Centralize Constants
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 Magic numbers are scattered throughout the codebase (25+ unique values).
@@ -248,6 +263,8 @@ Centralize all constants in `Data/Constants.cs`.
 ### Implementation
 
 ```csharp
+// ⚠ proposed — Data/Constants.cs not yet implemented (F47)
+// Actual: magic numbers scattered across all files (~40 unique values, F05)
 public static class Constants {
     // Audio
     public const float BfoBaseFrequency = 1000f;
@@ -328,7 +345,7 @@ Move configuration data to JSON files.
 ## 8. ADR-007: Unit Testing Strategy
 
 ### Status
-Accepted
+Deferred
 
 ### Context
 No unit tests exist (0% coverage). Bugs are discovered in production.
@@ -396,9 +413,9 @@ public class PositionFixCalculatorTests {
 | ADR | Review Date | Reviewer | Status |
 |-----|-------------|----------|--------|
 | ADR-001 | 2026-08-01 | Tech Lead | Active |
-| ADR-002 | 2026-08-01 | Audio Lead | Active |
-| ADR-003 | 2026-08-15 | Architect | Active |
-| ADR-004 | 2026-08-15 | Integration Lead | Active |
-| ADR-005 | 2026-08-01 | All | Active |
+| ADR-002 | 2026-08-01 | Audio Lead | Deferred |
+| ADR-003 | 2026-08-15 | Architect | Deferred |
+| ADR-004 | 2026-08-15 | Integration Lead | Deferred |
+| ADR-005 | 2026-08-01 | All | Deferred |
 | ADR-006 | 2026-08-15 | Data Lead | Proposed |
-| ADR-007 | 2026-08-01 | QA Lead | Active |
+| ADR-007 | 2026-08-01 | QA Lead | Deferred |

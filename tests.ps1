@@ -1,0 +1,20 @@
+param(
+    [string]$Configuration = "Debug"
+)
+
+$ErrorActionPreference = "Stop"
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+Write-Host "== RadioNavigation tests (F22 baseline) ==" -ForegroundColor Cyan
+
+# Custom runner (xunit core attributes, no vstest testhost) - works in restricted tokens
+# where testhost.x86 crashes on OpenProcess (Win32Exception 5).
+& dotnet run --project "$root\Tests\Runner\Runner.csproj" --configuration $Configuration --nologo
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "TESTS FAILED (exit $LASTEXITCODE)" -ForegroundColor Red
+    exit $LASTEXITCODE
+}
+
+Write-Host "TESTS PASSED" -ForegroundColor Green
+exit 0

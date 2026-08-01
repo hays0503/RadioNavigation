@@ -10,9 +10,21 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public event Action<bool> OnValueChanged;
 
-        public static bool IsRadioOn { get; private set; }
-        public static bool IsInteractable { get; private set; }
+        private static volatile bool isRadioOn;
+        private static bool isInteractable;
         private static bool groundActive;
+
+        public static bool IsRadioOn
+        {
+            get { return isRadioOn; }
+            private set { isRadioOn = value; }
+        }
+
+        public static bool IsInteractable
+        {
+            get { return isInteractable; }
+            private set { isInteractable = value; }
+        }
 
         public static void SetGroundActive(bool active)
         {
@@ -67,19 +79,22 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            Transform bg = transform.Find("Background");
+            Transform bg = transform.Find(PrefabNames.Background);
             if (bg.IsNotNull())
             {
-                onImage = bg.Find("on")?.gameObject;
-                offImage = bg.Find("off")?.gameObject;
+                onImage = bg.Find(PrefabNames.OnImage)?.gameObject;
+                offImage = bg.Find(PrefabNames.OffImage)?.gameObject;
             }
 
             if (transform.parent.IsNull())
             {
                 Debug.LogError("[RadioNav][ToggleHandler] transform.parent is null");
+                // F07: without a parent the dial can never be resolved;
+                // keep the handler disabled instead of idling active.
+                enabled = false;
                 return;
             }
-            Transform dial = transform.parent.Find("ciferbllat");
+            Transform dial = transform.parent.Find(PrefabNames.DialFace);
             if (dial.IsNotNull())
             {
                 dialImage = dial.GetComponent<Image>();
@@ -151,6 +166,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
+            // F61: static UI state must not leak into the next scene load.
+            isRadioOn = false;
+            isInteractable = false;
+            groundActive = false;
+
             if (toggleComp.IsNotNull())
                 toggleComp.onValueChanged.RemoveListener(OnToggleChanged);
         }

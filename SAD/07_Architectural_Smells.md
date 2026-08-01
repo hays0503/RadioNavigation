@@ -1,22 +1,38 @@
 # Architectural Smells — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-08-01):** Документ имеет обновленные smells. Добавлены F65–F199 (всего **199 проблем**). Ключевые исправления:
+> - **F45 (исправлено):** 5 ADR changed «Accepted» → «Deferred»
+> - **F46 (исправлено):** Harmony targets corrected (RadioStory, not Game)
+> - **F47:** 14+ несуществующих классов — annotated/removed
+> - **F48:** Array size 4→14 — все циклы итерируют 14 станций
+> - **F50:** LOC неверны для 10+ файлов (SonneController 506→508, MorseKeyer 150→240)
+> - **F51:** ProcessAudio 3→9 params (исправлено в Appendix B)
+> - **F52:** Добавлен SignalRichTextFormatter в диаграммы
+> - **F65-F76:** 12 новых smells (stale state, NRE, unchached reflection, etc.)
+> - **F77-F199:** 122 дополнительных smells (NaN, truncation, dead code, missing default cases, etc.)
+> - **F200-F207 (новое 2026-08-01):** 8 дополнительных проблем (мёртвый фид позиции, двойная передача паттерна, сдвиг 90° у спиннеров, кросс-талки QF, антимеридиан-среднее, кириллический градус, тики по кадрам, перехват drag). Итого **207 проблем**.
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`, `F200.md`..`F207.md`.
+
 ## 1. Smell Categories
 
 | Category | Count | Severity |
 |----------|-------|----------|
-| Code Smells | 15 | Medium-High |
-| Design Smells | 8 | High |
-| Architecture Smells | 5 | Critical |
-| **Total** | **28** | — |
+| Code Smells | 45 | Medium-High |
+| Design Smells | 18 | High |
+| Architecture Smells | 10 | Critical |
+| **Total** | **73** | — |
+
+> **_NOTE_**: Individual F-numbers (F01–F199) map to specific smell instances. Not every F-number is a unique smell — some are duplicates, variants, or quick-fix corrections of the same underlying issue. Smell count (73) ≤ problem count (199) because many F-numbers are trivial one-line fixes or documentation corrections.
 
 ## 2. Critical Architecture Smells
 
 ### 2.1 God Class
 
-**Location**: `SonneController.cs` (506 lines), `InformationPanelHandler.cs` (474 lines)
+**Location**: `SonneController.cs` (508 lines), `InformationPanelHandler.cs` (474 lines)
 
 **Symptoms**:
-- Single class does too many things
+- Single class does too many things (9 responsibilities)
 - 30+ methods, 25+ fields
 - Changes in one area affect unrelated areas
 
@@ -32,7 +48,7 @@
 **Location**: `RadioStoryIntegration.cs` (381 lines)
 
 **Symptoms**:
-- 12 reflection handlers
+- 9 cached reflection members (not 12 — corrected F50)
 - Direct type manipulation at runtime
 - No compile-time safety
 
@@ -188,6 +204,7 @@ switch (phase) {
 **Location**: `AudioSynthesisEngine.ProcessAudio()`
 
 ```csharp
+// 9 params (corrected from 8 — F51)
 public void ProcessAudio(
     float[] data,
     int channels,
@@ -196,7 +213,8 @@ public void ProcessAudio(
     Atmosphere atmosphere,
     ReceiverDsp receiverDsp,
     float outputVolume,
-    float feedbackVolume
+    float feedbackVolume,
+    bool radioOn
 )
 ```
 
@@ -233,7 +251,7 @@ public class VolumeSpinnerHandler : SpinnerHandlerBase {
 // Long chain
 SonneController.Instance
     .GetStationDiagnostics()
-    .FormatDiagnosticString();
+    .⚠ FormatDiagnosticString();  // ⚠ non-existent method (F47) — real: StationDiagnostics struct formatted by InformationPanelHandler
 
 // Another chain
 transform.Find("Background")
@@ -268,16 +286,22 @@ public static bool IsZero(this float f) => f == 0f;
 ```
 File                              Smells  Severity
 ─────────────────────────────────────────────────
-SonneController.cs                8       ██████████ Critical
-InformationPanelHandler.cs        6       ████████   Critical
-RadioStoryIntegration.cs          5       ███████    High
-AudioSynthesisEngine.cs           4       █████      High
+SonneController.cs                12      ██████████ Critical
+InformationPanelHandler.cs        8       ████████   Critical
+RadioStoryIntegration.cs          7       ███████    High
+AudioSynthesisEngine.cs           6       █████      High
+PositionFixCalculator.cs          5       ██████     High
+MorseKeyer.cs                     4       █████      Medium
+StationScheduler.cs               4       █████      Medium
+DspPipeline.cs                    3       ████       Medium
 ComparisonExtensions.cs           3       ████       Medium
-StationScheduler.cs               2       ███        Medium
-MorseKeyer.cs                     2       ███        Medium
 BeaconData.cs                     2       ███        Medium
-DialConfig.cs                     1       ██         Low
-PositionFixCalculator.cs          1       ██         Low
+DialConfig.cs                     2       ███        Low
+MorseAlphabet.cs                  2       ███        Low
+MorseTiming.cs                    1       ██         Low
+ConsolCycleConfig.cs              1       ██         Low
+RadioHandler.cs                   1       ██         Low
+DebugAngleHandler.cs              1       ██         Low
 ```
 
 ## 6. Smell Resolution Priority
@@ -311,12 +335,21 @@ PositionFixCalculator.cs          1       ██         Low
 
 ## 7. Smell Metrics
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| God Classes (>300 lines) | 2 | 0 |
-| Duplicated Code Groups | 6 | 0 |
-| Magic Numbers | 25+ | 0 |
-| Dead Code Items | 4+ | 0 |
-| Static Coupling Points | 5+ | 1 |
-| Reflection Handlers | 12 | 0 |
-| Thread Safety Issues | 2 | 0 |
+| Metric | Current | Target | Notes |
+|--------|---------|--------|-------|
+| God Classes (>300 lines) | 2 | 0 | F02, F03 |
+| Duplicated Code Groups | 7+ | 0 | F35, F36 |
+| Magic Numbers | ~40 | 0 | F05, F56 |
+| Dead Code Items | 15+ | 0 | F91-F96, F157-F199 |
+| Static Coupling Points | 3 | 0 | F05, F42, F61 |
+| Reflection Handlers | 9 | 0 (cached) | F23, F68 |
+| Thread Safety Issues | Widespread | 0 | F01, F13, F29 |
+| NaN/Guard Issues | 5+ | 0 | F80, F128, F137, F190, F191 |
+| Missing Default Cases | 3+ | 0 | F135, F167 |
+| Event Subscription Leaks | 3+ | 0 | F14, F30, F117, F119 |
+
+---
+
+*Document Version: 2.0*  
+*Last Updated: 2026-08-01*  
+*Updated: Smell catalog expanded from 28 to 73 (F65–F199). Added NaN/guard, dead code, event leak categories. Smell heatmap and metrics updated for 199 problems. See `refactoring-plan/INDEX.md` for full F-number mapping.*

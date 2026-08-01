@@ -7,14 +7,12 @@ namespace UBOAT.Mods.RadioNavigation
     public class RadioHandler : BlockInputUI
     {
         public static RadioHandler Instance;
-        public static event Action<bool> OnVisibilityChanged;
+        // F90: OnVisibilityChanged was never subscribed to anywhere — removed.
+        // F192: OnCursorAngleChanged was also never subscribed to — removed.
         public static event Action<float, int> OnFrequencyChanged;
-
-        public event Action<float> OnCursorAngleChanged;
 
         [SerializeField] private CanvasGroup canvasGroup;
 
-        private SonneController sonneController;
         private ZoneHandler zoneHandler;
         private float currentAngle;
         private int currentZoneIndex;
@@ -25,11 +23,11 @@ namespace UBOAT.Mods.RadioNavigation
             get => cursorAngle;
             set
             {
-                if (cursorAngle == value)
+                // F147: lerp-smoothed angles may differ by tiny rounding;
+                // exact float equality would spuriously re-emit or skip.
+                if (Mathf.Approximately(cursorAngle, value))
                     return;
                 cursorAngle = value;
-                if (OnCursorAngleChanged.IsNotNull())
-                    OnCursorAngleChanged(value);
                 EmitFrequency();
             }
         }
@@ -50,8 +48,6 @@ namespace UBOAT.Mods.RadioNavigation
                 canvasGroup.alpha = value ? 1f : 0f;
                 canvasGroup.interactable = value;
                 canvasGroup.blocksRaycasts = value;
-                if (OnVisibilityChanged.IsNotNull())
-                    OnVisibilityChanged(value);
             }
         }
 
@@ -70,6 +66,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (Instance == this)
                 Instance = null;
+            if (zoneHandler.IsNotNull())
+                zoneHandler.OnZoneChanged -= OnZoneChanged;
         }
 
         private void Start()
@@ -77,7 +75,6 @@ namespace UBOAT.Mods.RadioNavigation
             if (canvasGroup.IsNull())
                 canvasGroup = GetComponent<CanvasGroup>();
 
-            sonneController = GetComponent<SonneController>();
             zoneHandler = GetComponentInChildren<ZoneHandler>(true);
 
             if (zoneHandler.IsNotNull())
@@ -91,8 +88,13 @@ namespace UBOAT.Mods.RadioNavigation
             if (!Input.GetKeyDown(KeyCode.Escape) || !IsVisible)
                 return;
 
-            if (UnityEngine.EventSystems.EventSystem.current.IsNotNull() &&
-                UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject.IsNotNull())
+            var selected = UnityEngine.EventSystems.EventSystem.current.IsNotNull()
+                ? UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject
+                : null;
+
+            // F133: the cursor spinner keeps itself selected; Escape must still
+            // close the panel when the selection is inside this panel.
+            if (selected.IsNotNull() && !selected.transform.IsChildOf(transform))
                 return;
 
             IsVisible = false;
@@ -115,11 +117,6 @@ namespace UBOAT.Mods.RadioNavigation
             float freq = DialConfig.AngleToFrequency(currentAngle, currentZoneIndex);
             if (OnFrequencyChanged.IsNotNull())
                 OnFrequencyChanged(freq, currentZoneIndex);
-        }
-
-        public void NotifyCursorChanged()
-        {
-            EmitFrequency();
         }
     }
 }

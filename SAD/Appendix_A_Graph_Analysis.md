@@ -1,21 +1,32 @@
 # Appendix A: Graph Analysis — RadioNavigation Mod
 
+> **⚠️ Deep Scan Update (2026-08-01):** Анализ графа обновлён. Всего **199 проблем** (F01–F199).
+> - **F47:** Удалены несуществующие узлы
+> - **F48:** Array sizes 4→14
+> - **F49:** Community node/sizes updated: UI 15, Logic 12, Data 5, Sound 2 (total 34)
+> - **F51:** `Atmosphere.Apply(sample, sampleRate)` (not `GenerateNoise`), `ReceiverDsp.Process()` (not `ApplyAGC`)
+> - **F52:** SignalRichTextFormatter moved to UI Community; ComparisonExtensions moved to Logic Community
+>
+> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
+
 ## 1. Graph Overview
 
 | Metric | Value |
 |--------|-------|
-| Total Nodes | ~40 |
+| Total Nodes | ~34 (34 source files + inline types) |
 | Total Edges | ~80 |
 | Communities | 4 |
 | Average Degree | 4.0 |
 | Density | 0.10 |
+
+> **_NOTE_**: Node count corrected from 40→34 (F49). Community 4 (Integration) merged into Community 1 (Logic) since `Main` and `RadioStoryIntegration` are both in `Source/Logic/`.
 
 ## 2. Community Detection
 
 ### 2.1 Community Structure
 
 ```
-Community 0: UI Layer (12 nodes)
+Community 0: UI Layer (15 nodes)
 ├── RadioHandler
 ├── ToggleHandler
 ├── ZoneHandler
@@ -27,45 +38,37 @@ Community 0: UI Layer (12 nodes)
 ├── FeedbackSpinnerHandler
 ├── PanelDragHandler
 ├── ExpanderHandler
-└── RadioInstaller
+├── DebugAngleHandler
+├── RadioInstaller
+├── PrefabNames
+└── SignalRichTextFormatter
 
-Community 1: Logic Layer (14 nodes)
+Community 1: Logic Layer (12 nodes)
 ├── SonneController
+├── RadioStoryIntegration
 ├── StationScheduler
 ├── MorseKeyer
 ├── MorseAlphabet
 ├── NavigationPattern
-├── CallsignPattern
 ├── SonneSignalGenerator
 ├── PositionFixCalculator
-├── StationState
-├── ConsolCycleConfig
+├── MorseTiming
+├── ComparisonExtensions
 ├── NavigationElementType
-├── SignalEntry
-├── Group
-└── Measurement
+└── Main
 
-Community 2: Data Layer (8 nodes)
+Community 2: Data Layer (5 nodes)
 ├── BeaconData
 ├── DialConfig
-├── PrefabNames
-├── GameStrings
-├── ComparisonExtensions
-├── BeaconStation
-├── FixResult
-└── ConsolCycleConfig
+├── ConsolCycleConfig
+├── StationState
+└── SignalEntry (struct in SignalTypes.cs)
 
-Community 3: Sound Layer (6 nodes)
+Community 3: Sound Layer (4 nodes)
 ├── AudioSynthesisEngine
-├── DspPipeline
-├── CarrierGenerator
-├── Atmosphere
-├── ReceiverDsp
-└── TickScheduler
-
-Community 4: Integration (2 nodes)
-├── Main
-└── RadioStoryIntegration
+├── CarrierGenerator (nested in DspPipeline.cs)
+├── Atmosphere (nested in DspPipeline.cs)
+└── ReceiverDsp (nested in DspPipeline.cs)
 ```
 
 ### 2.2 Community Cohesion
@@ -96,9 +99,9 @@ Community 4: Integration (2 nodes)
 
 ```
 Connections:
-├──► StationScheduler[] (4)
-├──► MorseKeyer[] (4)
-├──► CarrierGenerator[] (4)
+├──► StationScheduler[] (14)
+├──► MorseKeyer[] (14)
+├──► CarrierGenerator[] (14)
 ├──► AudioSynthesisEngine
 ├──► BeaconData
 ├──► DialConfig
@@ -197,14 +200,14 @@ Data Layer ◄────────────────► Sound Layer
 OnAudioFilterRead()
     │
     ▼
-AudioSynthesisEngine.ProcessAudio()
+AudioSynthesisEngine.ProcessAudio()  [9 params, F51]
     │
     ├──► CarrierGenerator.NextSample()
-    ├──► Atmosphere.GenerateNoise()
-    └──► ReceiverDsp.ApplyAGC()
+    ├──► Atmosphere.Apply(sample, sampleRate)  [F51: was GenerateNoise]
+    └──► ReceiverDsp.Process()  [F51: was ApplyAGC]
 ```
 
-**Risk**: Thread safety issues in this path
+**Risk**: Thread safety issues in this path (F01, F13, F29)
 
 ### 6.2 Navigation Update Path
 
@@ -259,8 +262,8 @@ InformationPanelHandler.Update()
 
 | Hub | Current Degree | Target Degree | Action |
 |-----|----------------|---------------|--------|
-| SonneController | 12 | 6 | Extract StationManager, SignalDecoder |
-| InformationPanelHandler | 8 | 4 | Extract UIElementFactory, StationFinder |
+| SonneController | 12 | 6 | Extract ⚠ StationManager (F47), ⚠ SignalDecoder (F47) |
+| InformationPanelHandler | 8 | 4 | Extract ⚠ UIElementFactory, ⚠ StationFinder (both proposed F47) |
 
 ### 8.2 Break Cycles
 
@@ -329,3 +332,9 @@ Position 1      0      0      1       0      0        0      -
 │  └─────────────┘ └─────────────┘           │
 └─────────────────────────────────────────────┘
 ```
+
+---
+
+*Document Version: 2.0*  
+*Last Updated: 2026-08-01*  
+*Updated: Community structure corrected (4 communities, 34 nodes). API signatures corrected (F51). All phantom nodes removed (F47). SignalRichTextFormatter → UI Community, ComparisonExtensions → Logic Community. Updated for 199 problems (F01–F199).*
