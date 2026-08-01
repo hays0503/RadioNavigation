@@ -4,7 +4,7 @@
 
 | ID | Поломка | Приоритет | Мод (RadioStoryIntegration.cs) | Игра | Следствие |
 |----|---------|-----------|-------------------------------|------|-----------|
-| **G1** | `stageField` = null | P0 | :13, :95, :113-116, :151-156 | поля `stage` нет (RadioStory/GenericStory/Story) | Инжекция T3PLL38 всегда early-return |
+| **G1** | `stage` читался через `(int)`-каст boxed-перечисления → InvalidCastException (поле ЕСТЬ: RadioStory.cs:83, тип RadioStoryStage, MainChoices=1) — **находка уточнена, см. G1_stageField_dead.md** | P0 | :13, :95, :113-116, :151-156 | `private RadioStoryStage stage` (RadioStory.cs:83) | Инжекция T3PLL38 падает на любой стадии |
 | **G2** | `insertMethod` = null | P0 | :56-71 | `InsertDecision(int, Decision)` в `Story.cs:377`, GetMethod не трассирует базы | `Init()` падает: «Decision type not found» — всё мертво |
 | **G3** | `onUpdatedMethod` = null | P1 | :100-102, :244-262 | `OnUpdated()` в `Story.cs:438` | UI не обновится после инжекции |
 | **G4** | `localizationKeyProp` = null | P0 | :74, :183-199, :334-367 | `LocalizationKey` — readonly поле (`Story.cs:24`), не свойство | Перехват решений fail-open, нет дедупликации |

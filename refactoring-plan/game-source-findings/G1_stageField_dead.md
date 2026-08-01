@@ -1,54 +1,43 @@
-# G1. stageField мёртв — поле `stage` отсутствует в RadioStory (инжекция T3PLL38 не работает)
+# G1. stageField мёртв — InvalidCastException при `(int)`-касте boxed-перечисления RadioStoryStage
 
-**Статус:** ✔ ПОДТВЕРЖДЕНО (исходники игры, 2026-08-01)
+**Статус:** ⚠ УТОЧНЁН (2026-08-01, коммит 29259cb) — исходная находка «поля нет» ОШИБОЧНА
 **Приоритет:** P0 (Critical) — панель мода не открывается
 **Область:** Logic · RadioStoryIntegration · Reflection
 **Источник (мод):** `Source/Logic/RadioStoryIntegration.cs:13, 95, 113-116, 151-156`
-**Источник (игра):** `C:\code\projects\uboat` — `RadioStory.cs`, `GenericStory.cs`, `Story.cs`
+**Источник (игра):** `C:\code\projects\uboat` — `RadioStory.cs:83, 264-283, 303, 630`
 
 ---
 
-## Суть
+## Суть (исправленная)
 
-Мод читает поле `stage` у `RadioStory` для определения фазы истории (1 = MainChoices), но в текущей версии игры такого поля нет.
+Поле `stage` **существует**: `private RadioStoryStage stage;` (RadioStory.cs:83) — тип `RadioStoryStage` (**enum**), а не int. Мод читал его как `(int)stageField.GetValue(__instance)` — на boxed-перечислении `(int)` бросает `InvalidCastException` → catch в `InjectT3PLL38Decision` → return. Плюс до фикса G2 `stageField` оставался null из-за early-exit в Init().
 
-## Доказательство
+Проверка контрактом против установленной `com.uboat.game.dll` (тест `RadioStory_HasStageField_AsEnumType_NotInt`):
+- `GetField("stage", NonPublic|Instance)` → НЕ null
+- тип поля — enum `RadioStoryStage`
+- значения: `Unknown=0, MainChoices=1, PlayMusicStation=2, LeaveStation=3, RequestResupply=4, RequestNewAssignment=5`
 
-Мод (RadioStoryIntegration.cs):
-
-```csharp
-// :13
-private const string StageFieldName = "stage";
-// :95
-stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
-// :113-116 — guard
-if (!TryInit() || decisionCtor.IsNull() || stageField.IsNull())
-{
-    Debug.LogWarning("[RadioNav] Init failed, cannot inject T3PLL38");
-    return;
-}
-// :151-156
-private static bool IsStageOne(RadioStory __instance)
-{
-    int stageValue = (int)stageField.GetValue(__instance);
-    return stageValue == 1;
-}
-```
-
-Игра: `GetField("stage")` на RadioStory и его базах (GenericStory, Story) — **нигде нет**. Case-insensitive grep `\bStage\b` по всей игре: единственное вхождение — `HelpBehaviour.cs:27` (не связано). `GetField` трассирует базовые типы — и там поля нет.
+Оригинальная ошибка верификации: grep `\bStage\b` (case-insensitive по большой букве) пропустил строчное поле `stage` и enum `RadioStoryStage` в `RadioStory.cs`.
 
 ## Следствие
 
-`stageField` всегда null → `InjectT3PLL38Decision` (постфикс на `RadioStory.ContinueStory`) всегда выходит на строке 113-116 с warning → решение `Radio/OpenT3PLL38` никогда не появляется в меню радио-истории → **панель не открывается**. Даже при починке G2 (insertMethod) путь останется заблокированным.
+`(int)`-каст падает на любой стадии → инжекция никогда не работает (панель не открывается).
 
-## Предлагаемый фикс (вне рамок текущей задачи)
+## Применённый фикс (29259cb)
 
-- Убрать гейтинг по stage (RadioStory в текущей версии не имеет стадий — решения строятся в `ContinueStory` каждый вызов), либо
-- Определять «первый шаг» по `Decisions.Count` / отсутствию T3PLL38-решения (дедупликация уже есть — `DecisionAlreadyExists`).
+Восстановлен stage-гейт с enum-безопасным чтением:
+
+```csharp
+stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
+...
+int stageValue = Convert.ToInt32(stageField.GetValue(__instance)); // Convert.ToInt32 работает на boxed-перечислениях
+return stageValue == 1; // RadioStoryStage.MainChoices
+```
+
+Инжекция T3PLL38 только на стадии MainChoices — как задумал автор.
 
 ## Связано
 
-- G2 (insertMethod null) — независимая поломка того же контура
-- G4 (localizationKeyProp null) — даже после инжекции перехват не сработал бы
+- G2 (insertMethod null) — причина, по которой stageField был null ДО фикса
 - F23 (Reflection Fragility) — подтверждена усиленно
-- Отчёт: `refactoring-plan/VERIFICATION_REPORT.md`, секция 5.2
+- Контракт-тесты: `Tests/GameContractTests.cs`
