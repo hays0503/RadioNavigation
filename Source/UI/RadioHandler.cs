@@ -7,7 +7,7 @@ namespace UBOAT.Mods.RadioNavigation
     public class RadioHandler : BlockInputUI
     {
         public static RadioHandler Instance;
-        public static event Action<bool> OnVisibilityChanged;
+        // F90: OnVisibilityChanged was never subscribed to anywhere — removed.
         public static event Action<float, int> OnFrequencyChanged;
 
         public event Action<float> OnCursorAngleChanged;
@@ -50,8 +50,6 @@ namespace UBOAT.Mods.RadioNavigation
                 canvasGroup.alpha = value ? 1f : 0f;
                 canvasGroup.interactable = value;
                 canvasGroup.blocksRaycasts = value;
-                if (OnVisibilityChanged.IsNotNull())
-                    OnVisibilityChanged(value);
             }
         }
 

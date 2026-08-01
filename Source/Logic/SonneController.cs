@@ -124,6 +124,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
+            // F89: stop the audio source so OnAudioFilterRead cannot run on a
+            // partially-destroyed object during teardown.
+            var audio = GetComponent<AudioSource>();
+            if (audio.IsNotNull())
+                audio.Stop();
+
             RadioHandler.OnFrequencyChanged -= OnFrequencyChanged;
             if (volumeSpinner.IsNotNull())
                 volumeSpinner.OnValueChanged -= OnVolumeChanged;
