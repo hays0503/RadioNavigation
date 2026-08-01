@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>UBOAT.Mods.RadioNavigation.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>RadioNavigation.Tests</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Stubs\UnityEngineMathf.cs" />
+    <Compile Include="PositionFixCalculatorTests.cs" />
+    <Compile Include="MorseAlphabetTests.cs" />
+    <Compile Include="MorseTimingTests.cs" />
+    <Compile Include="NavigationPatternTests.cs" />
+    <Compile Include="DialConfigTests.cs" />
+    <Compile Include="SonneSignalGeneratorTests.cs" />
+    <Compile Include="StationSchedulerTests.cs" />
+    <Compile Include="BeaconDataTests.cs" />
+    <Compile Include="ConsolCycleConfigTests.cs" />
+    <Compile Include="ComparisonExtensionsTests.cs" />
+    <Compile Include="SignalTypesTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Source\Data\BeaconData.cs" Link="Source\Data\BeaconData.cs" />
+    <Compile Include="..\Source\Data\ConsolCycleConfig.cs" Link="Source\Data\ConsolCycleConfig.cs" />
+    <Compile Include="..\Source\Data\DialConfig.cs" Link="Source\Data\DialConfig.cs" />
+    <Compile Include="..\Source\Data\SignalTypes.cs" Link="Source\Data\SignalTypes.cs" />
+    <Compile Include="..\Source\Data\StationState.cs" Link="Source\Data\StationState.cs" />
+    <Compile Include="..\Source\Logic\ComparisonExtensions.cs" Link="Source\Logic\ComparisonExtensions.cs" />
+    <Compile Include="..\Source\Logic\MorseAlphabet.cs" Link="Source\Logic\MorseAlphabet.cs" />
+    <Compile Include="..\Source\Logic\MorseTiming.cs" Link="Source\Logic\MorseTiming.cs" />
+    <Compile Include="..\Source\Logic\NavigationElementType.cs" Link="Source\Logic\NavigationElementType.cs" />
+    <Compile Include="..\Source\Logic\NavigationPattern.cs" Link="Source\Logic\NavigationPattern.cs" />
+    <Compile Include="..\Source\Logic\PositionFixCalculator.cs" Link="Source\Logic\PositionFixCalculator.cs" />
+    <Compile Include="..\Source\Logic\SonneSignalGenerator.cs" Link="Source\Logic\SonneSignalGenerator.cs" />
+    <Compile Include="..\Source\Logic\StationScheduler.cs" Link="Source\Logic\StationScheduler.cs" />
+  </ItemGroup>
+
+</Project>
