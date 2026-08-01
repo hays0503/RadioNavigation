@@ -36,7 +36,7 @@
 | **F12** | Copy-Paste Duplication | **P2** | Hygiene | 200 | ✅ |
 | **F13** | Unity API in Audio Thread | **P0** | Sound · Threading | ~40 | ✅ |
 | **F14** | Event Subscription Leaks | **P1** | UI · Events | ~50 | 🔎 |
-| **F15** | No State Persistence | **P2** | Save/Load | ~50 | ⏸ |
+| **F15** | No State Persistence | **P2** | Save/Load | ~50 | ✅ |
 | **F16** | PositionFixCalculator.ErrorKm = 0 | **P1** | Logic · PF Calculator | ~10 | ✅ |
 | **F17** | StationState mutable struct | **P2** | Data · StationState | ~25 | ✅ |
 | **F18** | PositionFixCalculator God Object | **P2** | Architecture | ~60 | ⏸ |
