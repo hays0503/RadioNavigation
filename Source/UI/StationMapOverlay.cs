@@ -44,19 +44,25 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            if (TMP_Settings.defaultFontAsset.IsNull())
+                return;
+
             Debug.Log("[RadioNav][Map] renderer=" + mapRenderer.name
                 + " container=" + mapRenderer.VectorTerrainsUIContainer.name
                 + " active=" + mapRenderer.VectorTerrainsUIContainer.activeInHierarchy);
 
             int count = Math.Min(DebugStationCount, BeaconData.Stations.Length);
             for (int i = 0; i < count; i++)
-                CreateMarker(mapRenderer.VectorTerrainsUIContainer.transform, BeaconData.Stations[i], i);
+            {
+                if (!CreateMarker(mapRenderer.VectorTerrainsUIContainer.transform, BeaconData.Stations[i], i))
+                    return;
+            }
 
             markersCreated = true;
             Debug.Log("[RadioNav][Map] station markers created=" + count);
         }
 
-        private void CreateMarker(Transform parent, BeaconStation station, int index)
+        private bool CreateMarker(Transform parent, BeaconStation station, int index)
         {
             Vector2 worldPosition = Coordinates.ToWorldPosition(station.Latitude, station.Longitude);
             var marker = new GameObject("RadioNavStation" + index);
@@ -83,6 +89,7 @@ namespace UBOAT.Mods.RadioNavigation
                 + " lon=" + station.Longitude.ToString("F6")
                 + " world=" + worldPosition
                 + " scene=" + marker.transform.position);
+            return true;
         }
 
         private void OnDestroy()

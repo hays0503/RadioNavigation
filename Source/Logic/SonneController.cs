@@ -524,7 +524,9 @@ namespace UBOAT.Mods.RadioNavigation
                         StationIndex = i,
                         Latitude = (float)beaconStations[i].Latitude,
                         Longitude = (float)beaconStations[i].Longitude,
-                        Bearing = bearing,
+                        // PositionFixCalculator intersects rays from each
+                        // station toward the boat, not boat-to-station bearings.
+                        Bearing = bearingToBoat,
                         Weight = 1f
                     });
                 }
