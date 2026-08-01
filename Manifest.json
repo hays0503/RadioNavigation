@@ -1,6 +1,6 @@
 {
   "name": "RadioNavigation",
-  "version": "2.0",
+  "version": "2.1",
   "description": "CONSOLE/Sonne radio navigation beacon panel with audio synthesis and position fix",
   "author": "testui",
   "supportedGameVersions": ["2026.1"],
