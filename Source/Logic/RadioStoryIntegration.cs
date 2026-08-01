@@ -23,6 +23,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static MethodInfo insertMethod;
         private static MethodInfo onUpdatedMethod;
         private static bool initialized;
+        private static bool keepPanelOpenAfterStoryStop;
         private static PropertyInfo languageProp;
         private static MethodInfo loadSingletonMethod;
         private static Type localeType;
@@ -30,6 +31,7 @@ namespace UBOAT.Mods.RadioNavigation
         internal static void ResetRuntimeState()
         {
             initialized = false;
+            keepPanelOpenAfterStoryStop = false;
             decisionType = null;
             decisionCtor = null;
             localizationKeyField = null;
@@ -382,6 +384,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (key == LeaveStationKey)
                 {
                     Debug.Log("[RadioNav] LeaveStation - hiding T3PLL38 panel");
+                    keepPanelOpenAfterStoryStop = false;
                     if (RadioHandler.Instance.IsNotNull())
                         RadioHandler.Instance.IsVisible = false;
                     return AllowOriginal;
@@ -405,6 +408,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void HideRadioOnStop()
         {
+            if (keepPanelOpenAfterStoryStop)
+            {
+                Debug.Log("[RadioNav] Story stopped; keeping T3PLL38 panel open");
+                return;
+            }
+
             if (RadioHandler.Instance.IsNotNull())
                 RadioHandler.Instance.IsVisible = false;
         }
@@ -413,6 +422,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (RadioHandler.Instance.IsNotNull())
             {
+                keepPanelOpenAfterStoryStop = true;
                 RadioHandler.Instance.IsVisible = true;
                 Debug.Log("[RadioNav] T3PLL38 panel visible=" + RadioHandler.Instance.IsVisible);
             }

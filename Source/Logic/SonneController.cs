@@ -29,6 +29,8 @@ namespace UBOAT.Mods.RadioNavigation
         private bool positionAvailable; // F200: a fix without a position feed must not be shown
         private bool positionProviderFailureLogged;
         private bool positionProviderSuccessLogged;
+        private int lastLoggedMeasurementCount = -1;
+        private bool lastLoggedFixValid;
         private IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
         private VolumeSpinnerHandler volumeSpinner;
         private FeedbackSpinnerHandler feedbackSpinner;
@@ -525,10 +527,26 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 lastFix = PositionFixCalculator.Calculate(measurements);
                 fixValid = lastFix.Valid;
+                if (measurements.Count != lastLoggedMeasurementCount || fixValid != lastLoggedFixValid)
+                {
+                    Debug.Log("[RadioNav][POSITION] measurements=" + measurements.Count
+                        + " valid=" + fixValid
+                        + " lat=" + lastFix.Latitude.ToString("F5")
+                        + " lon=" + lastFix.Longitude.ToString("F5")
+                        + " errorKm=" + lastFix.ErrorKm.ToString("F2"));
+                    lastLoggedMeasurementCount = measurements.Count;
+                    lastLoggedFixValid = fixValid;
+                }
             }
             else
             {
                 fixValid = false;
+                if (lastLoggedMeasurementCount != measurements.Count || lastLoggedFixValid)
+                {
+                    Debug.Log("[RadioNav][POSITION] measurements=" + measurements.Count + "; at least 2 required");
+                    lastLoggedMeasurementCount = measurements.Count;
+                    lastLoggedFixValid = false;
+                }
             }
         }
 
