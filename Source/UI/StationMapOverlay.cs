@@ -15,13 +15,32 @@ namespace UBOAT.Mods.RadioNavigation
         private const float MapLabelHeight = 1100f;
         private const float LabelScale = 0.8f;
         private readonly List<GameObject> markers = new List<GameObject>();
+        private float retryTimer;
+        private bool markersCreated;
 
         private void Start()
+        {
+            TryCreateMarkers();
+        }
+
+        private void Update()
+        {
+            if (markersCreated)
+                return;
+
+            retryTimer += Time.unscaledDeltaTime;
+            if (retryTimer < 0.5f)
+                return;
+
+            retryTimer = 0f;
+            TryCreateMarkers();
+        }
+
+        private void TryCreateMarkers()
         {
             MapRenderer mapRenderer = FindObjectOfType<MapRenderer>();
             if (mapRenderer.IsNull() || mapRenderer.VectorTerrainsUIContainer.IsNull())
             {
-                Debug.LogWarning("[RadioNav][Map] MapRenderer/vector label container not found");
                 return;
             }
 
@@ -29,6 +48,7 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < count; i++)
                 CreateMarker(mapRenderer.VectorTerrainsUIContainer.transform, BeaconData.Stations[i], i);
 
+            markersCreated = true;
             Debug.Log("[RadioNav][Map] station markers created=" + count);
         }
 
