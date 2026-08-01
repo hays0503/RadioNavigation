@@ -111,9 +111,7 @@ namespace UBOAT.Mods.RadioNavigation
             decisionsProp = storyType.GetProperty("Decisions",
                 BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
 
-            onUpdatedMethod = storyType.GetMethod("OnUpdated",
-                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance,
-                null, Type.EmptyTypes, null);
+            onUpdatedMethod = FindMethodDeep(typeof(RadioStory), "OnUpdated", Type.EmptyTypes);
 
             languageProp = GetLanguageProperty();
 
