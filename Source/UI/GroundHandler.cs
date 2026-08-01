@@ -53,7 +53,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Start()
         {
-            Transform bgT = transform.Find("Background");
+            Transform bgT = transform.Find(PrefabNames.Background);
             bgImage = bgT.IsNotNull() ? bgT.GetComponent<Image>() : null;
             if (bgImage.IsNull())
             {
@@ -70,7 +70,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (bgT.IsNotNull())
             {
-                Transform cm = bgT.Find("GroundCheckmark");
+                Transform cm = bgT.Find(PrefabNames.GroundCheckmark);
                 if (cm.IsNotNull())
                 {
                     groundCheckmark = cm.GetComponent<Image>();
@@ -85,7 +85,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             if (transform.parent.IsNotNull())
-                radioToggle = transform.parent.Find("Toggle")?.GetComponent<Toggle>();
+                radioToggle = transform.parent.Find(PrefabNames.Toggle)?.GetComponent<Toggle>();
             else
                 Debug.LogError("[RadioNav][GroundHandler] transform.parent is null");
             if (radioToggle.IsNotNull())

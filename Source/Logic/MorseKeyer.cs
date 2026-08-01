@@ -157,6 +157,15 @@ namespace UBOAT.Mods.RadioNavigation
             if (consolPattern.IsNotNull() && elementIndex >= consolPattern.Length)
             {
                 OnSequenceFinished?.Invoke();
+                if (scheduler.IsNull())
+                {
+                    // F07: no scheduler means no next pattern can be fetched —
+                    // resetting elementIndex would loop the same pattern
+                    // forever; go idle instead.
+                    SetState(State.Idle);
+                    isActive = false;
+                    return;
+                }
                 if (scheduler.IsNotNull())
                 {
                     scheduler.OnSequenceFinished();

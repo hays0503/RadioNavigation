@@ -253,11 +253,6 @@ namespace UBOAT.Mods.RadioNavigation
             return SignalRichTextFormatter.FormatRichText(signalEntries);
         }
 
-        public string GetSignalBuffer()
-        {
-            return GetSignalRichText();
-        }
-
         public void ClearSignalBuffer()
         {
             signalEntries.Clear();
@@ -400,6 +395,18 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            // F09/F58: zero or NaN carrier frequency must not enter the gain
+            // math (division by zero / NaN ratio). Silence all stations
+            // instead of leaving stale gains behind.
+            float f = currentFrequencyKHz * 1000f;
+            if (f.IsNegligible(0.001f) || float.IsNaN(f))
+            {
+                for (int i = 0; i < stations.Length; i++)
+                    stations[i].Gain = 0f;
+                dominantStationIndex = -1;
+                return;
+            }
+
             var beaconStations = BeaconData.Stations;
             float maxGain = 0f;
             int maxIndex = -1;
@@ -415,7 +422,6 @@ namespace UBOAT.Mods.RadioNavigation
                 }
 
                 float f0 = freq.Value * 1000f;
-                float f = currentFrequencyKHz * 1000f;
                 float ratio = f / f0 - f0 / f;
                 float gain = 1f / (float)Math.Sqrt(1.0 + qf * qf * ratio * ratio);
 

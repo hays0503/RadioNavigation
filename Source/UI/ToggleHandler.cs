@@ -79,16 +79,19 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            Transform bg = transform.Find("Background");
+            Transform bg = transform.Find(PrefabNames.Background);
             if (bg.IsNotNull())
             {
-                onImage = bg.Find("on")?.gameObject;
-                offImage = bg.Find("off")?.gameObject;
+                onImage = bg.Find(PrefabNames.OnImage)?.gameObject;
+                offImage = bg.Find(PrefabNames.OffImage)?.gameObject;
             }
 
             if (transform.parent.IsNull())
             {
                 Debug.LogError("[RadioNav][ToggleHandler] transform.parent is null");
+                // F07: without a parent the dial can never be resolved;
+                // keep the handler disabled instead of idling active.
+                enabled = false;
                 return;
             }
             Transform dial = transform.parent.Find(PrefabNames.DialFace);
