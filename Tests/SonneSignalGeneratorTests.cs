@@ -24,12 +24,39 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(2.5f, r.LocalAngle, Tol);
         }
 
-        [Fact]
-        public void CalculateSector_DashSector_CountsReversed()
+        [Theory]
+        [InlineData(310f, 310f, true)]    // exactly on base angle
+        [InlineData(312.4f, 310f, true)]  // inside +2.5 half width
+        [InlineData(312.6f, 310f, false)] // outside +2.5
+        [InlineData(307.6f, 310f, true)]  // inside -2.5
+        [InlineData(307.4f, 310f, false)] // outside -2.5
+        [InlineData(357f, 0f, false)]     // wrap: -3 degrees
+        [InlineData(358f, 0f, true)]      // wrap: -2 degrees
+        [InlineData(307.5f, 310f, true)]  // boundary inclusive
+        public void CalculateInBeam_BearingVsBaseAngle(float bearing, float baseAngle, bool expected)
         {
-            var r = SonneSignalGenerator.CalculateSector(315.2f, 310.2f);
-            Assert.True(r.IsDashSector);
-            Assert.Equal(60, r.DotCount);
+            Assert.Equal(expected, SonneSignalGenerator.CalculateInBeam(bearing, baseAngle, SonneSignalGenerator.SectorWidthDeg));
+        }
+
+        [Fact]
+        public void ToNavigationPattern_RoundTripsConsolPattern()
+        {
+            var elements = SonneSignalGenerator.GenerateConsolPattern("B", 0, ConsolCycleConfig.Cycle120s);
+            Assert.Equal(65, elements.Length);
+
+            var pattern = SonneSignalGenerator.ToNavigationPattern(elements);
+
+            Assert.Equal(72, pattern.ElementCount); // 9 groups x 8
+            Assert.Equal(0, pattern.TransitionIndex); // equisignal lands in group 0
+            Assert.Contains("=", NavigationPattern.FormatPattern(pattern));
+        }
+
+        [Fact]
+        public void ToNavigationPattern_Empty_ReturnsEmptyPattern()
+        {
+            var pattern = SonneSignalGenerator.ToNavigationPattern(null);
+            Assert.Empty(pattern.Groups);
+            Assert.Equal(0, pattern.ElementCount);
         }
 
         [Fact]

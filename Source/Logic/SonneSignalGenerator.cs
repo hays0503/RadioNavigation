@@ -142,5 +142,50 @@ namespace UBOAT.Mods.RadioNavigation
             }
             return count;
         }
+
+        // F79: true when the bearing is inside the station's navigation sector
+        // (|angular difference to BaseAngle| <= half of the sector width, wrapped).
+        public static bool CalculateInBeam(float bearing, float baseAngle, float sectorWidthDeg)
+        {
+            float angleDiff = Math.Abs(((bearing + 360f) % 360f) - baseAngle);
+            if (angleDiff > 180f)
+                angleDiff = 360f - angleDiff;
+            return angleDiff <= sectorWidthDeg / 2f;
+        }
+
+        // F77: pack a generated consol element array into a NavigationPattern
+        // for diagnostics. The group containing the equisignal becomes the
+        // transition group.
+        public static NavigationPattern ToNavigationPattern(NavigationElementType[] elements, int groupSize = 8)
+        {
+            if (elements.IsNull() || elements.Length.IsZero())
+                return new NavigationPattern(Array.Empty<Group>(), (byte)groupSize, 255);
+
+            int groupCount = (elements.Length + groupSize - 1) / groupSize;
+            var groups = new Group[groupCount];
+            int transitionIndex = -1;
+
+            for (int g = 0; g < groupCount; g++)
+            {
+                ulong bits = 0;
+                bool hasEquisignal = false;
+                for (int e = 0; e < groupSize; e++)
+                {
+                    int idx = g * groupSize + e;
+                    if (idx >= elements.Length)
+                        break;
+                    if (elements[idx] == NavigationElementType.Dash)
+                        bits |= 1UL << e;
+                    else if (elements[idx] == NavigationElementType.Equisignal)
+                        hasEquisignal = true;
+                }
+                groups[g] = new Group(bits);
+                if (hasEquisignal && transitionIndex < 0)
+                    transitionIndex = g;
+            }
+
+            return new NavigationPattern(groups, (byte)groupSize,
+                transitionIndex >= 0 ? (byte)transitionIndex : (byte)255);
+        }
     }
 }

@@ -406,7 +406,7 @@ namespace UBOAT.Mods.RadioNavigation
 
                 var sector = SonneSignalGenerator.CalculateSector(bearing, beaconStations[i].BaseAngle);
 
-                stations[i].InBeam = true;
+                stations[i].InBeam = SonneSignalGenerator.CalculateInBeam(bearing, (float)beaconStations[i].BaseAngle, stations[i].Config.SectorWidthDeg);
                 stations[i].DotCount = sector.DotCount;
                 stations[i].CurrentBearing = (int)((bearing + 360f) % 360f);
                 stations[i].TransitionIndex = sector.DotCount;
@@ -422,6 +422,8 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     schedulers[i].CurrentConsolPattern = consolPattern;
                 }
+
+                stations[i].Pattern = SonneSignalGenerator.ToNavigationPattern(consolPattern); // F77: diagnostics Pattern was never updated after init
 
                 measurements.Add(new PositionFixCalculator.Measurement
                 {
