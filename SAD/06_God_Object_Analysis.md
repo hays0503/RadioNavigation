@@ -1,6 +1,6 @@
 # God Object Analysis — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-01):** Этот документ ссылается на несуществующие классы (F47: `StationManager`, `SignalDecoder`, `PositionTracker`, `AudioController`, `UIElementFactory`, `StationInfoDisplay`, `StationFinder`) в extraction plan — отмечены `⚠ proposed`. Реальные кандидаты на выделение: `RadioStoryIntegration` (381 LOC), `SonneSignalGenerator` (146), `SignalRichTextFormatter` (86). ADR-003 changed «Accepted» → «Deferred» (F45, исправлено). Добавлены F65–F199 (всего 199 проблем). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
+> **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Актуальные god-объекты, отложенные в roadmap SAD 08/09 (Фаза 4): `SonneController` (F02), `InformationPanelHandler` (F03), `PositionFixCalculator` (F18), `RadioStoryIntegration` (F04/F83 — мёртвая цепочка G1–G4), `Main.cs` (F21), `AudioSynthesisEngine` (F25). Реальные кандидаты на выделение: `SonneSignalGenerator` (146 LOC), `SignalRichTextFormatter` (86). Причины отложения — в `refactoring-plan/DEFERRED.md`. Несуществующие классы extraction plan (F47: `StationManager`, `SignalDecoder`, `PositionTracker`, `AudioController`, `UIElementFactory`, `StationInfoDisplay`, `StationFinder`) — отклонены.
 
 ## 1. God Objects Identified
 

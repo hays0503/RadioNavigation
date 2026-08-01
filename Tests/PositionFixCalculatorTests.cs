@@ -153,13 +153,13 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [Fact]
         public void GetDistanceKm_SamePoint_Zero()
         {
-            Assert.Equal(0f, PositionFixCalculator.GetDistanceKm(0f, 0f, 0f, 0f), 4);
+            Assert.Equal(0f, GeoMath.HaversineKm(0f, 0f, 0f, 0f), 4);
         }
 
         [Fact]
         public void GetDistanceKm_OneDegreeLatitude_About111Km()
         {
-            float d = PositionFixCalculator.GetDistanceKm(50f, 0f, 51f, 0f);
+            float d = GeoMath.HaversineKm(50f, 0f, 51f, 0f);
             Assert.InRange(d, 110f, 113f);
         }
     }

@@ -1,6 +1,6 @@
 # Refactoring Roadmap — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-01):** Проведён тотальный перекрёстный аудит (SAD vs code, git, build/config, cross-file consistency). Итого **199 проблем** (F01–F199). Быстрые победы: 65 + 8 документационных. Оценка времени ~95–130 часов + Фаза 0 (F22: 8–12 часов тестовой инфраструктуры). Добавлены F65–F199 (потерянные фазы F165–F199).
+> **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Выполнено в ветках `fix/audit-and-issue-files` (42 коммита) + `refactor/deferred-code` (F12/F73/F28/F10/F173): фазы 0, 1, 2, 3 и большая часть 5 закрыты; тесты **167/167**. Остаток roadmap — Фаза 4 (god-object декомпозиция: F02/F03/F18/F21/F25, deferred в `refactoring-plan/DEFERRED.md`).
 
 ## 1. Roadmap Overview
 
@@ -15,14 +15,14 @@ Week 4-5: Polish, Quick Wins & Testing (F66–F199)
 
 ### Phases Overview
 
-| Phase | Focus | Tasks | Effort | F-numbers |
-|--------|-------|-------|--------|-----------|
-| Phase 0 | Test infrastructure | F22 | 8–12h | F22 |
-| Phase 1 | Quick wins | F77–F164 | 20–25h | ~65 tasks |
-| Phase 2 | Safety & correctness | F01–F15, F65–F83, F121–F140 | 15–25h | ~35 tasks |
-| Phase 3 | Architecture blockers | F05, F29, F01, F04, F25 | 12–18h | 5 tasks |
-| Phase 4 | God-object decomposition | F02, F03, F04, F17, F18, F21 | 12–20h | 6 tasks |
-| Phase 5 | API design & polish | F65–F76, F165–F199 | 10–15h | ~55 tasks |
+| Phase | Focus | Tasks | Effort | F-numbers | Status |
+|--------|-------|-------|--------|-----------|--------|
+| Phase 0 | Test infrastructure | F22 | 8–12h | F22 | ✅ 2026-08-01 |
+| Phase 1 | Quick wins | F77–F164 | 20–25h | ~65 tasks | ✅ 2026-08-01 |
+| Phase 2 | Safety & correctness | F01–F15, F65–F83, F121–F140 | 15–25h | ~35 tasks | ✅ 2026-08-01 |
+| Phase 3 | Architecture blockers | F05, F29, F01, F04, F25 | 12–18h | 5 tasks | ✅ (F25 → Фаза 4) |
+| Phase 4 | God-object decomposition | F02, F03, F04, F17, F18, F21 | 12–20h | 6 tasks | ⏸ deferred (F02/F03/F18/F21) |
+| Phase 5 | API design & polish | F65–F76, F165–F199 | 10–15h | ~55 tasks | ✅ + F12/F28 (deferred-code) |
 
 ## 2. Phase 1: Safety & Critical Fixes (Week 1)
 

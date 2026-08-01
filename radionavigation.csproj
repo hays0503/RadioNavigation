@@ -11,68 +11,75 @@
          enabled, so the suppressions never matched anything. -->
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+  <!-- F10: the game path is a single MSBuild property now; override it with
+       `-p:GamePath=...`, the UBOAT_GAME_PATH env var, or the Steam default. -->
+  <PropertyGroup>
+    <GamePath Condition="'$(GamePath)' == ''">$([System.Environment]::GetEnvironmentVariable('UBOAT_GAME_PATH'))</GamePath>
+    <GamePath Condition="'$(GamePath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\UBOAT</GamePath>
+    <GameManaged>$(GamePath)\UBOAT_Data\Managed</GameManaged>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="Source\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(GameManaged)\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>$(GameManaged)\UnityEngine.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(GameManaged)\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UIModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\UnityEngine.UIModule.dll</HintPath>
+      <HintPath>$(GameManaged)\UnityEngine.UIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <HintPath>$(GameManaged)\UnityEngine.UI.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>$(GameManaged)\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>$(GameManaged)\UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+      <HintPath>$(GameManaged)\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <HintPath>$(GameManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.AudioModule">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\UnityEngine.AudioModule.dll</HintPath>
+      <HintPath>$(GameManaged)\UnityEngine.AudioModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="0Harmony">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\0Harmony.dll</HintPath>
+      <HintPath>$(GameManaged)\0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="com.uboat.dependencies">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\com.uboat.dependencies.dll</HintPath>
+      <HintPath>$(GameManaged)\com.uboat.dependencies.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="com.uboat.game">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\com.uboat.game.dll</HintPath>
+      <HintPath>$(GameManaged)\com.uboat.game.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="com.uboat.modapi">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\com.uboat.modapi.dll</HintPath>
+      <HintPath>$(GameManaged)\com.uboat.modapi.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <HintPath>$(GameManaged)\Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

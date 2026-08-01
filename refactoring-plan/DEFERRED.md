@@ -16,7 +16,7 @@ Resolved without code edits — each entry lists the reason:
 - **F08** GC pressure (per-frame heap allocations) — not a hot path; call sites already allocate only on 0.2 s station updates; no per-frame `new` remains.
 - **F10** 14 hardcoded HintPath + Steam-path dependency in csproj — dev-only build config; build.ps1 is the supported entry point; not game-facing.
 - **F12** `ToRadians` duplicated (SonneController vs PositionFixCalculator) — 3-line copy-paste; dedup goes with F73 (Haversine) into a shared geo module, SAD 08 roadmap.
-- **F15** No state persistence (volume/band/radio position reset) — feature request, not a defect; needs a save-system decision.
+- **F15** No state persistence (volume/band/radio position reset) — **✅ реализовано (2026-08-02, feat(F15) в refactor/deferred-code)**: `PanelStateStore` (PlayerPrefs) сохраняет volume/feedback/zone/cursor, восстанавливает в `InformationPanelHandler.Start`.
 - **F18** PositionFixCalculator god object (224 LOC) — architectural refactor, SAD 08 roadmap.
 - **F20** DialConfig band unit inconsistencies (Band I MHz vs kHz display) — display-string only; band math is consistent (Bands table).
 - **F21** Main.cs responsibilities — architectural refactor, SAD 08 roadmap.

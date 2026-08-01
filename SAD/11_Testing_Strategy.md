@@ -1,45 +1,32 @@
 # Testing Strategy — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-01):** ADR-007 имеет статус «Deferred» (был «Accepted» — F45, исправлено). **0 тестов существует** (F10). Проект использует `csc.exe` (не `dotnet build`), поэтому команда `dotnet test` не работает — нужна тестовая инфраструктура (F22). `StationManagerTests`/`SignalDecoderTests`/`PositionTrackerTests`/`AudioPipelineTests` относятся к несуществующим классам (F47) — annotated `⚠ proposed`. Всего **199 проблем** (F01–F199). Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
+> **⚠️ Deep Scan Update (2026-08-02):** Инфраструктура тестов РЕАЛИЗОВАНА (F22): xunit 2.9 + собственный раннер (`Tests/Runner`), **167 тестов PASS** (157 базовых + GeoMath после F12/F73). Команда: `dotnet run --project "Tests\Runner\Runner.csproj"`. ADR-007 имеет статус «Deferred» (F45, исправлено) — полный охват интеграционных/производительных тестов остаётся целевым. Всего **207 проблем** (F01–F207), статусы — в `refactoring-plan/hypothesis/INDEX.md`. Секции 3.x содержат целевые примеры тестов (не обязательно совпадают с реальными файлами); актуальные тесты — в `Tests/`.
 
 ## 1. Testing Overview
 
 | Test Type | Coverage Target | Current | Priority |
 |-----------|-----------------|---------|----------|
-| Unit Tests | >60% | 0% | High |
-| Integration Tests | >80% | 0% | High |
-| Manual Testing | 100% | Partial | Medium |
-| Performance Tests | Baseline + 10% | None | Medium |
+| Unit Tests | >60% | 167 PASS (core logic, без Unity) | High |
+| Integration Tests | >80% | Частично (DspPipeline, StationScheduler) | Medium |
+| Manual Testing | 100% | Partial (см. Фазу live-валидации) | Medium |
+| Performance Tests | Baseline + 10% | None | Low |
 
-## 2. Test Architecture
+## 2. Test Architecture (реализовано, 2026-08-02)
 
 ```
-Tests/  [⚠ proposed — F22: no test project exists yet]
-├── Unit/
-│   ├── Data/
-│   │   ├── BeaconDataTests.cs
-│   │   ├── DialConfigTests.cs
-│   │   └── ConsolCycleConfigTests.cs
-│   │
-│   ├── Logic/
-│   │   ├── PositionFixCalculatorTests.cs
-│   │   ├── MorseAlphabetTests.cs
-│   │   ├── MorseTimingTests.cs
-│   │   ├── NavigationPatternTests.cs
-│   │   ├── SonneSignalGeneratorTests.cs
-│   │   └── StationSchedulerTests.cs
-│   │
-│   └── Extensions/
-│       └── ComparisonExtensionsTests.cs
-│
-├── Integration/
-│   ├── ⚠ DspPipelineTests.cs  [⚠ proposed — tests CarrierGenerator/Atmosphere/ReceiverDsp nested classes]
-│   └── ⚠ AudioPipelineTests.cs [⚠ proposed — AudioPipeline doesn't exist, F47]
-│
-└── Manual/
-    ├── AudioQualityTests.md  [manual checklist, not .cs]
-    ├── UITests.md           [manual checklist, not .cs]
-    └── GameIntegrationTests.md [manual checklist, not .cs]
+Tests/  [xunit 2.9 + собственный раннер Tests/Runner; без Unity-рантайма]
+├── BeaconDataTests.cs          ├── MorseKeyerTests.cs
+├── ConsolCycleConfigTests.cs   ├── MorseTimingTests.cs
+├── ComparisonExtensionsTests.cs├── NavigationPatternTests.cs
+├── DialConfigTests.cs          ├── PlayerPositionProviderTests.cs
+├── DspPipelineTests.cs         ├── PositionFixCalculatorTests.cs
+├── GeoMathTests.cs             ├── SignalRichTextFormatterTests.cs
+├── MorseAlphabetTests.cs       ├── SignalTypesTests.cs
+├── AudioSynthesisEngineTests.cs├── SonneSignalGeneratorTests.cs
+│                               └── StationSchedulerTests.cs
+├── Stubs/            [UnityEngineMathf, UnityEngineDebug — фейки]
+└── Runner/Program.cs [самописный запускатель xunit (dotnet test неприменим:
+                      тесты подключают исходники мода напрямую)]
 ```
 
 ## 3. Unit Tests
@@ -291,63 +278,20 @@ public class DspPipelineTests {
 
 ## 4. Integration Tests
 
-### 4.1 DspPipelineTests.cs ⚠ proposed (F22)
+### 4.1 DspPipelineTests.cs ✅ реализовано
 
-```csharp
-// ⚠ proposed — CarrierGenerator, Atmosphere, ReceiverDsp are nested classes in DspPipeline.cs
-[TestFixture]
-public class DspPipelineTests {
-    [Test]
-    public void GenerateCarrier_SineWave_CorrectFrequency() {
-        var carrier = new CarrierGenerator(440f, 44100);
-        float sample = carrier.NextSample();
-        Assert.That(sample, Is.InRange(-1f, 1f));
-    }
-    
-    [Test]
-    public void ApplyAGC_LoudSignal_ReduceGain() {
-        var dsp = new ReceiverDsp();
-        float[] data = new float[1024];
-        for (int i = 0; i < data.Length; i++) {
-            data[i] = 0.9f;
-        }
-        
-        // ⚠ Actual API: ReceiverDsp has 1 Process method, not ApplyAGC (F51)
-        dsp.Process(data);  // Corrected — actual ReceiverDsp.Process() (F47)
-        
-        Assert.That(data[0], Is.LessThan(0.9f));
-    }
-    
-    [Test]
-    public void Atmosphere_Noise_BoundedOutput() {
-        var atmosphere = new Atmosphere();
-        float[] data = new float[1024];
-        
-        // ⚠ Actual API: Apply(sample, sampleRate), not GenerateNoise(data) (F47)
-        atmosphere.Apply(data, 44100);  // Corrected signature
-        
-        foreach (var sample in data) {
-            Assert.That(sample, Is.InRange(-1f, 1f));
-        }
-    }
-}
-```
+Покрывает `CarrierGenerator`/`Atmosphere`/`ReceiverDsp` (вложенные классы DspPipeline): фаза несущей [0,1), AGC, границы шума.
 
-### 4.2 StationManagerTests.cs ⚠ proposed (F47)
-
-```csharp
-// ⚠ proposed — StationManager doesn't exist (F47). Tests apply to SonneController instead.
-// Real test target: SonneController.UpdateStationGains(), StationScheduler.Tick()
-```
-
-### 4.3 Integration Test Gap
+### 4.2 Статус интеграционных классов (F47)
 
 | Test File | Status | Notes |
 |-----------|--------|-------|
-| AudioPipelineTests.cs | ⚠ proposed (F47) | AudioPipeline doesn't exist |
-| StationManagerTests.cs | ⚠ proposed (F47) | StationManager doesn't exist |
-| SignalDecoderTests.cs | ⚠ proposed (F47) | SignalDecoder doesn't exist |
-| PositionTrackerTests.cs | ⚠ proposed (F47) | PositionTracker doesn't exist |
+| AudioPipelineTests.cs | ✘ отклонено (F47) | AudioPipeline не существует |
+| StationManagerTests.cs | ✘ отклонено (F47) | StationManager не существует |
+| SignalDecoderTests.cs | ✘ отклонено (F47) | SignalDecoder не существует |
+| PositionTrackerTests.cs | ✘ отклонено (F47) | PositionTracker не существует |
+
+Реальные цели интеграции: `SonneController.UpdateStationGains()`, `StationScheduler.Tick()`, `AudioSynthesisEngine.Tick()` — покрыты соответствующими тестовыми файлами (насколько возможно без Unity-рантайма).
 
 ## 5. Manual Testing
 
@@ -444,32 +388,26 @@ public static class TestMeasurements {
 
 ## 8. Test Execution
 
-### 8.1 Test Infrastructure Setup (F22)
+### 8.1 Test Infrastructure (F22 ✅ реализовано)
 
 ```bash
-# ⚠ No test infrastructure exists yet (F22, F10)
-# Project uses csc.exe (not dotnet build)
-# Proposed: NUnit + .NET Framework test project with CSC-compiled references
-
-# Example build+test command (proposed):
-# csc.exe /target:library /out:Tests/bin/RadioNavigation.Tests.dll \
-#   Tests/*.cs Source/Logic/*.cs Source/Data/*.cs \
-#   -r:"path/to/Assembly-CSharp.dll" -r:"path/to/UnityEngine.dll" \
-#   -r:"path/to/Harmony.dll" -r:"path/to/nunit.framework.dll"
+# xunit + самописный раннер (dotnet test неприменим: тестовый проект линкует
+# исходники мода напрямую, без сборки игровой DLL)
+dotnet run --project "Tests\Runner\Runner.csproj"
+# ожидаемый результат: "Passed: 167, Failed: 0"
 ```
 
 ### 8.2 Run Specific Test Category
 
 ```bash
-# ⚠ Not applicable until test infrastructure is set up (F22)
-# Run specific category: nunit-console /where="TestCategory=Unit" Tests/bin/RadioNavigation.Tests.dll
-# Generate coverage: OpenCover + ReportGenerator
+# Фильтр по имени теста — через раннер не поддержан; запускать через
+# TestDriven/dotnet test нельзя (см. выше). Регрессионный прогон = весь набор.
 ```
 
 ### 8.3 Generate Coverage Report
 
 ```bash
-# ⚠ Not applicable until test infrastructure is set up (F22)
+# Не настроено; сборка покрытия — целевая задача (см. 9.2)
 ```
 
 ## 9. Test Maintenance
@@ -483,15 +421,16 @@ public static class TestMeasurements {
 
 ### 9.2 Test Debt
 
-| Item | Priority | Effort |
-|------|----------|--------|
-| Add missing unit tests | High | 4-6h |
-| Add integration tests | Medium | 3-4h |
-| Add performance tests | Medium | 2-3h |
-| Update manual test cases | Low | 1-2h |
+| Item | Priority | Effort | Status |
+|------|----------|--------|--------|
+| Базовая xunit-инфраструктура | High | — | ✅ F22, 2026-08-01 |
+| Тесты UI-хендлеров (зависимы от Unity) | Medium | 3-4h | Открыто |
+| Тесты циклов Consol 60/240s | Medium | 1-2h | Открыто (Фаза 4) |
+| Покрытие (OpenCover/ReportGenerator) | Low | 2-3h | Открыто |
+| Обновление manual-чеклистов под live-игру | Low | 1-2h | Открыто |
 
 ---
 
 *Document Version: 2.0*  
-*Last Updated: 2026-08-01*  
-*Updated: 199 problems cataloged (F01–F199). Test files referencing non-existent classes annotated `⚠ proposed` (F47). Build/run commands updated for `csc.exe` workflow. Actual nested class APIs documented (CarrierGenerator/Atmosphere/ReceiverDsp in DspPipeline.cs).*
+*Last Updated: 2026-08-02*  
+*Updated: инфраструктура реализована (F22), 167 тестов PASS; статусы F01–F207 в `refactoring-plan/hypothesis/INDEX.md`.*
