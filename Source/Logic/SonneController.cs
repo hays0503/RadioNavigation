@@ -18,6 +18,8 @@ namespace UBOAT.Mods.RadioNavigation
         private StationScheduler[] schedulers;
         private MorseKeyer[] keyers;
         private CarrierGenerator[] carriers;
+        private Action<NavigationElementType, bool>[] keyerElementHandlers;
+        private Action[] keyerSequenceHandlers;
         private AudioSynthesisEngine audioEngine;
 
         private float currentFrequencyKHz;
@@ -54,6 +56,8 @@ namespace UBOAT.Mods.RadioNavigation
             schedulers = new StationScheduler[beaconStations.Length];
             keyers = new MorseKeyer[beaconStations.Length];
             carriers = new CarrierGenerator[beaconStations.Length];
+            keyerElementHandlers = new Action<NavigationElementType, bool>[beaconStations.Length];
+            keyerSequenceHandlers = new Action[beaconStations.Length];
 
             for (int i = 0; i < beaconStations.Length; i++)
             {
@@ -89,8 +93,12 @@ namespace UBOAT.Mods.RadioNavigation
                 };
 
                 int stationIndex = i;
-                keyer.OnElementCompleted += (elemType, isCallsign) => OnStationElementCompleted(stationIndex, elemType, isCallsign);
-                keyer.OnSequenceFinished += () => OnStationSequenceFinished(stationIndex);
+                var elementHandler = new Action<NavigationElementType, bool>((elemType, isCallsign) => OnStationElementCompleted(stationIndex, elemType, isCallsign));
+                var sequenceHandler = new Action(() => OnStationSequenceFinished(stationIndex));
+                keyerElementHandlers[i] = elementHandler;
+                keyerSequenceHandlers[i] = sequenceHandler;
+                keyer.OnElementCompleted += elementHandler;
+                keyer.OnSequenceFinished += sequenceHandler;
             }
 
             var audio = GetComponent<AudioSource>();
@@ -118,6 +126,17 @@ namespace UBOAT.Mods.RadioNavigation
                 volumeSpinner.OnValueChanged -= OnVolumeChanged;
             if (feedbackSpinner.IsNotNull())
                 feedbackSpinner.OnValueChanged -= OnFeedbackChanged;
+            if (keyers.IsNotNull() && keyerElementHandlers.IsNotNull() && keyerSequenceHandlers.IsNotNull())
+            {
+                for (int i = 0; i < keyers.Length; i++)
+                {
+                    if (keyers[i].IsNotNull())
+                    {
+                        keyers[i].OnElementCompleted -= keyerElementHandlers[i];
+                        keyers[i].OnSequenceFinished -= keyerSequenceHandlers[i];
+                    }
+                }
+            }
         }
 
         private void OnStationElementCompleted(int stationIndex, NavigationElementType elemType, bool isCallsign)

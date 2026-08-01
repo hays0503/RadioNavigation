@@ -70,6 +70,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (Instance == this)
                 Instance = null;
+            if (zoneHandler.IsNotNull())
+                zoneHandler.OnZoneChanged -= OnZoneChanged;
         }
 
         private void Start()
