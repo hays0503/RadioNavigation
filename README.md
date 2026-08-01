@@ -2,7 +2,7 @@
 
 Мод для UBOAT: панель радионавигационных маяков CONSOLE/Sonne с синтезом звука и вычислением позиции.
 
-- **Версия:** 2.0
+- **Версия:** 2.1
 - **Автор:** testui
 - **Namespace:** `UBOAT.Mods.RadioNavigation`
 
@@ -24,7 +24,7 @@
 ```powershell
 powershell -File build.ps1 [-GamePath <path>]  # локальная DLL (для IDE-проверок)
 dotnet build radionavigation.csproj            # Release+Debug, эталонный билд
-dotnet run --project "Tests\Runner\Runner.csproj"   # тесты (157/157)
+dotnet run --project "Tests\Runner\Runner.csproj"   # тесты (170/170)
 ```
 
 ## Структура репозитория
@@ -38,10 +38,11 @@ dotnet run --project "Tests\Runner\Runner.csproj"   # тесты (157/157)
 ## Статус качества
 
 - Аудит рефакторинга: **207/207 гипотез закрыты** (157 исправлено, 29 отложено, 8 подтверждено без правок, 13 отклонено)
-- Тесты: **157/157 PASS**, сборка Release+Debug без ошибок
+- Тесты: **170/170 PASS**, сборка Release+Debug без ошибок
 - Отложено (live-проверка в игре): угол ручки спиннера (F202), селективность приёмника (F203), характер шума (F71)
 
 ## История
 
+- **2.1** — PlayerPrefs-персистентность панели (F15), GeoMath/Constants и обновление SAD
 - **2.0** — большой рефакторинг по аудиту (F01-F207), мерж `fix/audit-and-issue-files` (42 коммита)
 - **1.x** — исходная реализация панели, сборка AssetBundle Unity 2021.3.33f1 (совместим с 2021.3.45f2 игры)

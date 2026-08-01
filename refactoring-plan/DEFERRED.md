@@ -14,15 +14,15 @@ Resolved without code edits — each entry lists the reason:
 - **F03** InformationPanelHandler god-object (474 LOC, 9 responsibilities) — architectural refactor, SAD 08 roadmap.
 - **F04** RadioStoryIntegration god-object + reflection fragility — dead chain G1-G4, see `refactoring-plan/game-source-findings/`.
 - **F08** GC pressure (per-frame heap allocations) — not a hot path; call sites already allocate only on 0.2 s station updates; no per-frame `new` remains.
-- **F10** 14 hardcoded HintPath + Steam-path dependency in csproj — dev-only build config; build.ps1 is the supported entry point; not game-facing.
-- **F12** `ToRadians` duplicated (SonneController vs PositionFixCalculator) — 3-line copy-paste; dedup goes with F73 (Haversine) into a shared geo module, SAD 08 roadmap.
+- **F10** 14 hardcoded HintPath + Steam-path dependency in csproj — **✅ реализовано (2026-08-02)**: shared `GamePath`/`GameManaged` MSBuild properties with `UBOAT_GAME_PATH` override.
+- **F12** `ToRadians` duplicated (SonneController vs PositionFixCalculator) — **✅ реализовано (2026-08-02)** через общий `GeoMath`.
 - **F15** No state persistence (volume/band/radio position reset) — **✅ реализовано (2026-08-02, feat(F15) в refactor/deferred-code)**: `PanelStateStore` (PlayerPrefs) сохраняет volume/feedback/zone/cursor, восстанавливает в `InformationPanelHandler.Start`.
 - **F18** PositionFixCalculator god object (224 LOC) — architectural refactor, SAD 08 roadmap.
 - **F20** DialConfig band unit inconsistencies (Band I MHz vs kHz display) — display-string only; band math is consistent (Bands table).
 - **F21** Main.cs responsibilities — architectural refactor, SAD 08 roadmap.
 - **F25** AudioSynthesisEngine positional array coupling — architectural API design, SAD 08 roadmap.
 - **F27** ComparisonExtensions anti-pattern (~93 call sites) — style-only; null-safety helpers used consistently (F74 notes deliberate asymmetry).
-- **F28** ~40 magic numbers — partially fixed (BfoBase, thresholds); full Constants.cs is ADR-005, SAD 08 roadmap.
+- **F28** ~40 magic numbers — **✅ частично реализовано (2026-08-02)**: semantic BFO, Q-factor, station-match and cursor constants moved to `Constants` (ADR-005); remaining local geometry literals stay local.
 - **F31** 93 Debug.Log calls — remaining logs are intentional (errors/warnings); diagnostic block now #if DEBUG (F57/F93/F88).
 - **F32** 5 GetComponentInChildren in IPH.Start — one-time init cost, not hot path.
 - **F37** 6 stations with null callsign — historical data is correct (real Consol stations had no callsigns); runtime handles empty callsigns (F87).
@@ -33,9 +33,9 @@ Resolved without code edits — each entry lists the reason:
 - **F63** DebugAngleHandler TMP dependency — debug-only helper; stripping risk accepted, SAD 08 note.
 - **F70** NavigationPattern.FormatCompact transition misrepresentation — cosmetic string only; IPH reads pattern length, not this string.
 - **F71** 2-3 Random.NextDouble() per sample in audio thread — noise character is intentional; redesign would change the sound, needs a live listen.
-- **F73** Haversine duplicated (PositionFixCalculator vs NavigationPattern) — extracted only the NaN clamp (F80); full dedup is SAD 08 roadmap.
+- **F73** Haversine duplicated (PositionFixCalculator vs NavigationPattern) — **✅ реализовано (2026-08-02)**: shared `GeoMath.HaversineKm`; F80 NaN clamp preserved.
 - **F83** RadioStoryIntegration zombie decisions on hot-reload — dead chain G1-G4, see `refactoring-plan/game-source-findings/`.
-- **F173** InformationPanelHandler.CreateLabel OS font name ("Arial") — portability risk only; a missing font falls back to Unity's default, no crash; bundling a font is a content decision.
+- **F173** InformationPanelHandler.CreateLabel OS font name ("Arial") — **✅ реализовано (2026-08-02)**: fallback to Unity's `LegacyRuntime.ttf` with warning.
 
 ## Verified fixed without a new edit (code already satisfies, 2026-08-02)
 
