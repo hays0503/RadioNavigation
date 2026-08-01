@@ -27,14 +27,16 @@ namespace UBOAT.Mods.RadioNavigation
             if (measurements.IsNull() || measurements.Count < 2)
                 return new FixResult { Valid = false };
 
+            var work = new List<Measurement>(measurements);
+
             var rawIntersections = new List<GeoPoint>();
 
-            for (int i = 0; i < measurements.Count; i++)
+            for (int i = 0; i < work.Count; i++)
             {
-                for (int j = i + 1; j < measurements.Count; j++)
+                for (int j = i + 1; j < work.Count; j++)
                 {
-                    var m1 = measurements[i];
-                    var m2 = measurements[j];
+                    var m1 = work[i];
+                    var m2 = work[j];
                     var pt = FindIntersection(
                         m1.Latitude, m1.Longitude, m1.Bearing,
                         m2.Latitude, m2.Longitude, m2.Bearing);
@@ -56,22 +58,22 @@ namespace UBOAT.Mods.RadioNavigation
             roughLat /= rawIntersections.Count;
             roughLon /= rawIntersections.Count;
 
-            for (int i = 0; i < measurements.Count; i++)
+            for (int i = 0; i < work.Count; i++)
             {
-                var m = measurements[i];
+                var m = work[i];
                 float dist = GetDistanceKm(m.Latitude, m.Longitude, roughLat, roughLon);
                 m.Weight = dist > 0.1f ? 1.0f / (dist / 100.0f) : 10f;
-                measurements[i] = m;
+                work[i] = m;
             }
 
             var weightedIntersections = new List<WeightedPoint>();
 
-            for (int i = 0; i < measurements.Count; i++)
+            for (int i = 0; i < work.Count; i++)
             {
-                for (int j = i + 1; j < measurements.Count; j++)
+                for (int j = i + 1; j < work.Count; j++)
                 {
-                    var m1 = measurements[i];
-                    var m2 = measurements[j];
+                    var m1 = work[i];
+                    var m2 = work[j];
                     var pt = FindIntersection(
                         m1.Latitude, m1.Longitude, m1.Bearing,
                         m2.Latitude, m2.Longitude, m2.Bearing);
@@ -109,11 +111,22 @@ namespace UBOAT.Mods.RadioNavigation
             float calcLat = totalLat / totalW;
             float calcLon = totalLon / totalW;
 
+            double sqErr = 0.0;
+            double errW = 0.0;
+            for (int i = 0; i < weightedIntersections.Count; i++)
+            {
+                var wp = weightedIntersections[i];
+                double d = GetDistanceKm(calcLat, calcLon, wp.Latitude, wp.Longitude);
+                sqErr += d * d * wp.Weight;
+                errW += wp.Weight;
+            }
+            float errorKm = errW > 0.0 ? (float)Math.Sqrt(sqErr / errW) : 0f;
+
             return new FixResult
             {
                 Latitude = calcLat,
                 Longitude = calcLon,
-                ErrorKm = 0f,
+                ErrorKm = errorKm,
                 Valid = true
             };
         }
@@ -176,9 +189,9 @@ namespace UBOAT.Mods.RadioNavigation
             if ((Math.Sin(alpha1) * Math.Sin(alpha2)).IsNegative())
                 return new GeoPoint { Valid = false };
 
-            double alpha3 = Math.Acos(
-                -Math.Cos(alpha1) * Math.Cos(alpha2) +
-                Math.Sin(alpha1) * Math.Sin(alpha2) * Math.Cos(dist12));
+            double cosAlpha3 = -Math.Cos(alpha1) * Math.Cos(alpha2) +
+                               Math.Sin(alpha1) * Math.Sin(alpha2) * Math.Cos(dist12);
+            double alpha3 = Math.Acos(Math.Max(-1.0, Math.Min(1.0, cosAlpha3)));
 
             double dist13 = Math.Atan2(
                 Math.Sin(dist12) * Math.Sin(alpha1) * Math.Sin(alpha2),

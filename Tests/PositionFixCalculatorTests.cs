@@ -56,6 +56,73 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void Calculate_InconsistentBearings_ErrorKmPositive()
+        {
+            var r = PositionFixCalculator.Calculate(new List<PositionFixCalculator.Measurement>
+            {
+                M(48f, 8f, 34.52f),
+                M(52f, 9f, 164.14f),
+                M(49f, 12f, 310.35f),
+                M(51f, 11f, 214.85f)
+            });
+            Assert.True(r.Valid);
+            Assert.True(r.ErrorKm > 0.5f, "ErrorKm=" + r.ErrorKm);
+            Assert.False(float.IsNaN(r.ErrorKm));
+        }
+
+        [Fact]
+        public void Calculate_PerfectIntersection_ErrorKmNearZero()
+        {
+            var r = PositionFixCalculator.Calculate(new List<PositionFixCalculator.Measurement>
+            {
+                M(0f, 0f, 45f),
+                M(0f, 0f, 135f),
+                M(0f, 0f, 225f)
+            });
+            Assert.True(r.Valid);
+            Assert.True(r.ErrorKm < 0.5f, "ErrorKm=" + r.ErrorKm);
+        }
+
+        [Fact]
+        public void Calculate_DoesNotMutateInputMeasurements()
+        {
+            var measurements = new List<PositionFixCalculator.Measurement>
+            {
+                M(50f, 0f, 90f),
+                M(52f, 4f, 180f),
+                M(48f, -2f, 0f)
+            };
+            var snapshot = new List<PositionFixCalculator.Measurement>(measurements);
+            _ = PositionFixCalculator.Calculate(measurements);
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                Assert.Equal(snapshot[i].Weight, measurements[i].Weight);
+                Assert.Equal(snapshot[i].Bearing, measurements[i].Bearing);
+            }
+        }
+
+        [Fact]
+        public void Calculate_StressCases_NeverNaN()
+        {
+            var cases = new List<List<PositionFixCalculator.Measurement>>
+            {
+                new List<PositionFixCalculator.Measurement> { M(89f, 179f, 0f), M(89f, -179f, 90f) },
+                new List<PositionFixCalculator.Measurement> { M(0.001f, 0.001f, 10f), M(0.002f, 0.002f, 190f) },
+                new List<PositionFixCalculator.Measurement> { M(-89f, -179.9f, 270f), M(-89f, 179.9f, 90f) },
+                new List<PositionFixCalculator.Measurement> { M(45f, 10f, 350f), M(46f, 11f, 170f), M(44f, 9f, 260f) }
+            };
+            foreach (var measurements in cases)
+            {
+                var r = PositionFixCalculator.Calculate(measurements);
+                if (!r.Valid)
+                    continue;
+                Assert.False(float.IsNaN(r.Latitude));
+                Assert.False(float.IsNaN(r.Longitude));
+                Assert.False(float.IsNaN(r.ErrorKm));
+            }
+        }
+
+        [Fact]
         public void Calculate_AntipodalMeasurements_DoesNotThrow()
         {
             _ = PositionFixCalculator.Calculate(new List<PositionFixCalculator.Measurement>
