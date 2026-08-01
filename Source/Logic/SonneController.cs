@@ -101,6 +101,7 @@ namespace UBOAT.Mods.RadioNavigation
                     Config = config,
                     DotCount = 0,
                     CurrentBearing = 0,
+                    BearingToBoat = 0,
                     Pattern = new NavigationPattern(Array.Empty<Group>(), 8),
                     CallsignLength = callsignLen
                 };
@@ -326,6 +327,7 @@ namespace UBOAT.Mods.RadioNavigation
                 SchedulerPhase = schedulers[index].CurrentPhase,
                 DotCount = s.DotCount,
                 CurrentBearing = s.CurrentBearing,
+                BearingToBoat = s.BearingToBoat,
                 NavigationElapsed = elapsed
             };
         }
@@ -342,6 +344,7 @@ namespace UBOAT.Mods.RadioNavigation
             public StationScheduler.Phase SchedulerPhase;
             public int DotCount;
             public int CurrentBearing;
+            public int BearingToBoat;
             public float NavigationElapsed;
         }
 
@@ -486,12 +489,16 @@ namespace UBOAT.Mods.RadioNavigation
                 float bearing = CalculateBearing(
                     playerLatitude, playerLongitude,
                     (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude);
+                float bearingToBoat = CalculateBearing(
+                    (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude,
+                    playerLatitude, playerLongitude);
 
                 var sector = SonneSignalGenerator.CalculateSector(bearing, beaconStations[i].BaseAngle);
 
                 stations[i].InBeam = SonneSignalGenerator.CalculateInBeam(bearing, (float)beaconStations[i].BaseAngle, stations[i].Config.SectorWidthDeg);
                 stations[i].DotCount = sector.DotCount;
                 stations[i].CurrentBearing = (int)((bearing + 360f) % 360f);
+                stations[i].BearingToBoat = (int)((bearingToBoat + 360f) % 360f);
                 stations[i].TransitionIndex = sector.DotCount;
 
                 string callsign;

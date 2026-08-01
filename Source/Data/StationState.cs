@@ -8,6 +8,7 @@
         public float BeatFrequency;
         public int DotCount;
         public int CurrentBearing;
+        public int BearingToBoat;
         public int CallsignLength;
         public float NavigationStartTime;
         public ConsolCycleConfig Config;
