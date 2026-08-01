@@ -243,7 +243,7 @@ namespace UBOAT.Mods.RadioNavigation
             ctorArgs[0] = LocaleKey;
             ctorArgs[1] = null;
             ctorArgs[2] = true;
-            ctorArgs[3] = new Action(ToggleRadio);
+            ctorArgs[3] = new Action(OpenRadio);
             ctorArgs[4] = 0;
             ctorArgs[5] = null;
             var ctorParams = decisionCtor.GetParameters();
@@ -389,8 +389,8 @@ namespace UBOAT.Mods.RadioNavigation
 
                 if (key == LocaleKey)
                 {
-                    Debug.Log("[RadioNav] T3PLL38 toggled");
-                    ToggleRadio();
+                    Debug.Log("[RadioNav] T3PLL38 open requested");
+                    OpenRadio();
                     return PreventOriginal;
                 }
 
@@ -409,10 +409,17 @@ namespace UBOAT.Mods.RadioNavigation
                 RadioHandler.Instance.IsVisible = false;
         }
 
-        private static void ToggleRadio()
+        private static void OpenRadio()
         {
             if (RadioHandler.Instance.IsNotNull())
-                RadioHandler.Instance.ToggleVisibility();
+            {
+                RadioHandler.Instance.IsVisible = true;
+                Debug.Log("[RadioNav] T3PLL38 panel visible=" + RadioHandler.Instance.IsVisible);
+            }
+            else
+            {
+                Debug.LogError("[RadioNav] T3PLL38 open requested but RadioHandler.Instance is null");
+            }
         }
     }
 }

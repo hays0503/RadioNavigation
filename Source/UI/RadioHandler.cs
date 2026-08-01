@@ -48,6 +48,9 @@ namespace UBOAT.Mods.RadioNavigation
                 canvasGroup.alpha = value ? 1f : 0f;
                 canvasGroup.interactable = value;
                 canvasGroup.blocksRaycasts = value;
+                Debug.Log("[RadioNav][RadioHandler] visible=" + value
+                    + " alpha=" + canvasGroup.alpha
+                    + " active=" + gameObject.activeInHierarchy);
             }
         }
 
