@@ -33,6 +33,7 @@ namespace UBOAT.Mods.RadioNavigation
             this.sequence = sequence;
             this.scheduler = scheduler;
             this.config = config;
+            consolPattern = null; // F65: stale consol pattern must not win over the loaded sequence
             elementIndex = 0;
             ticksInState = 0;
             state = State.Idle;

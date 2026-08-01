@@ -23,6 +23,7 @@
     <Compile Include="GameContractTests.cs" />
     <Compile Include="PositionFixCalculatorTests.cs" />
     <Compile Include="MorseAlphabetTests.cs" />
+    <Compile Include="MorseKeyerTests.cs" />
     <Compile Include="MorseTimingTests.cs" />
     <Compile Include="NavigationPatternTests.cs" />
     <Compile Include="DialConfigTests.cs" />
@@ -42,6 +43,7 @@
     <Compile Include="..\Source\Data\StationState.cs" Link="Source\Data\StationState.cs" />
     <Compile Include="..\Source\Logic\ComparisonExtensions.cs" Link="Source\Logic\ComparisonExtensions.cs" />
     <Compile Include="..\Source\Logic\MorseAlphabet.cs" Link="Source\Logic\MorseAlphabet.cs" />
+    <Compile Include="..\Source\Logic\MorseKeyer.cs" Link="Source\Logic\MorseKeyer.cs" />
     <Compile Include="..\Source\Logic\MorseTiming.cs" Link="Source\Logic\MorseTiming.cs" />
     <Compile Include="..\Source\Logic\NavigationElementType.cs" Link="Source\Logic\NavigationElementType.cs" />
     <Compile Include="..\Source\Logic\NavigationPattern.cs" Link="Source\Logic\NavigationPattern.cs" />
