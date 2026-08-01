@@ -50,35 +50,31 @@ namespace UBOAT.Mods.RadioNavigation
             if (trigger.IsNull())
                 trigger = child.AddComponent<EventTrigger>();
 
-            EventTrigger.Entry leftClick = new EventTrigger.Entry
+            // F118: EventTrigger does not filter by mouse button at the
+            // eventID level; a single PointerClick entry avoids double
+            // callback invocations and the button dispatch is explicit.
+            EventTrigger.Entry click = new EventTrigger.Entry
             {
                 eventID = EventTriggerType.PointerClick
             };
-            leftClick.callback.AddListener((data) =>
+            click.callback.AddListener((data) =>
             {
                 PointerEventData ped = data as PointerEventData;
-                if (ped.IsNotNull() && ped.button == PointerEventData.InputButton.Left)
+                if (ped.IsNull())
+                    return;
+
+                if (ped.button == PointerEventData.InputButton.Left)
                 {
                     Debug.Log("[RadioNav][Zone] LMB click on " + child.name + " -> next");
                     NextZone();
                 }
-            });
-            trigger.triggers.Add(leftClick);
-
-            EventTrigger.Entry rightClick = new EventTrigger.Entry
-            {
-                eventID = EventTriggerType.PointerClick
-            };
-            rightClick.callback.AddListener((data) =>
-            {
-                PointerEventData ped = data as PointerEventData;
-                if (ped.IsNotNull() && ped.button == PointerEventData.InputButton.Right)
+                else if (ped.button == PointerEventData.InputButton.Right)
                 {
                     Debug.Log("[RadioNav][Zone] RMB click on " + child.name + " -> previous");
                     PreviousZone();
                 }
             });
-            trigger.triggers.Add(rightClick);
+            trigger.triggers.Add(click);
         }
 
         private void NextZone()

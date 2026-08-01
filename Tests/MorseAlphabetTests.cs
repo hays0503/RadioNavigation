@@ -94,16 +94,18 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(p.GetElement(1));
         }
 
-        // F125: unknown characters must not throw; they encode as an
-        // inter-character gap (3 silent elements), consistent with how a
-        // space is treated, so GetElementCount and TextToPattern agree.
+        // F125/F129: unknown characters must not throw; they encode as an
+        // inter-character gap (3 silent elements), while a space is an
+        // inter-word gap (7). Both keep GetElementCount/TextToPattern
+        // consistent (identical padded sizes here).
         [Fact]
-        public void TextToPattern_UnknownCharacter_ActsLikeSpace()
+        public void TextToPattern_UnknownCharacter_ActsAsGap()
         {
             var withUnknown = MorseAlphabet.TextToPattern("AB?C");
-            var withSpace = MorseAlphabet.TextToPattern("AB C");
-            Assert.Equal(withSpace.ElementCount, withUnknown.ElementCount);
-            Assert.Equal(MorseAlphabet.GetElementCount("AB?C"), MorseAlphabet.GetElementCount("AB C"));
+            var withLetter = MorseAlphabet.TextToPattern("ABCD");
+            Assert.Equal(3, withUnknown.Groups.Length);
+            Assert.Equal(withLetter.ElementCount, withUnknown.ElementCount);
+            Assert.Equal(MorseAlphabet.GetElementCount("AB?C") + 5, withUnknown.ElementCount);
         }
 
         [Fact]
@@ -111,6 +113,31 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             var p = MorseAlphabet.TextToPattern("???");
             Assert.NotNull(p.Groups);
+        }
+
+        // F129: inter-word pause is 7 elements, inter-character is 3.
+        // A = ".-" (2), B = "-..." (4).
+        [Fact]
+        public void GetElementCount_InterWordPause_IsSeven()
+        {
+            Assert.Equal(2 + 7 + 4, MorseAlphabet.GetElementCount("A B"));
+        }
+
+        [Fact]
+        public void GetElementCount_InterCharacterPause_IsThree()
+        {
+            Assert.Equal(2 + 3 + 4, MorseAlphabet.GetElementCount("AB"));
+        }
+
+        [Fact]
+        public void TextToPattern_InterWordPause_IsSeven()
+        {
+            var p = MorseAlphabet.TextToPattern("A B");
+            Assert.Equal(2, p.Groups.Length);
+            Assert.False(p.GetElement(0));
+            Assert.True(p.GetElement(1));
+            Assert.False(p.GetElement(8));
+            Assert.True(p.GetElement(9));
         }
     }
 }

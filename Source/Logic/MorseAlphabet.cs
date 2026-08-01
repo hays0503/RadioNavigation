@@ -77,7 +77,16 @@ namespace UBOAT.Mods.RadioNavigation
             int total = 0;
             for (int i = 0; i < text.Length; i++)
             {
-                if (i.IsPositive()) total += 3;
+                // F129: inter-word pause (7) instead of inter-character (3)
+                // after a space; a space itself encodes as silence, it must
+                // not also carry a leading pause.
+                if (i.IsPositive() && text[i] != ' ')
+                {
+                    if (text[i - 1] == ' ')
+                        total += 7;
+                    else
+                        total += 3;
+                }
                 total += GetMorse(text[i]).Length;
             }
             return total;
@@ -92,9 +101,13 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i < text.Length; i++)
             {
-                if (i.IsPositive())
+                // F129: mirror GetElementCount — 7-element inter-word pause
+                // after a space, 3-element inter-character pause otherwise;
+                // a space itself contributes only silence.
+                if (i.IsPositive() && text[i] != ' ')
                 {
-                    for (int g = 0; g < 3; g++)
+                    int pause = text[i - 1] == ' ' ? 7 : 3;
+                    for (int g = 0; g < pause; g++)
                         elements.Add(false);
                 }
 

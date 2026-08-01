@@ -54,7 +54,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static int[] GenerateBearingTable(BeaconStation station)
         {
-            var config = ConsolCycleConfig.Cycle120s;
+            // F127: derive the cycle config from the station instead of
+            // hardcoding Cycle120s (all 14 stations are 120s today, but the
+            // table must follow the station's own cycle duration).
+            var config = ConsolCycleConfig.GetForCycleDuration(station.CycleDurationSeconds);
             int maxCount = config.MaxNavigationCount;
             var table = new int[maxCount + 1];
 
