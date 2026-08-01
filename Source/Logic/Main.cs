@@ -27,7 +27,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (loaded)
             {
-                harmony?.UnpatchAll();
+                harmony?.UnpatchAll(harmony.Id); // F139: bare UnpatchAll() removes other mods' patches; 0Harmony 2.2.2 has no UnpatchSelf
                 RadioStoryIntegration.ResetRuntimeState();
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
             }
@@ -75,8 +75,8 @@ namespace UBOAT.Mods.RadioNavigation
                     catch (Exception ex)
                     {
                         Debug.LogError("[RadioNav] Patch failed for " + t.name + ": " + ex.Message);
-                        harmony.UnpatchAll();
-                        Debug.Log("[RadioNav] All patches rolled back due to partial failure");
+                        harmony.UnpatchAll(harmony.Id); // F121: bare UnpatchAll() would roll back other mods' patches too
+                        Debug.Log("[RadioNav] RadioNavigation patches rolled back due to partial failure");
                         break;
                     }
                 }
