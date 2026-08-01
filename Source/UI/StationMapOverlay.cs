@@ -78,6 +78,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return false;
 
             marker.name = "RadioNavStation" + index;
+            marker.gameObject.SetActive(true);
             TextMeshProUGUI label = marker.GetComponent<TextMeshProUGUI>();
             if (label.IsNull())
             {
@@ -101,7 +102,9 @@ namespace UBOAT.Mods.RadioNavigation
                 + " lat=" + station.Latitude.ToString("F6")
                 + " lon=" + station.Longitude.ToString("F6")
                 + " world=" + worldPosition
-                + " scene=" + label.transform.position);
+                + " scene=" + label.transform.position
+                + " activeSelf=" + marker.gameObject.activeSelf
+                + " activeInHierarchy=" + marker.gameObject.activeInHierarchy);
             return true;
         }
 
