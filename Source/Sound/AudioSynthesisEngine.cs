@@ -26,6 +26,16 @@ namespace UBOAT.Mods.RadioNavigation
             set => outputVolume = Mathf.Clamp(value, 0f, 1f);
         }
 
+        // F115: clear accumulated DSP state (QSB phase, AGC gain, filter
+        // state) when the controller is destroyed; a recreated engine must
+        // start from a clean state.
+        public void Reset()
+        {
+            atmosphere.Reset();
+            dsp.Reset();
+            tickAccumulator = 0f;
+        }
+
         public float QualityFactor { get; set; } = 20f;
         public float Feedback { get; private set; }
         public Atmosphere Atmosphere => atmosphere;

@@ -29,10 +29,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         public event Action<float> OnAngleChanged;
 
+        // F159: Start() must not unconditionally overwrite Inspector-assigned
+        // references — use the serialized value with a runtime fallback.
         private void Start()
         {
-            beaconText = GetComponentInChildren<TMP_Text>(true);
-            slider = GetComponentInChildren<Slider>(true);
+            if (beaconText.IsNull())
+                beaconText = GetComponentInChildren<TMP_Text>(true);
+            if (slider.IsNull())
+                slider = GetComponentInChildren<Slider>(true);
 
             if (beaconText.IsNull())
                 Debug.LogError("[RadioNav][DebugAngle] TMP_Text not found in children");

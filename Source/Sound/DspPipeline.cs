@@ -50,8 +50,15 @@ namespace UBOAT.Mods.RadioNavigation
 
     public class Atmosphere
     {
+        // F156: the rare "loud" crackle path used to be hardcoded magic
+        // numbers — name them so both impulse paths are visible and tunable.
+        private const float LoudCrackleProbability = 0.0001f;
+        private const float LoudCrackleAmplitude = 0.15f;
+
         private readonly System.Random rng;
         private float qsbPhase;
+        private float cachedGaussian;
+        private bool hasCachedGaussian;
 
         public float NoiseFloor { get; set; } = 0.002f;
         public float ImpulseProbability { get; set; } = 0.001f;
@@ -63,6 +70,14 @@ namespace UBOAT.Mods.RadioNavigation
         {
             rng = new System.Random(seed);
             qsbPhase = 0f;
+        }
+
+        // F115: clear accumulated modulation state so a recreated controller
+        // does not inherit the previous QSB phase.
+        public void Reset()
+        {
+            qsbPhase = 0f;
+            hasCachedGaussian = false;
         }
 
         public float Apply(float sample, float sampleRate)
@@ -77,37 +92,65 @@ namespace UBOAT.Mods.RadioNavigation
             if (rng.NextDouble() < ImpulseProbability)
                 noise += ImpulseAmplitude * ((float)rng.NextDouble() * 2f - 1f);
 
-            if (rng.NextDouble() < 0.0001)
-                noise += 0.15f * ((float)rng.NextDouble() * 2f - 1f);
+            if (rng.NextDouble() < LoudCrackleProbability)
+                noise += LoudCrackleAmplitude * ((float)rng.NextDouble() * 2f - 1f);
 
             return Mathf.Clamp(sample * qsb + noise, -1f, 1f);
         }
 
+        // F153: Box-Muller yields two independent normals per two uniforms;
+        // cache the cosine half instead of discarding 50% of the RNG output.
         private float GaussianNoise()
         {
+            if (hasCachedGaussian)
+            {
+                hasCachedGaussian = false;
+                return cachedGaussian;
+            }
+
             double u1 = 1.0 - rng.NextDouble();
             double u2 = 1.0 - rng.NextDouble();
-            return (float)(Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2));
+            double sqrtTerm = Math.Sqrt(-2.0 * Math.Log(u1));
+            cachedGaussian = (float)(sqrtTerm * Math.Cos(2.0 * Math.PI * u2));
+            hasCachedGaussian = true;
+            return (float)(sqrtTerm * Math.Sin(2.0 * Math.PI * u2));
         }
     }
 
     public class ReceiverDsp
     {
+        private readonly float sampleRate;
         private float agcGain;
         private float prevFilter;
         private double whistlePhase;
+        private float filterCutoff = 800f;
+        private float cachedAlpha;
 
         public float AgcAttackRate { get; set; } = 0.001f;
         public float AgcReleaseRate { get; set; } = 0.0001f;
-        public float FilterCutoff { get; set; } = 800f;
+        // F155: alpha is constant while FilterCutoff is unchanged; recompute
+        // it in the setter instead of 44100 times per second in Process.
+        public float FilterCutoff
+        {
+            get => filterCutoff;
+            set
+            {
+                filterCutoff = value;
+                cachedAlpha = ComputeAlpha(value);
+            }
+        }
         public float SaturationDrive { get; set; } = 1.5f;
         public float WhistleLevel { get; set; } = 0f;
 
         public ReceiverDsp(float sampleRate)
         {
+            // F154: the constructor sampleRate was accepted but discarded,
+            // misleading callers; it now configures the filter.
+            this.sampleRate = sampleRate;
             agcGain = 1f;
             prevFilter = 0f;
             whistlePhase = 0.0;
+            cachedAlpha = ComputeAlpha(filterCutoff);
         }
 
         public float Process(float sample, float sampleRate)
@@ -124,8 +167,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             float agcSample = sample / agcGain;
 
-            float alpha = FilterCutoff / (FilterCutoff + sampleRate / (2f * (float)Math.PI));
-            prevFilter += alpha * (agcSample - prevFilter);
+            prevFilter += cachedAlpha * (agcSample - prevFilter);
 
             float saturated = (float)Math.Tanh(SaturationDrive * prevFilter);
 
@@ -145,6 +187,11 @@ namespace UBOAT.Mods.RadioNavigation
             agcGain = 1f;
             prevFilter = 0f;
             whistlePhase = 0.0;
+        }
+
+        private float ComputeAlpha(float cutoff)
+        {
+            return cutoff / (cutoff + sampleRate / (2f * (float)Math.PI));
         }
     }
 }

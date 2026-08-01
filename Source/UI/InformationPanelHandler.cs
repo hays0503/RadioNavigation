@@ -19,6 +19,9 @@ namespace UBOAT.Mods.RadioNavigation
         private Text fixText;
 
         private ToggleHandler toggleHandler;
+        // F178: RefreshAll runs on a timer; cache the Toggle instead of
+        // GetComponent on every refresh.
+        private UnityEngine.UI.Toggle cachedToggle;
         private GroundHandler groundHandler;
         private ZoneHandler zoneHandler;
         private VolumeSpinnerHandler volumeSpinner;
@@ -159,6 +162,8 @@ namespace UBOAT.Mods.RadioNavigation
         private void FindHandlers()
         {
             toggleHandler = GetComponentInChildren<ToggleHandler>(true);
+            // F178: cache once; RefreshAll reads it on a timer.
+            cachedToggle = toggleHandler.IsNotNull() ? toggleHandler.GetComponent<UnityEngine.UI.Toggle>() : null;
             groundHandler = GetComponentInChildren<GroundHandler>(true);
             zoneHandler = GetComponentInChildren<ZoneHandler>(true);
             volumeSpinner = GetComponentInChildren<VolumeSpinnerHandler>(true);
@@ -209,8 +214,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void RefreshAll()
         {
-            if (toggleHandler.IsNotNull())
-                OnToggleChanged(toggleHandler.GetComponent<Toggle>().isOn);
+            if (cachedToggle.IsNotNull())
+                OnToggleChanged(cachedToggle.isOn);
             if (groundHandler.IsNotNull())
                 OnGroundChanged(IsGroundActive());
             if (zoneHandler.IsNotNull())
@@ -223,28 +228,13 @@ namespace UBOAT.Mods.RadioNavigation
                 OnFrequencyChanged(DialConfig.AngleToFrequency(radioHandler.CursorAngle + 90f, GetZoneIndex()), GetZoneIndex());
         }
 
-        private bool IsGroundActive()
-        {
-            Transform bgT = transform.Find("Ground/Background");
-            if (bgT.IsNull()) return false;
-            Image bgImage = bgT.GetComponent<Image>();
-            return bgImage.IsNotNull() && bgImage.color.a > GroundHandler.ActiveAlphaThreshold;
-        }
+        // F160: read the handler state instead of duplicating alpha-based
+        // heuristics with transform.Find string paths.
+        private bool IsGroundActive() =>
+            groundHandler.IsNotNull() && groundHandler.IsGroundEffectivelyActive();
 
-        private int GetZoneIndex()
-        {
-            Transform radioZone = transform.Find("RadioZone");
-            if (radioZone.IsNull()) return 0;
-            for (int i = 0; i < 5; i++)
-            {
-                Transform t = radioZone.Find("Zone" + (i + 1));
-                if (t.IsNull()) continue;
-                Image img = t.GetComponent<Image>();
-                if (img.IsNotNull() && img.color.a > 0.5f)
-                    return i;
-            }
-            return 0;
-        }
+        private int GetZoneIndex() =>
+            zoneHandler.IsNotNull() ? zoneHandler.CurrentIndex : 0;
 
         private void OnToggleChanged(bool isOn)
         {

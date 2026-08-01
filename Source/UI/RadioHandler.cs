@@ -14,7 +14,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         [SerializeField] private CanvasGroup canvasGroup;
 
-        private SonneController sonneController;
         private ZoneHandler zoneHandler;
         private float currentAngle;
         private int currentZoneIndex;
@@ -79,7 +78,6 @@ namespace UBOAT.Mods.RadioNavigation
             if (canvasGroup.IsNull())
                 canvasGroup = GetComponent<CanvasGroup>();
 
-            sonneController = GetComponent<SonneController>();
             zoneHandler = GetComponentInChildren<ZoneHandler>(true);
 
             if (zoneHandler.IsNotNull())

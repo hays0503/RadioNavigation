@@ -56,5 +56,34 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             keyer.Reset();
             Assert.False(keyer.IsActive);
         }
+
+        // F113: a new consol pattern produced by the scheduler must keep the
+        // callsign classification; callsignLength = 0 would merge callsign
+        // elements into navigation.
+        [Fact]
+        public void Advance_ConsolTransition_KeepsCallsignLength()
+        {
+            var scheduler = new StationScheduler("ES");
+            scheduler.CurrentConsolPattern = SonneSignalGenerator.GenerateConsolPattern("ES", 0, ConsolCycleConfig.Cycle120s);
+
+            var keyer = new MorseKeyer();
+            keyer.LoadConsol(scheduler.CurrentConsolPattern, scheduler, ConsolCycleConfig.Cycle120s, scheduler.CallsignElementCount);
+            Assert.True(keyer.IsActive);
+
+            var completed = new System.Collections.Generic.List<System.Tuple<bool, bool>>();
+            keyer.OnElementCompleted += (type, isCallsign) => completed.Add(System.Tuple.Create(type == NavigationElementType.Dash, isCallsign));
+
+            // Advance past the whole first pattern so AdvanceElement requests
+            // a new one from the scheduler.
+            for (int i = 0; i < 5000; i++)
+            {
+                if (!keyer.IsActive)
+                    break;
+                keyer.Advance();
+            }
+
+            Assert.False(keyer.IsActive); // pattern finished, no new pattern from scheduler during Navigation phase -> idle
+            Assert.Contains(completed, t => t.Item2); // callsign elements were emitted as callsign
+        }
     }
 }

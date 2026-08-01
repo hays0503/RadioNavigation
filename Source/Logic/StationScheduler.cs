@@ -17,6 +17,9 @@
         public Phase CurrentPhase { get; private set; }
         public int[] BearingTable { get; set; }
         public ConsolCycleConfig Config { get; set; }
+        // F113: the morse element count of the callsign — survives pattern
+        // transitions inside MorseKeyer.AdvanceElement.
+        public int CallsignElementCount { get; private set; }
 
         private int pauseTicksRemaining;
 
@@ -27,6 +30,7 @@
             CurrentConsolPattern = null;
             CurrentPhase = Phase.Pause;
             pauseTicksRemaining = 1;
+            CallsignElementCount = SonneSignalGenerator.GetCallsignElementCount(callsign);
         }
 
         public IKeySequence GetCurrentSequence()

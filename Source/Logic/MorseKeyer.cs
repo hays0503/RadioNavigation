@@ -168,7 +168,9 @@ namespace UBOAT.Mods.RadioNavigation
                         consolPattern = nextPattern;
                         sequence = null;
                         elementIndex = 0;
-                        callsignLength = 0;
+                        // F113: keep the callsign classification of the new
+                        // pattern — 0 would merge callsign into navigation.
+                        callsignLength = scheduler.CallsignElementCount;
                         StartElement();
                         return;
                     }
@@ -226,6 +228,12 @@ namespace UBOAT.Mods.RadioNavigation
             if (sequence.IsNotNull() && elementIndex < sequence.ElementCount)
                 return sequence.GetElement(elementIndex) ? NavigationElementType.Dash : NavigationElementType.Dot;
 
+            // F114: a silent Dot fallback masked an out-of-range elementIndex;
+            // surface it so an index bug is visible in the log instead of
+            // producing a wrong-length tone.
+            UnityEngine.Debug.LogError("[RadioNav][MorseKeyer] GetCurrentElementType: elementIndex " + elementIndex
+                + " out of range (consolPattern.Length=" + (consolPattern.IsNotNull() ? consolPattern.Length : -1)
+                + ", sequence.ElementCount=" + (sequence.IsNotNull() ? sequence.ElementCount : -1) + ")");
             return NavigationElementType.Dot;
         }
 

@@ -95,7 +95,9 @@ namespace UBOAT.Mods.RadioNavigation
             return total;
         }
 
-        public static NavigationPattern TextToPattern(string text, int elementDurationTicks = 1)
+        // F166: elementDurationTicks was accepted but never used — element
+        // timing lives in MorseTiming, not in the pattern; removed.
+        public static NavigationPattern TextToPattern(string text)
         {
             if (string.IsNullOrEmpty(text))
                 return new NavigationPattern(new Group[0], 1);

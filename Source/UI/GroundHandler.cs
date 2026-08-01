@@ -100,7 +100,9 @@ namespace UBOAT.Mods.RadioNavigation
 #endif
         }
 
-        private bool IsGroundEffectivelyActive() =>
+        // F160: exposed so InformationPanelHandler reads the handler state
+        // instead of duplicating the alpha heuristic with transform.Find.
+        internal bool IsGroundEffectivelyActive() =>
             bgImage.IsNotNull() && bgImage.color.a > ActiveAlphaThreshold;
 
         public void OnPointerClick(PointerEventData eventData)

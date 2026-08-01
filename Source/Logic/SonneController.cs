@@ -30,6 +30,8 @@ namespace UBOAT.Mods.RadioNavigation
         private IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
         private VolumeSpinnerHandler volumeSpinner;
         private FeedbackSpinnerHandler feedbackSpinner;
+        // F178: cached so OnDestroy does not re-query the component graph.
+        private AudioSource cachedAudioSource;
 
         // F120: pre-sized lists avoid capacity-doubling allocations on the
         // audio thread (signalEntries) and in the 5 Hz navigation update.
@@ -104,7 +106,8 @@ namespace UBOAT.Mods.RadioNavigation
                 keyer.OnSequenceFinished += sequenceHandler;
             }
 
-            var audio = GetComponent<AudioSource>();
+            cachedAudioSource = GetComponent<AudioSource>();
+            var audio = cachedAudioSource;
             audio.clip = silentClip;
             audio.loop = true;
             audio.Play();
@@ -126,9 +129,13 @@ namespace UBOAT.Mods.RadioNavigation
         {
             // F89: stop the audio source so OnAudioFilterRead cannot run on a
             // partially-destroyed object during teardown.
-            var audio = GetComponent<AudioSource>();
-            if (audio.IsNotNull())
-                audio.Stop();
+            if (cachedAudioSource.IsNotNull())
+                cachedAudioSource.Stop();
+
+            // F115: clear accumulated DSP/Atmosphere state so a recreated
+            // controller does not inherit QSB phase / AGC gain / filter state.
+            if (audioEngine.IsNotNull())
+                audioEngine.Reset();
 
             RadioHandler.OnFrequencyChanged -= OnFrequencyChanged;
             if (volumeSpinner.IsNotNull())

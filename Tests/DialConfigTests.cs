@@ -53,11 +53,14 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal("100.0 MHz", DialConfig.FormatFrequency(100f, 0).Replace(',', '.'));
         }
 
+        // F161: kHz bands keep one decimal so sub-kHz detail (332.5) is not
+        // truncated by Mathf.RoundToInt.
         [Fact]
-        public void FormatFrequency_KHzBand_RoundedInteger()
+        public void FormatFrequency_KHzBand_OneDecimal()
         {
-            Assert.Equal("266 kHz", DialConfig.FormatFrequency(266f, 1));
-            Assert.Equal("174 kHz", DialConfig.FormatFrequency(173.79f, 1));
+            Assert.Equal("266.0 kHz", DialConfig.FormatFrequency(266f, 1).Replace(',', '.'));
+            Assert.Equal("173.8 kHz", DialConfig.FormatFrequency(173.79f, 1).Replace(',', '.'));
+            Assert.Equal("332.5 kHz", DialConfig.FormatFrequency(332.5f, 1).Replace(',', '.'));
         }
 
         [Fact]

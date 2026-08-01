@@ -151,7 +151,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (band.Unit == "MHz")
                 return frequency.ToString("F1") + " MHz";
 
-            return Mathf.RoundToInt(frequency) + " kHz";
+            // F161: kHz bands used to truncate sub-kHz detail (332.5 -> "333 kHz").
+            return frequency.ToString("F1") + " kHz";
         }
     }
 }

@@ -37,6 +37,10 @@
         {
             if (!Cycle120s.IsValid())
                 UnityEngine.Debug.LogWarning("[RadioNav] ConsolCycleConfig.Cycle120s is invalid");
+            // F164: only the 120 s cycle is implemented; surface any other
+            // request so a future cycle silently mapping onto 120 s is visible.
+            if (cycleDurationSeconds != 120)
+                UnityEngine.Debug.LogWarning("[RadioNav] ConsolCycleConfig: only the 120 s cycle is supported, got " + cycleDurationSeconds + " s");
             return Cycle120s;
         }
 
