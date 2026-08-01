@@ -44,6 +44,10 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            Debug.Log("[RadioNav][Map] renderer=" + mapRenderer.name
+                + " container=" + mapRenderer.VectorTerrainsUIContainer.name
+                + " active=" + mapRenderer.VectorTerrainsUIContainer.activeInHierarchy);
+
             int count = Math.Min(DebugStationCount, BeaconData.Stations.Length);
             for (int i = 0; i < count; i++)
                 CreateMarker(mapRenderer.VectorTerrainsUIContainer.transform, BeaconData.Stations[i], i);
@@ -73,6 +77,12 @@ namespace UBOAT.Mods.RadioNavigation
             label.raycastTarget = false;
 
             markers.Add(marker);
+            Debug.Log("[RadioNav][Map] marker=" + index
+                + " name=" + station.Name
+                + " lat=" + station.Latitude.ToString("F6")
+                + " lon=" + station.Longitude.ToString("F6")
+                + " world=" + worldPosition
+                + " scene=" + marker.transform.position);
         }
 
         private void OnDestroy()

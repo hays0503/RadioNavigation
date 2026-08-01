@@ -536,6 +536,7 @@ namespace UBOAT.Mods.RadioNavigation
                 fixValid = lastFix.Valid;
                 if (measurements.Count != lastLoggedMeasurementCount || fixValid != lastLoggedFixValid)
                 {
+                    LogPositionMeasurements();
                     Debug.Log("[RadioNav][POSITION] measurements=" + measurements.Count
                         + " valid=" + fixValid
                         + " lat=" + lastFix.Latitude.ToString("F5")
@@ -550,11 +551,38 @@ namespace UBOAT.Mods.RadioNavigation
                 fixValid = false;
                 if (lastLoggedMeasurementCount != measurements.Count || lastLoggedFixValid)
                 {
+                    LogPositionMeasurements();
                     Debug.Log("[RadioNav][POSITION] measurements=" + measurements.Count + "; at least 2 required");
                     lastLoggedMeasurementCount = measurements.Count;
                     lastLoggedFixValid = false;
                 }
             }
+        }
+
+        private void LogPositionMeasurements()
+        {
+            var details = new StringBuilder();
+            details.Append("[RadioNav][POSITION] player=")
+                .Append(playerLatitude.ToString("F6"))
+                .Append(',').Append(playerLongitude.ToString("F6"))
+                .Append(" freqKHz=").Append(currentFrequencyKHz.ToString("F3"))
+                .Append(" zone=").Append(currentZoneIndex);
+
+            for (int i = 0; i < measurements.Count; i++)
+            {
+                var measurement = measurements[i];
+                string name = measurement.StationIndex >= 0 && measurement.StationIndex < BeaconData.Stations.Length
+                    ? BeaconData.Stations[measurement.StationIndex].Name
+                    : "?";
+                details.Append(" | ").Append(measurement.StationIndex)
+                    .Append(':').Append(name)
+                    .Append(" lat=").Append(measurement.Latitude.ToString("F5"))
+                    .Append(" lon=").Append(measurement.Longitude.ToString("F5"))
+                    .Append(" bearing=").Append(measurement.Bearing.ToString("F1"))
+                    .Append(" weight=").Append(measurement.Weight.ToString("F2"));
+            }
+
+            Debug.Log(details.ToString());
         }
 
         private void OnAudioFilterRead(float[] data, int channels)
