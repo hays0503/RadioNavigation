@@ -15,6 +15,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static Type decisionType;
         private static ConstructorInfo decisionCtor;
+        private static FieldInfo localizationKeyField;
         private static PropertyInfo localizationKeyProp;
         private static PropertyInfo decisionsProp;
         private static MethodInfo insertMethod;
@@ -27,6 +28,7 @@ namespace UBOAT.Mods.RadioNavigation
             initialized = false;
             decisionType = null;
             decisionCtor = null;
+            localizationKeyField = null;
             localizationKeyProp = null;
             decisionsProp = null;
             insertMethod = null;
@@ -83,7 +85,9 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             Debug.Log("[RadioNav] Decision type: " + decisionType.FullName);
-            localizationKeyProp = decisionType.GetProperty("LocalizationKey");
+            localizationKeyField = decisionType.GetField("LocalizationKey", BindingFlags.Public | BindingFlags.Instance);
+            if (localizationKeyField.IsNull())
+                localizationKeyProp = decisionType.GetProperty("LocalizationKey");
 
             foreach (var ctor in decisionType.GetConstructors(BindingFlags.Public | BindingFlags.Instance))
             {
@@ -188,9 +192,9 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < count; i++)
             {
                 object item = list.IsNotNull() ? list[i] : decisions.GetType().GetProperty("Item")?.GetValue(decisions, new object[] { i });
-                if (item.IsNotNull() && localizationKeyProp.IsNotNull())
+                if (item.IsNotNull())
                 {
-                    string key = (string)localizationKeyProp.GetValue(item);
+                    string key = GetLocalizationKey(item);
 #if DEBUG
                     Debug.Log("[RadioNav]   Menu[" + i + "] key=" + key);
 #endif
@@ -199,6 +203,17 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
             return false;
+        }
+
+        // G4: Decision.LocalizationKey is a public readonly FIELD (Story.cs:24),
+        // not a property. Prefer field, keep property as fallback.
+        private static string GetLocalizationKey(object decision)
+        {
+            if (localizationKeyField.IsNotNull())
+                return localizationKeyField.GetValue(decision) as string;
+            if (localizationKeyProp.IsNotNull())
+                return localizationKeyProp.GetValue(decision) as string;
+            return null;
         }
 
         private static object CreateDecision()
@@ -340,10 +355,10 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 if (!TryInit())
                     return AllowOriginal;
-                if (localizationKeyProp.IsNull())
+                if (localizationKeyField.IsNull() && localizationKeyProp.IsNull())
                     return AllowOriginal;
 
-                string key = (string)localizationKeyProp.GetValue(decision);
+                string key = GetLocalizationKey(decision);
 
                 if (key == LeaveStationKey)
                 {
