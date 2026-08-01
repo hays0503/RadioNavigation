@@ -19,10 +19,12 @@
 
   <ItemGroup>
     <Compile Include="Stubs\UnityEngineMathf.cs" />
-<Compile Include="Stubs\UnityEngineDebug.cs" />
+    <Compile Include="Stubs\UnityEngineDebug.cs" />
+    <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />
     <Compile Include="SkipTestException.cs" />
     <Compile Include="GameContractTests.cs" />
     <Compile Include="GeoMathTests.cs" />
+    <Compile Include="PanelStateStoreTests.cs" />
     <Compile Include="PositionFixCalculatorTests.cs" />
     <Compile Include="MorseAlphabetTests.cs" />
     <Compile Include="MorseKeyerTests.cs" />
@@ -62,6 +64,7 @@
     <Compile Include="..\Source\Logic\GeoPositionConverter.cs" Link="Source\Logic\GeoPositionConverter.cs" />
     <Compile Include="..\Source\Sound\AudioSynthesisEngine.cs" Link="Source\Sound\AudioSynthesisEngine.cs" />
     <Compile Include="..\Source\Sound\DspPipeline.cs" Link="Source\Sound\DspPipeline.cs" />
+    <Compile Include="..\Source\UI\PanelStateStore.cs" Link="Source\UI\PanelStateStore.cs" />
   </ItemGroup>
 
 </Project>

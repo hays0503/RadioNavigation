@@ -21,6 +21,16 @@ namespace UBOAT.Mods.RadioNavigation
 
         public float Angle => currentAngle;
 
+        // F15: restore a persisted angle; clamps to the valid range and
+        // applies the visual rotation like a drag would.
+        public void SetAngle(float angle)
+        {
+            currentAngle = ClampTargetAngle(angle);
+            if (spinnerRect.IsNotNull())
+                spinnerRect.localRotation = Quaternion.Euler(0, 0, -currentAngle);
+            OnAngleUpdated(currentAngle);
+        }
+
         protected abstract string DebugTag { get; }
 
         protected virtual float GetAngleOffset() => 90f;

@@ -17,6 +17,18 @@ namespace UBOAT.Mods.RadioNavigation
         private Image[] zoneImages;
         private int currentIndex;
         public int CurrentIndex => currentIndex;
+
+        // F15: restore a persisted zone index; no-op outside the valid range.
+        public void SetZone(int index)
+        {
+            if (zoneImages.IsNull() || index.IsNegative() || index >= ZoneNames.Length)
+                return;
+            SetAlpha(currentIndex, hiddenAlpha);
+            currentIndex = index;
+            SetAlpha(currentIndex, visibleAlpha);
+            if (OnZoneChanged.IsNotNull())
+                OnZoneChanged(currentIndex);
+        }
         private Transform parentTransform;
 
         private void Start()
