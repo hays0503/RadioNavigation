@@ -31,9 +31,9 @@
 | **F07** | Null Reference Risks | **P1** | Correctness | 65+ | ✅ |
 | **F08** | GC Pressure | **P2** | Performance | ~170 | ⏸ |
 | **F09** | Logic Bugs | **P1** | Correctness | 55+ | ✅ |
-| **F10** | Build Config Issues | **P2** | Build | ~160 | ⏸ |
+| **F10** | Build Config Issues | **P2** | Build | ~160 | ✅ |
 | **F11** | Memory Leaks | **P1** | Memory | ~160 | 🔎 |
-| **F12** | Copy-Paste Duplication | **P2** | Hygiene | 200 | ⏸ |
+| **F12** | Copy-Paste Duplication | **P2** | Hygiene | 200 | ✅ |
 | **F13** | Unity API in Audio Thread | **P0** | Sound · Threading | ~40 | ✅ |
 | **F14** | Event Subscription Leaks | **P1** | UI · Events | ~50 | 🔎 |
 | **F15** | No State Persistence | **P2** | Save/Load | ~50 | ⏸ |
@@ -49,7 +49,7 @@
 | **F25** | AudioSynthesisEngine Array Coupling | **P1** | Sound · API Design | ~40 | ⏸ |
 | **F26** | PrefabNames.cs Not Used | **P2** | UI · Constants | ~20 | ✅ |
 | **F27** | ComparisonExtensions Anti-Pattern | **P2** | Hygiene | ~34 | ⏸ |
-| **F28** | Magic Numbers Scattered (~40 literals) | **P2** | Project-wide | ~40 | ⏸ |
+| **F28** | Magic Numbers Scattered (~40 literals) | **P2** | Project-wide | ~40 | ✅ |
 | **F29** | Zero Synchronization Primitives | **P0** | Sound · Threading | ~30 | ✅ |
 | **F30** | RadioHandler missing OnDestroy unsubscribe | **P1** | UI · RadioHandler | ~10 | 🔎 |
 | **F31** | 93 Debug.Log — 81 active in Release | **P2** | Project-wide | ~80 (call-sites) | ⏸ |
@@ -94,7 +94,7 @@
 | **F70** | NavigationPattern.FormatCompact() — неверное отображение transition | **P1** | Logic · NavigationPattern | ~1 | ⏸ |
 | **F71** | DspPipeline — 2-3 Random.NextDouble() на сэмпл в audio thread | **P2** | Sound · DSP · Performance | ~1 | ⏸ |
 | **F72** | SpinnerHandlerBase — Mathf.Lerp без Time.deltaTime (FPS-зависим) | **P2** | UI · SpinnerHandler | ~1 | ✅ |
-| **F73** | PositionFixCalculator — Haversine формула дублирована | **P2** | Logic · PositionFixCalculator · Duplication | ~1 | ⏸ |
+| **F73** | PositionFixCalculator — Haversine формула дублирована | **P2** | Logic · PositionFixCalculator · Duplication | ~1 | ✅ |
 | **F74** | ComparisonExtensions — несимметричные пороги IsSignificant/IsNegligible | **P2** | Logic · ComparisonExtensions | ~1 | 🔎 |
 | **F75** | Мёртвый код: DecodeMorse(), StationScheduler.ToTicks() | **P2** | Logic · Hygiene | ~2 | ✅ |
 | **F76** | MorseAlphabet.GetElementCount() — теоретическое int overflow | **P3** | Logic · MorseAlphabet | ~1 | ✅ |
@@ -194,7 +194,7 @@
 | **F170** | MorseAlphabet fixed table overflow | **P2** | Logic · MorseAlphabet · Data Structure | ~10 | ✅ |
 | **F171** | GroundHandler.StateLog аллокация в DEBUG каждый кадр | **P3** | UI · GroundHandler · Performance | ~26 | ✅ |
 | **F172** | SignalRichTextFormatter.TrimEntries O(n²) RemoveAt(0) | **P3** | UI · SignalRichTextFormatter · Performance | ~8 | ✅ |
-| **F173** | InformationPanelHandler.CreateLabel fragile font loading | **P2** | UI · InformationPanelHandler · Portability | ~10 | ⏸ |
+| **F173** | InformationPanelHandler.CreateLabel fragile font loading | **P2** | UI · InformationPanelHandler · Portability | ~10 | ✅ |
 | **F174** | NavigationPattern.GetElement negative index OOB | **P2** | Logic · NavigationPattern · Correctness | ~8 | ✅ |
 | **F175** | MorseKeyer.AdvanceElement cross-type transition | **P2** | Logic · MorseKeyer · State Machine | ~40 | ✅ |
 | **F176** | Main.cs GameObject.Find hardcoded hierarchy path | **P2** | Logic · Main · Performance | ~15 | ✅ |
