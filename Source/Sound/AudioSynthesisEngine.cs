@@ -15,6 +15,7 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly float ticksPerSample;
         private float tickAccumulator;
         private float outputVolume = 1f;
+        private bool[] navStartPending = new bool[0];
 
         public float OutputVolume
         {
@@ -62,6 +63,21 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        // F13: main thread entry — stamps NavigationStartTime for every station
+        // that crossed PreNavPause -> Navigation on the audio thread since the
+        // last call. Keeps UnityEngine API out of ProcessAudio.
+        public void ConsumeNavStartFlags(StationState[] stations, float time)
+        {
+            for (int i = 0; i < stations.Length && i < navStartPending.Length; i++)
+            {
+                if (navStartPending[i])
+                {
+                    stations[i].NavigationStartTime = time;
+                    navStartPending[i] = false;
+                }
+            }
+        }
+
         public void ProcessAudio(float[] data, int channels, StationState[] stations, StationScheduler[] schedulers, MorseKeyer[] keyers, CarrierGenerator[] carriers, bool radioOn, int currentZoneIndex, int sonneZoneIndex)
         {
             if (currentZoneIndex != sonneZoneIndex)
@@ -69,6 +85,9 @@ namespace UBOAT.Mods.RadioNavigation
                 Array.Clear(data, 0, data.Length);
                 return;
             }
+
+            if (navStartPending.Length != stations.Length)
+                navStartPending = new bool[stations.Length];
 
             for (int i = 0; i < data.Length; i += channels)
             {
@@ -90,12 +109,13 @@ namespace UBOAT.Mods.RadioNavigation
                             {
                                 var prevPhase = sched.CurrentPhase;
                                 sched.Tick();
+                                // F13: no UnityEngine API on the audio thread.
+                                // Flag the transition; the main thread stamps
+                                // NavigationStartTime in ConsumeNavStartFlags.
                                 if (prevPhase == StationScheduler.Phase.PreNavPause &&
                                     sched.CurrentPhase == StationScheduler.Phase.Navigation)
                                 {
-                                    stations[s].NavigationStartTime = Time.time;
-                                    Debug.Log("[RadioNav][NAV] PreNavPause->Navigation st=" + s +
-                                        " NavStartTime=" + Time.time.ToString("F2"));
+                                    navStartPending[s] = true;
                                 }
                             }
 

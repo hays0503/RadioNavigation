@@ -332,6 +332,10 @@ namespace UBOAT.Mods.RadioNavigation
                 navUpdateTimer = 0f;
                 UpdateStationNavigation();
             }
+
+            // F13: audio thread only flags the PreNavPause -> Navigation
+            // transition; the main thread stamps NavigationStartTime here.
+            audioEngine.ConsumeNavStartFlags(stations, Time.time);
         }
 
         private void UpdateStationGains()
