@@ -24,6 +24,8 @@ namespace UBOAT.Mods.RadioNavigation
         private static MethodInfo onUpdatedMethod;
         private static bool initialized;
         private static PropertyInfo languageProp;
+        private static MethodInfo loadSingletonMethod;
+        private static Type localeType;
 
         internal static void ResetRuntimeState()
         {
@@ -37,6 +39,8 @@ namespace UBOAT.Mods.RadioNavigation
             insertMethod = null;
             onUpdatedMethod = null;
             languageProp = null;
+            loadSingletonMethod = null;
+            localeType = null;
         }
 
         private static bool TryInit()
@@ -121,6 +125,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             onUpdatedMethod = FindMethodDeep(typeof(RadioStory), "OnUpdated", Type.EmptyTypes);
 
+            ResolveRuntimeTypes();
             languageProp = GetLanguageProperty();
 
             initialized = true;
@@ -325,16 +330,23 @@ namespace UBOAT.Mods.RadioNavigation
             return "T3PLL38 on-board radio receiver for very long and long waves";
         }
 
+        private static Type ResolveType(string typeName)
+        {
+            return Type.GetType(typeName + ", com.uboat.game")
+                ?? Type.GetType(typeName + ", Assembly-CSharp");
+        }
+
+        private static void ResolveRuntimeTypes()
+        {
+            var singletonType = ResolveType("DWS.Common.InjectionFramework.ScriptableObjectSingleton");
+            if (singletonType.IsNotNull())
+                loadSingletonMethod = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
+            localeType = ResolveType("UBOAT.Game.Core.Data.Locale");
+        }
+
         private static PropertyInfo GetLanguageProperty()
         {
-            var singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, com.uboat.game")
-                ?? Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, Assembly-CSharp");
-            if (singletonType.IsNull()) return null;
-            var loadSingleton = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
-            if (loadSingleton.IsNull()) return null;
-            var localeType = Type.GetType("UBOAT.Game.Core.Data.Locale, com.uboat.game")
-                ?? Type.GetType("UBOAT.Game.Core.Data.Locale, Assembly-CSharp");
-            if (localeType.IsNull()) return null;
+            if (loadSingletonMethod.IsNull() || localeType.IsNull()) return null;
             return localeType.GetProperty("Language", BindingFlags.Public | BindingFlags.Instance);
         }
 
@@ -342,17 +354,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                if (languageProp.IsNull())
+                if (loadSingletonMethod.IsNull() || localeType.IsNull() || languageProp.IsNull())
                     return "english";
-                var singletonType = Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, com.uboat.game")
-                    ?? Type.GetType("DWS.Common.InjectionFramework.ScriptableObjectSingleton, Assembly-CSharp");
-                if (singletonType.IsNull()) return "english";
-                var loadSingleton = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
-                if (loadSingleton.IsNull()) return "english";
-                var localeType = Type.GetType("UBOAT.Game.Core.Data.Locale, com.uboat.game")
-                    ?? Type.GetType("UBOAT.Game.Core.Data.Locale, Assembly-CSharp");
-                if (localeType.IsNull()) return "english";
-                object locale = loadSingleton.Invoke(null, new object[] { localeType });
+                object locale = loadSingletonMethod.Invoke(null, new object[] { localeType });
                 if (locale.IsNull()) return "english";
                 string lang = languageProp.GetValue(locale) as string;
                 return lang?.ToLowerInvariant() ?? "english";

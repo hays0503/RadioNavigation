@@ -10,9 +10,21 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public event Action<bool> OnValueChanged;
 
-        public static bool IsRadioOn { get; private set; }
-        public static bool IsInteractable { get; private set; }
+        private static volatile bool isRadioOn;
+        private static bool isInteractable;
         private static bool groundActive;
+
+        public static bool IsRadioOn
+        {
+            get { return isRadioOn; }
+            private set { isRadioOn = value; }
+        }
+
+        public static bool IsInteractable
+        {
+            get { return isInteractable; }
+            private set { isInteractable = value; }
+        }
 
         public static void SetGroundActive(bool active)
         {
