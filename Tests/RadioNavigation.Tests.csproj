@@ -36,6 +36,7 @@
     <Compile Include="ConsolCycleConfigTests.cs" />
     <Compile Include="ComparisonExtensionsTests.cs" />
     <Compile Include="SignalTypesTests.cs" />
+<Compile Include="SignalRichTextFormatterTests.cs" />
     <Compile Include="DspPipelineTests.cs" />
   </ItemGroup>
 
@@ -44,6 +45,7 @@
     <Compile Include="..\Source\Data\ConsolCycleConfig.cs" Link="Source\Data\ConsolCycleConfig.cs" />
     <Compile Include="..\Source\Data\DialConfig.cs" Link="Source\Data\DialConfig.cs" />
     <Compile Include="..\Source\Data\SignalTypes.cs" Link="Source\Data\SignalTypes.cs" />
+<Compile Include="..\Source\UI\SignalRichTextFormatter.cs" Link="Source\UI\SignalRichTextFormatter.cs" />
     <Compile Include="..\Source\Data\StationState.cs" Link="Source\Data\StationState.cs" />
     <Compile Include="..\Source\Logic\ComparisonExtensions.cs" Link="Source\Logic\ComparisonExtensions.cs" />
     <Compile Include="..\Source\Logic\MorseAlphabet.cs" Link="Source\Logic\MorseAlphabet.cs" />

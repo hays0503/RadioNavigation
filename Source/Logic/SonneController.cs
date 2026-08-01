@@ -31,7 +31,9 @@ namespace UBOAT.Mods.RadioNavigation
         private VolumeSpinnerHandler volumeSpinner;
         private FeedbackSpinnerHandler feedbackSpinner;
 
-        private readonly List<SignalEntry> signalEntries = new List<SignalEntry>();
+        // F120: pre-sized lists avoid capacity-doubling allocations on the
+        // audio thread (signalEntries) and in the 5 Hz navigation update.
+        private readonly List<SignalEntry> signalEntries = new List<SignalEntry>(SignalRichTextFormatter.MaxSignalEntries);
         private int morseCharCount;
         private readonly StringBuilder morseDecoderBuffer = new StringBuilder();
         private readonly StringBuilder decodedText = new StringBuilder();
@@ -41,7 +43,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const float NavUpdateInterval = 0.2f;
         private const float TuningUpdateInterval = 0.016f;
 
-        private readonly List<PositionFixCalculator.Measurement> measurements = new List<PositionFixCalculator.Measurement>();
+        private readonly List<PositionFixCalculator.Measurement> measurements = new List<PositionFixCalculator.Measurement>(BeaconData.Stations.Length);
         private PositionFixCalculator.FixResult lastFix;
         private bool fixValid;
 
