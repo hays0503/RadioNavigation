@@ -25,7 +25,9 @@ namespace UBOAT.Mods.RadioNavigation
             get => cursorAngle;
             set
             {
-                if (cursorAngle == value)
+                // F147: lerp-smoothed angles may differ by tiny rounding;
+                // exact float equality would spuriously re-emit or skip.
+                if (Mathf.Approximately(cursorAngle, value))
                     return;
                 cursorAngle = value;
                 if (OnCursorAngleChanged.IsNotNull())

@@ -204,6 +204,7 @@ namespace UBOAT.Mods.RadioNavigation
             catch (Exception e)
             {
                 Debug.LogError("[RadioNav][Main] Error: " + e.Message);
+                Debug.LogException(e);
             }
         }
     }

@@ -16,6 +16,9 @@ namespace UBOAT.Mods.RadioNavigation
         private bool isHovering;
         private int activePointerId = -1;
         private RectTransform cursorRect;
+        // F102: ScrollRect is static after setup; cache instead of walking
+        // the hierarchy every frame while scrolling.
+        private ScrollRect cachedScrollRect;
 
         private void Start()
         {
@@ -41,6 +44,8 @@ namespace UBOAT.Mods.RadioNavigation
                 sr.vertical = false;
                 sr.movementType = ScrollRect.MovementType.Unrestricted;
             }
+
+            cachedScrollRect = GetComponentInParent<ScrollRect>();
         }
 
         public void OnBeginDrag(PointerEventData eventData)
@@ -127,9 +132,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (EventSystem.current.IsNotNull() && EventSystem.current.currentSelectedGameObject != gameObject)
                 EventSystem.current.SetSelectedGameObject(gameObject);
 
-            ScrollRect scrollRect = GetComponentInParent<ScrollRect>();
-            if (scrollRect.IsNotNull())
-                scrollRect.StopMovement();
+            if (cachedScrollRect.IsNotNull())
+                cachedScrollRect.StopMovement();
         }
     }
 }

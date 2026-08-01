@@ -118,6 +118,10 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        // F103: create the Arial font once and reuse it for every label
+        // instead of calling Font.CreateDynamicFontFromOSFont per label.
+        private static Font cachedArialFont;
+
         private static Text CreateLabel(Transform parent, string name, string defaultText)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
@@ -131,7 +135,9 @@ namespace UBOAT.Mods.RadioNavigation
 
             var text = go.AddComponent<Text>();
             text.text = defaultText;
-            text.font = Font.CreateDynamicFontFromOSFont("Arial", 14);
+            if (cachedArialFont.IsNull())
+                cachedArialFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
+            text.font = cachedArialFont;
             text.fontSize = 14;
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleLeft;
@@ -307,12 +313,21 @@ namespace UBOAT.Mods.RadioNavigation
             if (stationText.IsNotNull() && sonneController.StationCount.IsPositive())
             {
                 int domIdx = sonneController.DominantStationIndex;
-                var diag = sonneController.GetStationDiagnostics(domIdx);
-                string phase = diag.SchedulerPhase.ToString();
-                string suffix = " [" + phase + "]";
-                if (diag.NavigationElapsed.IsPositive())
-                    suffix += " " + FormatTime(diag.NavigationElapsed);
-                stationText.text = stationBaseText + suffix;
+                // F101: no dominant station (-1) must not show the default
+                // diagnostics phase ("[Pause]") of a non-existent station.
+                if (domIdx < 0)
+                {
+                    stationText.text = stationBaseText;
+                }
+                else
+                {
+                    var diag = sonneController.GetStationDiagnostics(domIdx);
+                    string phase = diag.SchedulerPhase.ToString();
+                    string suffix = " [" + phase + "]";
+                    if (diag.NavigationElapsed.IsPositive())
+                        suffix += " " + FormatTime(diag.NavigationElapsed);
+                    stationText.text = stationBaseText + suffix;
+                }
 
 #if DEBUG
                 Debug.Log("[RadioNav][PANEL] domIdx=" + domIdx +

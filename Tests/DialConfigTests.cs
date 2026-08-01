@@ -65,5 +65,24 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             Assert.Equal("---", DialConfig.FormatFrequency(float.NaN, 1));
         }
+
+        // F150: band ranges must not overlap — a frequency maps to one band.
+        [Fact]
+        public void Bands_DoNotOverlap()
+        {
+            for (int i = 0; i + 1 < DialConfig.Bands.Length; i++)
+            {
+                Assert.True(DialConfig.Bands[i].RangeMax <= DialConfig.Bands[i + 1].RangeMin,
+                    $"band {i} max {DialConfig.Bands[i].RangeMax} > band {i + 1} min {DialConfig.Bands[i + 1].RangeMin}");
+            }
+        }
+
+        // F151: interpolation between AngleStart and the first reference point.
+        [Fact]
+        public void AngleToFrequency_BetweenStartAndFirstPoint_Interpolates()
+        {
+            float f = DialConfig.AngleToFrequency(15f, 3);
+            Assert.True(f > 720f && f < 740f, $"expected interpolation, got {f}");
+        }
     }
 }

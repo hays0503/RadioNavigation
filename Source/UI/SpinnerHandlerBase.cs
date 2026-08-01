@@ -74,6 +74,14 @@ namespace UBOAT.Mods.RadioNavigation
             activePointerId = eventData.pointerId;
         }
 
+        // F149: if the object (or a parent) is disabled mid-drag, OnEndDrag
+        // never fires and the stale pointer id would lock out future drags.
+        protected virtual void OnEnable()
+        {
+            isDragging = false;
+            activePointerId = -1;
+        }
+
         protected bool IsActiveDrag(PointerEventData eventData) =>
             isDragging && eventData.pointerId == activePointerId;
 

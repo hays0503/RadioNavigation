@@ -137,6 +137,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDisable()
         {
+            // F149: reset drag state on disable so a mid-drag disable (which
+            // skips OnEndDrag) cannot lock out future drags.
+            isDragging = false;
+            activePointerId = -1;
+
             if (!moveCursorActive)
                 return;
 

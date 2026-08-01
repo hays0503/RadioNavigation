@@ -105,6 +105,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            // F148: right/middle clicks must not toggle the ground state.
+            if (eventData.button != PointerEventData.InputButton.Left)
+                return;
+
             bool isActive = IsGroundEffectivelyActive();
 
             if (isActive && radioToggle.IsNotNull() && radioToggle.isOn)

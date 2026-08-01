@@ -63,15 +63,17 @@ namespace UBOAT.Mods.RadioNavigation
                 });
 
             Bands[2] = new BandConfig(
-                "III", "yellow", 340, 760, "kHz", 5, "kHz", 16.8f, 167.9f,
+                // F150: Band III ends where Band IV starts (720) — the old
+                // RangeMax 760 overlapped Band IV's 720..1600, so e.g. 740 kHz
+                // mapped to two different angles (163.3 vs 18.8).
+                "III", "yellow", 340, 720, "kHz", 5, "kHz", 16.8f, 158.5f,
                 new SortedList<float, float>
                 {
                     { 340, 16.8f }, { 360, 30.9f }, { 380, 43.2f }, { 400, 53.3f },
                     { 420, 62.4f }, { 440, 70.5f }, { 460, 77.9f }, { 480, 85.1f },
                     { 500, 92.4f }, { 520, 99.4f }, { 540, 106.2f }, { 560, 113f },
                     { 580, 119.4f }, { 600, 125.5f }, { 620, 131.5f }, { 640, 137.4f },
-                    { 660, 142.9f }, { 680, 148.4f }, { 700, 153.7f }, { 720, 158.5f },
-                    { 740, 163.3f }, { 760, 167.9f }
+                    { 660, 142.9f }, { 680, 148.4f }, { 700, 153.7f }, { 720, 158.5f }
                 });
 
             Bands[3] = new BandConfig(
@@ -112,8 +114,11 @@ namespace UBOAT.Mods.RadioNavigation
             if (angle >= band.AngleEnd)
                 return band.RangeMax;
 
-            float prevFreq = 0, prevAngle = 0;
-            bool found = false;
+            // F151: start interpolation from (AngleStart, RangeMin) instead of
+            // returning the first reference point verbatim when the angle is
+            // between AngleStart and that point.
+            float prevFreq = band.RangeMin;
+            float prevAngle = band.AngleStart;
 
             foreach (var kvp in points)
             {
@@ -122,16 +127,12 @@ namespace UBOAT.Mods.RadioNavigation
 
                 if (ang >= angle)
                 {
-                    if (!found)
-                        return freq;
-
                     float t = (angle - prevAngle) / (ang - prevAngle);
                     return prevFreq + t * (freq - prevFreq);
                 }
 
                 prevFreq = freq;
                 prevAngle = ang;
-                found = true;
             }
 
             return band.RangeMax;
