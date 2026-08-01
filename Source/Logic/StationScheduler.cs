@@ -94,6 +94,10 @@
                     CurrentPhase = Phase.PostNavSilence;
                     pauseTicksRemaining = ToTicks(Config.PostNavSilenceMs);
                     break;
+
+                default:
+                    UnityEngine.Debug.LogWarning("[RadioNav][StationScheduler] OnSequenceFinished called during " + CurrentPhase + ", ignoring");
+                    break;
             }
         }
 

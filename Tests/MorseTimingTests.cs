@@ -55,5 +55,33 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             Assert.Equal(17, MorseTiming.ToTicks(875f));
         }
+
+        // F136: inconsistent config (sound longer than period) must not
+        // silently produce a 1-tick silence that exceeds the period.
+        [Fact]
+        public void GetDotSilenceTicks_BadConfig_ClampsToOneTick()
+        {
+            var c = Default();
+            c.DotSoundMs = 125f;
+            c.ElementPeriodMs = 100f;
+            Assert.Equal(1, MorseTiming.GetDotSilenceTicks(c));
+        }
+
+        [Fact]
+        public void GetDashSilenceTicks_BadConfig_ClampsToOneTick()
+        {
+            var c = Default();
+            c.DashSoundMs = 875f;
+            c.ElementPeriodMs = 100f;
+            Assert.Equal(1, MorseTiming.GetDashSilenceTicks(c));
+        }
+
+        [Fact]
+        public void GetDotSilenceTicks_ConsistentConfig_Unchanged()
+        {
+            var c = Default();
+            c.ElementPeriodMs = 1000f;
+            Assert.Equal(17, MorseTiming.GetDotSilenceTicks(c));
+        }
     }
 }

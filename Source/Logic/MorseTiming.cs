@@ -22,14 +22,25 @@ namespace UBOAT.Mods.RadioNavigation
         {
             float period = config.ElementPeriodMs.IsPositive() ? config.ElementPeriodMs : 1000f;
             float sound = config.DotSoundMs.IsPositive() ? config.DotSoundMs : 125f;
-            return Math.Max(1, (int)((period - sound) / TickMs));
+            return ToSilenceTicks(period, sound, "DotSoundMs");
         }
 
         public static int GetDashSilenceTicks(ConsolCycleConfig config)
         {
             float period = config.ElementPeriodMs.IsPositive() ? config.ElementPeriodMs : 1000f;
             float sound = config.DashSoundMs.IsPositive() ? config.DashSoundMs : 875f;
-            return Math.Max(1, (int)((period - sound) / TickMs));
+            return ToSilenceTicks(period, sound, "DashSoundMs");
+        }
+
+        // F136: an inconsistent config (sound longer than the element period)
+        // used to produce a misleading 1-tick silence instead of surfacing
+        // the configuration error.
+        private static int ToSilenceTicks(float period, float sound, string field)
+        {
+            float silenceMs = Math.Max(0, period - sound);
+            if (silenceMs <= 0)
+                UnityEngine.Debug.LogWarning("[RadioNav][MorseTiming] ElementPeriodMs (" + period + ") < " + field + " (" + sound + "), timing inaccurate");
+            return Math.Max(1, (int)(silenceMs / TickMs));
         }
 
         public static int GetToneTicks(ConsolCycleConfig config)

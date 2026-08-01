@@ -110,5 +110,25 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var s = new StationScheduler("TEST");
             Assert.Equal(16, s.Callsign.ElementCount);
         }
+
+        // F135: unexpected phase (Pause) must be ignored, not crash.
+        [Fact]
+        public void OnSequenceFinished_DuringPause_KeepsPhase()
+        {
+            var s = new StationScheduler("TEST");
+            s.OnSequenceFinished();
+            Assert.Equal(StationScheduler.Phase.Pause, s.CurrentPhase);
+        }
+
+        // F135: unexpected phase (PreNavPause) must be ignored.
+        [Fact]
+        public void OnSequenceFinished_DuringPreNavPause_KeepsPhase()
+        {
+            var s = new StationScheduler("TEST");
+            s.Tick();
+            s.OnSequenceFinished();
+            s.OnSequenceFinished();
+            Assert.Equal(StationScheduler.Phase.PreNavPause, s.CurrentPhase);
+        }
     }
 }

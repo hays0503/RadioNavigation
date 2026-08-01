@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <Compile Include="Stubs\UnityEngineMathf.cs" />
+<Compile Include="Stubs\UnityEngineDebug.cs" />
     <Compile Include="SkipTestException.cs" />
     <Compile Include="GameContractTests.cs" />
     <Compile Include="PositionFixCalculatorTests.cs" />
