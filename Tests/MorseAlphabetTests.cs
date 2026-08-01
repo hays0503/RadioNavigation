@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 
 namespace UBOAT.Mods.RadioNavigation.Tests
 {
@@ -25,7 +25,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [Fact]
         public void GetMorse_UnknownChar_ReturnsEmpty()
         {
-            Assert.Equal("", MorseAlphabet.GetMorse('я'));
+            Assert.Equal("", MorseAlphabet.GetMorse('?'));
             Assert.Equal("", MorseAlphabet.GetMorse((char)0));
             Assert.Equal("", MorseAlphabet.GetMorse('{'));
         }
@@ -92,6 +92,25 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(16, p.ElementCount);
             Assert.True(p.GetElement(0));
             Assert.True(p.GetElement(1));
+        }
+
+        // F125: unknown characters must not throw; they encode as an
+        // inter-character gap (3 silent elements), consistent with how a
+        // space is treated, so GetElementCount and TextToPattern agree.
+        [Fact]
+        public void TextToPattern_UnknownCharacter_ActsLikeSpace()
+        {
+            var withUnknown = MorseAlphabet.TextToPattern("AB?C");
+            var withSpace = MorseAlphabet.TextToPattern("AB C");
+            Assert.Equal(withSpace.ElementCount, withUnknown.ElementCount);
+            Assert.Equal(MorseAlphabet.GetElementCount("AB?C"), MorseAlphabet.GetElementCount("AB C"));
+        }
+
+        [Fact]
+        public void TextToPattern_OnlyUnknownCharacters_NoThrow()
+        {
+            var p = MorseAlphabet.TextToPattern("???");
+            Assert.NotNull(p.Groups);
         }
     }
 }
