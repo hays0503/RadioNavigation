@@ -9,7 +9,7 @@ namespace UBOAT.Mods.RadioNavigation
     public class SonneController : MonoBehaviour
     {
         private const int SonneZoneIndex = 1;
-        private const float BfoBase = 1000f;
+        private const float BfoBase = Constants.BfoBaseHz;
 
         private static readonly AudioClip silentClip = AudioClip.Create("SonneSilent", AudioSynthesisEngine.SampleRate * 2, 1, AudioSynthesisEngine.SampleRate, false);
 
@@ -428,7 +428,7 @@ namespace UBOAT.Mods.RadioNavigation
                 stations[i].Gain = gain;
 
                 float offset = currentFrequencyKHz - freq.Value;
-                stations[i].BeatFrequency = Math.Max(300f, Math.Min(1800f, BfoBase + offset * 1000f));
+                stations[i].BeatFrequency = Math.Max(Constants.BfoMinHz, Math.Min(Constants.BfoMaxHz, BfoBase + offset * 1000f));
                 carriers[i].Frequency = stations[i].BeatFrequency;
 
                 if (gain > maxGain)
@@ -565,21 +565,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static float CalculateBearing(float lat1, float lon1, float lat2, float lon2)
         {
-            double dLon = ToRadians(lon2 - lon1);
-            double lat1R = ToRadians(lat1);
-            double lat2R = ToRadians(lat2);
-
-            double y = Math.Sin(dLon) * Math.Cos(lat2R);
-            double x = Math.Cos(lat1R) * Math.Sin(lat2R) -
-                       Math.Sin(lat1R) * Math.Cos(lat2R) * Math.Cos(dLon);
-
-            float bearing = (float)(Math.Atan2(y, x) * (180.0 / Math.PI));
-            return (bearing + 360f) % 360f;
-        }
-
-        private static double ToRadians(float degrees)
-        {
-            return degrees * Math.PI / 180.0;
+            return GeoMath.InitialBearingDeg(lat1, lon1, lat2, lon2);
         }
     }
 }

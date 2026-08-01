@@ -55,7 +55,7 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < rawIntersections.Count; i++)
             {
                 roughLat += rawIntersections[i].Latitude;
-                double lonRad = ToRadians(rawIntersections[i].Longitude);
+                double lonRad = GeoMath.ToRadians(rawIntersections[i].Longitude);
                 roughX += (float)Math.Cos(lonRad);
                 roughY += (float)Math.Sin(lonRad);
             }
@@ -67,7 +67,7 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < work.Count; i++)
             {
                 var m = work[i];
-                float dist = GetDistanceKm(m.Latitude, m.Longitude, roughLat, roughLon);
+                float dist = GeoMath.HaversineKm(m.Latitude, m.Longitude, roughLat, roughLon);
                 m.Weight = dist > 0.1f ? 1.0f / (dist / 100.0f) : 10f;
                 // F64: struct copy must be written back via the indexer; a
                 // future `foreach` (or an early `continue`) would drop the
@@ -112,7 +112,7 @@ namespace UBOAT.Mods.RadioNavigation
                 var wp = weightedIntersections[i];
                 totalLat += wp.Latitude * wp.Weight;
                 totalW += wp.Weight;
-                double lonRad = ToRadians(wp.Longitude);
+                double lonRad = GeoMath.ToRadians(wp.Longitude);
                 lonX += (float)(Math.Cos(lonRad) * wp.Weight);
                 lonY += (float)(Math.Sin(lonRad) * wp.Weight);
             }
@@ -130,7 +130,7 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < weightedIntersections.Count; i++)
             {
                 var wp = weightedIntersections[i];
-                double d = GetDistanceKm(calcLat, calcLon, wp.Latitude, wp.Longitude);
+                double d = GeoMath.HaversineKm(calcLat, calcLon, wp.Latitude, wp.Longitude);
                 sqErr += d * d * wp.Weight;
                 errW += wp.Weight;
             }
@@ -163,12 +163,12 @@ namespace UBOAT.Mods.RadioNavigation
             float lat1, float lon1, float brng1,
             float lat2, float lon2, float brng2)
         {
-            double phi1 = ToRadians(lat1);
-            double lam01 = ToRadians(lon1);
-            double phi2 = ToRadians(lat2);
-            double lam02 = ToRadians(lon2);
-            double brng13 = ToRadians(brng1);
-            double brng23 = ToRadians(brng2);
+            double phi1 = GeoMath.ToRadians(lat1);
+            double lam01 = GeoMath.ToRadians(lon1);
+            double phi2 = GeoMath.ToRadians(lat2);
+            double lam02 = GeoMath.ToRadians(lon2);
+            double brng13 = GeoMath.ToRadians(brng1);
+            double brng23 = GeoMath.ToRadians(brng2);
 
             double deltaPhi = phi2 - phi1;
             double deltaLam = lam02 - lam01;
@@ -233,30 +233,6 @@ namespace UBOAT.Mods.RadioNavigation
             float lon3 = (float)((lam3 * (180.0 / Math.PI) + 540.0) % 360.0 - 180.0);
 
             return new GeoPoint { Latitude = lat3, Longitude = lon3, Valid = true };
-        }
-
-        public static float GetDistanceKm(float lat1, float lon1, float lat2, float lon2)
-        {
-            const double R = 6371.0;
-            double phi1 = ToRadians(lat1);
-            double phi2 = ToRadians(lat2);
-            double deltaPhi = ToRadians(lat2 - lat1);
-            double deltaLam = ToRadians(lon2 - lon1);
-
-            double a = Math.Sin(deltaPhi / 2.0) * Math.Sin(deltaPhi / 2.0) +
-                       Math.Cos(phi1) * Math.Cos(phi2) *
-                       Math.Sin(deltaLam / 2.0) * Math.Sin(deltaLam / 2.0);
-            // F80: rounding can push `a` a hair above 1.0 for (nearly) identical
-            // points; Math.Sqrt(1.0 - a) would then be NaN.
-            a = Math.Max(0.0, Math.Min(1.0, a));
-            double c = 2.0 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1.0 - a));
-
-            return (float)(R * c);
-        }
-
-        private static double ToRadians(float degrees)
-        {
-            return degrees * Math.PI / 180.0;
         }
     }
 }

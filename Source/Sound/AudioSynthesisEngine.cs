@@ -35,7 +35,7 @@ namespace UBOAT.Mods.RadioNavigation
             tickAccumulator = 0.0;
         }
 
-        public float QualityFactor { get; set; } = 20f;
+        public float QualityFactor { get; set; } = Constants.QualityFactorBase;
         public float Feedback { get; private set; }
         public Atmosphere Atmosphere => atmosphere;
         public ReceiverDsp Dsp => dsp;
@@ -50,7 +50,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             Feedback = Mathf.Clamp01(angle / 140f);
 
-            QualityFactor = 20f + Feedback * Feedback * 180f;
+            QualityFactor = Constants.QualityFactorBase + Feedback * Feedback * Constants.QualityFactorFeedbackPerUnit;
 
             atmosphere.NoiseFloor = Mathf.Lerp(0.004f, 0.0005f, Feedback);
             atmosphere.ImpulseProbability = Mathf.Lerp(0.002f, 0.0002f, Feedback);

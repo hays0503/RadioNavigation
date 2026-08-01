@@ -140,8 +140,17 @@ namespace UBOAT.Mods.RadioNavigation
 
             var text = go.AddComponent<Text>();
             text.text = defaultText;
+            // F173: "Arial" is an OS font name and may be missing; fall back
+            // to Unity's built-in font so the panel never renders without one.
             if (cachedArialFont.IsNull())
+            {
                 cachedArialFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
+                if (cachedArialFont.IsNull())
+                {
+                    UnityEngine.Debug.LogWarning("[RadioNav] OS font 'Arial' not found, falling back to built-in font");
+                    cachedArialFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                }
+            }
             text.font = cachedArialFont;
             text.fontSize = 14;
             text.color = Color.white;
@@ -227,7 +236,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (feedbackSpinner.IsNotNull())
                 OnFeedbackChanged(feedbackSpinner.Angle);
             if (radioHandler.IsNotNull())
-                OnFrequencyChanged(DialConfig.AngleToFrequency(radioHandler.CursorAngle + 90f, GetZoneIndex()), GetZoneIndex());
+                OnFrequencyChanged(DialConfig.AngleToFrequency(radioHandler.CursorAngle + Constants.CursorOffsetDeg, GetZoneIndex()), GetZoneIndex());
         }
 
         // F160: read the handler state instead of duplicating alpha-based
@@ -468,7 +477,7 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
 
-            if (bestName.IsNull() || bestDelta > 20f)
+            if (bestName.IsNull() || bestDelta > Constants.StationMatchDeltaKHz)
                 return "";
 
             float gain = Mathf.Exp(-(bestDelta * bestDelta) / (2f * 1.5f * 1.5f));

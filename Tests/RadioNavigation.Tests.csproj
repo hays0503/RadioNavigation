@@ -22,6 +22,7 @@
 <Compile Include="Stubs\UnityEngineDebug.cs" />
     <Compile Include="SkipTestException.cs" />
     <Compile Include="GameContractTests.cs" />
+    <Compile Include="GeoMathTests.cs" />
     <Compile Include="PositionFixCalculatorTests.cs" />
     <Compile Include="MorseAlphabetTests.cs" />
     <Compile Include="MorseKeyerTests.cs" />
@@ -48,6 +49,8 @@
 <Compile Include="..\Source\UI\SignalRichTextFormatter.cs" Link="Source\UI\SignalRichTextFormatter.cs" />
     <Compile Include="..\Source\Data\StationState.cs" Link="Source\Data\StationState.cs" />
     <Compile Include="..\Source\Logic\ComparisonExtensions.cs" Link="Source\Logic\ComparisonExtensions.cs" />
+    <Compile Include="..\Source\Logic\GeoMath.cs" Link="Source\Logic\GeoMath.cs" />
+    <Compile Include="..\Source\Logic\Constants.cs" Link="Source\Logic\Constants.cs" />
     <Compile Include="..\Source\Logic\MorseAlphabet.cs" Link="Source\Logic\MorseAlphabet.cs" />
     <Compile Include="..\Source\Logic\MorseKeyer.cs" Link="Source\Logic\MorseKeyer.cs" />
     <Compile Include="..\Source\Logic\MorseTiming.cs" Link="Source\Logic\MorseTiming.cs" />
