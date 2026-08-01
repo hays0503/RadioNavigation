@@ -10,14 +10,12 @@ namespace UBOAT.Mods.RadioNavigation
         private const string LocaleKey = "Radio/OpenT3PLL38";
         private const string LeaveStationKey = "Radio/LeaveStation";
         private const string LocalePrefix = "Stories/";
-        private const string StageFieldName = "stage";
         private const bool AllowOriginal = true;
         private const bool PreventOriginal = false;
 
         private static Type decisionType;
         private static ConstructorInfo decisionCtor;
         private static PropertyInfo localizationKeyProp;
-        private static FieldInfo stageField;
         private static PropertyInfo decisionsProp;
         private static MethodInfo insertMethod;
         private static MethodInfo onUpdatedMethod;
@@ -30,7 +28,6 @@ namespace UBOAT.Mods.RadioNavigation
             decisionType = null;
             decisionCtor = null;
             localizationKeyProp = null;
-            stageField = null;
             decisionsProp = null;
             insertMethod = null;
             onUpdatedMethod = null;
@@ -107,8 +104,6 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
-
             decisionsProp = storyType.GetProperty("Decisions",
                 BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
 
@@ -125,15 +120,15 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                if (!TryInit() || decisionCtor.IsNull() || stageField.IsNull())
+                if (!TryInit() || decisionCtor.IsNull())
                 {
                     Debug.LogWarning("[RadioNav] Init failed, cannot inject T3PLL38");
                     return;
                 }
 
-                if (!IsStageOne(__instance))
-                    return;
-
+                // G1: no "stage" field exists in RadioStory/GenericStory/Story.
+                // RadioStory builds its decisions on every ContinueStory call;
+                // duplicate protection is DecisionAlreadyExists below.
                 var decisions = GetDecisions(__instance);
                 if (decisions.IsNull())
                     return;
@@ -161,13 +156,6 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Debug.LogError("[RadioNav] InjectT3PLL38Decision error: " + ex);
             }
-        }
-
-        private static bool IsStageOne(RadioStory __instance)
-        {
-            int stageValue = (int)stageField.GetValue(__instance);
-            Debug.Log("[RadioNav] stage=" + stageValue + " (1=MainChoices)");
-            return stageValue == 1;
         }
 
         private static object GetDecisions(RadioStory __instance)
