@@ -67,13 +67,23 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(StationScheduler.Phase.Pause, s.CurrentPhase);
         }
 
-        // F122 (pending): Reset() currently sets PostNavSilence, not Pause. Baseline pins current behavior.
+        // F122: Reset() must start the cycle over at Pause (one-tick), not PostNavSilence.
         [Fact]
-        public void Reset_SetsPostNavSilence()
+        public void Reset_SetsPausePhase()
         {
             var s = new StationScheduler("TEST");
             s.Reset();
-            Assert.Equal(StationScheduler.Phase.PostNavSilence, s.CurrentPhase);
+            Assert.Equal(StationScheduler.Phase.Pause, s.CurrentPhase);
+        }
+
+        [Fact]
+        public void Reset_ThenTick_EntersCallsign()
+        {
+            var s = new StationScheduler("TEST");
+            s.Reset();
+            s.Tick();
+            Assert.Equal(StationScheduler.Phase.Callsign, s.CurrentPhase);
+            Assert.NotNull(s.GetCurrentSequence());
         }
 
         [Fact]

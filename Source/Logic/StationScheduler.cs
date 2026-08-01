@@ -99,8 +99,8 @@
 
         public void Reset()
         {
-            CurrentPhase = Phase.PostNavSilence;
-            pauseTicksRemaining = ToTicks(Config.PostNavSilenceMs);
+            CurrentPhase = Phase.Pause;
+            pauseTicksRemaining = 1;
         }
 
         private static int ToTicks(float ms)

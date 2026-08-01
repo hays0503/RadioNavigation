@@ -461,6 +461,10 @@ namespace UBOAT.Mods.RadioNavigation
                 lastFix = PositionFixCalculator.Calculate(measurements);
                 fixValid = lastFix.Valid;
             }
+            else
+            {
+                fixValid = false;
+            }
         }
 
         private void OnAudioFilterRead(float[] data, int channels)

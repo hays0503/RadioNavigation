@@ -443,7 +443,9 @@ namespace UBOAT.Mods.RadioNavigation
             var stations = BeaconData.Stations;
             for (int i = 0; i < stations.Length; i++)
             {
-                float? stationFreq = stations[i].History?[0].FrequencyKHz;
+                var history = stations[i].History;
+                if (history.IsNull() || history.Length.IsZero()) continue;
+                float? stationFreq = history[0].FrequencyKHz;
                 if (stationFreq.IsNull()) continue;
 
                 float delta = Math.Abs(freqKHz - stationFreq.Value);
@@ -452,7 +454,7 @@ namespace UBOAT.Mods.RadioNavigation
                     bestDelta = delta;
                     bestFreq = stationFreq.Value;
                     bestName = stations[i].Name;
-                    string cs = stations[i].History?[0].Callsign;
+                    string cs = history[0].Callsign;
                     if (!string.IsNullOrEmpty(cs))
                         bestCallsign = cs;
                 }
