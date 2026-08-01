@@ -218,5 +218,33 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(7, pars.Length);
             Assert.Equal(typeof(object[]), pars[6].ParameterType);
         }
+
+        [Fact]
+        public void PlayerShipPosition_Chain_Exists()
+        {
+            RequireGame();
+
+            // F200: GamePlayerPositionProvider resolves the player ship through
+            // Entity.playerShip (static, non-public) -> PlayerShip.SandboxPlayerShip
+            // -> SandboxGroup.Position (world units). Pin the chain against the
+            // installed DLL so a game update cannot silently break the fix feed.
+            var entity = Game().GetType("UBOAT.Game.Scene.Entities.Entity", false);
+            Assert.NotNull(entity);
+            var playerShipField = entity.GetField("playerShip",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            Assert.NotNull(playerShipField);
+            Assert.Equal("UBOAT.Game.Scene.Entities.PlayerShip", playerShipField.FieldType.FullName);
+
+            var playerShip = playerShipField.FieldType;
+            var sandbox = playerShip.GetProperty("SandboxPlayerShip",
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.NotNull(sandbox);
+            Assert.Equal("UBOAT.Game.Sandbox.SandboxPlayerWolfpack", sandbox.PropertyType.FullName);
+
+            var position = sandbox.PropertyType.GetProperty("Position",
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.NotNull(position);
+            Assert.Equal("UnityEngine.Vector2", position.PropertyType.FullName);
+        }
     }
 }

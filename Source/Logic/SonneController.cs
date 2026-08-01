@@ -24,6 +24,8 @@ namespace UBOAT.Mods.RadioNavigation
         private int currentZoneIndex;
         private float playerLatitude;
         private float playerLongitude;
+        private bool positionAvailable; // F200: a fix without a position feed must not be shown
+        private IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
         private VolumeSpinnerHandler volumeSpinner;
         private FeedbackSpinnerHandler feedbackSpinner;
 
@@ -308,10 +310,11 @@ namespace UBOAT.Mods.RadioNavigation
         {
             playerLatitude = latitude;
             playerLongitude = longitude;
+            positionAvailable = true; // F200: the (0,0) fallback is never a valid fix
             UpdateStationNavigation();
         }
 
-        public bool HasFix => fixValid;
+        public bool HasFix => fixValid && positionAvailable;
         public float FixLatitude => lastFix.Latitude;
         public float FixLongitude => lastFix.Longitude;
         public float FixErrorKm => lastFix.ErrorKm;
@@ -319,6 +322,20 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
+            // F200: poll the position feed; UpdatePosition is invoked on
+            // significant movement (threshold ~11 m). Without a feed the fix
+            // stays unavailable and the UI shows "--- Position Fix: ---".
+            float posLat, posLon;
+            if (positionProvider.IsNotNull() && positionProvider.TryGetPosition(out posLat, out posLon))
+            {
+                if (!positionAvailable
+                    || Math.Abs(posLat - playerLatitude) > 0.0001f
+                    || Math.Abs(posLon - playerLongitude) > 0.0001f)
+                {
+                    UpdatePosition(posLat, posLon);
+                }
+            }
+
             tuningUpdateTimer += Time.deltaTime;
             if (tuningUpdateTimer >= TuningUpdateInterval)
             {
