@@ -28,11 +28,15 @@ $srcFiles = Get-ChildItem $srcDir -Filter "*.cs" -Recurse | ForEach-Object { "`"
 
 $outPath = Join-Path $OutputDir "radionavigation.dll"
 
+# F78: C# preprocessor symbols are case-sensitive; /define:Debug would not
+# match #if DEBUG. Map the Configuration to an UPPERCASE symbol.
+$defineSymbol = if ($Configuration -eq "Debug") { "DEBUG" } else { "RELEASE" }
+
 csc /target:library `
     /out:$outPath `
     /debug:full `
     /optimize+ `
-    /define:$Configuration `
+    /define:$defineSymbol `
     $refArgs `
     $srcFiles
 
