@@ -101,6 +101,24 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             }
         }
 
+        // F128: stations straddling the antimeridian (179.5E / 179.5W)
+        // must intersect near lon=180, not at a mirrored false point.
+        [Fact]
+        public void Calculate_AntimeridianStations_IntersectsNearDateline()
+        {
+            var r = PositionFixCalculator.Calculate(new List<PositionFixCalculator.Measurement>
+            {
+                M(60f, 179.5f, 45f),
+                M(60f, -179.5f, 315f)
+            });
+            Assert.True(r.Valid);
+            Assert.False(float.IsNaN(r.Latitude));
+            Assert.False(float.IsNaN(r.Longitude));
+            Assert.InRange(r.Longitude, -180f, 180f);
+            Assert.True(Math.Abs(Math.Abs(r.Longitude) - 180f) < 1f, "lon=" + r.Longitude);
+            Assert.InRange(r.Latitude, 59.5f, 61.5f);
+        }
+
         [Fact]
         public void Calculate_StressCases_NeverNaN()
         {

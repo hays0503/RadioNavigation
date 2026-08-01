@@ -79,5 +79,32 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.False(g.GetElement(1));
             Assert.True(g.GetElement(2));
         }
+
+        // F144: ElementsPerGroup == 0 used to divide by zero in GetElement / format helpers.
+        [Fact]
+        public void Constructor_ZeroElementsPerGroup_FallsBackToEight()
+        {
+            var p = new NavigationPattern(new[] { new Group(0b10101010UL) }, 0);
+            Assert.Equal((byte)8, p.ElementsPerGroup);
+            Assert.Equal(8, p.ElementCount);
+        }
+
+        [Fact]
+        public void ZeroElementsPerGroup_GetElementDoesNotThrow()
+        {
+            var p = new NavigationPattern(new[] { new Group(0b10101010UL) }, 0);
+            _ = p.GetElement(0);
+            _ = p.GetElement(3);
+            _ = p.GetElement(7);
+            _ = p.GetElement(100);
+        }
+
+        [Fact]
+        public void ZeroElementsPerGroup_FormattersDoNotThrow()
+        {
+            var p = new NavigationPattern(new[] { new Group(0b11110000UL), new Group(0b00001111UL) }, 0, 1);
+            Assert.NotEmpty(NavigationPattern.FormatPattern(p));
+            Assert.NotEmpty(NavigationPattern.FormatCompact(p));
+        }
     }
 }

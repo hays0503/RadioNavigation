@@ -158,6 +158,8 @@ namespace UBOAT.Mods.RadioNavigation
 
             double deltaPhi = phi2 - phi1;
             double deltaLam = lam02 - lam01;
+            while (deltaLam > Math.PI) deltaLam -= 2.0 * Math.PI;
+            while (deltaLam < -Math.PI) deltaLam += 2.0 * Math.PI;
 
             double dist12 = 2.0 * Math.Asin(Math.Sqrt(
                 Math.Sin(deltaPhi / 2.0) * Math.Sin(deltaPhi / 2.0) +

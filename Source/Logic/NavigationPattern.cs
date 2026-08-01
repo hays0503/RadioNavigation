@@ -36,7 +36,7 @@ namespace UBOAT.Mods.RadioNavigation
         public NavigationPattern(Group[] groups, byte elementsPerGroup, byte transitionIndex = 255)
         {
             Groups = groups ?? Array.Empty<Group>();
-            ElementsPerGroup = elementsPerGroup;
+            ElementsPerGroup = elementsPerGroup == 0 ? (byte)8 : elementsPerGroup;
             TransitionIndex = transitionIndex;
         }
 
