@@ -27,11 +27,17 @@ namespace UBOAT.Mods.RadioNavigation
         private float playerLatitude;
         private float playerLongitude;
         private bool positionAvailable; // F200: a fix without a position feed must not be shown
+        private bool positionProviderFailureLogged;
+        private bool positionProviderSuccessLogged;
         private IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
         private VolumeSpinnerHandler volumeSpinner;
         private FeedbackSpinnerHandler feedbackSpinner;
         // F178: cached so OnDestroy does not re-query the component graph.
         private AudioSource cachedAudioSource;
+        // Fast-forward must not amplify a live radio signal into noise. Pause
+        // intentionally leaves this false: the current tone keeps sounding
+        // while scheduler ticks stop with Time.timeScale == 0.
+        private volatile bool suppressAudioForTimeCompression;
 
         // F120: pre-sized lists avoid capacity-doubling allocations on the
         // audio thread (signalEntries) and in the 5 Hz navigation update.
@@ -229,9 +235,9 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            if (decodedText.Length.IsPositive())
-                decodedText.Append(' ');
-
+            // Keep only the latest completed callsign. Appending every cycle
+            // made the panel grow into "FRQ MWN SL ..." until trimming.
+            decodedText.Clear();
             int pos = 0;
             foreach (char ch in callsign.ToUpperInvariant())
             {
@@ -268,6 +274,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnFrequencyChanged(float frequencyKHz, int zoneIndex)
         {
+            ClearSignalBuffer();
             UpdateTuning(frequencyKHz, zoneIndex);
         }
 
@@ -352,18 +359,30 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
+            suppressAudioForTimeCompression = Time.timeScale > 1.01f;
+
             // F200: poll the position feed; UpdatePosition is invoked on
             // significant movement (threshold ~11 m). Without a feed the fix
             // stays unavailable and the UI shows "--- Position Fix: ---".
             float posLat, posLon;
             if (positionProvider.IsNotNull() && positionProvider.TryGetPosition(out posLat, out posLon))
             {
+                if (!positionProviderSuccessLogged)
+                {
+                    Debug.Log("[RadioNav][POSITION] provider returned " + posLat.ToString("F5") + "," + posLon.ToString("F5"));
+                    positionProviderSuccessLogged = true;
+                }
                 if (!positionAvailable
                     || Math.Abs(posLat - playerLatitude) > 0.0001f
                     || Math.Abs(posLon - playerLongitude) > 0.0001f)
                 {
                     UpdatePosition(posLat, posLon);
                 }
+            }
+            else if (!positionProviderFailureLogged)
+            {
+                Debug.LogWarning("[RadioNav][POSITION] player position unavailable; position fix will remain hidden");
+                positionProviderFailureLogged = true;
             }
 
             tuningUpdateTimer += Time.deltaTime;
@@ -515,7 +534,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnAudioFilterRead(float[] data, int channels)
         {
-            audioEngine.ProcessAudio(data, channels, stations, keyers, carriers, ToggleHandler.IsRadioOn, currentZoneIndex, SonneZoneIndex);
+            bool audioEnabled = ToggleHandler.IsRadioOn && !suppressAudioForTimeCompression;
+            audioEngine.ProcessAudio(data, channels, stations, keyers, carriers, audioEnabled, currentZoneIndex, SonneZoneIndex);
         }
 
         public bool IsInSonneZone => currentZoneIndex == SonneZoneIndex;

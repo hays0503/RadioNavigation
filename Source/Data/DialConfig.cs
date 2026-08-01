@@ -3,9 +3,10 @@ using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
-    // F130: readonly struct so the static config array cannot be mutated
-    // (assignment to a readonly field is a compile error).
-    public readonly struct BandConfig
+    // F130: readonly fields keep the static config immutable. Use a regular
+    // struct because the game's runtime compiler is limited to C# 7.0 and
+    // does not support the C# 7.2 readonly-struct feature.
+    public struct BandConfig
     {
         public readonly string Id;
         public readonly string Color;

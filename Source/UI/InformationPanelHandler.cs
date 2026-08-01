@@ -32,6 +32,7 @@ namespace UBOAT.Mods.RadioNavigation
         private float currentFreqKHz;
         private int currentZoneIndex;
         private string stationBaseText = "";
+        private string lastLoggedDecoded = "";
         private float patternUpdateTimer;
         private const float PatternUpdateInterval = 0.5f;
         private float signalUpdateTimer;
@@ -298,6 +299,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             currentFreqKHz = freqKHz;
             currentZoneIndex = zoneIndex;
+            lastLoggedDecoded = "";
 
             string formatted = DialConfig.FormatFrequency(freqKHz, zoneIndex);
             string bandId = zoneIndex.IsNonNegative() && zoneIndex < DialConfig.Bands.Length
@@ -452,8 +454,11 @@ namespace UBOAT.Mods.RadioNavigation
                 string decoded = sonneController.GetDecodedText();
                 decodedText.text = string.IsNullOrEmpty(decoded) ? "Decoded: " : "Decoded: " + decoded;
 
-                if (!string.IsNullOrEmpty(decoded))
+                if (!string.IsNullOrEmpty(decoded) && decoded != lastLoggedDecoded)
+                {
                     Debug.Log("[RadioNav][PANEL] decoded=[" + decoded + "]");
+                    lastLoggedDecoded = decoded;
+                }
             }
         }
 
