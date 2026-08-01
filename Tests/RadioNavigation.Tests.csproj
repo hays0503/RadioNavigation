@@ -35,6 +35,7 @@
     <Compile Include="ConsolCycleConfigTests.cs" />
     <Compile Include="ComparisonExtensionsTests.cs" />
     <Compile Include="SignalTypesTests.cs" />
+    <Compile Include="DspPipelineTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

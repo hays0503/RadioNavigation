@@ -1,17 +1,19 @@
 ﻿using System;
+using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
     public class CarrierGenerator
     {
         private double phase;
-        private float frequency;
+        private volatile float targetFrequency;
+        private float smoothedFrequency;
         private float sampleRate;
 
         public float Frequency
         {
-            get => frequency;
-            set => frequency = Math.Max(0f, value);
+            get => targetFrequency;
+            set => targetFrequency = Math.Max(0f, value);
         }
 
         public CarrierGenerator(float sampleRate)
@@ -20,12 +22,16 @@ namespace UBOAT.Mods.RadioNavigation
             phase = 0.0;
         }
 
+        // F141: one-pole smoothing prevents a phase discontinuity (click) when
+        // the frequency is retuned between main-thread writes and audio reads.
         public float NextSample()
         {
-            if (frequency.IsNonPositive())
+            smoothedFrequency += (targetFrequency - smoothedFrequency) * 0.1f;
+
+            if (smoothedFrequency.IsNonPositive())
                 return 0f;
 
-            float sample = (float)Math.Sin(2.0 * Math.PI * frequency * phase / sampleRate);
+            float sample = (float)Math.Sin(2.0 * Math.PI * smoothedFrequency * phase / sampleRate);
             phase += 1.0;
 
             if (phase >= sampleRate)
@@ -42,7 +48,7 @@ namespace UBOAT.Mods.RadioNavigation
 
     public class Atmosphere
     {
-        private readonly Random rng;
+        private readonly System.Random rng;
         private float qsbPhase;
 
         public float NoiseFloor { get; set; } = 0.002f;
@@ -53,7 +59,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public Atmosphere(int seed)
         {
-            rng = new Random(seed);
+            rng = new System.Random(seed);
             qsbPhase = 0f;
         }
 
@@ -72,7 +78,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (rng.NextDouble() < 0.0001)
                 noise += 0.15f * ((float)rng.NextDouble() * 2f - 1f);
 
-            return sample * qsb + noise;
+            return Mathf.Clamp(sample * qsb + noise, -1f, 1f);
         }
 
         private float GaussianNoise()
@@ -129,7 +135,7 @@ namespace UBOAT.Mods.RadioNavigation
                 saturated += whistle * WhistleLevel * 0.12f;
             }
 
-            return saturated;
+            return Mathf.Clamp(saturated, -1f, 1f);
         }
 
         public void Reset()
