@@ -1,18 +1,49 @@
 # Appendix B: Class Diagrams — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-01):** Диаграммы классов содержат расхождения, частично исправлены:
-> - **F47:** ⚠ proposed классы в target diagrams
-> - **F51 (исправлено):** `Atmosphere.Apply(sample, sampleRate)` (было `GenerateNoise`)
-> - **F51 (исправлено):** `ReceiverDsp.Process()` (было 3 метода: ApplyAGC/ApplyFilter/ApplySaturation)
-> - **F51 (исправлено):** `ProcessAudio` сигнатура: 9 params
-> - **F51 (частично):** `RadioHandler.EmitFrequency` — private, 0 params
-> - **F48:** Array sizes: 4→14
+> **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Актуальный состав классов — раздел 0 ниже (по дереву `Source/`, 2026-08-02). Детальные ASCII-диаграммы разделов 1.x — исторический снимок до аудита: поля/методы могли измениться (удалены GetElementCount — F193, GetSignalBuffer — F06; добавлены PrefabNames — F26, GeoMath/Constants — F12/F28). Достоверный источник — исходники `Source/`.
+> - **F52 (закрыто):** недостающие классы добавлены в раздел 0
+> - **F47:** ⚠ proposed классы в target diagrams (отклонено)
+> - **F51 (закрыто):** `Atmosphere.Apply(sample, sampleRate)`, `ReceiverDsp.Process()`, `ProcessAudio` 9 params, `RadioHandler.EmitFrequency` private
+> - **F48:** Array sizes: 4→14 (аннотировано)
 > - **F50:** LOC: SonneController 506→508
-> - **F52:** Добавлен `SignalRichTextFormatter`
 > - **F158:** `RadioHandler.sonneController` — dead field (marked)
 > - **F160:** `InformationPanelHandler.uiElements` — не существует (marked)
->
-> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
+
+## 0. Актуальный состав классов (2026-08-02, после аудита F01–F207)
+
+| Слой | Класс | Роль |
+|------|-------|------|
+| Data | `BeaconData` | 14 маяков Consol/Sonne, 5 диапазонов |
+| Data | `ConsolCycleConfig` | Конфиг цикла 120 s (F164: другие циклы — warning) |
+| Data | `DialConfig` | Преобразование угол→частота по диапазонам |
+| Data | `SignalTypes` | SignalEntry, NavigationElementType и др. |
+| Data | `StationState` | Состояние станции (beat, gain, pattern) |
+| Logic | `Main` | Точка входа мода: Harmony, DI, инсталляция (SRP-сплит — F21, deferred) |
+| Logic | `SonneController` | Ядро симуляции: gains, navigation, аудио (god-object — F02, deferred) |
+| Logic | `StationScheduler` | Фазовая машина цикла (Callsign→Navigation→…) |
+| Logic | `MorseKeyer` | Воспроизведение морзе-паттернов |
+| Logic | `MorseAlphabet` | Азбука Морзе ↔ паттерны |
+| Logic | `MorseTiming` | Тайминги элементов |
+| Logic | `NavigationPattern` | Паттерны секторов Consol (IKeySequence) |
+| Logic | `PositionFixCalculator` | Секторные пересечения → позиция (F18, deferred) |
+| Logic | `GeoMath` | Сферическая геометрия: ToRadians/Haversine/bearing (**F12/F73**) |
+| Logic | `GeoPositionConverter` | Преобразования координат |
+| Logic | `PlayerPositionProvider` | Позиция подводной лодки из игры |
+| Logic | `SonneSignalGenerator` | Сектора/позывные станций |
+| Logic | `RadioStoryIntegration` | Мёртвая цепочка G1–G4 (F04/F83, deferred) |
+| Logic | `ComparisonExtensions` | null-безопасные сравнения (F27/F74, deferred) |
+| Logic | `Constants` | Семантические константы (**F28/ADR-005**) |
+| Sound | `AudioSynthesisEngine` | Мост аудио-потока, тики, AGC |
+| Sound | `DspPipeline` | CarrierGenerator, Atmosphere, ReceiverDsp (вложенные) |
+| UI | `InformationPanelHandler` | Панель состояния (god-object — F03, deferred) |
+| UI | `RadioInstaller` | Сборка панели из префаба, подписки (F57/F93: debug под DEBUG) |
+| UI | `RadioHandler` | Частота/зона, подписки (F30/F56) |
+| UI | `ZoneHandler`, `GroundHandler`, `ToggleHandler` | Кнопки панели |
+| UI | `SpinnerHandlerBase` + `VolumeSpinnerHandler`, `FeedbackSpinnerHandler` | Спиннеры (F33: слияние) |
+| UI | `CursorHandler`, `ExpanderHandler`, `PanelDragHandler` | Вспомогательные хендлеры |
+| UI | `DebugAngleHandler` | Отладочный угол (TMP — F63, deferred) |
+| UI | `SignalRichTextFormatter` | Форматирование сигналов (F52) |
+| UI | `PrefabNames` | Имена узлов префаба (**F26**) |
 
 ## 1. Current Class Diagram
 

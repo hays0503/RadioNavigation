@@ -1,12 +1,12 @@
 # Architecture Decisions — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-01):** Полный аудит выявил критические расхождения между статусами ADR и реальностью. Всего **199 проблем** (F01–F199).
-> - **F45 (исправлено):** ADR-002/003/004/005/007 — статус changed «Accepted» → «Deferred»
-> - **F46 (исправлено):** ADR-001 пример кода — replaced with real Harmony imperative patching
-> - **F47:** Implementation examples reference proposed/non-existent classes (annotated `⚠ proposed`)
-> - **F48:** ADR-003 упоминает 4 станции — реальность 14 (annotated)
+> **⚠️ Deep Scan Update (2026-08-02):** Полный аудит выявил критические расхождения между статусами ADR и реальностью. Всего **207 проблем** (F01–F207); статусы каждой — в `refactoring-plan/hypothesis/INDEX.md`.
+> - **F45 (закрыто):** ADR-002/003/004/005/007 — статусы исправлены: «Accepted» → «Deferred»
+> - **F46 (закрыто):** ADR-001 пример кода — заменён на реальное императивное Harmony-патчирование
+> - **F47 (отклонено):** примеры реализации ссылались на несуществующие классы — убраны/аннотированы
+> - **F48 (отклонено):** ADR-003 упоминал 4 станции — реальность 14 (аннотировано)
 >
-> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F76.md`.
+> Статусы ADR ниже актуальны; реализация частично закрыта (ADR-005 — Constants.cs в составе F28, ADR-003/004 — остаются в roadmap SAD 08).
 
 ## 1. Decision Overview
 

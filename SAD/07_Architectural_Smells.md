@@ -1,6 +1,6 @@
 # Architectural Smells — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-01):** Документ имеет обновленные smells. Добавлены F65–F199 (всего **199 проблем**). Ключевые исправления:
+> **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Ключевые исправления выполнены (42 коммита `fix/audit-and-issue-files` + `refactor/deferred-code`); оставшиеся архитектурные smells отложены в `refactoring-plan/DEFERRED.md` (god-объекты F02/F03/F18/F21/F25 → SAD 08/09 Фаза 4). Историческая сводка:
 > - **F45 (исправлено):** 5 ADR changed «Accepted» → «Deferred»
 > - **F46 (исправлено):** Harmony targets corrected (RadioStory, not Game)
 > - **F47:** 14+ несуществующих классов — annotated/removed
