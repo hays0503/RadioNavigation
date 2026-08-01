@@ -10,6 +10,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [InlineData('5', ".....")]
         [InlineData('O', "---")]
         [InlineData('T', "-")]
+        [InlineData('A', ".-")]
         public void GetMorse_Upper_ReturnsExpected(char c, string expected)
         {
             Assert.Equal(expected, MorseAlphabet.GetMorse(c));
@@ -33,6 +34,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [InlineData("-...", 'B')]
         [InlineData("---", 'O')]
         [InlineData("....", 'H')]
+        [InlineData(".-", 'A')]
         public void DecodeMorse_KnownSequence_ReturnsChar(string seq, char expected)
         {
             Assert.Equal(expected, MorseAlphabet.DecodeMorse(seq));

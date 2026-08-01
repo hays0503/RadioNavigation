@@ -9,7 +9,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         static MorseAlphabet()
         {
-            Define('A', "._");
+            Define('A', ".-");
             Define('B', "-...");
             Define('C', "-.-.");
             Define('D', "-..");
