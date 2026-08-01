@@ -30,25 +30,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal("", MorseAlphabet.GetMorse('{'));
         }
 
-        [Theory]
-        [InlineData("-...", 'B')]
-        [InlineData("---", 'O')]
-        [InlineData("....", 'H')]
-        [InlineData(".-", 'A')]
-        public void DecodeMorse_KnownSequence_ReturnsChar(string seq, char expected)
-        {
-            Assert.Equal(expected, MorseAlphabet.DecodeMorse(seq));
-        }
-
-        [Theory]
-        [InlineData("")]
-        [InlineData("nonsense")]
-        [InlineData(".-.-.-")]
-        public void DecodeMorse_UnknownSequence_ReturnsQuestionMark(string seq)
-        {
-            Assert.Equal('?', MorseAlphabet.DecodeMorse(seq));
-        }
-
         [Fact]
         public void TextToPattern_SingleChar_FirstElementIsDashForDashLetters()
         {

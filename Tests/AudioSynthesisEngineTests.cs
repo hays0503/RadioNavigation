@@ -43,7 +43,10 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var schedulers = new[] { CreateSchedulerInPreNavPause() };
             var keyers = new[] { new MorseKeyer() };
 
-            engine.UpdateStations(60 * 0.05f, 123.45f, stations, schedulers, keyers, true);
+            // 3.05 s = 61 logical ticks with margin; exactly 60 ticks would
+            // sit on the float/double rounding boundary (F94) and could
+            // deliver only 59.
+            engine.UpdateStations(3.05f, 123.45f, stations, schedulers, keyers, true);
 
             Assert.Equal(StationScheduler.Phase.Navigation, schedulers[0].CurrentPhase);
             Assert.Equal(123.45f, stations[0].NavigationStartTime);

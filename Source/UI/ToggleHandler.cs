@@ -91,7 +91,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Debug.LogError("[RadioNav][ToggleHandler] transform.parent is null");
                 return;
             }
-            Transform dial = transform.parent.Find("ciferbllat");
+            Transform dial = transform.parent.Find(PrefabNames.DialFace);
             if (dial.IsNotNull())
             {
                 dialImage = dial.GetComponent<Image>();
@@ -163,6 +163,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
+            // F61: static UI state must not leak into the next scene load.
+            isRadioOn = false;
+            isInteractable = false;
+            groundActive = false;
+
             if (toggleComp.IsNotNull())
                 toggleComp.onValueChanged.RemoveListener(OnToggleChanged);
         }

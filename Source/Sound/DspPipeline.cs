@@ -13,7 +13,10 @@ namespace UBOAT.Mods.RadioNavigation
         public float Frequency
         {
             get => targetFrequency;
-            set => targetFrequency = Math.Max(0f, value);
+            // F40: unbounded carrier frequencies alias above Nyquist; keep
+            // the carrier below a sane audio ceiling (well above the
+            // 300-1800 Hz beat range the controller actually produces).
+            set => targetFrequency = Math.Max(0f, Math.Min(value, 20000f));
         }
 
         public CarrierGenerator(float sampleRate)

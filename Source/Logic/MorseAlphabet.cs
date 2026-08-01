@@ -1,11 +1,8 @@
-﻿using System.Collections.Generic;
-
-namespace UBOAT.Mods.RadioNavigation
+﻿namespace UBOAT.Mods.RadioNavigation
 {
     public static class MorseAlphabet
     {
         private static readonly string[] table = new string[128];
-        private static readonly Dictionary<string, char> reverse = new Dictionary<string, char>();
 
         static MorseAlphabet()
         {
@@ -45,10 +42,6 @@ namespace UBOAT.Mods.RadioNavigation
             Define('7', "--...");
             Define('8', "---..");
             Define('9', "----.");
-
-            for (int i = 0; i < table.Length; i++)
-                if (table[i].IsNotNull() && table[i].Length.IsPositive() && !reverse.ContainsKey(table[i]))
-                    reverse[table[i]] = (char)i;
         }
 
         private static void Define(char c, string morse)
@@ -70,12 +63,9 @@ namespace UBOAT.Mods.RadioNavigation
             return table[c] ?? "";
         }
 
-        public static char DecodeMorse(string sequence)
-        {
-            if (string.IsNullOrEmpty(sequence))
-                return '?';
-            return reverse.TryGetValue(sequence, out char c) ? c : '?';
-        }
+        // F75: DecodeMorse and its reverse dictionary were dead code —
+        // decoding lives in SonneController.DecodeCallsignBuffer, which
+        // compares against the alphabet table directly.
 
         // F166: elementDurationTicks was accepted but never used — element
         // timing lives in MorseTiming, not in the pattern; removed.

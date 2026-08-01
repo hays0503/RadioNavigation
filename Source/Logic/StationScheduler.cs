@@ -28,9 +28,22 @@
             Callsign = new CallsignPattern(callsign);
             Navigation = new NavigationPattern(new Group[0], 8);
             CurrentConsolPattern = null;
-            CurrentPhase = Phase.Pause;
-            pauseTicksRemaining = 1;
             CallsignElementCount = SonneSignalGenerator.GetCallsignElementCount(callsign);
+            // F87: with no callsign elements (unknown callsign) the Callsign
+            // phase would never finish — MorseKeyer stays idle on an empty
+            // sequence and the cycle would stall forever. Skip straight to
+            // the pre-navigation pause (one tick; Config.PreNavPauseMs would
+            // need Config, which is assigned after construction).
+            if (CallsignElementCount.IsZero())
+            {
+                CurrentPhase = Phase.PreNavPause;
+                pauseTicksRemaining = 1;
+            }
+            else
+            {
+                CurrentPhase = Phase.Pause;
+                pauseTicksRemaining = 1;
+            }
         }
 
         public IKeySequence GetCurrentSequence()

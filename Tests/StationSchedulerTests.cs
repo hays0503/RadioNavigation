@@ -14,6 +14,17 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void Constructor_EmptyCallsign_SkipsCallsignPhase()
+        {
+            // F87: an empty callsign sequence never finishes (MorseKeyer
+            // stays idle), so the scheduler must skip the Callsign phase
+            // or the cycle would stall forever.
+            var s = new StationScheduler("");
+            Assert.Equal(StationScheduler.Phase.PreNavPause, s.CurrentPhase);
+            Assert.Null(s.GetCurrentSequence());
+        }
+
+        [Fact]
         public void Tick_FromPause_EntersCallsign()
         {
             var s = new StationScheduler("TEST");

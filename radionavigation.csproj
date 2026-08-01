@@ -7,8 +7,13 @@
     <OutputType>Library</OutputType>
     <OutputPath>.</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <NoWarn>CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625</NoWarn>
+    <!-- F88: removed dead NoWarn (CS8600..CS8625) — Nullable analysis is not
+         enabled, so the suppressions never matched anything. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Source\**\*.cs" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed\Assembly-CSharp.dll</HintPath>

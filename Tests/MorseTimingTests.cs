@@ -6,23 +6,24 @@ namespace UBOAT.Mods.RadioNavigation.Tests
     {
         private static ConsolCycleConfig Default() => ConsolCycleConfig.Cycle120s;
 
-        // F81 (truncation): (int) casts 2.5 -> 2. Value is the current behavior; will become 3 after Round() fix.
+        // F81: Math.Round replaces truncation — 2.5 rounds to 2 (banker's
+        // rounding: ToEven), 17.5 rounds to 18.
         [Fact]
-        public void GetDotSoundTicks_DefaultConfig_Truncates()
+        public void GetDotSoundTicks_DefaultConfig()
         {
             Assert.Equal(2, MorseTiming.GetDotSoundTicks(Default()));
         }
 
         [Fact]
-        public void GetDashSoundTicks_DefaultConfig_Truncates()
+        public void GetDashSoundTicks_DefaultConfig()
         {
-            Assert.Equal(17, MorseTiming.GetDashSoundTicks(Default()));
+            Assert.Equal(18, MorseTiming.GetDashSoundTicks(Default()));
         }
 
         [Fact]
         public void GetDotSilenceTicks_DefaultConfig()
         {
-            Assert.Equal(17, MorseTiming.GetDotSilenceTicks(Default()));
+            Assert.Equal(18, MorseTiming.GetDotSilenceTicks(Default()));
         }
 
         [Fact]
@@ -51,9 +52,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void ToTicks_Truncates()
+        public void ToTicks_HalfValue_RoundsToEven()
         {
-            Assert.Equal(17, MorseTiming.ToTicks(875f));
+            Assert.Equal(18, MorseTiming.ToTicks(875f));
         }
 
         // F136: inconsistent config (sound longer than period) must not
@@ -77,11 +78,11 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void GetDotSilenceTicks_ConsistentConfig_Unchanged()
+        public void GetDotSilenceTicks_ConsistentConfig()
         {
             var c = Default();
             c.ElementPeriodMs = 1000f;
-            Assert.Equal(17, MorseTiming.GetDotSilenceTicks(c));
+            Assert.Equal(18, MorseTiming.GetDotSilenceTicks(c));
         }
     }
 }

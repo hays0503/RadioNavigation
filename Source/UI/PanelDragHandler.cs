@@ -167,5 +167,18 @@ namespace UBOAT.Mods.RadioNavigation
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
             moveCursorActive = false;
         }
+
+        private void OnDestroy()
+        {
+            // F42: the cached cursor texture is a GPU resource; Application.quitting
+            // only fires on game exit, so a mod reload used to leak it until
+            // restart. A single panel is the expected deployment (RadioInstaller
+            // instantiates one), so destroying the cache here is safe.
+            if (cachedCursorTexture.IsNotNull())
+            {
+                Object.Destroy(cachedCursorTexture);
+                cachedCursorTexture = null;
+            }
+        }
     }
 }

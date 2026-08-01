@@ -532,7 +532,8 @@ namespace UBOAT.Mods.RadioNavigation
             !keyers[i].IsActive
             || schedulers[i].CurrentPhase != StationScheduler.Phase.Navigation;
 
-        private static bool TryGetCallsignFromHistory(BeaconStation station, out string callsign)        {
+        private static bool TryGetCallsignFromHistory(BeaconStation station, out string callsign)
+        {
             if (station.History.IsNotNull()
                 && station.History.Length.IsPositive()
                 && !string.IsNullOrEmpty(station.History[0].Callsign))
@@ -540,7 +541,12 @@ namespace UBOAT.Mods.RadioNavigation
                 callsign = station.History[0].Callsign;
                 return true;
             }
-            callsign = station.Name.Substring(0, Math.Min(2, station.Name.Length)).ToUpper();
+
+            // F87: no history callsign -> report absence instead of fabricating
+            // a fake one (e.g. "PL" from "Plougourvest"); GenerateConsolPattern
+            // skips the callsign phase and DecodeCallsignBuffer clears the
+            // buffer. F66: station.Name may be null and is not used here.
+            callsign = null;
             return false;
         }
 
@@ -563,14 +569,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             float bearing = (float)(Math.Atan2(y, x) * (180.0 / Math.PI));
             return (bearing + 360f) % 360f;
-        }
-
-        public static float NormalizeAngle(float angle)
-        {
-            angle = angle % 360f;
-            if (angle < -180f) angle += 360f;
-            if (angle > 180f) angle -= 360f;
-            return angle;
         }
 
         private static double ToRadians(float degrees)

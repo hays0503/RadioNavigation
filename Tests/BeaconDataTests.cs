@@ -42,15 +42,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void GetDotCountToBearingTable_LengthAndRange()
-        {
-            var table = BeaconData.Stations[0].GetDotCountToBearingTable();
-            Assert.Equal(61, table.Length);
-            foreach (int v in table)
-                Assert.InRange(v, 0, 359);
-        }
-
-        [Fact]
         public void Bushmills_FirstStation_Coordinates()
         {
             var s = BeaconData.Stations[0];

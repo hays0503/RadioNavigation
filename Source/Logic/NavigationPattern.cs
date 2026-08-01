@@ -60,23 +60,25 @@ namespace UBOAT.Mods.RadioNavigation
             if (pattern.Groups.IsNull() || pattern.Groups.Length.IsZero())
                 return "---";
 
-            string result = "";
+            // F19: string concatenation in loops allocates per group and per
+            // element; these run ~5x/second from InformationPanelHandler.
+            var sb = new System.Text.StringBuilder(pattern.Groups.Length * (pattern.ElementsPerGroup + 3));
             for (int g = 0; g < pattern.Groups.Length; g++)
             {
-                if (g.IsPositive()) result += " ";
-                result += "[";
+                if (g > 0) sb.Append(' ');
+                sb.Append('[');
                 for (int e = 0; e < pattern.ElementsPerGroup; e++)
                 {
                     if (g == pattern.TransitionIndex)
-                        result += "=";
+                        sb.Append('=');
                     else if (pattern.Groups[g].GetElement(e))
-                        result += "-";
+                        sb.Append('-');
                     else
-                        result += ".";
+                        sb.Append('.');
                 }
-                result += "]";
+                sb.Append(']');
             }
-            return result;
+            return sb.ToString();
         }
 
         public static string FormatCompact(NavigationPattern pattern)
@@ -84,7 +86,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (pattern.Groups.IsNull() || pattern.Groups.Length.IsZero())
                 return "---";
 
-            string result = "";
+            var sb = new System.Text.StringBuilder(pattern.Groups.Length * (pattern.ElementsPerGroup + 3));
             bool inDashes = false;
 
             for (int g = 0; g < pattern.Groups.Length; g++)
@@ -92,23 +94,23 @@ namespace UBOAT.Mods.RadioNavigation
                 if (g == pattern.TransitionIndex)
                 {
                     for (int e = 0; e < pattern.ElementsPerGroup; e++)
-                        result += ".";
-                    result += " = ";
+                        sb.Append('.');
+                    sb.Append(" = ");
                     inDashes = true;
                 }
                 else if (!inDashes)
                 {
                     for (int e = 0; e < pattern.ElementsPerGroup; e++)
-                        result += ".";
+                        sb.Append('.');
                 }
                 else
                 {
                     for (int e = 0; e < pattern.ElementsPerGroup; e++)
-                        result += "-";
+                        sb.Append('-');
                 }
             }
 
-            return result;
+            return sb.ToString();
         }
     }
 

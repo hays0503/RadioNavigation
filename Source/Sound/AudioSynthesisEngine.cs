@@ -10,14 +10,13 @@ namespace UBOAT.Mods.RadioNavigation
     public class AudioSynthesisEngine
     {
         public const int SampleRate = 44100;
-        private const float BfoBase = 1000f;
-        private const float BfoMin = 300f;
-        private const float BfoMax = 1800f;
         private const float TickIntervalSeconds = 0.05f; // 50 ms per logical tick
 
         private readonly Atmosphere atmosphere;
         private readonly ReceiverDsp dsp;
-        private float tickAccumulator;
+        // F94: double accumulator — float drift over hours of gameplay could
+        // shift the 50 ms tick tempo.
+        private double tickAccumulator;
         private float outputVolume = 1f;
 
         public float OutputVolume
@@ -33,7 +32,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             atmosphere.Reset();
             dsp.Reset();
-            tickAccumulator = 0f;
+            tickAccumulator = 0.0;
         }
 
         public float QualityFactor { get; set; } = 20f;
@@ -57,19 +56,6 @@ namespace UBOAT.Mods.RadioNavigation
             atmosphere.ImpulseProbability = Mathf.Lerp(0.002f, 0.0002f, Feedback);
 
             dsp.WhistleLevel = Mathf.Clamp01((Feedback - 0.75f) / 0.2f);
-        }
-
-        public void UpdateStationBeats(StationState[] stations, CarrierGenerator[] carriers, float currentFrequencyKHz, int currentZoneIndex, int sonneZoneIndex)
-        {
-            for (int i = 0; i < stations.Length; i++)
-            {
-                if (stations[i].Gain.IsNegligible(0.001f))
-                    continue;
-
-                float offset = currentFrequencyKHz - (stations[i].BeatFrequency - BfoBase) / 1000f;
-                stations[i].BeatFrequency = Mathf.Clamp(stations[i].BeatFrequency, BfoMin, BfoMax);
-                carriers[i].Frequency = stations[i].BeatFrequency;
-            }
         }
 
         // Main thread: advance the scheduler/keyer state machines at 50 ms

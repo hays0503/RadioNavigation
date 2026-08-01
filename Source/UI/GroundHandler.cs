@@ -79,7 +79,7 @@ namespace UBOAT.Mods.RadioNavigation
                         Color c = groundCheckmark.color;
                         c.a = 0f;
                         groundCheckmark.color = c;
-                        groundCheckmark.raycastTarget = true;
+                        groundCheckmark.raycastTarget = false; // F85: decorative child Image must not block clicks
                     }
                 }
             }

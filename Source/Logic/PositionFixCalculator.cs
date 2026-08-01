@@ -69,6 +69,9 @@ namespace UBOAT.Mods.RadioNavigation
                 var m = work[i];
                 float dist = GetDistanceKm(m.Latitude, m.Longitude, roughLat, roughLon);
                 m.Weight = dist > 0.1f ? 1.0f / (dist / 100.0f) : 10f;
+                // F64: struct copy must be written back via the indexer; a
+                // future `foreach` (or an early `continue`) would drop the
+                // Weight update silently.
                 work[i] = m;
             }
 
@@ -243,6 +246,9 @@ namespace UBOAT.Mods.RadioNavigation
             double a = Math.Sin(deltaPhi / 2.0) * Math.Sin(deltaPhi / 2.0) +
                        Math.Cos(phi1) * Math.Cos(phi2) *
                        Math.Sin(deltaLam / 2.0) * Math.Sin(deltaLam / 2.0);
+            // F80: rounding can push `a` a hair above 1.0 for (nearly) identical
+            // points; Math.Sqrt(1.0 - a) would then be NaN.
+            a = Math.Max(0.0, Math.Min(1.0, a));
             double c = 2.0 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1.0 - a));
 
             return (float)(R * c);

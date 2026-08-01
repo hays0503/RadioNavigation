@@ -86,10 +86,10 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void GetTransitionCount_CountsOnlyDots()
+        public void GetDotCount_CountsOnlyDots()
         {
             var pattern = new[] { NavigationElementType.Dot, NavigationElementType.Dot, NavigationElementType.Dash, NavigationElementType.Equisignal };
-            Assert.Equal(2, SonneSignalGenerator.GetTransitionCount(pattern));
+            Assert.Equal(2, SonneSignalGenerator.GetDotCount(pattern));
         }
 
         [Fact]
@@ -99,14 +99,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(61, table.Length);
             Assert.Equal(310, table[0]);
             Assert.Equal(315, table[60]);
-        }
-
-        [Fact]
-        public void LookupBearing_ClampsOutOfRange()
-        {
-            var table = SonneSignalGenerator.GenerateBearingTable(BeaconData.Stations[0]);
-            Assert.Equal(315, SonneSignalGenerator.LookupBearing(75, table));
-            Assert.Equal(310, SonneSignalGenerator.LookupBearing(-5, table));
         }
 
         [Fact]

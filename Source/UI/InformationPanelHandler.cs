@@ -319,14 +319,16 @@ namespace UBOAT.Mods.RadioNavigation
                     if (diag.NavigationElapsed.IsPositive())
                         suffix += " " + FormatTime(diag.NavigationElapsed);
                     stationText.text = stationBaseText + suffix;
-                }
 
 #if DEBUG
-                Debug.Log("[RadioNav][PANEL] domIdx=" + domIdx +
-                    " phase=" + phase +
-                    " navElapsed=" + diag.NavigationElapsed.ToString("F1") +
-                    " stationText=[" + stationText.text + "]");
+                    // F88: phase/diag are scoped to the else branch; the log
+                    // block used to live outside it and broke DEBUG builds.
+                    Debug.Log("[RadioNav][PANEL] domIdx=" + domIdx +
+                        " phase=" + phase +
+                        " navElapsed=" + diag.NavigationElapsed.ToString("F1") +
+                        " stationText=[" + stationText.text + "]");
 #endif
+                }
             }
 
             int displayIndex = 0;

@@ -99,7 +99,12 @@ namespace UBOAT.Mods.RadioNavigation
             float targetAngle = ClampTargetAngle(angle);
 
             if (UseSmoothing())
-                currentAngle = Mathf.Lerp(currentAngle, targetAngle, sensitivity);
+            {
+                // F72: frame-rate independent smoothing factor; raw Lerp(t)
+                // per frame is ~2x faster at 60 FPS than at 30 FPS.
+                float t = 1f - Mathf.Exp(-sensitivity * Time.deltaTime * 60f);
+                currentAngle = Mathf.Lerp(currentAngle, targetAngle, t);
+            }
             else
                 currentAngle = targetAngle;
 

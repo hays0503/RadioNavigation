@@ -20,6 +20,9 @@ namespace UBOAT.Mods.RadioNavigation
             if (transform.parent.IsNull())
             {
                 Debug.LogError("[RadioNav][ExpanderHandler] parent is null \u2014 cannot get panel RectTransform");
+                // F84: without a parent the panel RectTransform can never be
+                // resolved; keep the handler disabled instead of idling active.
+                enabled = false;
                 return;
             }
             panelRect = transform.parent.GetComponent<RectTransform>();

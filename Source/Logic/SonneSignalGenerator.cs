@@ -72,15 +72,6 @@ namespace UBOAT.Mods.RadioNavigation
             return table;
         }
 
-        public static int LookupBearing(int dotCount, int[] bearingTable)
-        {
-            if (bearingTable.IsNull() || bearingTable.Length.IsZero())
-                return 0;
-
-            dotCount = Math.Max(0, Math.Min(bearingTable.Length - 1, dotCount));
-            return bearingTable[dotCount];
-        }
-
         public static NavigationElementType[] GenerateConsolPattern(
             string callsign,
             int dotCount,
@@ -118,7 +109,9 @@ namespace UBOAT.Mods.RadioNavigation
             return result.ToArray();
         }
 
-        public static int GetTransitionCount(NavigationElementType[] pattern)
+        // F36: this counts dots, not pattern transitions — the old name
+        // promised transition semantics it never had.
+        public static int GetDotCount(NavigationElementType[] pattern)
         {
             if (pattern.IsNull())
                 return 0;

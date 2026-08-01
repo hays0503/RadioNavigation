@@ -24,22 +24,6 @@ namespace UBOAT.Mods.RadioNavigation
         public int CycleDurationSeconds;
         public float BaseAngle;
         public BeaconHistoryEntry[] History;
-
-        public int[] GetDotCountToBearingTable()
-        {
-            var config = ConsolCycleConfig.GetForCycleDuration(CycleDurationSeconds);
-            int maxCount = config.MaxNavigationCount;
-            var table = new int[maxCount + 1];
-
-            for (int i = 0; i <= maxCount; i++)
-            {
-                float ratio = maxCount.IsPositive() ? (float)i / maxCount : 0f;
-                float bearing = BeamHeadingDegTrue - BeamHalfWidthDeg + ratio * 2f * BeamHalfWidthDeg;
-                table[i] = (int)((bearing + 360f) % 360f);
-            }
-
-            return table;
-        }
     }
 
     public static class BeaconData
