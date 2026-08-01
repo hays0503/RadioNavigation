@@ -20,8 +20,12 @@ namespace UBOAT.Mods.RadioNavigation
         private ConsolCycleConfig config;
         private int callsignLength;
 
-        public bool KeyOn => state == State.ElementOn || state == State.Tone;
-        public bool IsActive { get; private set; }
+        // F01/F29: read from the audio thread — volatile, no torn reads.
+        private volatile bool keyOn;
+        private volatile bool isActive;
+
+        public bool KeyOn => keyOn;
+        public bool IsActive => isActive;
         public bool IsTone => state == State.Tone;
         public bool IsCallsignElement => consolPattern.IsNotNull() && elementIndex < callsignLength;
 
@@ -36,11 +40,11 @@ namespace UBOAT.Mods.RadioNavigation
             consolPattern = null; // F65: stale consol pattern must not win over the loaded sequence
             elementIndex = 0;
             ticksInState = 0;
-            state = State.Idle;
+            SetState(State.Idle);
             callsignLength = 0;
-            IsActive = sequence.IsNotNull() && sequence.ElementCount.IsPositive();
+            isActive = sequence.IsNotNull() && sequence.ElementCount.IsPositive();
 
-            if (IsActive)
+            if (isActive)
                 StartElement();
         }
 
@@ -56,12 +60,12 @@ namespace UBOAT.Mods.RadioNavigation
             this.config = config;
             elementIndex = 0;
             ticksInState = 0;
-            state = State.Idle;
+            SetState(State.Idle);
             consolPattern = pattern;
             this.callsignLength = callsignLength;
-            IsActive = pattern.IsNotNull() && pattern.Length.IsPositive();
+            isActive = pattern.IsNotNull() && pattern.Length.IsPositive();
 
-            if (IsActive)
+            if (isActive)
                 StartElement();
         }
 
@@ -71,19 +75,15 @@ namespace UBOAT.Mods.RadioNavigation
         {
             elementIndex = 0;
             ticksInState = 0;
-            state = State.Idle;
-            IsActive = false;
+            SetState(State.Idle);
+            isActive = false;
             consolPattern = null;
         }
 
         public void Advance()
         {
-            if (!IsActive)
-            {
-                if (scheduler.IsNotNull())
-                    scheduler.Tick();
-                return;
-            }
+            if (!isActive)
+                return; // F01/F98: the scheduler is ticked by the caller (UpdateStations), exactly once per logical tick
 
             ticksInState++;
 
@@ -117,6 +117,12 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        private void SetState(State newState)
+        {
+            state = newState;
+            keyOn = newState == State.ElementOn || newState == State.Tone;
+        }
+
         private void StartElement()
         {
             if (elementIndex < consolPattern?.Length)
@@ -124,19 +130,19 @@ namespace UBOAT.Mods.RadioNavigation
                 var elem = consolPattern[elementIndex];
                 if (elem == NavigationElementType.Equisignal)
                 {
-                    state = State.Tone;
+                    SetState(State.Tone);
                     ticksInState = 0;
                     return;
                 }
             }
 
-            state = State.ElementOn;
+            SetState(State.ElementOn);
             ticksInState = 0;
         }
 
         private void StartElementSilence()
         {
-            state = State.ElementSilence;
+            SetState(State.ElementSilence);
             ticksInState = 0;
         }
 
@@ -161,8 +167,8 @@ namespace UBOAT.Mods.RadioNavigation
                     }
                     else
                     {
-                        state = State.Idle;
-                        IsActive = false;
+                        SetState(State.Idle);
+                        isActive = false;
                         return;
                     }
                 }
@@ -187,8 +193,8 @@ namespace UBOAT.Mods.RadioNavigation
                     }
                     else
                     {
-                        state = State.Idle;
-                        IsActive = false;
+                        SetState(State.Idle);
+                        isActive = false;
                         return;
                     }
                 }

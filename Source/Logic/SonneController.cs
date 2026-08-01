@@ -350,9 +350,9 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateStationNavigation();
             }
 
-            // F13: audio thread only flags the PreNavPause -> Navigation
-            // transition; the main thread stamps NavigationStartTime here.
-            audioEngine.ConsumeNavStartFlags(stations, Time.time);
+            // F01/F29: the scheduler/keyer state machine runs on the main
+            // thread; the audio thread only samples the volatile KeyOn flag.
+            audioEngine.UpdateStations(Time.deltaTime, Time.time, stations, schedulers, keyers, ToggleHandler.IsRadioOn);
         }
 
         private void UpdateStationGains()
@@ -465,7 +465,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnAudioFilterRead(float[] data, int channels)
         {
-            audioEngine.ProcessAudio(data, channels, stations, schedulers, keyers, carriers, ToggleHandler.IsRadioOn, currentZoneIndex, SonneZoneIndex);
+            audioEngine.ProcessAudio(data, channels, stations, keyers, carriers, ToggleHandler.IsRadioOn, currentZoneIndex, SonneZoneIndex);
         }
 
         public bool IsInSonneZone => currentZoneIndex == SonneZoneIndex;
