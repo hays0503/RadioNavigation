@@ -72,6 +72,7 @@ namespace UBOAT.Mods.RadioNavigation
                     Config = config,
                     BearingTable = bearingTable
                 };
+                scheduler.CurrentConsolPattern = SonneSignalGenerator.GenerateConsolPattern(callsign, 0, config); // F145: pre-compute so the first callsign cycle has a pattern with a valid callsign length
                 var keyer = new MorseKeyer();
                 var carrier = new CarrierGenerator(AudioSynthesisEngine.SampleRate);
 
