@@ -53,8 +53,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void Define(char c, string morse)
         {
+            // F170: defensive bounds check — the table is ASCII-only.
+            if (c >= table.Length)
+                return;
             table[c] = morse;
-            if (c >= 'A' && c <= 'Z')
+            if (c >= 'A' && c <= 'Z' && c + 32 < table.Length)
                 table[c + 32] = morse;
         }
 

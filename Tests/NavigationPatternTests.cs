@@ -34,6 +34,24 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.False(p.GetElement(100));
         }
 
+        // F174: negative index used to compute a negative group index and
+        // crash on Groups[g]; must return false.
+        [Fact]
+        public void GetElement_NegativeIndex_False()
+        {
+            var p = new NavigationPattern(new[] { new Group(0b11111111UL) }, 8);
+            Assert.False(p.GetElement(-1));
+            Assert.False(p.GetElement(-8));
+            Assert.False(p.GetElement(-100));
+        }
+
+        [Fact]
+        public void Group_GetElement_NegativeIndex_False()
+        {
+            var g = new Group(0b101UL);
+            Assert.False(g.GetElement(-1));
+        }
+
         [Fact]
         public void ElementCount_GroupTimesSize()
         {

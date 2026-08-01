@@ -17,6 +17,9 @@ namespace UBOAT.Mods.RadioNavigation
     [NonSerializedInGameState]
     public class Main : IUserMod
     {
+        // F176: single source of truth for the game UI container lookup.
+        private const string MainSceneViewportPath = "/GUI/Viewport";
+
         [Inject] private static ResourceManager resourceManager;
         [NonSerializedInGameState] private Harmony harmony;
         private static bool loaded;
@@ -149,10 +152,13 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
 
-                Transform viewport = GameObject.Find("/GUI/Viewport")?.transform;
+                // F176: the GUI hierarchy path is a single source of truth
+                // here; keep it in one constant and fail loudly if the game
+                // renames the container.
+                Transform viewport = GameObject.Find(MainSceneViewportPath)?.transform;
                 if (viewport.IsNull())
                 {
-                    Debug.LogWarning("[RadioNav][Main] '/GUI/Viewport' not found \u2014 GUI hierarchy may have changed in this UBOAT version");
+                    Debug.LogWarning("[RadioNav][Main] '" + MainSceneViewportPath + "' not found \u2014 GUI hierarchy may have changed in this UBOAT version");
                     return;
                 }
 

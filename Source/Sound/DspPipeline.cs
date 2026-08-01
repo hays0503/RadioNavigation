@@ -24,6 +24,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         // F141: one-pole smoothing prevents a phase discontinuity (click) when
         // the frequency is retuned between main-thread writes and audio reads.
+        // F169: phase stays normalized to [0,1) so the accumulator never
+        // accumulates float precision loss at large sample counts.
         public float NextSample()
         {
             smoothedFrequency += (targetFrequency - smoothedFrequency) * 0.1f;
@@ -31,11 +33,11 @@ namespace UBOAT.Mods.RadioNavigation
             if (smoothedFrequency.IsNonPositive())
                 return 0f;
 
-            float sample = (float)Math.Sin(2.0 * Math.PI * smoothedFrequency * phase / sampleRate);
-            phase += 1.0;
+            float sample = (float)Math.Sin(2.0 * Math.PI * phase);
+            phase += smoothedFrequency / sampleRate;
 
-            if (phase >= sampleRate)
-                phase -= sampleRate;
+            if (phase >= 1.0)
+                phase -= 1.0;
 
             return sample;
         }

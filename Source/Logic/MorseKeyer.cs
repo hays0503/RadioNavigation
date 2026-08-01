@@ -77,6 +77,10 @@ namespace UBOAT.Mods.RadioNavigation
             ticksInState = 0;
             SetState(State.Idle);
             isActive = false;
+            // F165: clear both sources like Load/LoadConsol do — a stale
+            // sequence must not keep feeding GetCurrentElementType() after
+            // a reset.
+            sequence = null;
             consolPattern = null;
         }
 
@@ -159,7 +163,10 @@ namespace UBOAT.Mods.RadioNavigation
                     var nextPattern = scheduler.GetCurrentConsolPattern();
                     if (nextPattern.IsNotNull() && nextPattern.Length.IsPositive())
                     {
+                        // F175: consol and sequence sources are mutually
+                        // exclusive — clear the sequence when entering consol.
                         consolPattern = nextPattern;
+                        sequence = null;
                         elementIndex = 0;
                         callsignLength = 0;
                         StartElement();
@@ -186,7 +193,11 @@ namespace UBOAT.Mods.RadioNavigation
                     var nextSeq = scheduler.GetCurrentSequence();
                     if (nextSeq.IsNotNull() && nextSeq.ElementCount.IsPositive())
                     {
+                        // F175: entering a plain sequence must clear any stale
+                        // consol pattern and callsign classification.
                         sequence = nextSeq;
+                        consolPattern = null;
+                        callsignLength = 0;
                         elementIndex = 0;
                         StartElement();
                         return;

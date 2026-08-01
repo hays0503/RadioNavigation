@@ -45,5 +45,16 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             Assert.Equal(NavigationElementType.Dot, completed);
         }
+
+        // F165: Reset must clear the loaded sequence so an idle keyer cannot
+        // report stale sequence data through the getters.
+        [Fact]
+        public void Reset_ClearsSequence_KeyerStaysInactive()
+        {
+            var keyer = new MorseKeyer();
+            keyer.Load(MorseAlphabet.TextToPattern("TEST"));
+            keyer.Reset();
+            Assert.False(keyer.IsActive);
+        }
     }
 }

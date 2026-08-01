@@ -20,6 +20,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public bool GetElement(int index)
         {
+            // F174: negative shifts are undefined in C#.
+            if (index < 0) return false;
             return ((Bits >> index) & 1UL) != 0;
         }
     }
@@ -43,6 +45,9 @@ namespace UBOAT.Mods.RadioNavigation
         public bool GetElement(int index)
         {
             if (Groups.Length.IsZero()) return false;
+            // F174: negative index would produce a negative group index and
+            // an IndexOutOfRangeException on Groups[g].
+            if (index < 0) return false;
             int g = index / ElementsPerGroup;
             int e = index % ElementsPerGroup;
             if (g >= Groups.Length) return false;
