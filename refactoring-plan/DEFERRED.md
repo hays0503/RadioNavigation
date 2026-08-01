@@ -14,6 +14,11 @@ Resolved without code edits — each entry lists the reason:
 - **F03** InformationPanelHandler god-object (474 LOC, 9 responsibilities) — architectural refactor, SAD 08 roadmap.
 - **F04** RadioStoryIntegration god-object + reflection fragility — dead chain G1-G4, see `refactoring-plan/game-source-findings/`.
 - **F08** GC pressure (per-frame heap allocations) — not a hot path; call sites already allocate only on 0.2 s station updates; no per-frame `new` remains.
+- **F10** 14 hardcoded HintPath + Steam-path dependency in csproj — dev-only build config; build.ps1 is the supported entry point; not game-facing.
+- **F12** `ToRadians` duplicated (SonneController vs PositionFixCalculator) — 3-line copy-paste; dedup goes with F73 (Haversine) into a shared geo module, SAD 08 roadmap.
+- **F15** No state persistence (volume/band/radio position reset) — feature request, not a defect; needs a save-system decision.
+- **F18** PositionFixCalculator god object (224 LOC) — architectural refactor, SAD 08 roadmap.
+- **F20** DialConfig band unit inconsistencies (Band I MHz vs kHz display) — display-string only; band math is consistent (Bands table).
 - **F21** Main.cs responsibilities — architectural refactor, SAD 08 roadmap.
 - **F25** AudioSynthesisEngine positional array coupling — architectural API design, SAD 08 roadmap.
 - **F27** ComparisonExtensions anti-pattern (~93 call sites) — style-only; null-safety helpers used consistently (F74 notes deliberate asymmetry).
@@ -30,6 +35,7 @@ Resolved without code edits — each entry lists the reason:
 - **F71** 2-3 Random.NextDouble() per sample in audio thread — noise character is intentional; redesign would change the sound, needs a live listen.
 - **F73** Haversine duplicated (PositionFixCalculator vs NavigationPattern) — extracted only the NaN clamp (F80); full dedup is SAD 08 roadmap.
 - **F83** RadioStoryIntegration zombie decisions on hot-reload — dead chain G1-G4, see `refactoring-plan/game-source-findings/`.
+- **F173** InformationPanelHandler.CreateLabel OS font name ("Arial") — portability risk only; a missing font falls back to Unity's default, no crash; bundling a font is a content decision.
 
 ## Verified fixed without a new edit (code already satisfies, 2026-08-02)
 
@@ -43,3 +49,6 @@ Resolved without code edits — each entry lists the reason:
 - **F74** ComparisonExtensions threshold asymmetry — deliberate; comment added in F74-commit.
 - **F76** GetElementCount int overflow — method deleted (F193).
 - **F82** Main.cs exception swallow in panel construction — deliberate + LogException (see F69).
+- **F11** keyer lambda subscriptions — SonneController stores handlers and unsubscribes in OnDestroy (keyerElementHandlers/keyerSequenceHandlers arrays).
+- **F14** event subscription leaks — all UI handlers balance subscribe/unsubscribe (IPH 6/6, RadioHandler, ToggleHandler, DebugAngleHandler); ZoneHandler uses Unity EventTrigger owned by the GameObject, no leak.
+- **F167** StationScheduler.OnSequenceFinished — Callsign→PreNavPause and Navigation→PostNavSilence are handled; Pause/PreNavPause/PostNavSilence hit the guarded default branch (log + ignore), which is correct — no sequence is active in those phases.

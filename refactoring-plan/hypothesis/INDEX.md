@@ -22,48 +22,48 @@
 
 | ID | Название | Приоритет | Область | Строк | Статус |
 |----|----------|-----------|---------|-------|-------|
-| **F01** | Audio Race Condition | **P0** | Sound · Threading | 84 | ✔ |
-| **F02** | God Object: SonneController | **P1** | Architecture | 100+ | ✔ |
-| **F03** | God Object: InformationPanelHandler | **P1** | Architecture | 80+ | ✔ |
-| **F04** | God Object: RadioStoryIntegration | **P1** | Architecture | 70+ | ✔ |
-| **F05** | Static Mutable State | **P0** | Threading · Architecture | 60+ | ✔ |
-| **F06** | Dead Code & Mistakes | **P2** | Hygiene | 50+ | ✔ |
-| **F07** | Null Reference Risks | **P1** | Correctness | 65+ | ✔ |
-| **F08** | GC Pressure | **P2** | Performance | ~170 | ✔ |
-| **F09** | Logic Bugs | **P1** | Correctness | 55+ | ✔ |
-| **F10** | Build Config Issues | **P2** | Build | ~160 | ✔ |
-| **F11** | Memory Leaks | **P1** | Memory | ~160 | ✔ |
-| **F12** | Copy-Paste Duplication | **P2** | Hygiene | 200 | ✔ |
-| **F13** | Unity API in Audio Thread | **P0** | Sound · Threading | ~40 | ✔ |
-| **F14** | Event Subscription Leaks | **P1** | UI · Events | ~50 | ✔ |
-| **F15** | No State Persistence | **P2** | Save/Load | ~50 | ✔ |
-| **F16** | PositionFixCalculator.ErrorKm = 0 | **P1** | Logic · PF Calculator | ~10 | ✔ |
-| **F17** | StationState mutable struct | **P2** | Data · StationState | ~25 | ✔ |
-| **F18** | PositionFixCalculator God Object | **P2** | Architecture | ~60 | ✔ |
-| **F19** | NavigationPattern string concat | **P3** | Performance | ~20 | ✔ |
-| **F20** | DialConfig band inconsistencies | **P2** | Data · DialConfig | ~30 | ✔ |
-| **F21** | Main.cs multiple responsibilities | **P2** | Architecture | ~60 | ✔ |
-| **F22** | No test coverage (0%) | **P2** | Project-wide | ~60 | ✔ |
-| **F23** | Reflection Fragility — RadioStoryIntegration | **P0** | Logic · Integration | ~80 | ✔ |
-| **F24** | TrimEntries O(n²) RemoveAt(0) | **P1** | UI · Signal Buffer | ~15 | ✔ |
-| **F25** | AudioSynthesisEngine Array Coupling | **P1** | Sound · API Design | ~40 | ✔ |
-| **F26** | PrefabNames.cs Not Used | **P2** | UI · Constants | ~20 | ✔ |
-| **F27** | ComparisonExtensions Anti-Pattern | **P2** | Hygiene | ~34 | ✔ |
-| **F28** | Magic Numbers Scattered (~40 literals) | **P2** | Project-wide | ~40 | ✔ |
-| **F29** | Zero Synchronization Primitives | **P0** | Sound · Threading | ~30 | ✔ |
-| **F30** | RadioHandler missing OnDestroy unsubscribe | **P1** | UI · RadioHandler | ~10 | ✔ |
-| **F31** | 93 Debug.Log — 81 active in Release | **P2** | Project-wide | ~80 (call-sites) | ✔ |
-| **F32** | IPH: 5 GetComponentInChildren подряд | **P3** | UI · Performance | ~5 | ✔ |
-| **F33** | VolumeSpinner / FeedbackSpinner дубликаты | **P3** | UI · Duplication | ~34 | ✔ |
-| **F34** | BearingTable / LookupBearing — мёртвый код | **P1** | Logic · Bearing Table | ~40 | ✔ |
-| **F35** | Два разных алгоритма GenerateBearingTable | **P2** | Logic · Data · Duplication | ~30 | ✔ |
-| **F36** | GetTransitionCount считает только Dots | **P2** | Logic · Naming | ~12 | ✔ |
-| **F37** | 6 станций с null callsign | **P2** | Data · BeaconData | ~30 | ✔ |
-| **F38** | Plougourvest имеет null Frequency | **P2** | Data · BeaconData | ~25 | ✔ |
-| **F39** | 3 станции на одной частоте 332.5 kHz | **P2** | Data · BeaconData | ~15 | ✔ |
-| **F40** | CarrierGenerator frequency без верхней границы | **P2** | Sound · DSP | ~5 | ✔ |
-| **F41** | Double vs float — фаза в DSP | **P2** | Sound · DSP | ~15 | ✔ |
-| **F42** | Static Texture2D курсора не уничтожен | **P2** | UI · PanelDragHandler | ~10 | ✔ |
+| **F01** | Audio Race Condition | **P0** | Sound · Threading | 84 | ✅ |
+| **F02** | God Object: SonneController | **P1** | Architecture | 100+ | ⏸ |
+| **F03** | God Object: InformationPanelHandler | **P1** | Architecture | 80+ | ⏸ |
+| **F04** | God Object: RadioStoryIntegration | **P1** | Architecture | 70+ | ⏸ |
+| **F05** | Static Mutable State | **P0** | Threading · Architecture | 60+ | ✅ |
+| **F06** | Dead Code & Mistakes | **P2** | Hygiene | 50+ | ✅ |
+| **F07** | Null Reference Risks | **P1** | Correctness | 65+ | ✅ |
+| **F08** | GC Pressure | **P2** | Performance | ~170 | ⏸ |
+| **F09** | Logic Bugs | **P1** | Correctness | 55+ | ✅ |
+| **F10** | Build Config Issues | **P2** | Build | ~160 | ⏸ |
+| **F11** | Memory Leaks | **P1** | Memory | ~160 | 🔎 |
+| **F12** | Copy-Paste Duplication | **P2** | Hygiene | 200 | ⏸ |
+| **F13** | Unity API in Audio Thread | **P0** | Sound · Threading | ~40 | ✅ |
+| **F14** | Event Subscription Leaks | **P1** | UI · Events | ~50 | 🔎 |
+| **F15** | No State Persistence | **P2** | Save/Load | ~50 | ⏸ |
+| **F16** | PositionFixCalculator.ErrorKm = 0 | **P1** | Logic · PF Calculator | ~10 | ✅ |
+| **F17** | StationState mutable struct | **P2** | Data · StationState | ~25 | ✅ |
+| **F18** | PositionFixCalculator God Object | **P2** | Architecture | ~60 | ⏸ |
+| **F19** | NavigationPattern string concat | **P3** | Performance | ~20 | ✅ |
+| **F20** | DialConfig band inconsistencies | **P2** | Data · DialConfig | ~30 | ⏸ |
+| **F21** | Main.cs multiple responsibilities | **P2** | Architecture | ~60 | ⏸ |
+| **F22** | No test coverage (0%) | **P2** | Project-wide | ~60 | ✅ |
+| **F23** | Reflection Fragility — RadioStoryIntegration | **P0** | Logic · Integration | ~80 | ✅ |
+| **F24** | TrimEntries O(n²) RemoveAt(0) | **P1** | UI · Signal Buffer | ~15 | 🔎 |
+| **F25** | AudioSynthesisEngine Array Coupling | **P1** | Sound · API Design | ~40 | ⏸ |
+| **F26** | PrefabNames.cs Not Used | **P2** | UI · Constants | ~20 | ✅ |
+| **F27** | ComparisonExtensions Anti-Pattern | **P2** | Hygiene | ~34 | ⏸ |
+| **F28** | Magic Numbers Scattered (~40 literals) | **P2** | Project-wide | ~40 | ⏸ |
+| **F29** | Zero Synchronization Primitives | **P0** | Sound · Threading | ~30 | ✅ |
+| **F30** | RadioHandler missing OnDestroy unsubscribe | **P1** | UI · RadioHandler | ~10 | 🔎 |
+| **F31** | 93 Debug.Log — 81 active in Release | **P2** | Project-wide | ~80 (call-sites) | ⏸ |
+| **F32** | IPH: 5 GetComponentInChildren подряд | **P3** | UI · Performance | ~5 | ⏸ |
+| **F33** | VolumeSpinner / FeedbackSpinner дубликаты | **P3** | UI · Duplication | ~34 | ✅ |
+| **F34** | BearingTable / LookupBearing — мёртвый код | **P1** | Logic · Bearing Table | ~40 | ✅ |
+| **F35** | Два разных алгоритма GenerateBearingTable | **P2** | Logic · Data · Duplication | ~30 | ✅ |
+| **F36** | GetTransitionCount считает только Dots | **P2** | Logic · Naming | ~12 | ✅ |
+| **F37** | 6 станций с null callsign | **P2** | Data · BeaconData | ~30 | ⏸ |
+| **F38** | Plougourvest имеет null Frequency | **P2** | Data · BeaconData | ~25 | ⏸ |
+| **F39** | 3 станции на одной частоте 332.5 kHz | **P2** | Data · BeaconData | ~15 | ⏸ |
+| **F40** | CarrierGenerator frequency без верхней границы | **P2** | Sound · DSP | ~5 | ✅ |
+| **F41** | Double vs float — фаза в DSP | **P2** | Sound · DSP | ~15 | ✅ |
+| **F42** | Static Texture2D курсора не уничтожен | **P2** | UI · PanelDragHandler | ~10 | ✅ |
 | **F43** | AudioSource не добавлен при готовом SonneController | **P1** | UI · RadioInstaller | ~10 | ✘ |
 | **F44** | SAD Appendix B — 10+ расхождений с кодом | **P2** | Documentation · SAD | ~100 | ✘ |
 | **F45** | SAD ADRs «Accepted» but 0% implemented (ADR-002/003/004/005/007) | **P0** | Documentation · SAD | ~35 | ✘ |
@@ -73,162 +73,162 @@
 | **F49** | SAD layer file counts wrong (40→34) | **P2** | Documentation · SAD | ~45 | ✘ |
 | **F50** | SAD line counts wrong (10+ files) | **P2** | Documentation · SAD | ~51 | ✘ |
 | **F51** | SAD method signatures wrong | **P2** | Documentation · SAD | ~43 | ✘ |
-| **F52** | SAD missing 3 real classes from diagrams | **P1** | Documentation · SAD | ~57 | ✔ |
-| **F53** | MorseAlphabet 'A' — `._` вместо `.-` (dot-underscore) | **P0** | Logic · MorseAlphabet | 1 | ✔ |
-| **F54** | AudioSynthesisEngine.UpdateStationBeats() — мёртвый код | **P1** | Sound · Dead Code | ~12 | ✔ |
-| **F55** | ConsolCycleConfig.GetForCycleDuration() игнорирует параметр | **P1** | Data · ConsolCycleConfig | ~4 | ✔ |
-| **F56** | RadioHandler — zoneHandler.OnZoneChanged без отписки | **P1** | UI · RadioHandler · Events | ~3 | ✔ |
-| **F57** | RadioInstaller.Instantiate() — Debug.Log без #if DEBUG (×10) | **P1** | Build · Debug Logging | ~10 | ✔ |
-| **F58** | DialConfig.AngleToFrequency() — float.NaN не проверяется | **P1** | Data · DialConfig · Correctness | ~5 | ✔ |
-| **F59** | PrefabNames.DialFace определён, но не используется | **P2** | Data · PrefabNames | ~1 | ✔ |
+| **F52** | SAD missing 3 real classes from diagrams | **P1** | Documentation · SAD | ~57 | ⏸ |
+| **F53** | MorseAlphabet 'A' — `._` вместо `.-` (dot-underscore) | **P0** | Logic · MorseAlphabet | 1 | ✅ |
+| **F54** | AudioSynthesisEngine.UpdateStationBeats() — мёртвый код | **P1** | Sound · Dead Code | ~12 | ✅ |
+| **F55** | ConsolCycleConfig.GetForCycleDuration() игнорирует параметр | **P1** | Data · ConsolCycleConfig | ~4 | ✅ |
+| **F56** | RadioHandler — zoneHandler.OnZoneChanged без отписки | **P1** | UI · RadioHandler · Events | ~3 | ✅ |
+| **F57** | RadioInstaller.Instantiate() — Debug.Log без #if DEBUG (×10) | **P1** | Build · Debug Logging | ~10 | ✅ |
+| **F58** | DialConfig.AngleToFrequency() — float.NaN не проверяется | **P1** | Data · DialConfig · Correctness | ~5 | ✅ |
+| **F59** | PrefabNames.DialFace определён, но не используется | **P2** | Data · PrefabNames | ~1 | ✅ |
 | **F60** | CursorHandler.Update() форсирует SetSelectedGameObject каждый фрейм | **P2** | UI · CursorHandler · EventSystem | ~1 | ✘ |
-| **F61** | ToggleHandler статика не сбрасывается при перезагрузке сцены | **P2** | UI · ToggleHandler · Static | ~2 | ✔ |
-| **F62** | StationState.Pattern — ссылочный массив внутри struct → алиасинг | **P2** | Logic · StationState · Memory | ~1 | ✔ |
-| **F63** | DebugAngleHandler — жёсткая зависимость от TMPro | **P2** | UI · DebugAngleHandler | ~3 | ✔ |
-| **F64** | PositionFixCalculator — struct copy mutation через for (fragile) | **P2** | Logic · PositionFixCalculator | ~6 | ✔ |
-| **F65** | MorseKeyer.Load() — stale consolPattern не очищен | **P0** | Logic · MorseKeyer | ~2 | ✔ |
-| **F66** | TryGetCallsignFromHistory — NRE при station.Name == null | **P1** | Logic · SonneController | ~1 | ✔ |
-| **F67** | InformationPanelHandler — Toggle component без null-чека | **P1** | UI · InformationPanelHandler | ~1 | ✔ |
-| **F68** | RadioStoryIntegration — рефлексия Type.GetType не кешируется | **P1** | Logic · Integration · Performance | ~1 | ✔ |
-| **F69** | Main.cs — catch блок логгирует только e.Message | **P1** | Logic · Main | ~1 | ✔ |
-| **F70** | NavigationPattern.FormatCompact() — неверное отображение transition | **P1** | Logic · NavigationPattern | ~1 | ✔ |
-| **F71** | DspPipeline — 2-3 Random.NextDouble() на сэмпл в audio thread | **P2** | Sound · DSP · Performance | ~1 | ✔ |
-| **F72** | SpinnerHandlerBase — Mathf.Lerp без Time.deltaTime (FPS-зависим) | **P2** | UI · SpinnerHandler | ~1 | ✔ |
-| **F73** | PositionFixCalculator — Haversine формула дублирована | **P2** | Logic · PositionFixCalculator · Duplication | ~1 | ✔ |
-| **F74** | ComparisonExtensions — несимметричные пороги IsSignificant/IsNegligible | **P2** | Logic · ComparisonExtensions | ~1 | ✔ |
-| **F75** | Мёртвый код: DecodeMorse(), StationScheduler.ToTicks() | **P2** | Logic · Hygiene | ~2 | ✔ |
-| **F76** | MorseAlphabet.GetElementCount() — теоретическое int overflow | **P3** | Logic · MorseAlphabet | ~1 | ✔ |
-| **F77** | StationState.Pattern never updated after init | **P0** | Logic · SonneController | ~5 | ✔ |
-| **F78** | build.ps1 preprocessor case mismatch (`Debug` vs `DEBUG`) | **P0** | Build · Configuration | ~5 | ✔ |
-| **F79** | InBeam = true hardcoded (always "IN BEAM") | **P0** | Logic · SonneController · Navigation | ~3 | ✔ |
-| **F80** | PositionFixCalculator Haversine NaN | **P1** | Logic · PositionFixCalculator | ~3 | ✔ |
-| **F81** | MorseTiming integer truncation (5% speedup) | **P1** | Logic · MorseTiming | ~5 | ✔ |
-| **F82** | Main.cs swallows exceptions | **P1** | Logic · Main | ~5 | ✔ |
-| **F83** | RadioStoryIntegration zombie decisions on hot-reload | **P1** | Logic · RadioStoryIntegration | ~10 | ✔ |
-| **F84** | ExpanderHandler.Start doesn't disable on null parent | **P2** | UI · ExpanderHandler | ~3 | ✔ |
-| **F85** | GroundHandler raycastTarget blocks clicks | **P2** | UI · GroundHandler | ~1 | ✔ |
-| **F86** | ConsolCycleConfig.GetForCycleDuration stub | **P2** | Data · ConsolCycleConfig | ~4 | ✔ |
-| **F87** | TryGetCallsignFromHistory fake callsigns | **P2** | Logic · SonneController | ~5 | ✔ |
-| **F88** | csproj suppresses all nullable warnings | **P2** | Build · Configuration | ~1 | ✔ |
-| **F89** | OnDestroy doesn't stop AudioSource | **P3** | Logic · SonneController · Cleanup | ~3 | ✔ |
-| **F90** | OnVisibilityChanged event never subscribed | **P3** | UI · RadioHandler · Events | ~1 | ✔ |
-| **F91** | NormalizeAngle dead code | **P3** | Logic · SonneController | ~7 | ✔ |
-| **F92** | ConsolCycleConfig unused fields | **P3** | Data · ConsolCycleConfig | ~3 | ✔ |
-| **F93** | RadioInstaller Debug.Log without #if DEBUG | **P3** | Build · Debug Logging | ~10 | ✔ |
-| **F94** | AudioSynthesisEngine tickAccumulator float drift | **P3** | Sound · AudioSynthesisEngine | ~2 | ✔ |
-| **F95** | CursorHandler unnecessary ScrollRect | **P3** | UI · CursorHandler | ~7 | ✔ |
+| **F61** | ToggleHandler статика не сбрасывается при перезагрузке сцены | **P2** | UI · ToggleHandler · Static | ~2 | ✅ |
+| **F62** | StationState.Pattern — ссылочный массив внутри struct → алиасинг | **P2** | Logic · StationState · Memory | ~1 | ⏸ |
+| **F63** | DebugAngleHandler — жёсткая зависимость от TMPro | **P2** | UI · DebugAngleHandler | ~3 | ⏸ |
+| **F64** | PositionFixCalculator — struct copy mutation через for (fragile) | **P2** | Logic · PositionFixCalculator | ~6 | ✅ |
+| **F65** | MorseKeyer.Load() — stale consolPattern не очищен | **P0** | Logic · MorseKeyer | ~2 | ✅ |
+| **F66** | TryGetCallsignFromHistory — NRE при station.Name == null | **P1** | Logic · SonneController | ~1 | ✅ |
+| **F67** | InformationPanelHandler — Toggle component без null-чека | **P1** | UI · InformationPanelHandler | ~1 | ✅ |
+| **F68** | RadioStoryIntegration — рефлексия Type.GetType не кешируется | **P1** | Logic · Integration · Performance | ~1 | ✅ |
+| **F69** | Main.cs — catch блок логгирует только e.Message | **P1** | Logic · Main | ~1 | 🔎 |
+| **F70** | NavigationPattern.FormatCompact() — неверное отображение transition | **P1** | Logic · NavigationPattern | ~1 | ⏸ |
+| **F71** | DspPipeline — 2-3 Random.NextDouble() на сэмпл в audio thread | **P2** | Sound · DSP · Performance | ~1 | ⏸ |
+| **F72** | SpinnerHandlerBase — Mathf.Lerp без Time.deltaTime (FPS-зависим) | **P2** | UI · SpinnerHandler | ~1 | ✅ |
+| **F73** | PositionFixCalculator — Haversine формула дублирована | **P2** | Logic · PositionFixCalculator · Duplication | ~1 | ⏸ |
+| **F74** | ComparisonExtensions — несимметричные пороги IsSignificant/IsNegligible | **P2** | Logic · ComparisonExtensions | ~1 | 🔎 |
+| **F75** | Мёртвый код: DecodeMorse(), StationScheduler.ToTicks() | **P2** | Logic · Hygiene | ~2 | ✅ |
+| **F76** | MorseAlphabet.GetElementCount() — теоретическое int overflow | **P3** | Logic · MorseAlphabet | ~1 | ✅ |
+| **F77** | StationState.Pattern never updated after init | **P0** | Logic · SonneController | ~5 | ✅ |
+| **F78** | build.ps1 preprocessor case mismatch (`Debug` vs `DEBUG`) | **P0** | Build · Configuration | ~5 | ✅ |
+| **F79** | InBeam = true hardcoded (always "IN BEAM") | **P0** | Logic · SonneController · Navigation | ~3 | ✅ |
+| **F80** | PositionFixCalculator Haversine NaN | **P1** | Logic · PositionFixCalculator | ~3 | ✅ |
+| **F81** | MorseTiming integer truncation (5% speedup) | **P1** | Logic · MorseTiming | ~5 | ✅ |
+| **F82** | Main.cs swallows exceptions | **P1** | Logic · Main | ~5 | ✅ |
+| **F83** | RadioStoryIntegration zombie decisions on hot-reload | **P1** | Logic · RadioStoryIntegration | ~10 | ⏸ |
+| **F84** | ExpanderHandler.Start doesn't disable on null parent | **P2** | UI · ExpanderHandler | ~3 | ✅ |
+| **F85** | GroundHandler raycastTarget blocks clicks | **P2** | UI · GroundHandler | ~1 | ✅ |
+| **F86** | ConsolCycleConfig.GetForCycleDuration stub | **P2** | Data · ConsolCycleConfig | ~4 | ✅ |
+| **F87** | TryGetCallsignFromHistory fake callsigns | **P2** | Logic · SonneController | ~5 | ✅ |
+| **F88** | csproj suppresses all nullable warnings | **P2** | Build · Configuration | ~1 | ✅ |
+| **F89** | OnDestroy doesn't stop AudioSource | **P3** | Logic · SonneController · Cleanup | ~3 | ✅ |
+| **F90** | OnVisibilityChanged event never subscribed | **P3** | UI · RadioHandler · Events | ~1 | ✅ |
+| **F91** | NormalizeAngle dead code | **P3** | Logic · SonneController | ~7 | ✅ |
+| **F92** | ConsolCycleConfig unused fields | **P3** | Data · ConsolCycleConfig | ~3 | ✅ |
+| **F93** | RadioInstaller Debug.Log without #if DEBUG | **P3** | Build · Debug Logging | ~10 | ✅ |
+| **F94** | AudioSynthesisEngine tickAccumulator float drift | **P3** | Sound · AudioSynthesisEngine | ~2 | ✅ |
+| **F95** | CursorHandler unnecessary ScrollRect | **P3** | UI · CursorHandler | ~7 | ✅ |
 | **F96** | InformationPanelHandler GetComponent vs GetComponentInParent | **P3** | UI · InformationPanelHandler | ~2 | ✘ |
-| **F97** | CursorHandler.OnScroll — RadioHandler.Instance NRE before null check | **P1** | UI · CursorHandler · NRE | ~5 | ✔ |
-| **F98** | Scheduler ticked 2-3x per audio cycle (pauses halved/thirded) | **P1** | Sound · Logic · Timing | ~20 | ✔ |
-| **F99** | Stale position fix retained when measurements < 2 | **P1** | Logic · SonneController · Position Fix | ~5 | ✔ |
-| **F100** | FindClosestStation stale callsign from previously-closer station | **P2** | UI · InformationPanelHandler · Logic | ~5 | ✔ |
-| **F101** | InformationPanelHandler shows "[Pause]" when no dominant station | **P2** | UI · InformationPanelHandler · Logic | ~5 | ✔ |
-| **F102** | CursorHandler.Update per-frame GetComponentInParent<ScrollRect> | **P2** | UI · CursorHandler · Performance | ~3 | ✔ |
-| **F103** | Font.CreateDynamicFontFromOSFont called per label (~15x) | **P2** | UI · InformationPanelHandler · GC Pressure | ~2 | ✔ |
+| **F97** | CursorHandler.OnScroll — RadioHandler.Instance NRE before null check | **P1** | UI · CursorHandler · NRE | ~5 | ✅ |
+| **F98** | Scheduler ticked 2-3x per audio cycle (pauses halved/thirded) | **P1** | Sound · Logic · Timing | ~20 | ✅ |
+| **F99** | Stale position fix retained when measurements < 2 | **P1** | Logic · SonneController · Position Fix | ~5 | ✅ |
+| **F100** | FindClosestStation stale callsign from previously-closer station | **P2** | UI · InformationPanelHandler · Logic | ~5 | ✅ |
+| **F101** | InformationPanelHandler shows "[Pause]" when no dominant station | **P2** | UI · InformationPanelHandler · Logic | ~5 | ✅ |
+| **F102** | CursorHandler.Update per-frame GetComponentInParent<ScrollRect> | **P2** | UI · CursorHandler · Performance | ~3 | ✅ |
+| **F103** | Font.CreateDynamicFontFromOSFont called per label (~15x) | **P2** | UI · InformationPanelHandler · GC Pressure | ~2 | ✅ |
 | **F104** | RadioStoryIntegration AmbiguousMatchException from combined BindingFlags | **P2** | Logic · RadioStoryIntegration · Reflection | ~10 | ✘ |
-| **F105** | StringBuilder allocs on audio thread (DecodeCallsignBuffer) | **P2** | Sound · Threading · GC Pressure | ~15 | ✔ |
-| **F106** | Debug.Log + Time.time in audio thread, no #if DEBUG | **P2** | Sound · Audio Thread · Debug Logging | ~3 | ✔ |
-| **F107** | Uncached Type.GetType on every locale string lookup | **P2** | Logic · RadioStoryIntegration · Performance | ~10 | ✔ |
-| **F108** | List.Add on audio thread can resize + allocate | **P2** | Sound · Threading · Thread Safety | ~5 | ✔ |
-| **F109** | RemoveAt(0) on audio thread while main thread reads (data corruption) | **P1** | Sound · Threading · Data Corruption | ~10 | ✔ |
-| **F110** | dominantStationIndex cross-thread read/write, no volatile | **P2** | Sound · Threading · Memory Visibility | ~2 | ✔ |
-| **F111** | MorseKeyer.IsActive cross-thread, no volatile | **P2** | Sound · Threading · Memory Visibility | ~2 | ✔ |
-| **F112** | BeatFrequency write/read without synchronization | **P3** | Sound · Threading · Thread Safety | ~2 | ✔ |
-| **F113** | MorseKeyer.AdvanceElement resets callsignLength=0 on pattern transition | **P3** | Logic · MorseKeyer · Correctness | ~3 | ✔ |
-| **F114** | GetCurrentElementType silent Dot fallback masks potential OOB | **P3** | Logic · MorseKeyer · Defensive Coding | ~2 | ✔ |
-| **F115** | OnDestroy doesn't reset DSP/Atmosphere state | **P3** | Logic · SonneController · Resource Mgmt | ~3 | ✔ |
-| **F116** | Asymmetric null-clearing between Load/LoadConsol | **P3** | Logic · MorseKeyer · API Design | ~3 | ✔ |
-| **F117** | SonneController keyer event subscriptions leak in OnDestroy | **P1** | Logic · SonneController · Events · Memory | ~10 | ✔ |
-| **F118** | ZoneHandler PointerClick entries не фильтруют по кнопке | **P2** | UI · ZoneHandler · EventTrigger | ~5 | ✔ |
-| **F119** | RadioHandler.OnDestroy не отписывается от zoneHandler.OnZoneChanged | **P1** | UI · RadioHandler · Events · Memory | ~5 | ✔ |
-| **F120** | SonneController signalEntries + measurements GC pressure в hot path | **P2** | Logic · SonneController · Performance · GC | ~15 | ✔ |
-| **F121** | Harmony.UnpatchAll() глобально откатывает патчи всех модов | **P1** | Logic · Main · Harmony | ~5 | ✔ |
-| **F122** | StationScheduler.Reset() устанавливает неправильную фазу | **P1** | Logic · StationScheduler · State Machine | ~5 | ✔ |
-| **F123** | StationState.NavigationStartTime не инициализируется в Awake | **P1** | Logic · SonneController · Station State | ~5 | ✔ |
-| **F124** | GetCurrentLanguage() повторно резолвит Type.GetType на каждый вызов | **P2** | Logic · RadioStoryIntegration · Performance | ~25 | ✔ |
-| **F125** | MorseAlphabet.GetMorse() молча возвращает "" для неизвестных символов | **P2** | Logic · MorseAlphabet · Correctness | ~5 | ✔ |
-| **F126** | ConsolCycleConfig — нет валидации отрицательных timing values | **P2** | Data · ConsolCycleConfig · Validation | ~15 | ✔ |
-| **F127** | SonneSignalGenerator.GenerateBearingTable хардкодит Cycle120s | **P2** | Logic · SonneSignalGenerator · Configuration | ~3 | ✔ |
-| **F128** | PositionFixCalculator.FindIntersection не обрабатывает анти meridian | **P2** | Logic · PositionFixCalculator · Geography | ~10 | ✔ |
-| **F129** | MorseAlphabet.GetElementCount() не учитывает границы слов | **P3** | Logic · MorseAlphabet · Morse Standard | ~10 | ✔ |
-| **F130** | BandConfig — mutable class в static readonly массиве | **P3** | Data · DialConfig · Encapsulation | ~15 | ✔ |
-| **F131** | Stations w/o frequency in position fix | **P2** | Logic · SonneController · Position Fix | ~15 | ✔ |
-| **F132** | Keyer/scheduler advance while radio off | **P1** | Sound · AudioSynthesisEngine · RadioOff | ~20 | ✔ |
-| **F133** | Escape key blocked by child selection | **P2** | UI · RadioHandler · Escape Key | ~10 | ✔ |
-| **F134** | Calculate mutates input measurements | **P3** | Logic · PositionFixCalculator · API Design | ~5 | ✔ |
-| **F135** | OnSequenceFinished no default case | **P3** | Logic · StationScheduler · Defensive Coding | ~5 | ✔ |
-| **F136** | MorseTiming silence wrong for bad config | **P3** | Logic · MorseTiming · Validation | ~10 | ✔ |
-| **F137** | PositionFixCalculator Math.Acos NaN | **P1** | Logic · PositionFixCalculator · Numerical | ~5 | ✔ |
-| **F138** | IPH History[0] bounds crash | **P1** | UI · InformationPanelHandler · Bounds | ~3 | ✔ |
-| **F139** | Main UnpatchAll without harmony ID | **P1** | Logic · Main · Harmony | ~5 | ✔ |
-| **F140** | Main patch method null check missing | **P2** | Logic · Main · Reflection | ~5 | ✔ |
-| **F141** | CarrierGenerator frequency clicks | **P2** | Sound · DSP · CarrierGenerator | ~10 | ✔ |
-| **F142** | ReceiverDsp output unclamped (whistle) | **P2** | Sound · DSP · ReceiverDsp | ~3 | ✔ |
-| **F143** | Atmosphere output unclamped (noise) | **P2** | Sound · DSP · Atmosphere | ~3 | ✔ |
-| **F144** | NavigationPattern zero divide | **P2** | Logic · NavigationPattern · Validation | ~5 | ✔ |
-| **F145** | First callsign cycle no callsignLength | **P2** | Logic · SonneController · Timing | ~10 | ✔ |
-| **F146** | PositionFix mutates on failure path | **P2** | Logic · PositionFixCalculator · API | ~5 | ✔ |
-| **F147** | RadioHandler float equality == | **P2** | UI · RadioHandler · Floating-Point | ~3 | ✔ |
-| **F148** | GroundHandler no button filter | **P2** | UI · GroundHandler · Input | ~3 | ✔ |
-| **F149** | SpinnerHandler multitouch state leak | **P2** | UI · SpinnerHandlerBase · State | ~5 | ✔ |
-| **F150** | DialConfig overlapping Band III/IV | **P2** | Data · DialConfig · Band Ranges | ~5 | ✔ |
-| **F151** | DialConfig missing interpolation segment | **P2** | Data · DialConfig · Interpolation | ~5 | ✔ |
-| **F152** | Main third catch loses stack trace | **P2** | Logic · Main · Error Handling | ~3 | ✔ |
-| **F153** | Atmosphere Box-Muller wastes 50% RNG | **P3** | Sound · DSP · Atmosphere · RNG | ~5 | ✔ |
-| **F154** | ReceiverDsp constructor ignores sampleRate | **P3** | Sound · DSP · ReceiverDsp · API | ~3 | ✔ |
-| **F155** | ReceiverDsp filter alpha recomputes | **P3** | Sound · DSP · ReceiverDsp · Perf | ~3 | ✔ |
-| **F156** | Atmosphere undocumented impulse path | **P3** | Sound · DSP · Atmosphere · Maintainability | ~3 | ✔ |
-| **F157** | RadioStoryIntegration duplicate BindingFlags | **P3** | Logic · RadioStoryIntegration · Hygiene | ~1 | ✔ |
-| **F158** | RadioHandler dead sonneController field | **P3** | UI · RadioHandler · Dead Code | ~2 | ✔ |
-| **F159** | DebugAngleHandler SerializeField overwrite | **P3** | UI · DebugAngleHandler · Unity Lifecycle | ~3 | ✔ |
-| **F160** | IPH duplicated state queries | **P3** | UI · InformationPanelHandler · Code Smell | ~5 | ✔ |
-| **F161** | DialConfig inconsistent rounding | **P3** | Data · DialConfig · Formatting | ~3 | ✔ |
-| **F162** | BeaconData DotTable ignores parameter | **P3** | Data · BeaconData · API | ~3 | ✔ |
-| **F163** | StationState mutable struct copy-divergence | **P3** | Data · StationState · Value Type | ~5 | ✔ |
-| **F164** | ConsolCycleConfig GetForCycleDuration stub | **P3** | Data · ConsolCycleConfig · Stub | ~3 | ✔ |
-| **F165** | MorseKeyer.Reset doesn't clear sequence | **P2** | Logic · MorseKeyer · State Management | ~10 | ✔ |
-| **F166** | MorseAlphabet.TextToPattern ignores parameter | **P3** | Logic · MorseAlphabet · API | ~1 | ✔ |
-| **F167** | StationScheduler.OnSequenceFinished missing phases | **P2** | Logic · StationScheduler · State Machine | ~12 | ✔ |
-| **F168** | PositionFixCalculator.Calculate returns ErrorKm = 0 | **P2** | Logic · PositionFixCalculator · Algorithm | ~5 | ✔ |
-| **F169** | CarrierGenerator phase drift from float precision | **P2** | Sound · DspPipeline · Numerical | ~10 | ✔ |
-| **F170** | MorseAlphabet fixed table overflow | **P2** | Logic · MorseAlphabet · Data Structure | ~10 | ✔ |
-| **F171** | GroundHandler.StateLog аллокация в DEBUG каждый кадр | **P3** | UI · GroundHandler · Performance | ~26 | ✔ |
-| **F172** | SignalRichTextFormatter.TrimEntries O(n²) RemoveAt(0) | **P3** | UI · SignalRichTextFormatter · Performance | ~8 | ✔ |
-| **F173** | InformationPanelHandler.CreateLabel fragile font loading | **P2** | UI · InformationPanelHandler · Portability | ~10 | ✔ |
-| **F174** | NavigationPattern.GetElement negative index OOB | **P2** | Logic · NavigationPattern · Correctness | ~8 | ✔ |
-| **F175** | MorseKeyer.AdvanceElement cross-type transition | **P2** | Logic · MorseKeyer · State Machine | ~40 | ✔ |
-| **F176** | Main.cs GameObject.Find hardcoded hierarchy path | **P2** | Logic · Main · Performance | ~15 | ✔ |
-| **F177** | DspPipeline deterministic radio noise generation | **P3** | Sound · DspPipeline · Architecture | ~5 | ✔ |
-| **F178** | Repeated GetComponent lookups не кешируются | **P3** | UI · Hygiene | ~20 | ✔ |
-| **F179** | Main.cs bootstrap объединяет несколько обязанностей | **P2** | Logic · Main · Architecture | ~35 | ✔ |
-| **F180** | UI validation основана на строковых путях | **P2** | Logic · Main · Maintainability | ~20 | ✔ |
-| **F181** | Main.cs избыточное диагностическое логирование | **P3** | Logic · Main · Logging | ~10 | ✔ |
-| **F182** | `build.ps1` doesn't validate `$GamePath` existence before invoking `csc` | **P3** | Build · Scripting | ~10 | ✔ |
-| **F183** | `MorseAlphabet.GetMorse` performs redundant `c < 0` check on unsigned `char` | **P3** | Logic · MorseAlphabet · Code Hygiene | ~5 | ✔ |
-| **F184** | `MorseKeyer` duplicates pattern/sequence branching in multiple internal getters | **P3** | Logic · MorseKeyer · Duplication | ~15 | ✔ |
-| **F185** | `InformationPanelHandler` hardcodes 6 pattern labels for 14 available stations | **P2** | UI · InformationPanelHandler · Data Representation | ~10 | ✔ |
+| **F105** | StringBuilder allocs on audio thread (DecodeCallsignBuffer) | **P2** | Sound · Threading · GC Pressure | ~15 | ✅ |
+| **F106** | Debug.Log + Time.time in audio thread, no #if DEBUG | **P2** | Sound · Audio Thread · Debug Logging | ~3 | ✅ |
+| **F107** | Uncached Type.GetType on every locale string lookup | **P2** | Logic · RadioStoryIntegration · Performance | ~10 | ✅ |
+| **F108** | List.Add on audio thread can resize + allocate | **P2** | Sound · Threading · Thread Safety | ~5 | ✅ |
+| **F109** | RemoveAt(0) on audio thread while main thread reads (data corruption) | **P1** | Sound · Threading · Data Corruption | ~10 | ✅ |
+| **F110** | dominantStationIndex cross-thread read/write, no volatile | **P2** | Sound · Threading · Memory Visibility | ~2 | ✅ |
+| **F111** | MorseKeyer.IsActive cross-thread, no volatile | **P2** | Sound · Threading · Memory Visibility | ~2 | ✅ |
+| **F112** | BeatFrequency write/read without synchronization | **P3** | Sound · Threading · Thread Safety | ~2 | ✅ |
+| **F113** | MorseKeyer.AdvanceElement resets callsignLength=0 on pattern transition | **P3** | Logic · MorseKeyer · Correctness | ~3 | ✅ |
+| **F114** | GetCurrentElementType silent Dot fallback masks potential OOB | **P3** | Logic · MorseKeyer · Defensive Coding | ~2 | ✅ |
+| **F115** | OnDestroy doesn't reset DSP/Atmosphere state | **P3** | Logic · SonneController · Resource Mgmt | ~3 | ✅ |
+| **F116** | Asymmetric null-clearing between Load/LoadConsol | **P3** | Logic · MorseKeyer · API Design | ~3 | ✅ |
+| **F117** | SonneController keyer event subscriptions leak in OnDestroy | **P1** | Logic · SonneController · Events · Memory | ~10 | ✅ |
+| **F118** | ZoneHandler PointerClick entries не фильтруют по кнопке | **P2** | UI · ZoneHandler · EventTrigger | ~5 | ✅ |
+| **F119** | RadioHandler.OnDestroy не отписывается от zoneHandler.OnZoneChanged | **P1** | UI · RadioHandler · Events · Memory | ~5 | ✅ |
+| **F120** | SonneController signalEntries + measurements GC pressure в hot path | **P2** | Logic · SonneController · Performance · GC | ~15 | ✅ |
+| **F121** | Harmony.UnpatchAll() глобально откатывает патчи всех модов | **P1** | Logic · Main · Harmony | ~5 | ✅ |
+| **F122** | StationScheduler.Reset() устанавливает неправильную фазу | **P1** | Logic · StationScheduler · State Machine | ~5 | ✅ |
+| **F123** | StationState.NavigationStartTime не инициализируется в Awake | **P1** | Logic · SonneController · Station State | ~5 | ✅ |
+| **F124** | GetCurrentLanguage() повторно резолвит Type.GetType на каждый вызов | **P2** | Logic · RadioStoryIntegration · Performance | ~25 | ✅ |
+| **F125** | MorseAlphabet.GetMorse() молча возвращает "" для неизвестных символов | **P2** | Logic · MorseAlphabet · Correctness | ~5 | ✅ |
+| **F126** | ConsolCycleConfig — нет валидации отрицательных timing values | **P2** | Data · ConsolCycleConfig · Validation | ~15 | ✅ |
+| **F127** | SonneSignalGenerator.GenerateBearingTable хардкодит Cycle120s | **P2** | Logic · SonneSignalGenerator · Configuration | ~3 | ✅ |
+| **F128** | PositionFixCalculator.FindIntersection не обрабатывает анти meridian | **P2** | Logic · PositionFixCalculator · Geography | ~10 | ✅ |
+| **F129** | MorseAlphabet.GetElementCount() не учитывает границы слов | **P3** | Logic · MorseAlphabet · Morse Standard | ~10 | ✅ |
+| **F130** | BandConfig — mutable class в static readonly массиве | **P3** | Data · DialConfig · Encapsulation | ~15 | ✅ |
+| **F131** | Stations w/o frequency in position fix | **P2** | Logic · SonneController · Position Fix | ~15 | ✅ |
+| **F132** | Keyer/scheduler advance while radio off | **P1** | Sound · AudioSynthesisEngine · RadioOff | ~20 | ✅ |
+| **F133** | Escape key blocked by child selection | **P2** | UI · RadioHandler · Escape Key | ~10 | ✅ |
+| **F134** | Calculate mutates input measurements | **P3** | Logic · PositionFixCalculator · API Design | ~5 | ✅ |
+| **F135** | OnSequenceFinished no default case | **P3** | Logic · StationScheduler · Defensive Coding | ~5 | ✅ |
+| **F136** | MorseTiming silence wrong for bad config | **P3** | Logic · MorseTiming · Validation | ~10 | ✅ |
+| **F137** | PositionFixCalculator Math.Acos NaN | **P1** | Logic · PositionFixCalculator · Numerical | ~5 | ✅ |
+| **F138** | IPH History[0] bounds crash | **P1** | UI · InformationPanelHandler · Bounds | ~3 | ✅ |
+| **F139** | Main UnpatchAll without harmony ID | **P1** | Logic · Main · Harmony | ~5 | ✅ |
+| **F140** | Main patch method null check missing | **P2** | Logic · Main · Reflection | ~5 | ✅ |
+| **F141** | CarrierGenerator frequency clicks | **P2** | Sound · DSP · CarrierGenerator | ~10 | ✅ |
+| **F142** | ReceiverDsp output unclamped (whistle) | **P2** | Sound · DSP · ReceiverDsp | ~3 | ✅ |
+| **F143** | Atmosphere output unclamped (noise) | **P2** | Sound · DSP · Atmosphere | ~3 | ✅ |
+| **F144** | NavigationPattern zero divide | **P2** | Logic · NavigationPattern · Validation | ~5 | ✅ |
+| **F145** | First callsign cycle no callsignLength | **P2** | Logic · SonneController · Timing | ~10 | ✅ |
+| **F146** | PositionFix mutates on failure path | **P2** | Logic · PositionFixCalculator · API | ~5 | ✅ |
+| **F147** | RadioHandler float equality == | **P2** | UI · RadioHandler · Floating-Point | ~3 | ✅ |
+| **F148** | GroundHandler no button filter | **P2** | UI · GroundHandler · Input | ~3 | ✅ |
+| **F149** | SpinnerHandler multitouch state leak | **P2** | UI · SpinnerHandlerBase · State | ~5 | ✅ |
+| **F150** | DialConfig overlapping Band III/IV | **P2** | Data · DialConfig · Band Ranges | ~5 | ✅ |
+| **F151** | DialConfig missing interpolation segment | **P2** | Data · DialConfig · Interpolation | ~5 | ✅ |
+| **F152** | Main third catch loses stack trace | **P2** | Logic · Main · Error Handling | ~3 | ✅ |
+| **F153** | Atmosphere Box-Muller wastes 50% RNG | **P3** | Sound · DSP · Atmosphere · RNG | ~5 | ✅ |
+| **F154** | ReceiverDsp constructor ignores sampleRate | **P3** | Sound · DSP · ReceiverDsp · API | ~3 | ✅ |
+| **F155** | ReceiverDsp filter alpha recomputes | **P3** | Sound · DSP · ReceiverDsp · Perf | ~3 | ✅ |
+| **F156** | Atmosphere undocumented impulse path | **P3** | Sound · DSP · Atmosphere · Maintainability | ~3 | ✅ |
+| **F157** | RadioStoryIntegration duplicate BindingFlags | **P3** | Logic · RadioStoryIntegration · Hygiene | ~1 | ✅ |
+| **F158** | RadioHandler dead sonneController field | **P3** | UI · RadioHandler · Dead Code | ~2 | ✅ |
+| **F159** | DebugAngleHandler SerializeField overwrite | **P3** | UI · DebugAngleHandler · Unity Lifecycle | ~3 | ✅ |
+| **F160** | IPH duplicated state queries | **P3** | UI · InformationPanelHandler · Code Smell | ~5 | ✅ |
+| **F161** | DialConfig inconsistent rounding | **P3** | Data · DialConfig · Formatting | ~3 | ✅ |
+| **F162** | BeaconData DotTable ignores parameter | **P3** | Data · BeaconData · API | ~3 | 🔎 |
+| **F163** | StationState mutable struct copy-divergence | **P3** | Data · StationState · Value Type | ~5 | ✅ |
+| **F164** | ConsolCycleConfig GetForCycleDuration stub | **P3** | Data · ConsolCycleConfig · Stub | ~3 | ✅ |
+| **F165** | MorseKeyer.Reset doesn't clear sequence | **P2** | Logic · MorseKeyer · State Management | ~10 | ✅ |
+| **F166** | MorseAlphabet.TextToPattern ignores parameter | **P3** | Logic · MorseAlphabet · API | ~1 | ✅ |
+| **F167** | StationScheduler.OnSequenceFinished missing phases | **P2** | Logic · StationScheduler · State Machine | ~12 | 🔎 |
+| **F168** | PositionFixCalculator.Calculate returns ErrorKm = 0 | **P2** | Logic · PositionFixCalculator · Algorithm | ~5 | ✅ |
+| **F169** | CarrierGenerator phase drift from float precision | **P2** | Sound · DspPipeline · Numerical | ~10 | ✅ |
+| **F170** | MorseAlphabet fixed table overflow | **P2** | Logic · MorseAlphabet · Data Structure | ~10 | ✅ |
+| **F171** | GroundHandler.StateLog аллокация в DEBUG каждый кадр | **P3** | UI · GroundHandler · Performance | ~26 | ✅ |
+| **F172** | SignalRichTextFormatter.TrimEntries O(n²) RemoveAt(0) | **P3** | UI · SignalRichTextFormatter · Performance | ~8 | ✅ |
+| **F173** | InformationPanelHandler.CreateLabel fragile font loading | **P2** | UI · InformationPanelHandler · Portability | ~10 | ⏸ |
+| **F174** | NavigationPattern.GetElement negative index OOB | **P2** | Logic · NavigationPattern · Correctness | ~8 | ✅ |
+| **F175** | MorseKeyer.AdvanceElement cross-type transition | **P2** | Logic · MorseKeyer · State Machine | ~40 | ✅ |
+| **F176** | Main.cs GameObject.Find hardcoded hierarchy path | **P2** | Logic · Main · Performance | ~15 | ✅ |
+| **F177** | DspPipeline deterministic radio noise generation | **P3** | Sound · DspPipeline · Architecture | ~5 | ✅ |
+| **F178** | Repeated GetComponent lookups не кешируются | **P3** | UI · Hygiene | ~20 | ✅ |
+| **F179** | Main.cs bootstrap объединяет несколько обязанностей | **P2** | Logic · Main · Architecture | ~35 | ⏸ |
+| **F180** | UI validation основана на строковых путях | **P2** | Logic · Main · Maintainability | ~20 | ⏸ |
+| **F181** | Main.cs избыточное диагностическое логирование | **P3** | Logic · Main · Logging | ~10 | ⏸ |
+| **F182** | `build.ps1` doesn't validate `$GamePath` existence before invoking `csc` | **P3** | Build · Scripting | ~10 | ✅ |
+| **F183** | `MorseAlphabet.GetMorse` performs redundant `c < 0` check on unsigned `char` | **P3** | Logic · MorseAlphabet · Code Hygiene | ~5 | ✅ |
+| **F184** | `MorseKeyer` duplicates pattern/sequence branching in multiple internal getters | **P3** | Logic · MorseKeyer · Duplication | ~15 | ✅ |
+| **F185** | `InformationPanelHandler` hardcodes 6 pattern labels for 14 available stations | **P2** | UI · InformationPanelHandler · Data Representation | ~10 | ✅ |
 | **F186** | `RadioStoryIntegration.Init` accesses `GetParameters()[1]` without length check | **P2** | Logic · RadioStoryIntegration · Reflection Fragility | ~5 | ✘ |
-| **F187** | `PanelDragHandler.OnPointerExit` resets custom cursor while dragging outside panel bounds | **P3** | UI · PanelDragHandler · User Experience | ~5 | ✔ |
-| **F188** | `RadioInstaller` hardcodes fixed initial local position `(300, 100, 0)` without resolution scaling | **P3** | UI · RadioInstaller · Layout | ~5 | ✔ |
-| **F189** | Cross-thread data race on `signalEntries` / `morseDecoderBuffer` between Audio Thread and UI Thread | **P1** | Sound · UI · Thread Safety | ~15 | ✔ |
-| **F190** | PositionFixCalculator: `Math.Asin` без clamp на строке 149 — F137 ошибочно ссылается на F80 как на покрывающий | **P1** | Logic · PositionFixCalculator · Numerical Stability | ~5 | ✔ |
-| **F191** | PositionFixCalculator: `Math.Asin` без clamp на строке 187 (`phi3`) | **P1** | Logic · PositionFixCalculator · Numerical Stability | ~5 | ✔ |
-| **F192** | RadioHandler: `OnCursorAngleChanged` событие объявлено и вызывается, но никогда не подписано | **P3** | UI · RadioHandler · Events · Dead Code | ~2 | ✔ |
-| **F193** | `MorseAlphabet.GetElementCount()` — мёртвый код, баги в F76/F129/F170 бесполезны | **P2** | Logic · MorseAlphabet · Dead Code | ~5 | ✔ |
-| **F194** | `DebugAngleHandler.OnAngleChanged` — событие объявлено и вызывается, но никогда не подписано | **P3** | UI · DebugAngleHandler · Events · Dead Code | ~2 | ✔ |
-| **F195** | `RadioHandler.NotifyCursorChanged()` — метод определён, но никогда не вызывается | **P3** | UI · RadioHandler · Dead Code | ~1 | ✔ |
-| **F196** | `build.ps1` — `/debug:full` с `/optimize+` для всех конфигураций | **P3** | Build · Configuration | ~5 | ✔ |
-| **F197** | `ExpanderHandler.OnBeginDrag` — отсутствует проверка `ToggleHandler.IsInteractable` | **P3** | UI · ExpanderHandler · Input | ~2 | ✔ |
-| **F198** | `PanelDragHandler.OnBeginDrag` — отсутствует проверка `ToggleHandler.IsInteractable` | **P3** | UI · PanelDragHandler · Input | ~2 | ✔ |
-| **F199** | `ExpanderHandler` — отсутствует очистка состояния drag при `OnDisable`/`OnDestroy` | **P3** | UI · ExpanderHandler · State Management | ~3 | ✔ |
-| **F200** | `UpdatePosition()` — ноль вызывающих: position fix всегда ~0°N 0°E, dot-счёт статичен | **P0** | Logic · SonneController · Position Fix | ~20 | ✔ |
-| **F201** | Полный Consol-паттерн транслируется дважды за цикл; фаза «только позывной» не играет | **P1** | Logic · StationScheduler · State Machine | ~20 | ✔ |
-| **F202** | SpinnerHandlerBase — сдвиг 90° между значением и визуалом: прыжок при захвате, мёртвая зона | **P1** | UI · SpinnerHandlerBase · Input Mapping | ~15 | ✔ |
-| **F203** | Приёмник: дефолтный QF=20 — кросс-талки соседних станций на 30-99% громкости | **P2** | Sound · Receiver Selectivity | ~15 | ✔ |
-| **F204** | PositionFixCalculator — арифметическое среднее долгот через антимеридиан (latent) | **P2** | Logic · PositionFixCalculator · Geography | ~10 | ✔ |
-| **F205** | IPH — кириллическая «В°» вместо «°» (U+0412+U+00B0) в 3 строках | **P3** | UI · InformationPanelHandler · Text | ~3 | ✔ |
-| **F206** | AudioSynthesisEngine — тики по кадрам, не по сэмплам: стерео замедлит морзе вдвое (latent) | **P3** | Sound · AudioSynthesisEngine · Timing | ~5 | ✔ |
-| **F207** | PanelDragHandler — перехват drag, начатого на Zone-кнопках / Toggle / Ground | **P2** | UI · PanelDragHandler · Input | ~5 | ✔ |
+| **F187** | `PanelDragHandler.OnPointerExit` resets custom cursor while dragging outside panel bounds | **P3** | UI · PanelDragHandler · User Experience | ~5 | ✅ |
+| **F188** | `RadioInstaller` hardcodes fixed initial local position `(300, 100, 0)` without resolution scaling | **P3** | UI · RadioInstaller · Layout | ~5 | ✅ |
+| **F189** | Cross-thread data race on `signalEntries` / `morseDecoderBuffer` between Audio Thread and UI Thread | **P1** | Sound · UI · Thread Safety | ~15 | ✅ |
+| **F190** | PositionFixCalculator: `Math.Asin` без clamp на строке 149 — F137 ошибочно ссылается на F80 как на покрывающий | **P1** | Logic · PositionFixCalculator · Numerical Stability | ~5 | ✅ |
+| **F191** | PositionFixCalculator: `Math.Asin` без clamp на строке 187 (`phi3`) | **P1** | Logic · PositionFixCalculator · Numerical Stability | ~5 | ✅ |
+| **F192** | RadioHandler: `OnCursorAngleChanged` событие объявлено и вызывается, но никогда не подписано | **P3** | UI · RadioHandler · Events · Dead Code | ~2 | ✅ |
+| **F193** | `MorseAlphabet.GetElementCount()` — мёртвый код, баги в F76/F129/F170 бесполезны | **P2** | Logic · MorseAlphabet · Dead Code | ~5 | ✅ |
+| **F194** | `DebugAngleHandler.OnAngleChanged` — событие объявлено и вызывается, но никогда не подписано | **P3** | UI · DebugAngleHandler · Events · Dead Code | ~2 | ✅ |
+| **F195** | `RadioHandler.NotifyCursorChanged()` — метод определён, но никогда не вызывается | **P3** | UI · RadioHandler · Dead Code | ~1 | ✅ |
+| **F196** | `build.ps1` — `/debug:full` с `/optimize+` для всех конфигураций | **P3** | Build · Configuration | ~5 | ✅ |
+| **F197** | `ExpanderHandler.OnBeginDrag` — отсутствует проверка `ToggleHandler.IsInteractable` | **P3** | UI · ExpanderHandler · Input | ~2 | ✅ |
+| **F198** | `PanelDragHandler.OnBeginDrag` — отсутствует проверка `ToggleHandler.IsInteractable` | **P3** | UI · PanelDragHandler · Input | ~2 | ✅ |
+| **F199** | `ExpanderHandler` — отсутствует очистка состояния drag при `OnDisable`/`OnDestroy` | **P3** | UI · ExpanderHandler · State Management | ~3 | ✅ |
+| **F200** | `UpdatePosition()` — ноль вызывающих: position fix всегда ~0°N 0°E, dot-счёт статичен | **P0** | Logic · SonneController · Position Fix | ~20 | ✅ |
+| **F201** | Полный Consol-паттерн транслируется дважды за цикл; фаза «только позывной» не играет | **P1** | Logic · StationScheduler · State Machine | ~20 | ✅ |
+| **F202** | SpinnerHandlerBase — сдвиг 90° между значением и визуалом: прыжок при захвате, мёртвая зона | **P1** | UI · SpinnerHandlerBase · Input Mapping | ~15 | ✅ |
+| **F203** | Приёмник: дефолтный QF=20 — кросс-талки соседних станций на 30-99% громкости | **P2** | Sound · Receiver Selectivity | ~15 | ✅ |
+| **F204** | PositionFixCalculator — арифметическое среднее долгот через антимеридиан (latent) | **P2** | Logic · PositionFixCalculator · Geography | ~10 | ✅ |
+| **F205** | IPH — кириллическая «В°» вместо «°» (U+0412+U+00B0) в 3 строках | **P3** | UI · InformationPanelHandler · Text | ~3 | ✅ |
+| **F206** | AudioSynthesisEngine — тики по кадрам, не по сэмплам: стерео замедлит морзе вдвое (latent) | **P3** | Sound · AudioSynthesisEngine · Timing | ~5 | ✅ |
+| **F207** | PanelDragHandler — перехват drag, начатого на Zone-кнопках / Toggle / Ground | **P2** | UI · PanelDragHandler · Input | ~5 | ✅ |
 
 ---
 
