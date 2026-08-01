@@ -10,6 +10,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests.Runner
     {
         private static int passed;
         private static int failed;
+        private static int skipped;
 
         private static int Main()
         {
@@ -53,7 +54,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests.Runner
             }
 
             Console.WriteLine();
-            Console.WriteLine($"Passed: {passed}, Failed: {failed}");
+            Console.WriteLine($"Passed: {passed}, Failed: {failed}, Skipped: {skipped}");
             return failed == 0 ? 0 : 1;
         }
 
@@ -72,7 +73,15 @@ namespace UBOAT.Mods.RadioNavigation.Tests.Runner
             }
             catch (TargetInvocationException ex)
             {
-                RecordFail(method, ex.InnerException != null ? ex.InnerException.Message : ex.Message);
+                var inner = ex.InnerException;
+                if (inner != null && inner.GetType().Name == "SkipTestException")
+                {
+                    skipped++;
+                    Console.WriteLine("SKIP  " + name);
+                    Console.WriteLine("      " + inner.Message);
+                    return;
+                }
+                RecordFail(method, inner != null ? inner.Message : ex.Message);
             }
             catch (Exception ex)
             {
