@@ -46,16 +46,15 @@
             }
         }
 
+        // F201: the full consol pattern must only play during Navigation;
+        // in the Callsign phase GetCurrentSequence() provides the short
+        // callsign pattern, otherwise the pattern would be transmitted twice
+        // per cycle and the callsign-only phase would never be heard.
         public NavigationElementType[] GetCurrentConsolPattern()
         {
-            switch (CurrentPhase)
-            {
-                case Phase.Callsign:
-                case Phase.Navigation:
-                    return CurrentConsolPattern;
-                default:
-                    return null;
-            }
+            if (CurrentPhase != Phase.Navigation)
+                return null;
+            return CurrentConsolPattern;
         }
 
         public void Tick()

@@ -79,7 +79,9 @@ namespace UBOAT.Mods.RadioNavigation
                 EnsureComponent<DebugAngleHandler>(debugAnglePanel.gameObject);
 
             radio.transform.SetParent(viewport, false);
-            radio.transform.localPosition = new Vector3(300f, 100f, 0f);
+            // F188: (300, 100) in pixels pushed the panel off-screen on low
+            // resolutions; center it so it is visible on any viewport.
+            radio.transform.localPosition = Vector3.zero;
             radio.SetActive(true);
 
             return radio;

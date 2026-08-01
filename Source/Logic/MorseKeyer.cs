@@ -237,28 +237,28 @@ namespace UBOAT.Mods.RadioNavigation
             return NavigationElementType.Dot;
         }
 
+        // F184: single source check shared by the tick getters.
+        private bool IsCurrentElementDash()
+        {
+            if (consolPattern.IsNotNull() && elementIndex < consolPattern.Length)
+                return consolPattern[elementIndex] == NavigationElementType.Dash;
+            if (sequence.IsNotNull() && elementIndex < sequence.ElementCount)
+                return sequence.GetElement(elementIndex);
+            return false;
+        }
+
         private int GetCurrentSoundTicks()
         {
-            bool isDash = false;
-
-            if (consolPattern.IsNotNull() && elementIndex < consolPattern.Length)
-                isDash = consolPattern[elementIndex] == NavigationElementType.Dash;
-            else if (sequence.IsNotNull() && elementIndex < sequence.ElementCount)
-                isDash = sequence.GetElement(elementIndex);
-
-            return isDash ? MorseTiming.GetDashSoundTicks(config) : MorseTiming.GetDotSoundTicks(config);
+            return IsCurrentElementDash()
+                ? MorseTiming.GetDashSoundTicks(config)
+                : MorseTiming.GetDotSoundTicks(config);
         }
 
         private int GetCurrentSilenceTicks()
         {
-            bool isDash = false;
-
-            if (consolPattern.IsNotNull() && elementIndex < consolPattern.Length)
-                isDash = consolPattern[elementIndex] == NavigationElementType.Dash;
-            else if (sequence.IsNotNull() && elementIndex < sequence.ElementCount)
-                isDash = sequence.GetElement(elementIndex);
-
-            return isDash ? MorseTiming.GetDashSilenceTicks(config) : MorseTiming.GetDotSilenceTicks(config);
+            return IsCurrentElementDash()
+                ? MorseTiming.GetDashSilenceTicks(config)
+                : MorseTiming.GetDotSilenceTicks(config);
         }
 
 

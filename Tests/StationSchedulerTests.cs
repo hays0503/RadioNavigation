@@ -86,14 +86,30 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.NotNull(s.GetCurrentSequence());
         }
 
+        // F201: the full consol pattern must only be exposed during the
+        // Navigation phase — in Callsign it would transmit the pattern twice
+        // per cycle and silence the callsign-only phase.
         [Fact]
-        public void GetCurrentConsolPattern_ActivePhases_ReturnsPattern()
+        public void GetCurrentConsolPattern_Navigation_ReturnsPattern()
         {
             var s = new StationScheduler("TEST");
             var pattern = new[] { NavigationElementType.Dot };
             s.CurrentConsolPattern = pattern;
             s.Tick();
+            s.OnSequenceFinished();
+            for (int i = 0; i < 60; i++) s.Tick();
+            Assert.Equal(StationScheduler.Phase.Navigation, s.CurrentPhase);
             Assert.Same(pattern, s.GetCurrentConsolPattern());
+        }
+
+        [Fact]
+        public void GetCurrentConsolPattern_Callsign_ReturnsNull()
+        {
+            var s = new StationScheduler("TEST");
+            s.CurrentConsolPattern = new[] { NavigationElementType.Dot };
+            s.Tick();
+            Assert.Equal(StationScheduler.Phase.Callsign, s.CurrentPhase);
+            Assert.Null(s.GetCurrentConsolPattern());
         }
 
         [Fact]

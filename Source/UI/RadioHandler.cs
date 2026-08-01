@@ -8,9 +8,8 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public static RadioHandler Instance;
         // F90: OnVisibilityChanged was never subscribed to anywhere — removed.
+        // F192: OnCursorAngleChanged was also never subscribed to — removed.
         public static event Action<float, int> OnFrequencyChanged;
-
-        public event Action<float> OnCursorAngleChanged;
 
         [SerializeField] private CanvasGroup canvasGroup;
 
@@ -29,8 +28,6 @@ namespace UBOAT.Mods.RadioNavigation
                 if (Mathf.Approximately(cursorAngle, value))
                     return;
                 cursorAngle = value;
-                if (OnCursorAngleChanged.IsNotNull())
-                    OnCursorAngleChanged(value);
                 EmitFrequency();
             }
         }
@@ -120,11 +117,6 @@ namespace UBOAT.Mods.RadioNavigation
             float freq = DialConfig.AngleToFrequency(currentAngle, currentZoneIndex);
             if (OnFrequencyChanged.IsNotNull())
                 OnFrequencyChanged(freq, currentZoneIndex);
-        }
-
-        public void NotifyCursorChanged()
-        {
-            EmitFrequency();
         }
     }
 }

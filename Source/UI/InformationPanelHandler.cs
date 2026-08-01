@@ -68,7 +68,9 @@ namespace UBOAT.Mods.RadioNavigation
             CreateSeparator(content, "Sep2");
             CreateLabel(content, "PatternsHeader", "--- Signal Patterns ---");
 
-            patternTexts = new Text[6];
+            // F185: 6 hardcoded labels hid stations 7-14; size the panel for
+            // the full station database.
+            patternTexts = new Text[BeaconData.Stations.Length];
             for (int i = 0; i < patternTexts.Length; i++)
                 patternTexts[i] = CreateLabel(content, "Pattern" + i, "");
 
@@ -344,7 +346,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (diag.NavigationElapsed.IsPositive())
                     line += " " + FormatTime(diag.NavigationElapsed);
                 if (diag.InBeam)
-                    line += "\n  Dots:" + diag.DotCount + " Bearing:" + diag.CurrentBearing + "В°";
+                    line += "\n  Dots:" + diag.DotCount + " Bearing:" + diag.CurrentBearing + "\u00B0";
 
                 patternTexts[displayIndex].text = line;
 
@@ -384,8 +386,8 @@ namespace UBOAT.Mods.RadioNavigation
             string lonDir = lon.IsNonNegative() ? "E" : "W";
 
             fixText.text = "--- Position Fix ---\n" +
-                "Fix: " + Math.Abs(lat).ToString("F4") + "В° " + latDir +
-                " " + Math.Abs(lon).ToString("F4") + "В° " + lonDir + "\n" +
+                "Fix: " + Math.Abs(lat).ToString("F4") + "\u00B0 " + latDir +
+                " " + Math.Abs(lon).ToString("F4") + "\u00B0 " + lonDir + "\n" +
                 "Beacons: " + meas + " | Error: " + err.ToString("F1") + " km";
             fixText.color = err < 15f ? Color.green : (err < 35f ? Color.yellow : Color.red);
         }

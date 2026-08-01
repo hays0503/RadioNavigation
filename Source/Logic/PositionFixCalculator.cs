@@ -50,13 +50,19 @@ namespace UBOAT.Mods.RadioNavigation
 
             float roughLat = 0f;
             float roughLon = 0f;
+            float roughX = 0f;
+            float roughY = 0f;
             for (int i = 0; i < rawIntersections.Count; i++)
             {
                 roughLat += rawIntersections[i].Latitude;
-                roughLon += rawIntersections[i].Longitude;
+                double lonRad = ToRadians(rawIntersections[i].Longitude);
+                roughX += (float)Math.Cos(lonRad);
+                roughY += (float)Math.Sin(lonRad);
             }
             roughLat /= rawIntersections.Count;
-            roughLon /= rawIntersections.Count;
+            // F204: average longitudes as unit vectors so a fix straddling the
+            // antimeridian (+179.5°/-179.5°) lands near ±180° instead of ~0°.
+            roughLon = (float)(Math.Atan2(roughY, roughX) * (180.0 / Math.PI));
 
             for (int i = 0; i < work.Count; i++)
             {
@@ -94,22 +100,27 @@ namespace UBOAT.Mods.RadioNavigation
                 return new FixResult { Valid = false };
 
             float totalLat = 0f;
-            float totalLon = 0f;
             float totalW = 0f;
+            float lonX = 0f;
+            float lonY = 0f;
 
             for (int i = 0; i < weightedIntersections.Count; i++)
             {
                 var wp = weightedIntersections[i];
                 totalLat += wp.Latitude * wp.Weight;
-                totalLon += wp.Longitude * wp.Weight;
                 totalW += wp.Weight;
+                double lonRad = ToRadians(wp.Longitude);
+                lonX += (float)(Math.Cos(lonRad) * wp.Weight);
+                lonY += (float)(Math.Sin(lonRad) * wp.Weight);
             }
 
             if (totalW < 1e-6f)
                 return new FixResult { Valid = false };
 
             float calcLat = totalLat / totalW;
-            float calcLon = totalLon / totalW;
+            // F204: circular mean (see roughLon above); also keeps the error
+            // distance computed from calcLon meaningful near the dateline.
+            float calcLon = (float)(Math.Atan2(lonY, lonX) * (180.0 / Math.PI));
 
             double sqErr = 0.0;
             double errW = 0.0;
@@ -161,10 +172,14 @@ namespace UBOAT.Mods.RadioNavigation
             while (deltaLam > Math.PI) deltaLam -= 2.0 * Math.PI;
             while (deltaLam < -Math.PI) deltaLam += 2.0 * Math.PI;
 
-            double dist12 = 2.0 * Math.Asin(Math.Sqrt(
-                Math.Sin(deltaPhi / 2.0) * Math.Sin(deltaPhi / 2.0) +
-                Math.Cos(phi1) * Math.Cos(phi2) *
-                Math.Sin(deltaLam / 2.0) * Math.Sin(deltaLam / 2.0)));
+            // F190: float->double accumulation can push the Haversine sum
+            // above 1.0 (e.g. 1.0000000000000002); Math.Asin(NaN) would poison
+            // every downstream bearing/fix computation.
+            double havA = Math.Sin(deltaPhi / 2.0) * Math.Sin(deltaPhi / 2.0) +
+                          Math.Cos(phi1) * Math.Cos(phi2) *
+                          Math.Sin(deltaLam / 2.0) * Math.Sin(deltaLam / 2.0);
+            havA = Math.Max(0.0, Math.Min(1.0, havA));
+            double dist12 = 2.0 * Math.Asin(Math.Sqrt(havA));
 
             if (Math.Abs(dist12) < 1e-9)
                 return new GeoPoint { Latitude = lat1, Longitude = lon1, Valid = true };
@@ -199,9 +214,11 @@ namespace UBOAT.Mods.RadioNavigation
                 Math.Sin(dist12) * Math.Sin(alpha1) * Math.Sin(alpha2),
                 Math.Cos(alpha2) + Math.Cos(alpha1) * Math.Cos(alpha3));
 
-            double phi3 = Math.Asin(
-                Math.Sin(phi1) * Math.Cos(dist13) +
-                Math.Cos(phi1) * Math.Sin(dist13) * Math.Cos(brng13));
+            // F191: the spherical sine law argument can exceed [-1, 1] by
+            // rounding; Math.Asin would return NaN for the fix latitude.
+            double sinPhi3 = Math.Sin(phi1) * Math.Cos(dist13) +
+                             Math.Cos(phi1) * Math.Sin(dist13) * Math.Cos(brng13);
+            double phi3 = Math.Asin(Math.Max(-1.0, Math.Min(1.0, sinPhi3)));
 
             double deltaLam13 = Math.Atan2(
                 Math.Sin(brng13) * Math.Sin(dist13) * Math.Cos(phi1),

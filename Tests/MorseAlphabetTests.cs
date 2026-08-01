@@ -50,24 +50,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void GetElementCount_SingleChar_IsMorseLength()
-        {
-            Assert.Equal(4, MorseAlphabet.GetElementCount("B"));
-        }
-
-        [Fact]
-        public void GetElementCount_Empty_Zero()
-        {
-            Assert.Equal(0, MorseAlphabet.GetElementCount(""));
-        }
-
-        [Fact]
-        public void GetElementCount_TwoChars_AddsInterCharacterPause()
-        {
-            Assert.Equal(4 + 3 + 4, MorseAlphabet.GetElementCount("BC"));
-        }
-
-        [Fact]
         public void TextToPattern_SingleChar_FirstElementIsDashForDashLetters()
         {
             var p = MorseAlphabet.TextToPattern("B");
@@ -96,8 +78,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
         // F125/F129: unknown characters must not throw; they encode as an
         // inter-character gap (3 silent elements), while a space is an
-        // inter-word gap (7). Both keep GetElementCount/TextToPattern
-        // consistent (identical padded sizes here).
+        // inter-word gap (7). "AB?C" = 2+3+4+3+0+3+4 = 19 raw elements.
         [Fact]
         public void TextToPattern_UnknownCharacter_ActsAsGap()
         {
@@ -105,7 +86,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var withLetter = MorseAlphabet.TextToPattern("ABCD");
             Assert.Equal(3, withUnknown.Groups.Length);
             Assert.Equal(withLetter.ElementCount, withUnknown.ElementCount);
-            Assert.Equal(MorseAlphabet.GetElementCount("AB?C") + 5, withUnknown.ElementCount);
+            Assert.Equal(24, withUnknown.ElementCount);
         }
 
         [Fact]
@@ -118,18 +99,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         // F129: inter-word pause is 7 elements, inter-character is 3.
         // A = ".-" (2), B = "-..." (4).
         [Fact]
-        public void GetElementCount_InterWordPause_IsSeven()
-        {
-            Assert.Equal(2 + 7 + 4, MorseAlphabet.GetElementCount("A B"));
-        }
-
-        [Fact]
-        public void GetElementCount_InterCharacterPause_IsThree()
-        {
-            Assert.Equal(2 + 3 + 4, MorseAlphabet.GetElementCount("AB"));
-        }
-
-        [Fact]
         public void TextToPattern_InterWordPause_IsSeven()
         {
             var p = MorseAlphabet.TextToPattern("A B");
@@ -138,6 +107,18 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(p.GetElement(1));
             Assert.False(p.GetElement(8));
             Assert.True(p.GetElement(9));
+        }
+
+        // F193: TextToPattern pauses were verified against the removed
+        // GetElementCount oracle; keep the pause contract pinned here.
+        [Fact]
+        public void TextToPattern_InterCharacterPause_IsThree()
+        {
+            var p = MorseAlphabet.TextToPattern("AB");
+            Assert.Equal(2, p.Groups.Length);
+            Assert.False(p.GetElement(2)); // pause after 'A'
+            Assert.False(p.GetElement(3));
+            Assert.False(p.GetElement(4));
         }
     }
 }

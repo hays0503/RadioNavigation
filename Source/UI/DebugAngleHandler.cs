@@ -1,5 +1,4 @@
-﻿using System;
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -22,12 +21,9 @@ namespace UBOAT.Mods.RadioNavigation
                 if (Mathf.Approximately(angle, value))
                     return;
                 angle = value;
-                OnAngleChanged?.Invoke(angle);
                 UpdateUI();
             }
         }
-
-        public event Action<float> OnAngleChanged;
 
         // F159: Start() must not unconditionally overwrite Inspector-assigned
         // references — use the serialized value with a runtime fallback.

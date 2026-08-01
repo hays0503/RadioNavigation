@@ -63,7 +63,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static string GetMorse(char c)
         {
-            if (c < 0 || c >= table.Length)
+            // F183: char is unsigned in C# - the c < 0 check was always false
+            // (CS0472); only the upper bound matters.
+            if (c >= table.Length)
                 return "";
             return table[c] ?? "";
         }
@@ -73,26 +75,6 @@ namespace UBOAT.Mods.RadioNavigation
             if (string.IsNullOrEmpty(sequence))
                 return '?';
             return reverse.TryGetValue(sequence, out char c) ? c : '?';
-        }
-
-        public static int GetElementCount(string text)
-        {
-            int total = 0;
-            for (int i = 0; i < text.Length; i++)
-            {
-                // F129: inter-word pause (7) instead of inter-character (3)
-                // after a space; a space itself encodes as silence, it must
-                // not also carry a leading pause.
-                if (i.IsPositive() && text[i] != ' ')
-                {
-                    if (text[i - 1] == ' ')
-                        total += 7;
-                    else
-                        total += 3;
-                }
-                total += GetMorse(text[i]).Length;
-            }
-            return total;
         }
 
         // F166: elementDurationTicks was accepted but never used — element
