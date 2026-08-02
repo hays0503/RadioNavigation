@@ -2,25 +2,26 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UBOAT.Game.Sandbox;
-using UBOAT.Game.Scene.Environment;
-using UBOAT.Game.Scene.Effects;
+using UBOAT.Game.Scene.Tasks;
+using UBOAT.Game.UI;
+using UBOAT.Game.UI.Map;
 using UnityEngine;
-using TMPro;
 
 namespace UBOAT.Mods.RadioNavigation
 {
-    // Debug overlay for the map opened with M. It uses the same world-space
-    // layer as the game's MapRenderer, so markers pan and zoom with the map.
+    // Debug overlay for the map opened with M. Uses the game's own map point
+    // prefab so sprite, label, canvas and camera scaling match native points.
     public sealed class StationMapOverlay : MonoBehaviour
     {
         private const int DebugStationCount = 6;
-        private const float MapLabelHeight = 1100f;
-        private const float LabelScale = 0.8f;
-        private readonly List<GameObject> markers = new List<GameObject>();
+        private readonly List<MapPointUI> markers = new List<MapPointUI>();
         private float retryTimer;
         private bool markersCreated;
-        private static readonly FieldInfo LabelPrefabField = typeof(MapRenderer).GetField(
-            "labelPrefab", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        private static readonly FieldInfo PointPrefabField = typeof(MapChartingUI).GetField(
+            "pointPrefab", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo PointsContainerField = typeof(MapChartingUI).GetField(
+            "pointsContainer", BindingFlags.Instance | BindingFlags.NonPublic);
 
         private void Start()
         {
@@ -30,7 +31,10 @@ namespace UBOAT.Mods.RadioNavigation
         private void Update()
         {
             if (markersCreated)
+            {
+                MapPointUI.UpdatePoints(markers);
                 return;
+            }
 
             retryTimer += Time.unscaledDeltaTime;
             if (retryTimer < 0.5f)
@@ -42,70 +46,42 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void TryCreateMarkers()
         {
-            MapRenderer mapRenderer = FindObjectOfType<MapRenderer>();
-            if (mapRenderer.IsNull() || mapRenderer.MapTopLayer.IsNull())
-            {
-                return;
-            }
-
-            if (LabelPrefabField.IsNull())
+            MapChartingUI charting = FindObjectOfType<MapChartingUI>();
+            if (charting.IsNull() || PointPrefabField.IsNull() || PointsContainerField.IsNull())
                 return;
 
-            MapLabel labelPrefab = LabelPrefabField.GetValue(mapRenderer) as MapLabel;
-            if (labelPrefab.IsNull())
+            MapPointUI pointPrefab = PointPrefabField.GetValue(charting) as MapPointUI;
+            Transform pointsContainer = PointsContainerField.GetValue(charting) as Transform;
+            if (pointPrefab.IsNull() || pointsContainer.IsNull())
                 return;
 
-            Debug.Log("[RadioNav][Map] renderer=" + mapRenderer.name
-                + " topLayer=" + mapRenderer.MapTopLayer.name
-                + " active=" + mapRenderer.MapTopLayer.activeInHierarchy);
+            Debug.Log("[RadioNav][Map] native points container=" + pointsContainer.name
+                + " active=" + pointsContainer.gameObject.activeInHierarchy);
 
             int count = Math.Min(DebugStationCount, BeaconData.Stations.Length);
             for (int i = 0; i < count; i++)
             {
-                if (!CreateMarker(mapRenderer.MapTopLayer.transform, labelPrefab, BeaconData.Stations[i], i))
-                    return;
+                BeaconStation station = BeaconData.Stations[i];
+                Vector2 position = Coordinates.ToWorldPosition(station.Latitude, station.Longitude);
+                var data = new MapPointData(position)
+                {
+                    Name = station.Name
+                };
+                MapPointUI point = pointPrefab.Duplicate(data);
+                point.Interactive = false;
+                point.transform.SetParent(pointsContainer, false);
+                markers.Add(point);
+                Debug.Log("[RadioNav][Map] marker=" + i
+                    + " name=" + station.Name
+                    + " lat=" + station.Latitude.ToString("F6")
+                    + " lon=" + station.Longitude.ToString("F6")
+                    + " encounter=" + position
+                    + " active=" + point.gameObject.activeInHierarchy);
             }
 
             markersCreated = true;
+            MapPointUI.UpdatePoints(markers);
             Debug.Log("[RadioNav][Map] station markers created=" + count);
-        }
-
-        private bool CreateMarker(Transform parent, MapLabel labelPrefab, BeaconStation station, int index)
-        {
-            Vector2 worldPosition = Coordinates.ToWorldPosition(station.Latitude, station.Longitude);
-            TextMeshProUGUI sourceLabel = labelPrefab.GetComponent<TextMeshProUGUI>();
-            if (sourceLabel.IsNull() || sourceLabel.font.IsNull())
-                return false;
-
-            var marker = new GameObject("RadioNavStation" + index);
-            marker.transform.SetParent(parent, false);
-            marker.layer = parent.gameObject.layer;
-            marker.transform.position = new Vector3(
-                worldPosition.x * 1000f,
-                MapLabelHeight,
-                worldPosition.y * 1000f);
-            marker.transform.localScale = Vector3.one * LabelScale;
-            marker.transform.localEulerAngles = new Vector3(90f, 0f, 0f);
-
-            var label = marker.AddComponent<TextMeshPro>();
-            label.font = sourceLabel.font;
-            label.fontSharedMaterial = sourceLabel.fontSharedMaterial;
-            label.fontSize = 36f;
-            label.color = new Color(1f, 0.82f, 0.15f, 1f);
-            label.text = "● " + station.Name;
-            label.alignment = TextAlignmentOptions.Left;
-
-            markers.Add(marker);
-            Debug.Log("[RadioNav][Map] marker=" + index
-                + " name=" + station.Name
-                + " lat=" + station.Latitude.ToString("F6")
-                + " lon=" + station.Longitude.ToString("F6")
-                + " world=" + worldPosition
-                + " scene=" + marker.transform.position
-                + " layer=" + marker.layer
-                + " activeSelf=" + marker.activeSelf
-                + " activeInHierarchy=" + marker.activeInHierarchy);
-            return true;
         }
 
         private void OnDestroy()
@@ -113,7 +89,7 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < markers.Count; i++)
             {
                 if (markers[i].IsNotNull())
-                    Destroy(markers[i]);
+                    Destroy(markers[i].gameObject);
             }
             markers.Clear();
         }
