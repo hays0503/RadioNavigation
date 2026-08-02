@@ -56,6 +56,51 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void Calculate_LiveBearings_BushmillsAndPloneis_IntersectsAtBoat()
+        {
+            var r = PositionFixCalculator.Calculate(new List<PositionFixCalculator.Measurement>
+            {
+                M(55.202800f, -6.500000f, 91.8f),
+                M(48.018333f, -4.215278f, 46.4f)
+            });
+
+            Assert.True(r.Valid);
+            Assert.InRange(r.Latitude, 54.05f, 54.15f);
+            Assert.InRange(r.Longitude, 7.68f, 7.78f);
+            Assert.True(r.ErrorKm < 8f, "ErrorKm=" + r.ErrorKm);
+        }
+
+        [Fact]
+        public void Calculate_LiveBearings_PloneisAndStavanger_IntersectsAtBoat()
+        {
+            var r = PositionFixCalculator.Calculate(new List<PositionFixCalculator.Measurement>
+            {
+                M(48.018333f, -4.215278f, 46.4f),
+                M(58.625556f, 5.630278f, 164.7f)
+            });
+
+            Assert.True(r.Valid);
+            Assert.InRange(r.Latitude, 54.05f, 54.15f);
+            Assert.InRange(r.Longitude, 7.68f, 7.78f);
+            Assert.True(r.ErrorKm < 8f, "ErrorKm=" + r.ErrorKm);
+        }
+
+        [Fact]
+        public void Calculate_LiveBearings_BushmillsAndStavanger_IntersectsAtBoat()
+        {
+            var r = PositionFixCalculator.Calculate(new List<PositionFixCalculator.Measurement>
+            {
+                M(55.202800f, -6.500000f, 91.8f),
+                M(58.625556f, 5.630278f, 164.7f)
+            });
+
+            Assert.True(r.Valid);
+            Assert.InRange(r.Latitude, 54.05f, 54.15f);
+            Assert.InRange(r.Longitude, 7.68f, 7.78f);
+            Assert.True(r.ErrorKm < 8f, "ErrorKm=" + r.ErrorKm);
+        }
+
+        [Fact]
         public void Calculate_InconsistentBearings_ErrorKmPositive()
         {
             var r = PositionFixCalculator.Calculate(new List<PositionFixCalculator.Measurement>

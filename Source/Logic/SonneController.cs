@@ -31,6 +31,9 @@ namespace UBOAT.Mods.RadioNavigation
         private bool positionProviderSuccessLogged;
         private int lastLoggedMeasurementCount = -1;
         private bool lastLoggedFixValid;
+        private bool bearingDiagnosticsLogged;
+        private float lastBearingLogLatitude;
+        private float lastBearingLogLongitude;
         private IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
         private VolumeSpinnerHandler volumeSpinner;
         private FeedbackSpinnerHandler feedbackSpinner;
@@ -343,8 +346,8 @@ namespace UBOAT.Mods.RadioNavigation
             public NavigationPattern Pattern;
             public StationScheduler.Phase SchedulerPhase;
             public int DotCount;
-            public int CurrentBearing;
-            public int BearingToBoat;
+            public float CurrentBearing;
+            public float BearingToBoat;
             public float NavigationElapsed;
         }
 
@@ -492,13 +495,16 @@ namespace UBOAT.Mods.RadioNavigation
                 float bearingToBoat = CalculateBearing(
                     (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude,
                     playerLatitude, playerLongitude);
+                float mapBearingToBoat = CalculateMapBearing(
+                    (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude,
+                    playerLatitude, playerLongitude);
 
                 var sector = SonneSignalGenerator.CalculateSector(bearing, beaconStations[i].BaseAngle);
 
                 stations[i].InBeam = SonneSignalGenerator.CalculateInBeam(bearing, (float)beaconStations[i].BaseAngle, stations[i].Config.SectorWidthDeg);
                 stations[i].DotCount = sector.DotCount;
-                stations[i].CurrentBearing = (int)((bearing + 360f) % 360f);
-                stations[i].BearingToBoat = (int)((bearingToBoat + 360f) % 360f);
+                stations[i].CurrentBearing = (bearing + 360f) % 360f;
+                stations[i].BearingToBoat = mapBearingToBoat;
                 stations[i].TransitionIndex = sector.DotCount;
 
                 string callsign;
@@ -531,6 +537,8 @@ namespace UBOAT.Mods.RadioNavigation
                     });
                 }
             }
+
+            LogBearingDiagnostics(beaconStations);
 
             if (HasEnoughMeasurementsForFix())
             {
@@ -587,6 +595,56 @@ namespace UBOAT.Mods.RadioNavigation
             Debug.Log(details.ToString());
         }
 
+        private void LogBearingDiagnostics(BeaconStation[] beaconStations)
+        {
+            if (!positionAvailable
+                || (bearingDiagnosticsLogged
+                    && Math.Abs(playerLatitude - lastBearingLogLatitude) < 0.00001f
+                    && Math.Abs(playerLongitude - lastBearingLogLongitude) < 0.00001f))
+                return;
+
+            Debug.Log("[RadioNav][BEARING] player lat=" + playerLatitude.ToString("F6")
+                + " lon=" + playerLongitude.ToString("F6"));
+
+            for (int i = 0; i < beaconStations.Length; i++)
+            {
+                BeaconStation station = beaconStations[i];
+                float boatToStation = stations[i].CurrentBearing;
+                float stationToBoat = stations[i].BearingToBoat;
+                float trueStationToBoat = CalculateBearing(
+                    (float)station.Latitude, (float)station.Longitude,
+                    playerLatitude, playerLongitude);
+                float trueReciprocal = (trueStationToBoat + 180f) % 360f;
+                float trueReciprocalDelta = Math.Abs(trueReciprocal - boatToStation);
+                if (trueReciprocalDelta > 180f)
+                    trueReciprocalDelta = 360f - trueReciprocalDelta;
+                float mapBoatToStation = CalculateMapBearing(
+                    playerLatitude, playerLongitude,
+                    (float)station.Latitude, (float)station.Longitude);
+                float mapReciprocal = (stationToBoat + 180f) % 360f;
+                float mapReciprocalDelta = Math.Abs(mapReciprocal - mapBoatToStation);
+                if (mapReciprocalDelta > 180f)
+                    mapReciprocalDelta = 360f - mapReciprocalDelta;
+
+                Debug.Log("[RadioNav][BEARING] index=" + i
+                    + " name=" + station.Name
+                    + " callsign=" + (station.History.IsNotNull() && station.History.Length.IsPositive()
+                        ? station.History[0].Callsign : "?")
+                    + " station=" + station.Latitude.ToString("F6") + "," + station.Longitude.ToString("F6")
+                    + " boatToStation=" + boatToStation.ToString("F1")
+                    + " trueStationToBoat=" + trueStationToBoat.ToString("F1")
+                    + " mapStationToBoat=" + stationToBoat.ToString("F1")
+                    + " trueReciprocalDelta=" + trueReciprocalDelta.ToString("F1")
+                    + " mapReciprocalDelta=" + mapReciprocalDelta.ToString("F1")
+                    + " baseAngle=" + station.BaseAngle.ToString("F1")
+                    + " beamHeading=" + station.BeamHeadingDegTrue.ToString("F1"));
+            }
+
+            lastBearingLogLatitude = playerLatitude;
+            lastBearingLogLongitude = playerLongitude;
+            bearingDiagnosticsLogged = true;
+        }
+
         private void OnAudioFilterRead(float[] data, int channels)
         {
             bool audioEnabled = ToggleHandler.IsRadioOn && !suppressAudioForTimeCompression;
@@ -641,6 +699,11 @@ namespace UBOAT.Mods.RadioNavigation
         public static float CalculateBearing(float lat1, float lon1, float lat2, float lon2)
         {
             return GeoMath.InitialBearingDeg(lat1, lon1, lat2, lon2);
+        }
+
+        public static float CalculateMapBearing(float lat1, float lon1, float lat2, float lon2)
+        {
+            return GeoMath.MapBearingDeg(lat1, lon1, lat2, lon2);
         }
     }
 }

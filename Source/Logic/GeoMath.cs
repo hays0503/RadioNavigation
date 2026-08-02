@@ -47,5 +47,16 @@ namespace UBOAT.Mods.RadioNavigation
             float bearing = (float)(Math.Atan2(y, x) * (180.0 / Math.PI));
             return (bearing + 360f) % 360f;
         }
+
+        // Bearing used by UBOAT's flat encounter-space map and protractor.
+        // The game maps latitude and longitude to world axes with the same
+        // scale, so the visual map angle is not the spherical true bearing.
+        public static float MapBearingDeg(float lat1, float lon1, float lat2, float lon2)
+        {
+            float deltaLatitude = lat2 - lat1;
+            float deltaLongitude = lon2 - lon1;
+            float bearing = (float)(Math.Atan2(deltaLongitude, deltaLatitude) * (180.0 / Math.PI));
+            return (bearing + 360f) % 360f;
+        }
     }
 }

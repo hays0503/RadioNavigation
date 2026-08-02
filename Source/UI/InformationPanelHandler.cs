@@ -373,11 +373,11 @@ namespace UBOAT.Mods.RadioNavigation
                 string phase = diag.SchedulerPhase.ToString();
 
                 string line = callsign + " [" + beam + "] " + gain + " BFO:" + bfo
-                    + " " + phase + " ToBoat:" + diag.BearingToBoat + "\u00B0";
+                    + " " + phase + " ToBoat:" + diag.BearingToBoat.ToString("F1") + "\u00B0";
                 if (diag.NavigationElapsed.IsPositive())
                     line += " " + FormatTime(diag.NavigationElapsed);
                 if (diag.InBeam)
-                    line += "\n  Dots:" + diag.DotCount + " Bearing:" + diag.CurrentBearing + "\u00B0";
+                    line += "\n  Dots:" + diag.DotCount + " Bearing:" + diag.CurrentBearing.ToString("F1") + "\u00B0";
 
                 patternTexts[displayIndex].text = line;
 

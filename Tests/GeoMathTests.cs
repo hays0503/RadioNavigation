@@ -70,5 +70,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             float b = GeoMath.InitialBearingDeg(50f, 11f, 50f, 10f);
             Assert.InRange(b, 0f, 360f);
         }
+
+        [Fact]
+        public void MapBearingDeg_UsesFlatGameMapProjection()
+        {
+            float b = GeoMath.MapBearingDeg(58.625556f, 5.630278f, 54.09821f, 7.73621f);
+            Assert.InRange(b, 154.5f, 155.5f);
+        }
     }
 }
