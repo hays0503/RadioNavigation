@@ -86,13 +86,13 @@ namespace UBOAT.Mods.RadioNavigation
                 return false;
             }
 
-            label.transform.SetParent(parent, false);
-            label.transform.position = new Vector3(
+            marker.transform.SetParent(parent, false);
+            marker.transform.position = new Vector3(
                 worldPosition.x * 1000f,
                 MapLabelHeight,
                 worldPosition.y * 1000f);
-            label.transform.localScale = Vector3.one * LabelScale;
-            label.transform.localEulerAngles = new Vector3(90f, 0f, 0f);
+            marker.transform.localScale = Vector3.one * LabelScale;
+            marker.transform.localEulerAngles = new Vector3(90f, 0f, 0f);
             label.color = new Color(1f, 0.82f, 0.15f, 1f);
             label.text = "● " + station.Name;
 
@@ -102,9 +102,10 @@ namespace UBOAT.Mods.RadioNavigation
                 + " lat=" + station.Latitude.ToString("F6")
                 + " lon=" + station.Longitude.ToString("F6")
                 + " world=" + worldPosition
-                + " scene=" + label.transform.position
+                + " scene=" + marker.transform.position
                 + " activeSelf=" + marker.gameObject.activeSelf
-                + " activeInHierarchy=" + marker.gameObject.activeInHierarchy);
+                + " activeInHierarchy=" + marker.gameObject.activeInHierarchy
+                + " labelActive=" + label.gameObject.activeInHierarchy);
             return true;
         }
 
