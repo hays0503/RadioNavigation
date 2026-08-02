@@ -79,6 +79,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             var marker = new GameObject("RadioNavStation" + index);
             marker.transform.SetParent(parent, false);
+            marker.layer = parent.gameObject.layer;
             marker.transform.position = new Vector3(
                 worldPosition.x * 1000f,
                 MapLabelHeight,
@@ -101,6 +102,7 @@ namespace UBOAT.Mods.RadioNavigation
                 + " lon=" + station.Longitude.ToString("F6")
                 + " world=" + worldPosition
                 + " scene=" + marker.transform.position
+                + " layer=" + marker.layer
                 + " activeSelf=" + marker.activeSelf
                 + " activeInHierarchy=" + marker.activeInHierarchy);
             return true;
