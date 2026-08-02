@@ -43,7 +43,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void TryCreateMarkers()
         {
             MapRenderer mapRenderer = FindObjectOfType<MapRenderer>();
-            if (mapRenderer.IsNull() || mapRenderer.VectorTerrainsUIContainer.IsNull())
+            if (mapRenderer.IsNull() || mapRenderer.MapTopLayer.IsNull())
             {
                 return;
             }
@@ -56,13 +56,13 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             Debug.Log("[RadioNav][Map] renderer=" + mapRenderer.name
-                + " container=" + mapRenderer.VectorTerrainsUIContainer.name
-                + " active=" + mapRenderer.VectorTerrainsUIContainer.activeInHierarchy);
+                + " topLayer=" + mapRenderer.MapTopLayer.name
+                + " active=" + mapRenderer.MapTopLayer.activeInHierarchy);
 
             int count = Math.Min(DebugStationCount, BeaconData.Stations.Length);
             for (int i = 0; i < count; i++)
             {
-                if (!CreateMarker(mapRenderer.VectorTerrainsUIContainer.transform, labelPrefab, BeaconData.Stations[i], i))
+                if (!CreateMarker(mapRenderer.MapTopLayer.transform, labelPrefab, BeaconData.Stations[i], i))
                     return;
             }
 
@@ -73,19 +73,11 @@ namespace UBOAT.Mods.RadioNavigation
         private bool CreateMarker(Transform parent, MapLabel labelPrefab, BeaconStation station, int index)
         {
             Vector2 worldPosition = Coordinates.ToWorldPosition(station.Latitude, station.Longitude);
-            MapLabel marker = labelPrefab.Duplicate() as MapLabel;
-            if (marker.IsNull())
+            TextMeshProUGUI sourceLabel = labelPrefab.GetComponent<TextMeshProUGUI>();
+            if (sourceLabel.IsNull() || sourceLabel.font.IsNull())
                 return false;
 
-            marker.name = "RadioNavStation" + index;
-            marker.gameObject.SetActive(true);
-            TextMeshProUGUI label = marker.GetComponent<TextMeshProUGUI>();
-            if (label.IsNull())
-            {
-                Destroy(marker.gameObject);
-                return false;
-            }
-
+            var marker = new GameObject("RadioNavStation" + index);
             marker.transform.SetParent(parent, false);
             marker.transform.position = new Vector3(
                 worldPosition.x * 1000f,
@@ -93,19 +85,24 @@ namespace UBOAT.Mods.RadioNavigation
                 worldPosition.y * 1000f);
             marker.transform.localScale = Vector3.one * LabelScale;
             marker.transform.localEulerAngles = new Vector3(90f, 0f, 0f);
+
+            var label = marker.AddComponent<TextMeshPro>();
+            label.font = sourceLabel.font;
+            label.fontSharedMaterial = sourceLabel.fontSharedMaterial;
+            label.fontSize = 36f;
             label.color = new Color(1f, 0.82f, 0.15f, 1f);
             label.text = "● " + station.Name;
+            label.alignment = TextAlignmentOptions.Left;
 
-            markers.Add(marker.gameObject);
+            markers.Add(marker);
             Debug.Log("[RadioNav][Map] marker=" + index
                 + " name=" + station.Name
                 + " lat=" + station.Latitude.ToString("F6")
                 + " lon=" + station.Longitude.ToString("F6")
                 + " world=" + worldPosition
                 + " scene=" + marker.transform.position
-                + " activeSelf=" + marker.gameObject.activeSelf
-                + " activeInHierarchy=" + marker.gameObject.activeInHierarchy
-                + " labelActive=" + label.gameObject.activeInHierarchy);
+                + " activeSelf=" + marker.activeSelf
+                + " activeInHierarchy=" + marker.activeInHierarchy);
             return true;
         }
 
