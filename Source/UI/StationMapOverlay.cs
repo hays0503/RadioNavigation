@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using UBOAT.Game.Sandbox;
-using UBOAT.Game.Scene.Tasks;
 using UBOAT.Game.UI;
 using UBOAT.Game.UI.Map;
 using UnityEngine;
@@ -17,11 +15,6 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<MapPointUI> markers = new List<MapPointUI>();
         private float retryTimer;
         private bool markersCreated;
-
-        private static readonly FieldInfo PointPrefabField = typeof(MapChartingUI).GetField(
-            "pointPrefab", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static readonly FieldInfo PointsContainerField = typeof(MapChartingUI).GetField(
-            "pointsContainer", BindingFlags.Instance | BindingFlags.NonPublic);
 
         private void Start()
         {
@@ -47,29 +40,19 @@ namespace UBOAT.Mods.RadioNavigation
         private void TryCreateMarkers()
         {
             MapChartingUI charting = FindObjectOfType<MapChartingUI>();
-            if (charting.IsNull() || PointPrefabField.IsNull() || PointsContainerField.IsNull())
+            if (charting.IsNull())
                 return;
 
-            MapPointUI pointPrefab = PointPrefabField.GetValue(charting) as MapPointUI;
-            Transform pointsContainer = PointsContainerField.GetValue(charting) as Transform;
-            if (pointPrefab.IsNull() || pointsContainer.IsNull())
-                return;
-
-            Debug.Log("[RadioNav][Map] native points container=" + pointsContainer.name
-                + " active=" + pointsContainer.gameObject.activeInHierarchy);
+            Debug.Log("[RadioNav][Map] MapChartingUI=" + charting.name
+                + " active=" + charting.gameObject.activeInHierarchy);
 
             int count = Math.Min(DebugStationCount, BeaconData.Stations.Length);
             for (int i = 0; i < count; i++)
             {
                 BeaconStation station = BeaconData.Stations[i];
                 Vector2 position = Coordinates.ToWorldPosition(station.Latitude, station.Longitude);
-                var data = new MapPointData(position)
-                {
-                    Name = station.Name
-                };
-                MapPointUI point = pointPrefab.Duplicate(data);
+                MapPointUI point = charting.CreatePoint(position, station.Name);
                 point.Interactive = false;
-                point.transform.SetParent(pointsContainer, false);
                 markers.Add(point);
                 Debug.Log("[RadioNav][Map] marker=" + i
                     + " name=" + station.Name
