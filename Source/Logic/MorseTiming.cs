@@ -8,28 +8,50 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static int GetDotSoundTicks(ConsolCycleConfig config)
         {
-            float ms = config.DotSoundMs.IsPositive() ? config.DotSoundMs : 125f;
-            return Math.Max(1, (int)Math.Round(ms / TickMs));
+            return GetSoundTicks(config.DotSoundMs, 200f);
         }
 
         public static int GetDashSoundTicks(ConsolCycleConfig config)
         {
-            float ms = config.DashSoundMs.IsPositive() ? config.DashSoundMs : 875f;
-            return Math.Max(1, (int)Math.Round(ms / TickMs));
+            return GetSoundTicks(config.DashSoundMs, 400f);
         }
 
         public static int GetDotSilenceTicks(ConsolCycleConfig config)
         {
             float period = config.ElementPeriodMs.IsPositive() ? config.ElementPeriodMs : 1000f;
-            float sound = config.DotSoundMs.IsPositive() ? config.DotSoundMs : 125f;
+            float sound = config.DotSoundMs.IsPositive() ? config.DotSoundMs : 200f;
             return ToSilenceTicks(period, sound, "DotSoundMs");
         }
 
         public static int GetDashSilenceTicks(ConsolCycleConfig config)
         {
             float period = config.ElementPeriodMs.IsPositive() ? config.ElementPeriodMs : 1000f;
-            float sound = config.DashSoundMs.IsPositive() ? config.DashSoundMs : 875f;
+            float sound = config.DashSoundMs.IsPositive() ? config.DashSoundMs : 400f;
             return ToSilenceTicks(period, sound, "DashSoundMs");
+        }
+
+        public static int GetCallsignDotSoundTicks(ConsolCycleConfig config)
+        {
+            return GetSoundTicks(config.CallsignDotSoundMs, 125f);
+        }
+
+        public static int GetCallsignDashSoundTicks(ConsolCycleConfig config)
+        {
+            return GetSoundTicks(config.CallsignDashSoundMs, 875f);
+        }
+
+        public static int GetCallsignDotSilenceTicks(ConsolCycleConfig config)
+        {
+            float period = config.CallsignElementPeriodMs.IsPositive() ? config.CallsignElementPeriodMs : 1000f;
+            float sound = config.CallsignDotSoundMs.IsPositive() ? config.CallsignDotSoundMs : 125f;
+            return ToSilenceTicks(period, sound, "CallsignDotSoundMs");
+        }
+
+        public static int GetCallsignDashSilenceTicks(ConsolCycleConfig config)
+        {
+            float period = config.CallsignElementPeriodMs.IsPositive() ? config.CallsignElementPeriodMs : 1000f;
+            float sound = config.CallsignDashSoundMs.IsPositive() ? config.CallsignDashSoundMs : 875f;
+            return ToSilenceTicks(period, sound, "CallsignDashSoundMs");
         }
 
         // F136: an inconsistent config (sound longer than the element period)
@@ -51,6 +73,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static int ToTicks(float ms)
         {
+            return Math.Max(1, (int)Math.Round(ms / TickMs));
+        }
+
+        private static int GetSoundTicks(float milliseconds, float fallbackMilliseconds)
+        {
+            float ms = milliseconds.IsPositive() ? milliseconds : fallbackMilliseconds;
             return Math.Max(1, (int)Math.Round(ms / TickMs));
         }
     }

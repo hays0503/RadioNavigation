@@ -78,6 +78,25 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(StationScheduler.Phase.Pause, s.CurrentPhase);
         }
 
+        [Fact]
+        public void PostNavSilence_WithConfiguredCycle_LastsThreeSeconds()
+        {
+            var s = new StationScheduler("TEST")
+            {
+                Config = ConsolCycleConfig.Cycle120s
+            };
+            s.Tick();
+            s.OnSequenceFinished();
+            for (int i = 0; i < 60; i++) s.Tick();
+            Assert.Equal(StationScheduler.Phase.Navigation, s.CurrentPhase);
+
+            s.OnSequenceFinished();
+            for (int i = 0; i < 59; i++) s.Tick();
+            Assert.Equal(StationScheduler.Phase.PostNavSilence, s.CurrentPhase);
+            s.Tick();
+            Assert.Equal(StationScheduler.Phase.Pause, s.CurrentPhase);
+        }
+
         // F122: Reset() must start the cycle over at Pause (one-tick), not PostNavSilence.
         [Fact]
         public void Reset_SetsPausePhase()
@@ -111,6 +130,24 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             for (int i = 0; i < 60; i++) s.Tick();
             Assert.Equal(StationScheduler.Phase.Navigation, s.CurrentPhase);
             Assert.Same(pattern, s.GetCurrentConsolPattern());
+        }
+
+        [Fact]
+        public void GetCurrentConsolPattern_Navigation_PreservesHistoricalDashOrder()
+        {
+            var s = new StationScheduler("TEST");
+            var pattern = SonneBeam.BuildPattern(38, true);
+            s.CurrentConsolPattern = pattern;
+            s.Tick();
+            s.OnSequenceFinished();
+            for (int i = 0; i < 60; i++) s.Tick();
+
+            Assert.Equal(StationScheduler.Phase.Navigation, s.CurrentPhase);
+            Assert.Same(pattern, s.GetCurrentConsolPattern());
+            Assert.Equal(NavigationElementType.Dash, pattern[0]);
+            Assert.Equal(NavigationElementType.Equisignal, pattern[20]);
+            Assert.Equal(NavigationElementType.Equisignal, pattern[23]);
+            Assert.Equal(NavigationElementType.Dot, pattern[24]);
         }
 
         [Fact]

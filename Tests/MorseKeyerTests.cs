@@ -57,24 +57,20 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.False(keyer.IsActive);
         }
 
-        // F113: a new consol pattern produced by the scheduler must keep the
-        // callsign classification; callsignLength = 0 would merge callsign
-        // elements into navigation.
         [Fact]
-        public void Advance_ConsolTransition_KeepsCallsignLength()
+        public void LoadCallsign_MarksElementsAsCallsign()
         {
             var scheduler = new StationScheduler("ES");
-            scheduler.CurrentConsolPattern = SonneSignalGenerator.GenerateConsolPattern("ES", 0, ConsolCycleConfig.Cycle120s);
+            scheduler.Config = ConsolCycleConfig.Cycle120s;
+            scheduler.Tick();
 
             var keyer = new MorseKeyer();
-            keyer.LoadConsol(scheduler.CurrentConsolPattern, scheduler, ConsolCycleConfig.Cycle120s, scheduler.CallsignElementCount);
+            keyer.Load(scheduler.GetCurrentSequence(), scheduler, ConsolCycleConfig.Cycle120s);
             Assert.True(keyer.IsActive);
 
             var completed = new System.Collections.Generic.List<System.Tuple<bool, bool>>();
             keyer.OnElementCompleted += (type, isCallsign) => completed.Add(System.Tuple.Create(type == NavigationElementType.Dash, isCallsign));
 
-            // Advance past the whole first pattern so AdvanceElement requests
-            // a new one from the scheduler.
             for (int i = 0; i < 5000; i++)
             {
                 if (!keyer.IsActive)
@@ -82,8 +78,29 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 keyer.Advance();
             }
 
-            Assert.False(keyer.IsActive); // pattern finished, no new pattern from scheduler during Navigation phase -> idle
-            Assert.Contains(completed, t => t.Item2); // callsign elements were emitted as callsign
+            Assert.False(keyer.IsActive);
+            Assert.NotEmpty(completed);
+            Assert.All(completed, t => Assert.True(t.Item2));
+        }
+
+        [Fact]
+        public void LoadConsol_DashSector_EmitsDashEquisignalDotOrder()
+        {
+            var pattern = SonneBeam.BuildPattern(38, true);
+            var keyer = new MorseKeyer();
+            var completed = new System.Collections.Generic.List<NavigationElementType>();
+            keyer.OnElementCompleted += (type, isCallsign) => completed.Add(type);
+
+            keyer.LoadConsol(pattern);
+            for (int ticks = 0; ticks < 10000 && completed.Count < 25; ticks++)
+                keyer.Advance();
+
+            Assert.True(completed.Count >= 24);
+            for (int i = 0; i < 20; i++)
+                Assert.Equal(NavigationElementType.Dash, completed[i]);
+            for (int i = 20; i < 24; i++)
+                Assert.Equal(NavigationElementType.Equisignal, completed[i]);
+            Assert.Equal(NavigationElementType.Dot, completed[24]);
         }
     }
 }

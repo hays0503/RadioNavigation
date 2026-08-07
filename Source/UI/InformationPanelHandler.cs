@@ -35,6 +35,7 @@ namespace UBOAT.Mods.RadioNavigation
         private string lastLoggedDecoded = "";
         private float patternUpdateTimer;
         private const float PatternUpdateInterval = 0.5f;
+        private const float PatternLabelHeight = 60f;
         private float signalUpdateTimer;
         private const float SignalUpdateInterval = 0.15f;
 
@@ -69,11 +70,15 @@ namespace UBOAT.Mods.RadioNavigation
             CreateSeparator(content, "Sep2");
             CreateLabel(content, "PatternsHeader", "--- Signal Patterns ---");
 
-            // F185: 6 hardcoded labels hid stations 7-14; size the panel for
-            // the full station database.
+            // Keep panel rows aligned with the active historical station set.
             patternTexts = new Text[BeaconData.Stations.Length];
             for (int i = 0; i < patternTexts.Length; i++)
+            {
                 patternTexts[i] = CreateLabel(content, "Pattern" + i, "");
+                patternTexts[i].verticalOverflow = VerticalWrapMode.Overflow;
+                patternTexts[i].GetComponent<RectTransform>().sizeDelta =
+                    new Vector2(200f, PatternLabelHeight);
+            }
 
             CreateSeparator(content, "Sep3");
             fixText = CreateLabel(content, "FixStatus", "--- Position Fix: ---");
@@ -330,9 +335,9 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            int domIdx = sonneController.DominantStationIndex;
             if (stationText.IsNotNull() && sonneController.StationCount.IsPositive())
             {
-                int domIdx = sonneController.DominantStationIndex;
                 // F101: no dominant station (-1) must not show the default
                 // diagnostics phase ("[Pause]") of a non-existent station.
                 if (domIdx < 0)
@@ -376,8 +381,17 @@ namespace UBOAT.Mods.RadioNavigation
                     + " " + phase + " ToBoat:" + diag.BearingToBoat.ToString("F1") + "\u00B0";
                 if (diag.NavigationElapsed.IsPositive())
                     line += " " + FormatTime(diag.NavigationElapsed);
-                if (diag.InBeam)
-                    line += "\n  Dots:" + diag.DotCount + " Bearing:" + diag.CurrentBearing.ToString("F1") + "\u00B0";
+                line += "\n  Zone:S" + diag.SectorNumber
+                    + (diag.IsDashSector ? "(DASH)" : "(DOT)")
+                    + " EQ@" + diag.EqSignIndex + "/" + (diag.DotCount + diag.DashCount)
+                    + " Dots:" + diag.DotCount
+                    + " Dashes:" + diag.DashCount
+                    + " Bearing:" + diag.CurrentBearing.ToString("F1") + "\u00B0";
+                if (i == domIdx)
+                {
+                    line += "\n  Recv: " + sonneController.GetReceivedNavigationDotCount()
+                        + "\u2022 " + sonneController.GetReceivedNavigationDashCount() + "\u25AC";
+                }
 
                 patternTexts[displayIndex].text = line;
 

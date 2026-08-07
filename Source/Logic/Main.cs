@@ -20,7 +20,9 @@ namespace UBOAT.Mods.RadioNavigation
         // F176: single source of truth for the game UI container lookup.
         private const string MainSceneViewportPath = "/GUI/Viewport";
 
-        [Inject] private static ResourceManager resourceManager;
+        // DI assigns this field during mod initialization; explicit default
+        // keeps standalone Roslyn builds free of CS0649.
+        [Inject] private static ResourceManager resourceManager = null;
         [NonSerializedInGameState] private Harmony harmony;
         private static bool loaded;
 

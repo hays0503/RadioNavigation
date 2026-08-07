@@ -4,19 +4,33 @@
 
 > **game-model ≠ real system.** `documents-readonly/CONSOL_SONNE_досье.md` описывает реальную CONSOL/SONNE; план реализует внутреннюю модель игры (`GenerateConsolPattern`/`CalculateSector`). Расхождения (число лучей, ±1 счёт, поправка наблюдателя) — `game-упрощения`, intentional, в критерии не вносятся (см. D2/D6).
 
+## Статус реализации (2026-08-04)
+
+- [x] Шаги 1–4: `SectorNumber`, zone/eq diagnostics, `Recv`-счётчики и вывод панели реализованы в `Source/`.
+- [x] F71 time-scale guard: пауза сохраняет текущий тон, fast-forward глушит радио; первый audio buffer также защищён в `Awake`.
+- [x] Position fix: provider и `UpdatePosition` отбрасывают `NaN`/`Infinity`, чтобы не блокировать последующее обновление координат.
+- [x] Callsign хранит только последний завершённый результат; панель создаёт строки для всех станций из `BeaconData.Stations` и резервирует высоту для summary/Zone/Recv.
+- [x] Исторический directional DASH-порядок реализован: `DASH -> Equisignal -> DOT`; callsign prefix и текущие scheduler-фазы сохранены.
+- [x] Исторический CAP 59 набор ограничен пятью станциями; Seville помечен `RadioBeaconOnly`, дополнительные послевоенные записи удалены.
+- [x] Regression tests добавлены для генератора, scheduler/MorseKeyer и rich-text; тесты: `184 passed`.
+- [x] `graphify update .` выполнен; эквивалентная полная Roslyn-компиляция `Source/` проходит без предупреждений.
+- [ ] Live-проверка в игре: звук, callsign, position fix, EQ/Recv, hot-reload и отсутствие повторных подписок.
+- [ ] Deferred-архитектура F163/F179–F181/F186 остаётся за пределами этого плана.
+
 ## Ветвление
 
 - Перед первым изменением кода: `git checkout -b feature/panel-eq-zone-recv`
-- Коммитим только `Source/`. `Bundles/testui`, `documents/` и сами планы в коммиты ветки не включаем.
+- Кодовые изменения коммитим только из `Source/` и `Tests/`. `Bundles/testui`, `documents/` и планы не включаем в кодовый коммит.
 
 ## Что писать в коде (сводка)
 
 | Файл | Что добавить / изменить | Точка соприкосновения |
 |---|---|---|
-| `SonneSignalGenerator.cs` | `SectorResult.SectorNumber`; заполнить в `CalculateSector` | `sectorNumber` (чёт = dot, нечёт = dash) |
+| `SonneSignalGenerator.cs` | `SectorResult.SectorNumber`; заполнить в `CalculateSector`; zone-aware order в `GenerateConsolPattern` | `sectorNumber`, `isDashSector` |
 | `StationState.cs` | `IsDashSector`, `SectorNumber` | — |
-| `SonneController.cs` | `UpdateStationNavigation`: `IsDashSector`/`SectorNumber` из `sector`; `StationDiagnostics.IsDashSector/SectorNumber/EqSignIndex/DashCount`; новые геттеры `GetReceivedNavigationDotCount`/`GetReceivedNavigationDashCount` | `StationDiagnostics` (GetStationDiagnostics) |
+| `SonneController.cs` | `UpdateStationNavigation`: `IsDashSector`/`SectorNumber` из `sector`; передать `sector.IsDashSector` в generator; `StationDiagnostics.IsDashSector/SectorNumber/EqSignIndex/DashCount`; новые геттеры `GetReceivedNavigationDotCount`/`GetReceivedNavigationDashCount` | `StationDiagnostics` (GetStationDiagnostics) |
 | `InformationPanelHandler.cs` | `UpdatePatterns`: убрать гейт `if (diag.InBeam)` для счётчиков; добавить строку `Recv: X• Y▬` только для `i == dominantStationIndex` | `diag` из `GetStationDiagnostics` |
+| `Tests/*.cs` | Проверить DOT/DASH order, equisignal position, keyer emission и rich-text order | `GenerateConsolPattern`, `MorseKeyer`, `SignalRichTextFormatter` |
 
 > Номера строк на момент аудита — в `AUDIT_InfoPanel_ZoneDebug.md` (snapshot 2026-08-03).
 
@@ -27,18 +41,22 @@
 - **I3** `Recv` считает **только** `SignalCharType.Dot`/`.Dash` — `.Callsign` и `.Equisignal` исключаются по типу.
 - **I4** `EqSignIndex == TransitionIndex` **только** в dot-зоне (в dash-зоне EqSignIndex = MaxNavigationCount − DotCount).
 - **I5** все мутации `signalEntries` — на main-потоке; Recv-геттеры читают безопасно (UI вызывает только при `i == dominantStationIndex`, где `signalEntries` заполнен).
+- **I6** directional DASH pattern = `Dash × (MaxNavigationCount − DotCount) -> Equisignal -> Dot × DotCount`.
+- **I7** callsign prefix остаётся перед directional segment; полная перестановка исторического `T -> D -> R` не входит в этот change.
 
 ## Риски реализации
 
-- [ ] забыть заполнить `SectorResult.SectorNumber` в `CalculateSector`
-- [ ] забыть добавить `IsDashSector`/`SectorNumber` в `StationState`
-- [ ] вывести Recv для всех станций (нужен гейт `i == dominantStationIndex`)
-- [ ] использовать `EqSignIndex` вместо `TransitionIndex` в dash-зоне (они не равны там)
-- [ ] посчитать Callsign/Equisignal в Recv-геттерах (их нужно исключать по `SignalCharType`)
-- [ ] забыть убрать `#if DEBUG` вокруг новых строк (игра компилирует `Source` без `DEBUG` — блоки вырезаются в рантайме)
-- [ ] забыть `graphify update .` после правок
-- [ ] забыть `powershell -File build.ps1` (A7)
-- [ ] убрать `if (diag.InBeam)` вокруг строки Zone/EQ/Dots/Dashes (line 379), но **сохранить** `InBeam` для цвета (line 384) и для строки `[IN BEAM]/[OUTSIDE]` (line 370) — см. Фикс #3
+- [x] забыть заполнить `SectorResult.SectorNumber` в `CalculateSector`
+- [x] забыть добавить `IsDashSector`/`SectorNumber` в `StationState`
+- [x] вывести Recv для всех станций (нужен гейт `i == dominantStationIndex`)
+- [x] использовать `EqSignIndex` вместо `TransitionIndex` в dash-зоне (они не равны там)
+- [x] посчитать Callsign/Equisignal в Recv-геттерах (их нужно исключать по `SignalCharType`)
+- [x] забыть убрать `#if DEBUG` вокруг новых строк (игра компилирует `Source` без `DEBUG` — блоки вырезаются в рантайме)
+- [x] забыть `graphify update .` после правок
+- [x] забыть `powershell -File build.ps1` (A7)
+- [x] убрать `if (diag.InBeam)` вокруг строки Zone/EQ/Dots/Dashes (line 379), но **сохранить** `InBeam` для цвета (line 384) и для строки `[IN BEAM]/[OUTSIDE]` (line 370) — см. Фикс #3
+
+> A7: точный запуск `powershell -File build.ps1` в этой среде блокируется Execution Policy и отсутствием `csc` в `PATH`; эквивалентная Roslyn-компиляция полного `Source/` проходит без предупреждений.
 
 ## Фиксы ревизии (2026-08-03)
 
@@ -88,6 +106,7 @@ Plan Step 4 убирает гейт `if (diag.InBeam)` для строк Zone/EQ
 
 - `SectorResult`: добавить **только** `public int SectorNumber;` (`IsDashSector` уже есть в структуре — line 15).
 - `CalculateSector`: `SectorNumber = sectorNumber` (вычисляется внутри метода: `sectorNumber = (int)(delta / SectorWidthDeg)`; чётный = dot, нечётный = dash).
+- `GenerateConsolPattern`: добавить `bool isDashSector`; в dash-зоне эмитить `Dash × (MaxNavigationCount − dotCount) -> Equisignal -> Dot × dotCount`; в dot-зоне сохранить DOT-first.
 - `RestoreBearingFromDotCount`, `GenerateBearingTable` — не трогать.
 
 ## Шаг 2 — `Source/Data/StationState.cs`
@@ -110,6 +129,7 @@ Plan Step 4 убирает гейт `if (diag.InBeam)` для строк Zone/EQ
   - `EqSignIndex = s.IsDashSector ? s.Config.MaxNavigationCount − s.DotCount : s.DotCount` — семантика C.A.P. (позиция чтения из `RestoreBearingFromDotCount`); в dot-зоне `EqSignIndex ≡ TransitionIndex` (I4) — зафиксировать в коде (P20).
 - Новые геттеры после `GetDecodedText`: `GetReceivedNavigationDotCount()` / `GetReceivedNavigationDashCount()` — проход по `signalEntries`, подсчёт **только** `SignalCharType.Dot`/`.Dash` (Callsign исключён по типу `.Callsign`, Equisignal — по `.Equisignal`; P6/P9). Мутация буфера только на main-потоке (I5) — чтение из UI безопасно. **XML-документация** на геттерах: `/// <summary> Count of dots/dashes in the emission window (≤20 chars). This is NOT the CAP observer count (DotCount/DashCount from 60-cycle). Recv ≪ CAP-count; Recv = 0 during callsign phase is expected. </summary>` (см. Фикс #2).
 - **UI — только при `i == dominantStationIndex`**: `signalEntries` заполняется только для доминантной станции (гейт `IsProcessingDominantStation`) — иначе недоминантная строка покажет чужой буфер (P22).
+- `StationScheduler.CurrentConsolPattern` получает уже zone-aware массив; state machine и `MorseKeyer` не меняют порядок самостоятельно.
 
 ## Шаг 4 — `Source/UI/InformationPanelHandler.cs`, `UpdatePatterns`
 
@@ -121,11 +141,13 @@ Plan Step 4 убирает гейт `if (diag.InBeam)` для строк Zone/EQ
   (InBeam достижим только в секторе 0 (dot) / 71 (dash) — порог `CalculateInBeam` ≈ 2.5°; пример с OUTSIDE — реалистичный, P5.)
 - Доминантная станция (строго `i == domIdx`): доп. строка `Recv: X• Y▬` из новых геттеров. Пример: `Recv: 7• 13▬` — оконная семантика: `signalEntries` триммится до `MaxMorseChars = 20`; Recv — малое колеблющееся число ≤ 20, **не равное** `Dots/Dashes` той же строки (таргеты из `StationState`, цикл 60 знаков; P2 вариант **(а)**). `X + Y ≤ 20` всегда (I2). `Recv: 0• 0▬` после смены доминанты/частоты (буфер чистится) и почти всю фазу Callsign (окно заполнено callsign-глифами) — ожидаемое поведение, не баг (P15/P18).
 - Цвета прежние (зелёный InBeam / серый Outside).
+- Для DASH в rich-text порядок должен быть синий `▬` -> пурпурный `◆◆` -> красный `•`; для DOT — красный `•` -> `◆◆` -> синий `▬`.
 - **Без `#if DEBUG`** — игра компилирует `Source/*.cs` без `DEBUG`.
 
 ## Шаг 5 — Проверка сборки
 
 - `powershell -File build.ps1` — компиляция без ошибок (статическая; рантайм-DLL не используется, игра компилирует Source/*.cs сама).
+- `powershell -File tests.ps1` — regression suite для generator/keyer/formatter.
 
 ## Шаг 6 — Обслуживание графа
 
@@ -144,13 +166,15 @@ Plan Step 4 убирает гейт `if (diag.InBeam)` для строк Zone/EQ
 - A5. В `UpdatePatterns` строка Zone/EQ/Dots/Dashes у **всех** станций с gain; Recv — только доминантная, геттеры вызываются строго при `i == domIdx` (P22).
 - A6. Новые строки не под `#if DEBUG`.
 - A7. `build.ps1` проходит без ошибок/предупреждений компиляции.
+- A8. `GenerateConsolPattern("", 38, true, config)` выдаёт `Dash × 22 -> Equisignal -> Dot × 38`; DOT-порядок не меняется.
+- A9. Callsign prefix сохраняется, directional segment содержит ровно один equisignal, scheduler/keyer воспроизводят новый порядок без изменения callsign classification.
 
 **Рантайм (игра, зона Sonne, станция слышна):**
 
 - R1. У каждой станции с gain видно `Zone:S<n>(DOT|DASH)`; у доминантной — `Recv: X• Y▬`. Нулевые Recv (после смены доминанты/частоты, фаза Callsign) — ожидаемое поведение, не баг.
 - R2. `EQ@N` согласован с зоной: dot-зона `Dots == N`; dash-зона `Dashes == N`, где `N = EqSignIndex`. Сумма `Dots + Dashes == MaxNavigationCount` — тавтология формулы (I1), оставлена как контроль конфига.
-- R3. Визуальный подсчёт в рич-тексте Signal: считать только красные • (Dot) и синие ▬ (Dash), исключая зелёные callsign-глифы и пурпурные ◆◆ (`SignalCharType.Equisignal`). Сравнение Recv с визуальным счётом — **только** на стоянке / в PreNavPause-окне: при движении лодки внутри сектора паттерн заморожен на старте Navigation (`IsKeyerAvailableForPatternUpdate`), а `DotCount` живёт — сравнение провалится (P13/P19). ◆ виден в окне только в первые ~20 знаков цикла, далее вытриммирован (P8). `X + Y ≤ 20` всегда (I2).
+- R3. Визуальный подсчёт в рич-тексте Signal: считать только красные • (Dot) и синие ▬ (Dash), исключая зелёные callsign-глифы и пурпурные ◆◆ (`SignalCharType.Equisignal`). Для DASH directional segment порядок — `▬ -> ◆◆ -> •`; для DOT — `• -> ◆◆ -> ▬`. Сравнение Recv с визуальным счётом — **только** на стоянке / в PreNavPause-окне: при движении лодки внутри сектора паттерн заморожен на старте Navigation (`IsKeyerAvailableForPatternUpdate`), а `DotCount` живёт — сравнение провалится (P13/P19). ◆ виден в окне только в первые ~20 знаков цикла, далее вытриммирован (P8). `X + Y ≤ 20` всегда (I2).
 - R4. EQ@ — **пила**: растёт 0→60 от ◆-линии (начало сектора) к дальнему краю; на каждой границе сектора сброс 60→0; зона DOT↔DASH переключается на границе (P7). Не монотонно.
-- R5. В dash-зоне `EQ@` = C.A.P.-позиция (`MaxNavigationCount − DotCount`); ◆◆ в рич-тексте = позиция модели `callsignLen + DotCount` (dot-first эмиссия) — расхождение ожидаемо, отладка по `EqSignIndex`, а не по ◆◆ (P3 вариант **(б)**). ◆ — в первые ~20 знаков цикла (P8). Полный цикл = callsign + **61** знак (60 навигационных + ◆) (P12).
+- R5. В dash-зоне `EQ@` = C.A.P.-позиция (`MaxNavigationCount − DotCount`); ◆◆ в rich-text directional segment = `callsignLen + EqSignIndex` при полном не-trimmed окне. Offset callsign prefix сохраняется; старое расхождение из-за dot-first генерации устранено. ◆ — в первые ~20 знаков цикла (P8). Полный текущий game-pattern = callsign + **61** знак; полный исторический `T/D/R` sequence остаётся отдельным scope.
 
 **Откат:** `git checkout main` (ветка не сливается, пока критерии не пройдены).

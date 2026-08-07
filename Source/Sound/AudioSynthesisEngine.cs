@@ -88,7 +88,7 @@ namespace UBOAT.Mods.RadioNavigation
                         var consolPattern = sched.GetCurrentConsolPattern();
                         if (consolPattern.IsNotNull() && consolPattern.Length.IsPositive())
                         {
-                            keyers[s].LoadConsol(consolPattern, sched, stations[s].Config, stations[s].CallsignLength);
+                            keyers[s].LoadConsol(consolPattern, sched, stations[s].Config);
                         }
                         else
                         {

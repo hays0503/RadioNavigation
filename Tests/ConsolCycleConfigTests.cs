@@ -8,32 +8,41 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         public void Cycle120s_ExpectedDefaults()
         {
             var c = ConsolCycleConfig.Cycle120s;
-            Assert.Equal(125f, c.DotSoundMs);
-            Assert.Equal(875f, c.DashSoundMs);
+            Assert.Equal(120f, c.CycleDurationSeconds);
+            Assert.Equal(200f, c.DotSoundMs);
+            Assert.Equal(400f, c.DashSoundMs);
             Assert.Equal(1000f, c.ElementPeriodMs);
             Assert.Equal(1000f, c.EquisignalMs);
+            Assert.Equal(125f, c.CallsignDotSoundMs);
+            Assert.Equal(875f, c.CallsignDashSoundMs);
+            Assert.Equal(1000f, c.CallsignElementPeriodMs);
             Assert.Equal(3000f, c.PreNavPauseMs);
-            Assert.Equal(1000f, c.PostNavSilenceMs);
+            Assert.Equal(3000f, c.PostNavSilenceMs);
             Assert.Equal(60, c.MaxNavigationCount);
             Assert.Equal(5f, c.SectorWidthDeg);
             Assert.Equal(5f / 60f, c.DegPerSign, 1e-6f);
         }
 
         [Fact]
-        public void GetForCycleDuration_120_ReturnsCycle120s()
+        public void GetForCycleDuration_40_ReturnsHalfSecondProfile()
         {
-            var c = ConsolCycleConfig.GetForCycleDuration(120);
-            Assert.Equal(ConsolCycleConfig.Cycle120s.DotSoundMs, c.DotSoundMs);
+            var c = ConsolCycleConfig.GetForCycleDuration(40);
+            Assert.Equal(40f, c.CycleDurationSeconds);
+            Assert.Equal(1000f, c.ElementPeriodMs);
+            Assert.Equal(200f, c.DotSoundMs);
+            Assert.Equal(400f, c.DashSoundMs);
+            Assert.Equal(500f, c.CallsignElementPeriodMs);
+            Assert.Equal(62.5f, c.CallsignDotSoundMs);
+            Assert.Equal(437.5f, c.CallsignDashSoundMs);
             Assert.Equal(ConsolCycleConfig.Cycle120s.MaxNavigationCount, c.MaxNavigationCount);
-            Assert.Equal(ConsolCycleConfig.Cycle120s.DashSoundMs, c.DashSoundMs);
         }
 
-        // F55/F86 (pending): GetForCycleDuration is a stub that always returns Cycle120s. Baseline pins current behavior.
         [Fact]
-        public void GetForCycleDuration_OtherDuration_StillReturnsCycle120s()
+        public void GetForCycleDuration_60_ReturnsOneSecondProfile()
         {
             var c = ConsolCycleConfig.GetForCycleDuration(60);
-            Assert.Equal(ConsolCycleConfig.Cycle120s.DashSoundMs, c.DashSoundMs);
+            Assert.Equal(ConsolCycleConfig.Cycle60s.CycleDurationSeconds, c.CycleDurationSeconds);
+            Assert.Equal(ConsolCycleConfig.Cycle60s.ElementPeriodMs, c.ElementPeriodMs);
         }
 
         [Fact]

@@ -1,9 +1,9 @@
 ## Deferred findings (live-validation required)
 
-These confirmed findings are intentionally NOT fixed in code — they require validation on the live in-game panel, so they were left out of the audit fix commits (2026-08-02):
+These findings require validation on the live in-game panel. Status synchronized 2026-08-04:
 
-- **F202** SpinnerHandlerBase 90 deg angle offset — knob art orientation lives in the binary AssetBundle (`Bundles/testui`), unknown from sources; both proposed variants need a live-panel check.
-- **F203** Receiver default QF=20 causes cross-talk of neighbouring stations at 59-99% loudness (307/306, 316/315, 266/257 kHz) — selectivity tuning needs listening; default state is the least selective.
+- **F202** SpinnerHandlerBase 90 deg angle offset — ✅ live-validated by checklist; no strange knob behavior observed, no code change required.
+- **F203** Receiver default QF=20 causes cross-talk of neighbouring stations at 59-99% loudness (307/306, 316/315, 266/257 kHz) — ✅ live-validated by checklist; useful Morse was audible without cross-talk, no tuning change required.
 - **F163** mutable struct (F17-adjacent), **F179/F180/F181** architectural refactors (Main.cs SRP split, typed references, log levels), **F186** RadioStoryIntegration (dead chain G1-G4).
 
 ## Deferred findings (architectural / data / docs, no code change, 2026-08-02)
@@ -32,7 +32,7 @@ Resolved without code edits — each entry lists the reason:
 - **F62** StationState/NavigationPattern struct aliasing — patterns are replaced wholesale, never mutated through copies; theoretical risk only.
 - **F63** DebugAngleHandler TMP dependency — debug-only helper; stripping risk accepted, SAD 08 note.
 - **F70** NavigationPattern.FormatCompact transition misrepresentation — cosmetic string only; IPH reads pattern length, not this string.
-- **F71** 2-3 Random.NextDouble() per sample in audio thread — noise character is intentional; redesign would change the sound, needs a live listen.
+- **F71** 2-3 Random.NextDouble() per sample in audio thread — time-scale mute/pause behavior is implemented in `SonneController`; noise/per-sample RNG redesign remains deferred because it changes sound and needs live listening.
 - **F73** Haversine duplicated (PositionFixCalculator vs NavigationPattern) — **✅ реализовано (2026-08-02)**: shared `GeoMath.HaversineKm`; F80 NaN clamp preserved.
 - **F83** RadioStoryIntegration zombie decisions on hot-reload — dead chain G1-G4, see `refactoring-plan/game-source-findings/`.
 - **F173** InformationPanelHandler.CreateLabel OS font name ("Arial") — **✅ реализовано (2026-08-02)**: fallback to Unity's `LegacyRuntime.ttf` with warning.
@@ -43,7 +43,7 @@ Resolved without code edits — each entry lists the reason:
 - **F30/F56** RadioHandler unsubscribes `zoneHandler.OnZoneChanged` in OnDestroy.
 - **F33** Volume/FeedbackSpinnerHandler already merged into SpinnerHandlerBase.
 - **F41** double/float phase mismatch — phase normalized to [0,1) by F169.
-- **F55/F86** GetForCycleDuration stub — F164 logs a warning for non-120 s requests; all 14 beacons use 120 s.
+- **F55/F86** GetForCycleDuration stub — resolved for the historical CAP set: 40 s and 60 s profiles are selected; full profile-driven T/D/R cycle remains a separate rewrite step.
 - **F67** IPH `GetComponent<Toggle>()` NRE — RefreshAll uses cached `cachedToggle` with null guard.
 - **F69** Main.cs swallow — LogError + LogException both present; swallow is deliberate (mod must not crash the game).
 - **F74** ComparisonExtensions threshold asymmetry — deliberate; comment added in F74-commit.

@@ -79,5 +79,25 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(10, entries.Count);
             Assert.Equal(10, count);
         }
+
+        [Fact]
+        public void FormatRichText_DashFirst_RendersDashEquisignalDot()
+        {
+            var entries = new List<SignalEntry>
+            {
+                new SignalEntry('-', SignalCharType.Dash),
+                new SignalEntry('=', SignalCharType.Equisignal),
+                new SignalEntry('.', SignalCharType.Dot)
+            };
+
+            string rich = SignalRichTextFormatter.FormatRichText(entries);
+
+            int dash = rich.IndexOf("#2288FF", System.StringComparison.Ordinal);
+            int equisignal = rich.IndexOf("#FF00FF", System.StringComparison.Ordinal);
+            int dot = rich.IndexOf("#FF2222", System.StringComparison.Ordinal);
+            Assert.True(dash >= 0);
+            Assert.True(equisignal > dash);
+            Assert.True(dot > equisignal);
+        }
     }
 }

@@ -32,6 +32,7 @@
     <Compile Include="NavigationPatternTests.cs" />
     <Compile Include="DialConfigTests.cs" />
     <Compile Include="SonneSignalGeneratorTests.cs" />
+    <Compile Include="SonneBeamTests.cs" />
     <Compile Include="AudioSynthesisEngineTests.cs" />
     <Compile Include="PlayerPositionProviderTests.cs" />
     <Compile Include="StationSchedulerTests.cs" />
@@ -60,6 +61,7 @@
     <Compile Include="..\Source\Logic\NavigationPattern.cs" Link="Source\Logic\NavigationPattern.cs" />
     <Compile Include="..\Source\Logic\PositionFixCalculator.cs" Link="Source\Logic\PositionFixCalculator.cs" />
     <Compile Include="..\Source\Logic\SonneSignalGenerator.cs" Link="Source\Logic\SonneSignalGenerator.cs" />
+    <Compile Include="..\Source\Data\SonneBeam.cs" Link="Source\Data\SonneBeam.cs" />
     <Compile Include="..\Source\Logic\StationScheduler.cs" Link="Source\Logic\StationScheduler.cs" />
     <Compile Include="..\Source\Logic\GeoPositionConverter.cs" Link="Source\Logic\GeoPositionConverter.cs" />
     <Compile Include="..\Source\Sound\AudioSynthesisEngine.cs" Link="Source\Sound\AudioSynthesisEngine.cs" />

@@ -11,7 +11,6 @@ namespace UBOAT.Mods.RadioNavigation
     // prefab so sprite, label, canvas and camera scaling match native points.
     public sealed class StationMapOverlay : MonoBehaviour
     {
-        private const int DebugStationCount = 6;
         private readonly List<MapPointUI> markers = new List<MapPointUI>();
         private float retryTimer;
         private bool markersCreated;
@@ -46,7 +45,7 @@ namespace UBOAT.Mods.RadioNavigation
             Debug.Log("[RadioNav][Map] MapChartingUI=" + charting.name
                 + " active=" + charting.gameObject.activeInHierarchy);
 
-            int count = Math.Min(DebugStationCount, BeaconData.Stations.Length);
+            int count = BeaconData.Stations.Length;
             for (int i = 0; i < count; i++)
             {
                 BeaconStation station = BeaconData.Stations[i];

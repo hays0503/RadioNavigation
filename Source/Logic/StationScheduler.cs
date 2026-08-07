@@ -15,10 +15,8 @@
         public NavigationPattern Navigation { get; set; }
         public NavigationElementType[] CurrentConsolPattern { get; set; }
         public Phase CurrentPhase { get; private set; }
-        public int[] BearingTable { get; set; }
         public ConsolCycleConfig Config { get; set; }
-        // F113: the morse element count of the callsign — survives pattern
-        // transitions inside MorseKeyer.AdvanceElement.
+        // Used to skip a missing callsign phase without stalling the scheduler.
         public int CallsignElementCount { get; private set; }
 
         private int pauseTicksRemaining;

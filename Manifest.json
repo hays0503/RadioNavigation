@@ -5,6 +5,6 @@
   "author": "testui",
   "supportedGameVersions": ["2026.1"],
   "assemblyName": "radionavigation",
-  "permissions": ["Reflection"],
+  "permissions": ["Reflection", "IO"],
   "dependencies": {}
 }
