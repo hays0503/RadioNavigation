@@ -19,6 +19,7 @@ namespace UBOAT.Mods.RadioNavigation
     {
         // F176: single source of truth for the game UI container lookup.
         private const string MainSceneViewportPath = "/GUI/Viewport";
+        private const string RadioRootName = "RadioNavigationPanel";
 
         // DI assigns this field during mod initialization; explicit default
         // keeps standalone Roslyn builds free of CS0649.
@@ -176,6 +177,12 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
 
+                if (viewport.Find(RadioRootName).IsNotNull())
+                {
+                    Debug.Log("[RadioNav][Main] Existing stable RadioNavigation panel found");
+                    return;
+                }
+
                 Debug.Log("[RadioNav][Main] InstantiatePrefab(\"Radio\") from resourceManager \u2014 AssetBundle Bundles/testui expected to be loaded by game mod loader");
                 GameObject radio = resourceManager.InstantiatePrefab("Radio");
                 if (radio.IsNull())
@@ -183,6 +190,8 @@ namespace UBOAT.Mods.RadioNavigation
                     Debug.LogError("[RadioNav][Main] Prefab 'Radio' not found in AssetBundle or InstantiatePrefab returned null. Check Bundles/testui");
                     return;
                 }
+
+                radio.name = RadioRootName;
 
                 string[] requiredChildren = { "CursorSpinner", "Toggle", "Ground", "Ground/Background", "Ground/Background/GroundCheckmark", "Expander", "RadioZone", "VolumeSpinner", "FeedbackSpinner" };
                 var missing = new System.Collections.Generic.List<string>();

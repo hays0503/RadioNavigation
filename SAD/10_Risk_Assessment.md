@@ -7,7 +7,7 @@
 > - **F65-F76:** 12 новых проблем (stale consolPattern, NRE, unchached reflection, etc.)
 > - **F77-F199:** 122 дополнительных проблем (NaN clamping, truncation, dead code, missing default cases, event leaks)
 > - **Cross-file:** 6 dead методов в AudioSynthesisEngine, 16/17 констант PrefabNames не используются
-> - **F200-F207 (новое 2026-08-01):** 8 дополнительных проблем. F200 (P0): `UpdatePosition()` без вызывающих — position fix всегда ≈0°N 0°E. F201-F202 (P1): двойная передача Consol-паттерна за цикл; сдвиг 90° у спиннеров. F203/F204/F207 (P2): кросс-талки при QF=20; антимеридиан-среднее долгот; перехват drag с дочерних контролов. F205-F206 (P3): кириллическая «В°»; тики по кадрам. Итого **207 проблем**.
+> - **F200-F207 (новое 2026-08-01):** 8 дополнительных проблем. F200 (P0): устаревшая цепочка position fix удалена; F201-F202 (P1): двойная передача Consol-паттерна за цикл; сдвиг 90° у спиннеров. F203/F204/F207 (P2): кросс-талки при QF=20; антимеридиан-среднее долгот; перехват drag с дочерних контролов. F205-F206 (P3): кириллическая «В°»; тики по кадрам. Итого **207 проблем**.
 >
 > **Итого:** 207 проблем, ~95-130 часов рефакторинга + тестовая инфраструктура (F22: 8-12 часов) + F200-F207 (~4-6 часов).
 > Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`, `F200.md`..`F207.md`.
@@ -366,51 +366,7 @@ Impact
 3. Fix decomposition plan
 4. Redo extraction with fixes
 
-### 8.4 NaN / Math Domain Errors in Position Fix
-
-**Risk ID**: TECH-007
-**Probability**: High
-**Impact**: High
-**Severity**: **High**
-
-**Description**:
-`PositionFixCalculator` has unprotected `Math.Acos`, `Math.Asin` calls that produce NaN when arguments exceed [-1, 1] (F137, F190, F191). Also mutates input `measurements` list (F134).
-
-**Affected Components**:
-- `PositionFixCalculator.cs`
-- `StationState.cs`
-
-**Mitigation**:
-- Clamp arguments before Math.Acos/Asin (F137, F190, F191)
-- Work on copy of measurements list (F134)
-- Normalize delta longitude to [-PI, PI] (F128)
-
-**Effort**: 1-2 hours
-**Owner**: Logic Team
-
-### 8.5 Position Feed Never Connected (F200)
-
-**Risk ID**: TECH-010
-**Probability**: High (0 callers in codebase)
-**Impact**: Critical (core feature)
-**Severity**: **Critical**
-
-**Description**:
-`SonneController.UpdatePosition()` has zero call sites — the submarine position is never fed into the mod. `UpdateStationNavigation()` computes all bearings from (0,0): the position fix always resolves to ≈0°N 0°E with `ErrorKm = 0` (green), and dot counts are static regardless of movement. The mod's core navigation feature is non-functional and the UI presents a bogus confident fix.
-
-**Affected Components**:
-- `SonneController.cs`
-- `InformationPanelHandler.cs` (fix display)
-- `PositionFixCalculator.cs` (chain: F204 becomes reachable)
-
-**Mitigation**:
-- Wire a position provider (patch on game navigation API or `IPositionProvider` interface)
-- Until then, hide the fix display when no position data is available (F200)
-
-**Effort**: 1-2 hours (provider) / 15 min (data guard)
-**Owner**: Logic Team
-
-### 8.6 Event Subscription Leaks
+### 8.4 Event Subscription Leaks
 
 **Risk ID**: TECH-008
 **Probability**: High
@@ -430,7 +386,7 @@ UI handlers subscribe to events but don't unsubscribe in `OnDestroy` (F14, F30, 
 **Effort**: 1-2 hours
 **Owner**: UI Team
 
-### 8.7 Dead Code in Audio Pipeline
+### 8.5 Dead Code in Audio Pipeline
 
 **Risk ID**: TECH-009
 **Probability**: Medium
@@ -450,7 +406,7 @@ UI handlers subscribe to events but don't unsubscribe in `OnDestroy` (F14, F30, 
 **Effort**: 1-2 hours
 **Owner**: All
 
-### 8.8 Build Configuration Conflict
+### 8.6 Build Configuration Conflict
 
 **Risk ID**: PROC-005
 **Probability**: Medium

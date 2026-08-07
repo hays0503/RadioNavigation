@@ -25,7 +25,6 @@
 | Logic | `MorseAlphabet` | Азбука Морзе ↔ паттерны |
 | Logic | `MorseTiming` | Тайминги элементов |
 | Logic | `NavigationPattern` | Паттерны секторов Consol (IKeySequence) |
-| Logic | `PositionFixCalculator` | Секторные пересечения → позиция (F18, deferred) |
 | Logic | `GeoMath` | Сферическая геометрия: ToRadians/Haversine/bearing (**F12/F73**) |
 | Logic | `GeoPositionConverter` | Преобразования координат |
 | Logic | `PlayerPositionProvider` | Позиция подводной лодки из игры |
@@ -337,7 +336,6 @@
 ├─────────────────────────────────────────────────────────────────────┤
 │ - ⚠ stationManager: StationManager     [NOT created]                │
 │ - ⚠ signalDecoder: SignalDecoder     [NOT created]                │
-│ - ⚠ positionTracker: PositionTracker  [NOT created]                │
 │ - ⚠ audioController: AudioController   [NOT created]                │
 │ - radioContext: IRadioState           [⚠ proposed]                  │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -544,8 +542,6 @@ CursorHandler ────────────┬──── uses ───
                          │
                          ├──── uses ──── ⚠ SignalDecoder [NOT created]
                          │
-                         ├──── uses ──── ⚠ PositionTracker [NOT created]
-                         │
                          ├──── uses ──── ⚠ AudioController [NOT created]
                          │
                          └──── uses ──── IRadioState
@@ -557,10 +553,6 @@ CursorHandler ────────────┬──── uses ───
 ⚠ SignalDecoder [NOT created] ────────┬──── uses ──── MorseKeyer
                          │
                          └──── uses ──── MorseAlphabet
-
-⚠ PositionTracker [NOT created] ──────┬──── uses ──── PositionFixCalculator
-                         │
-                         └──── uses ──── IStationDataSource
 
 ⚠ AudioController [NOT created] ──────┬──── uses ──── IAudioOutput
                          │

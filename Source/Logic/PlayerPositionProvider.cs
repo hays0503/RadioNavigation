@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
-    // F200: feeds the player submarine's world position into the fix pipeline.
+    // Feeds the player submarine's world position into bearing calculations.
     // The game keeps the ship in the static field Entity.playerShip;
     // PlayerShip.SandboxPlayerShip.Position is a Vector2 in world units where
     // 1 unit = 1/111.3198888888889 degree (the exact factor mirrored by

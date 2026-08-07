@@ -1,6 +1,6 @@
 # God Object Analysis — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Актуальные god-объекты, отложенные в roadmap SAD 08/09 (Фаза 4): `SonneController` (F02), `InformationPanelHandler` (F03), `PositionFixCalculator` (F18), `RadioStoryIntegration` (F04/F83 — мёртвая цепочка G1–G4), `Main.cs` (F21), `AudioSynthesisEngine` (F25). Реальные кандидаты на выделение: `SonneSignalGenerator` (146 LOC), `SignalRichTextFormatter` (86). Причины отложения — в `refactoring-plan/DEFERRED.md`. Несуществующие классы extraction plan (F47: `StationManager`, `SignalDecoder`, `PositionTracker`, `AudioController`, `UIElementFactory`, `StationInfoDisplay`, `StationFinder`) — отклонены.
+> **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Актуальные god-объекты, отложенные в roadmap SAD 08/09 (Фаза 4): `SonneController` (F02), `InformationPanelHandler` (F03), `RadioStoryIntegration` (F04/F83 — мёртвая цепочка G1–G4), `Main.cs` (F21), `AudioSynthesisEngine` (F25). Реальные кандидаты на выделение: `SonneSignalGenerator` (146 LOC), `SignalRichTextFormatter` (86). Причины отложения — в `refactoring-plan/DEFERRED.md`. Несуществующие классы extraction plan (F47: `StationManager`, `SignalDecoder`, `AudioController`, `UIElementFactory`, `StationInfoDisplay`, `StationFinder`) — отклонены.
 
 ## 1. God Objects Identified
 
@@ -63,17 +63,15 @@ SonneController.cs (508 lines) — Source/Logic/SonneController.cs
 │   │
 │   ├── Position
 │   │   ├── UpdatePosition()
-│   │   ├── CalculateBearing()
-│   │   └── GetPositionFix()
+│   │   └── CalculateBearing()
 │   └── Navigation Pattern
 │       └── CurrentConsolPattern      (F145: pre-compute in Awake)
 │
-└── Responsibilities (Mixed — 9 total)
+└── Responsibilities (Mixed — 8 total)
     ├── Station management
     ├── Navigation calculation
     ├── Signal decoding
     ├── Audio synthesis
-    ├── Position tracking
     ├── UI coordination
     ├── Diagnostics
     ├── Morse timing coordination
@@ -88,7 +86,6 @@ SonneController.cs (508 lines) — Source/Logic/SonneController.cs
 | Navigation Calculation | ~80 | 3 | ⚠ proposed (N/A) | F77 |
 | Signal Decoding | ~90 | 5 | ⚠ proposed (F02) | F02 |
 | Audio Processing | ~120 | 3 | ⚠ proposed (AudioController F47) | F02 |
-| Position Tracking | ~60 | 3 | ⚠ proposed (PositionTracker F47) | F02, F18 |
 | UI Coordination | ~40 | 2 | ⚠️ Keep in Controller | F02 |
 | Diagnostics | ~16 | 2 | ✅ DiagnosticsCollector | F02 |
 | Pattern Coordination | ~30 | 2 | ⚠️ Keep in Controller | F145 |
@@ -230,12 +227,6 @@ BEFORE: SonneController (508 lines) — Source/Logic/SonneController.cs
     │   ├── InitializeAudio()
     │   └── CreateSilentClip()
     │
-    ├── ⚠ PositionTracker (~60 lines) [non-existent — F47]
-    │   ├── measurements
-    │   ├── lastFix
-    │   ├── UpdatePosition()
-    │   └── GetPositionFix()
-    │
     └── SonneController (~200 lines) — ORCHESTRATOR
         ├── Awake()
         ├── Update()
@@ -296,7 +287,6 @@ BEFORE: InformationPanelHandler (474 lines) — Source/UI/InformationPanelHandle
 |--------|------------------------------|
 | Station logic tied to SonneController | ⚠ StationManager reusable |
 | UI creation tied to InformationPanel | ⚠ UIElementFactory reusable |
-| Position logic tied to SonneController | ⚠ PositionTracker reusable |
 
 ## 7. Metrics Comparison
 

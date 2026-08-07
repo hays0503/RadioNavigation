@@ -34,7 +34,7 @@
 │  │  • Navigation Calculation                      │                  │
 │  │  • Signal Decoding                             │                  │
 │  │  • Audio Coordination                          │                  │
-│  │  • Position Tracking                           │                  │
+│  │  • Bearing Diagnostics                         │                  │
 │  └──────┬───────────────┬───────────────┬───────┘                  │
 │         │               │               │                          │
 │  ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐                  │
@@ -42,11 +42,11 @@
 │  │ (Scheduler) │ │ (Keyer)     │ │ (Morse)     │                  │
 │  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
 │         │               │               │                          │
-│  ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐                  │
-│  │NavPattern   │ │SonneSignal  │ │PositionFix  │                  │
-│  │ (Patterns)  │ │Generator    │ │Calculator   │                  │
-│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
-│         │               │               │                          │
+│  ┌──────┴──────┐ ┌──────┴──────┐                            │
+│  │NavPattern   │ │SonneSignal  │                            │
+│  │ (Patterns)  │ │Generator    │                            │
+│  └──────┬──────┘ └──────┬──────┘                            │
+│         │               │                                    │
 │  ┌──────┴──────┐ ┌──────┴──────┐                                 │
 │  │RadioStory   │ │Comparison   │                                 │
 │  │Integration  │ │Extensions   │                                 │
@@ -216,11 +216,6 @@
 - **Lines**: 146
 - **Responsibility**: Generate bearing tables and signal data
 - **Issues**: Duplicates BeaconData.GetDotCountToBearingTable(). BearingTable is dead code (F34/F35)
-
-#### PositionFixCalculator.cs (Position Calculator)
-- **Lines**: 224
-- **Responsibility**: Calculate position from bearing measurements
-- **Issues**: ErrorKm always returns 0, mutable struct measurements
 
 #### RadioStoryIntegration.cs (Game Integration)
 - **Lines**: 381

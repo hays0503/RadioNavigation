@@ -25,7 +25,6 @@
     <Compile Include="GameContractTests.cs" />
     <Compile Include="GeoMathTests.cs" />
     <Compile Include="PanelStateStoreTests.cs" />
-    <Compile Include="PositionFixCalculatorTests.cs" />
     <Compile Include="MorseAlphabetTests.cs" />
     <Compile Include="MorseKeyerTests.cs" />
     <Compile Include="MorseTimingTests.cs" />
@@ -59,7 +58,6 @@
     <Compile Include="..\Source\Logic\MorseTiming.cs" Link="Source\Logic\MorseTiming.cs" />
     <Compile Include="..\Source\Logic\NavigationElementType.cs" Link="Source\Logic\NavigationElementType.cs" />
     <Compile Include="..\Source\Logic\NavigationPattern.cs" Link="Source\Logic\NavigationPattern.cs" />
-    <Compile Include="..\Source\Logic\PositionFixCalculator.cs" Link="Source\Logic\PositionFixCalculator.cs" />
     <Compile Include="..\Source\Logic\SonneSignalGenerator.cs" Link="Source\Logic\SonneSignalGenerator.cs" />
     <Compile Include="..\Source\Data\SonneBeam.cs" Link="Source\Data\SonneBeam.cs" />
     <Compile Include="..\Source\Logic\StationScheduler.cs" Link="Source\Logic\StationScheduler.cs" />

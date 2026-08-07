@@ -9,11 +9,11 @@
 
 ## 1 Objective
 
-Design a period-authentic Consol/Sonne radio navigation beacon panel that integrates seamlessly into UBOAT's WW2-era submarine simulator UI while providing functional audio synthesis and position-fixing capabilities. The design must feel indistinguishable from native UBOAT instrumentation  no anachronisms, no "mod signature" styling.
+Design a period-authentic Consol/Sonne radio navigation beacon panel that integrates seamlessly into UBOAT's WW2-era submarine simulator UI while providing functional audio synthesis and bearing diagnostics. The design must feel indistinguishable from native UBOAT instrumentation  no anachronisms, no "mod signature" styling.
 
 **Scope includes:**  
 - Main panel: zone selection dial, cursor spinner, frequency display, toggle controls  
-- Information panel: real-time Morse signal extraction, ground condition indicators, position fix calculator output  
+- Information panel: real-time Morse signal extraction, ground condition and bearing diagnostics
 
 ---
 
@@ -197,8 +197,7 @@ The following describes the main panel artifact as a single reading-order flow f
                                                                                             INFO PANEL (collapsible)            
  DECODED TEXT STREAM                              
  BEAUVALS  R   ----                           Height: expands downward when toggled  max visible lines 6; content scrolls with newest entry at bottom                                         SIGNAL OK                             Child #4 (implied): "Ground" GameObject contains Background + GroundCheckmark child  image element fill
-                                              Position Fix: fixed-width number pair | Child #3 implied: "InfoPanel" or "InfoGroup" under parent "Radio" with its own Canvas Group.  Must add to Main.cs line 165 requiredChildren[] if not already present                                         POSITION 48N07E                      
-                                              Expandable Info Panel structure                                                                                   
+                                               Expandable Info Panel structure
 ```
 
 ### Element Crosswalk (Prefab  Handler  Behavior)

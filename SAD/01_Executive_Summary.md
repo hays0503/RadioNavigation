@@ -21,7 +21,7 @@
 ## Key Findings
 
 ### Strengths
-- **Strong Domain Logic**: Mathematically correct Sonne navigation, Morse timing, and position fix calculations
+- **Strong Domain Logic**: Mathematically correct Sonne navigation, Morse timing, and bearing diagnostics
 - **Clear Layer Separation**: Data / Logic / Sound / UI directories well-organized
 - **State Machine Pattern**: Proper use in `StationScheduler` and `MorseKeyer`
 - **Template Method**: `SpinnerHandlerBase` provides good extensibility point

@@ -13,7 +13,7 @@ Rules:
 
 ## Project identity
 
-C# .NET Standard 2.0 Unity mod for [UBOAT](https://www.deepwaterstudio.com/uboot) (WW2 submarine simulator). Adds a Consol/Sonne radio navigation beacon panel with audio synthesis and position fixing. Namespace: `UBOAT.Mods.RadioNavigation`. Author: testui, Version: 2.0.
+C# .NET Standard 2.0 Unity mod for [UBOAT](https://www.deepwaterstudio.com/uboot) (WW2 submarine simulator). Adds a Consol/Sonne radio navigation beacon panel with audio synthesis and bearing diagnostics. Namespace: `UBOAT.Mods.RadioNavigation`. Author: testui, Version: 2.0.
 
 ## Build system
 
@@ -33,7 +33,7 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 - **Harmony patches** target: `RadioStory.ContinueStory`, `Locale.RetrieveString` (2 overloads), `RadioStory.OnDecisionSelected`, `RadioStory.OnStopped`
 - **DI framework**: UBOAT's custom `DWS.Common.InjectionFramework` — requires Reflection permission in Manifest.json. The mod's assembly is injected explicitly via `InjectIntoAssembly` (`Mod.cs InitializeAssembly`), not by the framework's `"uboat"`-filtered auto-injection (mod assembly name `radionavigation` doesn't match). `OnSceneAwake` handler injects scene objects.
 - **UI**: Unity uGUI prefabs loaded from AssetBundle (`Bundles/testui`). Prefab hierarchy is validated against hardcoded paths at runtime (Main.cs:165). Destroyed and skipped if validation fails.
-- **Source layout**: `Data/` (static configs — 14 beacons, 5 radio bands), `Logic/` (core simulation — morse keyer, navigation patterns, position fixing), `Sound/` (DSP audio synthesis via `OnAudioFilterRead`), `UI/` (MonoBehaviour handlers)
+- **Source layout**: `Data/` (static configs — 14 beacons, 5 radio bands), `Logic/` (core simulation — morse keyer, navigation patterns, bearing diagnostics), `Sound/` (DSP audio synthesis via `OnAudioFilterRead`), `UI/` (MonoBehaviour handlers)
 
 ## Gotchas
 

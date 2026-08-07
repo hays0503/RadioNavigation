@@ -2,6 +2,10 @@
 
 These findings require validation on the live in-game panel. Status synchronized 2026-08-04:
 
+Position Fix chain (`PositionFixCalculator`, measurement aggregation, and panel
+output) was removed on 2026-08-08. Historical position-fix findings remain in
+the audit archive only.
+
 - **F202** SpinnerHandlerBase 90 deg angle offset — ✅ live-validated by checklist; no strange knob behavior observed, no code change required.
 - **F203** Receiver default QF=20 causes cross-talk of neighbouring stations at 59-99% loudness (307/306, 316/315, 266/257 kHz) — ✅ live-validated by checklist; useful Morse was audible without cross-talk, no tuning change required.
 - **F163** mutable struct (F17-adjacent), **F179/F180/F181** architectural refactors (Main.cs SRP split, typed references, log levels), **F186** RadioStoryIntegration (dead chain G1-G4).
@@ -15,9 +19,8 @@ Resolved without code edits — each entry lists the reason:
 - **F04** RadioStoryIntegration god-object + reflection fragility — dead chain G1-G4, see `refactoring-plan/game-source-findings/`.
 - **F08** GC pressure (per-frame heap allocations) — not a hot path; call sites already allocate only on 0.2 s station updates; no per-frame `new` remains.
 - **F10** 14 hardcoded HintPath + Steam-path dependency in csproj — **✅ реализовано (2026-08-02)**: shared `GamePath`/`GameManaged` MSBuild properties with `UBOAT_GAME_PATH` override.
-- **F12** `ToRadians` duplicated (SonneController vs PositionFixCalculator) — **✅ реализовано (2026-08-02)** через общий `GeoMath`.
+- **F12** `ToRadians` duplicated — **✅ реализовано (2026-08-02)** через общий `GeoMath`.
 - **F15** No state persistence (volume/band/radio position reset) — **✅ реализовано (2026-08-02, feat(F15) в refactor/deferred-code)**: `PanelStateStore` (PlayerPrefs) сохраняет volume/feedback/zone/cursor, восстанавливает в `InformationPanelHandler.Start`.
-- **F18** PositionFixCalculator god object (224 LOC) — architectural refactor, SAD 08 roadmap.
 - **F20** DialConfig band unit inconsistencies (Band I MHz vs kHz display) — display-string only; band math is consistent (Bands table).
 - **F21** Main.cs responsibilities — architectural refactor, SAD 08 roadmap.
 - **F25** AudioSynthesisEngine positional array coupling — architectural API design, SAD 08 roadmap.
@@ -26,14 +29,12 @@ Resolved without code edits — each entry lists the reason:
 - **F31** 93 Debug.Log calls — remaining logs are intentional (errors/warnings); diagnostic block now #if DEBUG (F57/F93/F88).
 - **F32** 5 GetComponentInChildren in IPH.Start — one-time init cost, not hot path.
 - **F37** 6 stations with null callsign — historical data is correct (real Consol stations had no callsigns); runtime handles empty callsigns (F87).
-- **F38** Plougourvest null frequency — gain code zeroes it (guard) and F131 excludes it from position fixes.
 - **F39** 3 stations at 332.5 kHz — historical frequencies; co-channel behaviour is the point of Consol navigation (QSB separation).
 - **F52** SAD Appendix B missing classes — documentation task, SAD update.
 - **F62** StationState/NavigationPattern struct aliasing — patterns are replaced wholesale, never mutated through copies; theoretical risk only.
 - **F63** DebugAngleHandler TMP dependency — debug-only helper; stripping risk accepted, SAD 08 note.
 - **F70** NavigationPattern.FormatCompact transition misrepresentation — cosmetic string only; IPH reads pattern length, not this string.
 - **F71** 2-3 Random.NextDouble() per sample in audio thread — time-scale mute/pause behavior is implemented in `SonneController`; noise/per-sample RNG redesign remains deferred because it changes sound and needs live listening.
-- **F73** Haversine duplicated (PositionFixCalculator vs NavigationPattern) — **✅ реализовано (2026-08-02)**: shared `GeoMath.HaversineKm`; F80 NaN clamp preserved.
 - **F83** RadioStoryIntegration zombie decisions on hot-reload — dead chain G1-G4, see `refactoring-plan/game-source-findings/`.
 - **F173** InformationPanelHandler.CreateLabel OS font name ("Arial") — **✅ реализовано (2026-08-02)**: fallback to Unity's `LegacyRuntime.ttf` with warning.
 

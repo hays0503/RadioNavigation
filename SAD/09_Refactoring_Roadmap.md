@@ -59,7 +59,7 @@ Week 4-5: Polish, Quick Wins & Testing (F66–F199)
 | Extract magic numbers to Constants.cs | All files with magic numbers | 2h |
 | Remove ComparisonExtensions.cs | ComparisonExtensions.cs, 30+ files | 2h |
 | Fix BfoBase duplicate | SonneController.cs, AudioSynthesisEngine.cs | 0.5h |
-| Remove dead code | ToggleHandler.cs, PositionFixCalculator.cs | 0.5h |
+| Remove dead code | ToggleHandler.cs | 0.5h |
 
 **Success Criteria**:
 - [ ] All magic numbers in Constants.cs
@@ -79,7 +79,6 @@ Week 4-5: Polish, Quick Wins & Testing (F66–F199)
 |------|----------|---------------------|--------|-------|
 | ⚠ Extract StationManager | StationManager.cs | stations[], UpdateStationGains(), UpdateStationNavigation() | 4-5h | F02 |
 | ⚠ Extract SignalDecoder | SignalDecoder.cs | signalEntries, OnStationElementCompleted(), DecodeCallsignBuffer() | 3-4h | F02 |
-| ⚠ Extract PositionTracker | PositionTracker.cs | measurements, lastFix, UpdatePosition() | 2h | F02 |
 | Extract DiagnosticsCollector | DiagnosticsCollector.cs | GetStationDiagnostics() | 1h | F02 |
 | Refactor SonneController | SonneController.cs | Orchestration only (~200 lines) | 2h | F02 |
 | Integration testing | — | — | 2h | F02 |
@@ -209,11 +208,9 @@ Day 1-2: Station Management (⚠ proposed — StationManager)
 ├── Update SonneController to delegate
 └── Test station functionality
 
-Day 3-4: Signal & Position (⚠ proposed — SignalDecoder, PositionTracker)
+Day 3-4: Signal (⚠ proposed — SignalDecoder)
 ├── Extract signal decoding logic (F02)
-├── Extract position calculation (F02, F18)
-├── Add IPositionCalculator interface (F18)
-└── Test signal + position functionality
+└── Test signal functionality
 
 Day 5: Integration & Testing
 ├── Wire extracted classes together (F02)

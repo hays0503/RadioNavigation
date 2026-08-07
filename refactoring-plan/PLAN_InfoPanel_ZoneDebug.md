@@ -14,7 +14,7 @@
 - [x] Исторический CAP 59 набор ограничен пятью станциями; Seville помечен `RadioBeaconOnly`, дополнительные послевоенные записи удалены.
 - [x] Regression tests добавлены для генератора, scheduler/MorseKeyer и rich-text; тесты: `184 passed`.
 - [x] `graphify update .` выполнен; эквивалентная полная Roslyn-компиляция `Source/` проходит без предупреждений.
-- [ ] Live-проверка в игре: звук, callsign, position fix, EQ/Recv, hot-reload и отсутствие повторных подписок.
+- [ ] Live-проверка в игре: звук, callsign, EQ/Recv, hot-reload и отсутствие повторных подписок.
 - [ ] Deferred-архитектура F163/F179–F181/F186 остаётся за пределами этого плана.
 
 ## Ветвление

@@ -16,7 +16,6 @@ namespace UBOAT.Mods.RadioNavigation
         private Text[] patternTexts;
         private Text signalText;
         private Text decodedText;
-        private Text fixText;
 
         private ToggleHandler toggleHandler;
         // F178: RefreshAll runs on a timer; cache the Toggle instead of
@@ -79,11 +78,6 @@ namespace UBOAT.Mods.RadioNavigation
                 patternTexts[i].GetComponent<RectTransform>().sizeDelta =
                     new Vector2(200f, PatternLabelHeight);
             }
-
-            CreateSeparator(content, "Sep3");
-            fixText = CreateLabel(content, "FixStatus", "--- Position Fix: ---");
-            fixText.supportRichText = true;
-            fixText.color = Color.yellow;
 
             FindHandlers();
             Subscribe();
@@ -176,7 +170,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             text.font = cachedArialFont;
             text.fontSize = 14;
-            text.color = Color.white;
+            text.color = Color.black;
             text.alignment = TextAnchor.MiddleLeft;
             text.horizontalOverflow = HorizontalWrapMode.Overflow;
 
@@ -407,34 +401,6 @@ namespace UBOAT.Mods.RadioNavigation
                 if (patternTexts[i].IsNotNull())
                     patternTexts[i].text = "";
 
-            UpdateFixDisplay();
-        }
-
-        private void UpdateFixDisplay()
-        {
-            if (sonneController.IsNull() || fixText.IsNull())
-                return;
-
-            if (!sonneController.IsInSonneZone || !sonneController.HasFix)
-            {
-                fixText.text = "--- Position Fix: ---";
-                fixText.color = Color.gray;
-                return;
-            }
-
-            float lat = sonneController.FixLatitude;
-            float lon = sonneController.FixLongitude;
-            float err = sonneController.FixErrorKm;
-            int meas = sonneController.MeasurementCount;
-
-            string latDir = lat.IsNonNegative() ? "N" : "S";
-            string lonDir = lon.IsNonNegative() ? "E" : "W";
-
-            fixText.text = "--- Position Fix ---\n" +
-                "Fix: " + Math.Abs(lat).ToString("F4") + "\u00B0 " + latDir +
-                " " + Math.Abs(lon).ToString("F4") + "\u00B0 " + lonDir + "\n" +
-                "Beacons: " + meas + " | Error: " + err.ToString("F1") + " km";
-            fixText.color = err < 15f ? Color.green : (err < 35f ? Color.yellow : Color.red);
         }
 
         private void UpdateSignalDisplay()

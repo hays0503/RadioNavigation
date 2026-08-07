@@ -160,7 +160,6 @@ Decompose God Classes into focused, single-responsibility classes.
 |-----------|----------------|-------|--------|
 | ⚠ StationManager | Station management | ~100 | Proposed |
 | ⚠ SignalDecoder | Signal processing | ~90 | Proposed |
-| ⚠ PositionTracker | Position calculation | ~60 | Proposed |
 | DiagnosticsCollector | Diagnostics | ~30 | Existing (inline) |
 | SonneController | Orchestration | ~136 | Existing (508 LOC) |
 
@@ -370,9 +369,9 @@ Implement unit tests for all pure C# logic.
 
 ```csharp
 [TestFixture]
-public class PositionFixCalculatorTests {
+public class SonneBeamTests {
     [Test]
-    public void Calculate_TwoStations_FindsIntersection() {
+    public void BuildPattern_UsesSixtyElements() {
         // Test implementation
     }
 }
