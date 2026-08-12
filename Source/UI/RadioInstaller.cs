@@ -76,6 +76,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             EnsureComponent<InformationPanelHandler>(radio);
+            EnsureComponent<ChronometerOverlayHandler>(radio);
 
             Transform debugAnglePanel = radio.transform.Find(PrefabNames.DebugAnglePanel);
             if (debugAnglePanel.IsNotNull())

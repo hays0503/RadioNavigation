@@ -12,10 +12,13 @@ namespace UBOAT.Mods.RadioNavigation
         private Texture2D moveCursorTexture;
         private static readonly Vector2 cursorHotspot = new Vector2(16, 16);
         private static Texture2D cachedCursorTexture;
+        private Texture2D cursorOverrideTexture;
+        private Vector2 cursorOverrideHotspot;
         private bool moveCursorActive;
         private bool isDragging;
         private int activePointerId = -1;
         private ExpanderHandler expander;
+        private ChronometerOverlayHandler chronometerOverlay;
 
         private void Start()
         {
@@ -35,6 +38,7 @@ namespace UBOAT.Mods.RadioNavigation
                 cachedCursorTexture = GenerateMoveCursor();
             moveCursorTexture = cachedCursorTexture;
             expander = GetComponentInChildren<ExpanderHandler>(true);
+            chronometerOverlay = GetComponent<ChronometerOverlayHandler>();
         }
 
         private static Texture2D GenerateMoveCursor()
@@ -106,6 +110,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             if ((expander.IsNotNull() && press.IsChildOf(expander.transform))
+                || (chronometerOverlay.IsNotNull() && chronometerOverlay.IsChronometerElement(press))
                 || press.GetComponentInParent<ZoneHandler>() != null
                 || press.GetComponentInParent<ToggleHandler>() != null
                 || press.GetComponentInParent<GroundHandler>() != null)
@@ -138,6 +143,12 @@ namespace UBOAT.Mods.RadioNavigation
             if (eventData.dragging)
                 return;
 
+            if (cursorOverrideTexture.IsNotNull())
+            {
+                Cursor.SetCursor(cursorOverrideTexture, cursorOverrideHotspot, CursorMode.Auto);
+                return;
+            }
+
             Cursor.SetCursor(moveCursorTexture, cursorHotspot, CursorMode.Auto);
             moveCursorActive = true;
         }
@@ -154,6 +165,23 @@ namespace UBOAT.Mods.RadioNavigation
             moveCursorActive = false;
         }
 
+        internal void SetCursorOverride(Texture2D texture, Vector2 hotspot)
+        {
+            cursorOverrideTexture = texture;
+            cursorOverrideHotspot = hotspot;
+            Cursor.SetCursor(cursorOverrideTexture, cursorOverrideHotspot, CursorMode.Auto);
+        }
+
+        internal void ClearCursorOverride()
+        {
+            cursorOverrideTexture = null;
+            cursorOverrideHotspot = Vector2.zero;
+            if (moveCursorActive)
+                Cursor.SetCursor(moveCursorTexture, cursorHotspot, CursorMode.Auto);
+            else
+                Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+        }
+
         private void OnDisable()
         {
             // F149: reset drag state on disable so a mid-drag disable (which
@@ -162,10 +190,14 @@ namespace UBOAT.Mods.RadioNavigation
             activePointerId = -1;
 
             if (!moveCursorActive)
+            {
+                cursorOverrideTexture = null;
                 return;
+            }
 
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
             moveCursorActive = false;
+            cursorOverrideTexture = null;
         }
 
         private void OnDestroy()
