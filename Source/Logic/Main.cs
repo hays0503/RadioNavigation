@@ -240,6 +240,12 @@ namespace UBOAT.Mods.RadioNavigation
                 DumpHierarchy(radio.transform, "[RadioNav][Main] Prefab hierarchy: ");
 #endif
 
+                // STAR_SKY: create star sky renderer (ADR-021)
+                GameObject starSkyRoot = new GameObject("StarSkyRoot");
+                starSkyRoot.AddComponent<StarsMesh>();
+                Object.DontDestroyOnLoad(starSkyRoot);
+                Debug.Log("[RadioNav][Main] StarSkyRoot created with StarsMesh component");
+
                 LighthousePlacer.EnsureRunning();
             }
             catch (Exception e)

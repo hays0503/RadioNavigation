@@ -43,26 +43,39 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Прецессия IAU-1976 матрица 3×3 из эпохи jdFrom в jdTo (Meeus гл.21). Row-major 9 элементов.</summary>
         public static void PrecessionMatrix(double jdFrom, double jdTo, double[] m)
         {
-            double t = (jdFrom - 2451545.0) / 36525.0;
-            double dt = (jdTo - jdFrom) / 36525.0;
-            // Уproщённо: используем T = (jdTo-2451545)/36525 для zeta/z/theta, как в Meeus 21.4
-            double T = (jdTo - 2451545.0) / 36525.0;
-            // zeta, z, theta в секундах, затем в радианы
-            double zetaSec = (2306.2181 + 0.30188 * T + 0.017998 * T * T) * dt * 36525.0 / 100.0 + 2306.2181 * T + 0.30188 * T * T + 0.017998 * T * T * T;
-            // Точная формула Meeus 21.3-21.4 требует полином, упрощаем до линейного для 1939-1945 (±0.01° — достаточно, см STAR_SKY_PLAN §7.2)
-            // Для сопровождаемости оставляем точную Meeus 21.4: zeta/z/theta как в плане
+            // Best practice: считаем через J2000 как в Meeus 21.4, затем From→To = inv(From) * To
+            // STAR_SKY_PLAN §7.2: T — столетия от J2000, zeta/z/theta в секундах → радианы
+            double[] mFrom = new double[9];
+            double[] mTo = new double[9];
+            MatrixFromJ2000(jdFrom, mFrom);
+            MatrixFromJ2000(jdTo, mTo);
+            // m = transpose(mFrom) * mTo
+            // mFrom^T * mTo (row-major)
+            for (int r = 0; r < 3; r++)
+                for (int c = 0; c < 3; c++)
+                    m[r * 3 + c] = mFrom[0 * 3 + r] * mTo[0 * 3 + c]
+                                 + mFrom[1 * 3 + r] * mTo[1 * 3 + c]
+                                 + mFrom[2 * 3 + r] * mTo[2 * 3 + c];
+        }
+
+        private static void MatrixFromJ2000(double jd, double[] m)
+        {
+            double T = (jd - 2451545.0) / 36525.0;
+            if (Math.Abs(T) < 1e-12)
+            {
+                // Identity for J2000
+                m[0] = 1; m[1] = 0; m[2] = 0;
+                m[3] = 0; m[4] = 1; m[5] = 0;
+                m[6] = 0; m[7] = 0; m[8] = 1;
+                return;
+            }
             double zeta = (2306.2181 * T + 0.30188 * T * T + 0.017998 * T * T * T) * Deg2Rad / 3600.0;
             double z = (2306.2181 * T + 1.09468 * T * T + 0.018203 * T * T * T) * Deg2Rad / 3600.0;
             double theta = (2004.3109 * T - 0.42665 * T * T - 0.041833 * T * T * T) * Deg2Rad / 3600.0;
-            // Коррекция dt масштабом
-            zeta *= dt / T; z *= dt / T; theta *= dt / T;
-            if (double.IsNaN(zeta) || double.IsInfinity(zeta)) { zeta = 0; z = 0; theta = 0; }
-            // R = R3(-z) * R2(theta) * R3(-zeta)
             double cz = Math.Cos(z), sz = Math.Sin(z);
             double ct = Math.Cos(theta), st = Math.Sin(theta);
             double czeta = Math.Cos(zeta), szeta = Math.Sin(zeta);
-            // R2(theta)
-            // R3(-zeta) * R2 * R3(-z) — упрощённо считаем как в Meeus
+            // R = R3(-z) * R2(theta) * R3(-zeta) (Meeus 21.4)
             m[0] = czeta * ct * cz - szeta * sz;
             m[1] = -szeta * ct * cz - czeta * sz;
             m[2] = -st * cz;
