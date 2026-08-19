@@ -252,6 +252,15 @@ namespace UBOAT.Mods.RadioNavigation
                 Object.DontDestroyOnLoad(constellationRoot);
                 Debug.Log("[RadioNav][Main] ConstellationRoot created with ConstellationMesh component");
 
+                // STAR_SKY: create planetary billboard renderer once
+                if (GameObject.Find("PlanetRoot").IsNull())
+                {
+                    GameObject planetRoot = new GameObject("PlanetRoot");
+                    planetRoot.AddComponent<PlanetRenderer>();
+                    Object.DontDestroyOnLoad(planetRoot);
+                    Debug.Log("[RadioNav][Main] PlanetRoot created with PlanetRenderer component");
+                }
+
                 LighthousePlacer.EnsureRunning();
             }
             catch (Exception e)

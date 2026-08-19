@@ -62,5 +62,42 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.InRange(m[4], 0.99, 1.01);
             Assert.InRange(m[8], 0.99, 1.01);
         }
+
+        [Fact]
+        public void PlanetRaDec_AllSupportedPlanets_ReturnFiniteCoordinates()
+        {
+            double jd = AstroMath.ToJulianDay(new DateTime(1942, 6, 15, 0, 0, 0, DateTimeKind.Utc));
+
+            for (int planetId = 0; planetId < 4; planetId++)
+            {
+                Assert.True(AstroMath.PlanetRaDec(planetId, jd, out var ra, out var dec));
+                Assert.InRange(ra, 0, 2 * Math.PI);
+                Assert.InRange(dec, -Math.PI / 2, Math.PI / 2);
+                Assert.False(double.IsNaN(ra) || double.IsInfinity(ra));
+                Assert.False(double.IsNaN(dec) || double.IsInfinity(dec));
+            }
+        }
+
+        [Fact]
+        public void PlanetRaDec_RejectsUnknownPlanet()
+        {
+            Assert.False(AstroMath.PlanetRaDec(-1, 2451545.0, out _, out _));
+            Assert.False(AstroMath.PlanetRaDec(4, 2451545.0, out _, out _));
+        }
+
+        [Fact]
+        public void PlanetRaDec_PlanetsHaveNonZeroDeclination()
+        {
+            double jd = AstroMath.ToJulianDay(new DateTime(1942, 6, 15, 0, 0, 0, DateTimeKind.Utc));
+            int nonZero = 0;
+
+            for (int planetId = 0; planetId < 4; planetId++)
+            {
+                AstroMath.PlanetRaDec(planetId, jd, out _, out var dec);
+                if (Math.Abs(dec) > 0.001) nonZero++;
+            }
+
+            Assert.True(nonZero >= 3, "Orbital inclination and obliquity must affect declination");
+        }
     }
 }
