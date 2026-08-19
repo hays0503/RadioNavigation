@@ -37,6 +37,7 @@ namespace UBOAT.Mods.RadioNavigation
                 RadioStoryIntegration.ResetRuntimeState();
                 LighthousePlacer.Reset();
                 LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
+                GameTimeResolver.Reset();
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
             }
 

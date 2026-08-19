@@ -24,9 +24,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void LateUpdate()
         {
-            // Get current time from game (placeholder: use system time for now)
-            // TODO: integrate with UBOAT GameTime when available
-            currentTimeUtc = DateTime.UtcNow;
+            currentTimeUtc = GameTimeResolver.GetUtcNow();
             double jd = AstroMath.ToJulianDay(currentTimeUtc);
 
             // Get observer position

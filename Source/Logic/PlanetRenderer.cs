@@ -79,7 +79,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            double jd = AstroMath.ToJulianDay(DateTime.UtcNow);
+            double jd = AstroMath.ToJulianDay(GameTimeResolver.GetUtcNow());
             double lstDeg = AstroMath.LstDeg(jd, longitude);
             bool needsRebuild = !meshRenderer.enabled
                 || Vector3.Distance(cam.transform.position, lastCameraPosition) > 10f

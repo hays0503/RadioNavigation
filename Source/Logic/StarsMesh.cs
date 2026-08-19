@@ -76,7 +76,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (!positionProvider.TryGetPosition(out lat, out lon))
                 return;
 
-            DateTime utc = DateTime.UtcNow;
+            DateTime utc = GameTimeResolver.GetUtcNow();
             double jd = AstroMath.ToJulianDay(utc);
             double lstDeg = AstroMath.LstDeg(jd, lon);
 
