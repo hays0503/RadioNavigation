@@ -69,6 +69,9 @@ namespace UBOAT.Mods.RadioNavigation
             if (!positionProvider.TryGetPosition(out lat, out lon))
                 return;
 
+            if (material != null)
+                material.color = new Color(1f, 1f, 1f, SkyVisibilityResolver.GetVisibility());
+
             DateTime utc = GameTimeResolver.GetUtcNow();
             double jd = AstroMath.ToJulianDay(utc);
             double lstDeg = AstroMath.LstDeg(jd, lon);

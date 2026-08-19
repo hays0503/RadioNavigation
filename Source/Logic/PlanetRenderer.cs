@@ -79,6 +79,9 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            if (material != null)
+                material.color = new Color(1f, 1f, 1f, SkyVisibilityResolver.GetVisibility());
+
             double jd = AstroMath.ToJulianDay(GameTimeResolver.GetUtcNow());
             double lstDeg = AstroMath.LstDeg(jd, longitude);
             bool needsRebuild = !meshRenderer.enabled
