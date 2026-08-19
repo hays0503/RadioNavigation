@@ -27,6 +27,7 @@
 | ADR-019 | Panel Hardening (PrefabNames+clamp) | Accepted | 2026-08-19 |
 | ADR-020 | StarSky Phase0 log only | Proposed | 2026-08-19 |
 | ADR-021 | StarSky catalog (5046 звёзд) | Accepted | 2026-08-19 |
+| ADR-022 | Созвездия (215 линий) | Accepted | 2026-08-19 |
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 
