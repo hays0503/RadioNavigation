@@ -1,6 +1,7 @@
 using DWS.Common.InjectionFramework;
+using System;
+using System.Reflection;
 using UBOAT.Game.Scene.Environment;
-using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -13,17 +14,47 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                if (weather == null || weather.Sky == null)
+                if (weather == null)
                     return 1f;
 
-                TOD_Sky sky = weather.Sky;
-                return Mathf.Clamp01((1f - sky.Atmosphere.Fogginess) * (1f - sky.LerpValue));
+                object sky = ReadMember(weather, "Sky");
+                if (sky == null)
+                    return 1f;
+
+                object atmosphere = ReadMember(sky, "Atmosphere");
+                float fogginess = ReadFloat(atmosphere, "Fogginess");
+                float lerpValue = ReadFloat(sky, "LerpValue");
+                float visibility = (1f - fogginess) * (1f - lerpValue);
+                return Math.Max(0f, Math.Min(1f, visibility));
             }
             catch
             {
                 // A scene transition can temporarily invalidate injected Unity references.
                 return 1f;
             }
+        }
+
+        private static float ReadFloat(object target, string memberName)
+        {
+            if (target == null)
+                return 0f;
+
+            object value = ReadMember(target, memberName);
+            return value == null ? 0f : Convert.ToSingle(value);
+        }
+
+        private static object ReadMember(object target, string memberName)
+        {
+            if (target == null)
+                return null;
+
+            Type type = target.GetType();
+            PropertyInfo property = type.GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
+            if (property != null)
+                return property.GetValue(target, null);
+
+            FieldInfo field = type.GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
+            return field == null ? null : field.GetValue(target);
         }
     }
 }

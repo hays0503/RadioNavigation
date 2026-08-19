@@ -6,6 +6,7 @@
 ## Решение
 
 - Получать injected `Weather` из UBOAT.
+- Читать `Sky`, `Atmosphere`, `Fogginess` и `LerpValue` через reflection: runtime-компилятор модов не добавляет прямую ссылку на `com.uboat.dependencies`.
 - Использовать игровую формулу видимости:
   `visibility = (1 - weather.Sky.Atmosphere.Fogginess) * (1 - weather.Sky.LerpValue)`.
 - Применять visibility к alpha material для звёзд, созвездий, планет и Луны.
