@@ -360,53 +360,13 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         private void ResolveCamera()
         {
-            InstallRenderHook();
-
-            if (gameMainCamera.IsNull() || !gameMainCamera.gameObject.activeInHierarchy)
-            {
-                gameMainCamera = Object.FindObjectOfType<MainCamera>();
-            }
-
-            Camera candidate = null;
-
-            Camera main = Camera.main;
-            if (main.IsNotNull() && main.gameObject.activeInHierarchy && !IsUtilityCamera(main))
-            {
-                candidate = main;
-            }
-
-            if (candidate == null)
-            {
-                candidate = ResolveDeviceCamera();
-            }
-
-            if (candidate == null && renderingCamera.IsNotNull() &&
-                renderingCamera.gameObject.activeInHierarchy && !IsUtilityCamera(renderingCamera))
-            {
-                candidate = renderingCamera;
-            }
-
-            if (candidate == null)
-            {
-                candidate = FindScreenCamera();
-            }
-
-            renderingCamera = candidate;
-
-            if (candidate != lastLoggedCamera)
-            {
-                lastLoggedCamera = candidate;
-                if (candidate.IsNull())
-                {
-                    Debug.LogWarning("[RadioNav][Lighthouse] glow: no rendering camera found; dot hidden");
-                }
-                else
-                {
-                    Debug.Log("[RadioNav][Lighthouse] glow camera: '" + candidate.name +
-                        "' enabled=" + candidate.enabled + " tag='" + candidate.tag + "'" +
-                        " rt=" + (candidate.targetTexture != null));
-                }
-            }
+            // ADR-018: делегируем в общий CameraResolver (1 подписчик onPreCull, не дублируем логику)
+            if (CameraResolver.TryResolve(out var cam))
+                renderingCamera = cam;
+            else
+                renderingCamera = null;
+            // lastLoggedCamera теперь внутри Resolver, локальный не нужен — синхронизируем для совместимости
+            lastLoggedCamera = renderingCamera;
         }
 
         /// <summary>
@@ -475,16 +435,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void InstallRenderHook()
         {
-            if (renderHookInstalled)
-            {
-                return;
-            }
+            // ADR-018: общий хук в CameraResolver, не дублируем
+            CameraResolver.InstallOnce();
+            // Для совместимости отметим локальный флаг, чтобы старый ResetStatics не висел
             renderHookInstalled = true;
-            Camera.onPreCull += OnAnyCameraPreCull;
         }
 
         /// <summary>
-        /// ADR-017: уносит статику маяка при hot-reload мода. Best practice — 1 подписчик onPreCull, без GPU утечки.
+        /// ADR-017/018: уносит статику маяка при hot-reload. Best practice — 1 подписчик onPreCull, без GPU утечки.
         /// Вызывается только на main thread из Main.OnLoaded (loaded==true), когда все glow-GO уже уничтожены.
         /// </summary>
         public static void ResetStatics()
@@ -499,12 +457,15 @@ namespace UBOAT.Mods.RadioNavigation
                 Object.Destroy(streakTexture);
                 streakTexture = null;
             }
+            // Чистим локальную статику + общий резолвер (1 хук)
             if (renderHookInstalled)
             {
-                Camera.onPreCull -= OnAnyCameraPreCull;
+                try { Camera.onPreCull -= OnAnyCameraPreCull; } catch { }
                 renderHookInstalled = false;
             }
             renderingCamera = null;
+            // lastLoggedCamera — instance поле, чистим только на instance (не в static Reset)
+            CameraResolver.ResetForReload();
         }
 
         private static void OnAnyCameraPreCull(Camera cam)

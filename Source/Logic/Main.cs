@@ -195,7 +195,18 @@ namespace UBOAT.Mods.RadioNavigation
 
                 radio.name = RadioRootName;
 
-                string[] requiredChildren = { "CursorSpinner", "Toggle", "Ground", "Ground/Background", "Ground/Background/GroundCheckmark", "Expander", "RadioZone", "VolumeSpinner", "FeedbackSpinner" };
+                // ADR-019: централизовано через PrefabNames (best practice, не строковые литералы) + degraded open
+                string[] requiredChildren = {
+                    PrefabNames.Cursor,
+                    PrefabNames.Toggle,
+                    PrefabNames.Ground,
+                    PrefabNames.Ground + "/" + PrefabNames.Background,
+                    PrefabNames.Ground + "/" + PrefabNames.Background + "/" + PrefabNames.GroundCheckmark,
+                    PrefabNames.Expander,
+                    PrefabNames.RadioZone,
+                    PrefabNames.VolumeSpinner,
+                    PrefabNames.FeedbackSpinner
+                };
                 var missing = new System.Collections.Generic.List<string>();
                 foreach (var path in requiredChildren)
                 {
@@ -204,9 +215,16 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 if (missing.Count.IsPositive())
                 {
-                    Debug.LogError("[RadioNav][Main] Prefab structure validation FAILED. Missing: " + string.Join(", ", missing));
-                    Object.Destroy(radio);
-                    return;
+                    string msg = "[RadioNav][Main] Prefab structure validation FAILED. Missing: " + string.Join(", ", missing);
+                    // PlayerPrefs RadioNav.SkipValidation=1 → degraded open (ловим бандл-расхождение без краша)
+                    if (PlayerPrefs.GetInt("RadioNav.SkipValidation", 0) == 1)
+                        Debug.LogWarning(msg + " — SkipValidation=1, continuing degraded");
+                    else
+                    {
+                        Debug.LogError(msg);
+                        Object.Destroy(radio);
+                        return;
+                    }
                 }
 
                 RadioInstaller.Instantiate(radio, viewport);

@@ -23,6 +23,9 @@
 | ADR-015 | Test Shield Gain/Geo | Accepted | 2026-08-19 |
 | ADR-016 | Bushmills 89.9 data fix | Accepted | 2026-08-19 |
 | ADR-017 | Lighthouse ResetStatics | Accepted | 2026-08-19 |
+| ADR-018 | CameraResolver (маяк+звезда) | Accepted | 2026-08-19 |
+| ADR-019 | Panel Hardening (PrefabNames+clamp) | Accepted | 2026-08-19 |
+| ADR-020 | StarSky Phase0 log only | Proposed | 2026-08-19 |
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 
