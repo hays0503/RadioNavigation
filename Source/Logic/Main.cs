@@ -246,6 +246,12 @@ namespace UBOAT.Mods.RadioNavigation
                 Object.DontDestroyOnLoad(starSkyRoot);
                 Debug.Log("[RadioNav][Main] StarSkyRoot created with StarsMesh component");
 
+                // STAR_SKY: create constellation lines renderer
+                GameObject constellationRoot = new GameObject("ConstellationRoot");
+                constellationRoot.AddComponent<ConstellationMesh>();
+                Object.DontDestroyOnLoad(constellationRoot);
+                Debug.Log("[RadioNav][Main] ConstellationRoot created with ConstellationMesh component");
+
                 LighthousePlacer.EnsureRunning();
             }
             catch (Exception e)
