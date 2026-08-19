@@ -35,6 +35,8 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 harmony?.UnpatchAll(harmony.Id); // F139: bare UnpatchAll() removes other mods' patches; 0Harmony 2.2.2 has no UnpatchSelf
                 RadioStoryIntegration.ResetRuntimeState();
+                LighthousePlacer.Reset();
+                LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
             }
 
@@ -219,6 +221,8 @@ namespace UBOAT.Mods.RadioNavigation
 #if DEBUG
                 DumpHierarchy(radio.transform, "[RadioNav][Main] Prefab hierarchy: ");
 #endif
+
+                LighthousePlacer.EnsureRunning();
             }
             catch (Exception e)
             {

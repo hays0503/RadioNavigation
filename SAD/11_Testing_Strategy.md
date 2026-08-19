@@ -1,12 +1,12 @@
 # Testing Strategy — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-02):** Инфраструктура тестов РЕАЛИЗОВАНА (F22): xunit 2.9 + собственный раннер (`Tests/Runner`), **174 теста PASS** после удаления неиспользуемого Position Fix. Команда: `dotnet run --project "Tests\Runner\Runner.csproj"`. ADR-007 имеет статус «Deferred» (F45, исправлено) — полный охват интеграционных/производительных тестов остаётся целевым. Секции 3.x содержат целевые примеры тестов (не обязательно совпадают с реальными файлами); актуальные тесты — в `Tests/`.
+> **⚠️ Baseline (2026-08-19, ADR-014):** Инфраструктура тестов РЕАЛИЗОВАНА (F22): xunit 2.9 + собственный раннер (`Tests/Runner`), **182 теста PASS** (`baseline-182-20260819` на `8b3021fa`, `powershell -ExecutionPolicy Bypass -File tests.ps1`). `dotnet build -c Release -c Debug` 0 errors. ADR-007 «Deferred» (F45) — полный охват интеграционных/производительных тестов целевой (см. `docs/adr/ADR-014-baseline.md`). Секции 3.x — целевые примеры (могут не совпадать с `Tests/`).
 
 ## 1. Testing Overview
 
 | Test Type | Coverage Target | Current | Priority |
 |-----------|-----------------|---------|----------|
-| Unit Tests | >60% | 174 PASS (core logic, без Unity) | High |
+| Unit Tests | >60% | 182 PASS (baseline ADR-014, core logic без Unity) | High |
 | Integration Tests | >80% | Частично (DspPipeline, StationScheduler) | Medium |
 | Manual Testing | 100% | Partial (см. Фазу live-валидации) | Medium |
 | Performance Tests | Baseline + 10% | None | Low |
@@ -331,8 +331,8 @@ public static class TestMeasurements {
 ```bash
 # xunit + самописный раннер (dotnet test неприменим: тестовый проект линкует
 # исходники мода напрямую, без сборки игровой DLL)
-dotnet run --project "Tests\Runner\Runner.csproj"
-# ожидаемый результат: "Passed: 167, Failed: 0"
+powershell -ExecutionPolicy Bypass -File tests.ps1
+# ожидаемый результат: "Passed: 182, Failed: 0" (baseline ADR-014)
 ```
 
 ### 8.2 Run Specific Test Category
@@ -369,6 +369,6 @@ dotnet run --project "Tests\Runner\Runner.csproj"
 
 ---
 
-*Document Version: 2.0*  
-*Last Updated: 2026-08-02*  
-*Updated: инфраструктура реализована (F22), 167 тестов PASS; статусы F01–F207 в `refactoring-plan/hypothesis/INDEX.md`.*
+*Document Version: 2.1*  
+*Last Updated: 2026-08-19 (ADR-014 baseline 182, tag baseline-182-20260819)*  
+*Updated: 182 PASS; статусы F01–F207 в `refactoring-plan/hypothesis/INDEX.md`.*

@@ -21,9 +21,9 @@
 ## Сборка
 
 ```powershell
-powershell -File build.ps1 [-GamePath <path>]  # локальная DLL (для IDE-проверок)
-dotnet build radionavigation.csproj            # Release+Debug, эталонный билд
-dotnet run --project "Tests\Runner\Runner.csproj"   # тесты (170/170)
+powershell -ExecutionPolicy Bypass -File build.ps1 [-GamePath <path>]  # локальная DLL (для IDE-проверок)
+dotnet build radionavigation.csproj -c Release -c Debug        # Release+Debug, эталонный билд (0 errors, MSB3277 warn ожидаем)
+powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (182/182, baseline ADR-014)
 ```
 
 ## Структура репозитория
@@ -37,7 +37,7 @@ dotnet run --project "Tests\Runner\Runner.csproj"   # тесты (170/170)
 ## Статус качества
 
 - Аудит рефакторинга: **207/207 гипотез закрыты** (163 исправлено, 23 отложено, 8 подтверждено без правок, 13 отклонено)
-- Тесты: **174/174 PASS**, сборка Release+Debug без ошибок
+- Тесты: **182/182 PASS** (baseline `baseline-182-20260819` на `8b3021fa`, ADR-014), сборка Release+Debug без ошибок
 - Отложено (live-проверка в игре): угол ручки спиннера (F202), селективность приёмника (F203), характер шума (F71)
 
 ## История

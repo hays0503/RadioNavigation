@@ -18,7 +18,11 @@
 | ADR-004 | Interface-based integration | Deferred | 2026-07-26 |
 | ADR-005 | Centralize constants | Deferred | 2026-07-26 |
 | ADR-006 | JSON configuration files | Proposed | 2026-07-26 |
-| ADR-007 | Unit testing strategy | Deferred | 2026-07-26 |
+| ADR-007 | Unit testing strategy | Accepted (F22 baseline 182) | 2026-08-19 |
+| ADR-014 | Baseline 182 + farClip tag | Accepted | 2026-08-19 |
+| ADR-015 | Test Shield Gain/Geo | Accepted | 2026-08-19 |
+| ADR-016 | Bushmills 89.9 data fix | Accepted | 2026-08-19 |
+| ADR-017 | Lighthouse ResetStatics | Accepted | 2026-08-19 |
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 
@@ -344,7 +348,9 @@ Move configuration data to JSON files.
 ## 8. ADR-007: Unit Testing Strategy
 
 ### Status
-Deferred
+Accepted (2026-08-19, baseline ADR-014: 182 PASS)
+
+> **Update 2026-08-19 (ADR-014):** F22 закрыто — `Tests/Runner` 182 PASS `powershell -ExecutionPolicy Bypass -File tests.ps1`, `dotnet build Release/Debug` 0 errors, tag `baseline-182-20260819` на `8b3021fa`. Цель `SAD/11` >80% Data / >70% Logic — частично достигнута (чистая математика покрыта, UI 0% — см. `docs/adr/ADR-014-baseline.md`).
 
 ### Context
 No unit tests exist (0% coverage). Bugs are discovered in production.

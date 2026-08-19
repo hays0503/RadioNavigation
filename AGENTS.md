@@ -37,7 +37,7 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 
 ## Gotchas
 
-- No test suite exists. SAD chapter 11 proposes tests but none are implemented yet.
+- Test suite: 182 PASS `powershell -ExecutionPolicy Bypass -File tests.ps1` (xunit 2.9 + Runner, baseline ADR-014 `baseline-182-20260819`), `dotnet build -c Release/Debug` 0 errors. SAD 11 — 182 PASS.
 - No lint, formatter, or `.editorconfig`. Refactoring plans propose adding one.
 - Harmony patches silently fail if UBOAT game version changes — target methods may be renamed/removed. Check pre-flight log (`target methods not found`) on mod load.
 - AssetBundle must exist at `Bundles/testui` relative to mod root. Unity editor build process creates it; the mod loader expects it at runtime.

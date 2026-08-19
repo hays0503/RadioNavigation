@@ -40,7 +40,9 @@
     <Compile Include="ComparisonExtensionsTests.cs" />
     <Compile Include="SignalTypesTests.cs" />
 <Compile Include="SignalRichTextFormatterTests.cs" />
+    <Compile Include="LighthouseProfileTests.cs" />
     <Compile Include="DspPipelineTests.cs" />
+    <Compile Include="ShieldTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -65,6 +67,8 @@
     <Compile Include="..\Source\Sound\AudioSynthesisEngine.cs" Link="Source\Sound\AudioSynthesisEngine.cs" />
     <Compile Include="..\Source\Sound\DspPipeline.cs" Link="Source\Sound\DspPipeline.cs" />
     <Compile Include="..\Source\UI\PanelStateStore.cs" Link="Source\UI\PanelStateStore.cs" />
+    <Compile Include="..\Source\Data\LighthouseProfile.cs" Link="Source\Data\LighthouseProfile.cs" />
+    <Compile Include="..\Source\Data\LighthouseProfiles.cs" Link="Source\Data\LighthouseProfiles.cs" />
   </ItemGroup>
 
 </Project>
