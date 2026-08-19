@@ -28,19 +28,19 @@ namespace UBOAT.Mods.RadioNavigation
         {
             InstallOnce();
 
-            if (gameMainCamera.IsNull() || !gameMainCamera.gameObject.activeInHierarchy)
+            if (gameMainCamera == null || !gameMainCamera.gameObject.activeInHierarchy)
                 gameMainCamera = Object.FindObjectOfType<MainCamera>();
 
             Camera candidate = null;
 
             Camera main = Camera.main;
-            if (main.IsNotNull() && main.gameObject.activeInHierarchy && !IsUtilityCamera(main))
+            if (main != null && main.gameObject.activeInHierarchy && !IsUtilityCamera(main))
                 candidate = main;
 
             if (candidate == null)
                 candidate = ResolveDeviceCamera();
 
-            if (candidate == null && renderingCamera.IsNotNull() &&
+            if (candidate == null && renderingCamera != null &&
                 renderingCamera.gameObject.activeInHierarchy && !IsUtilityCamera(renderingCamera))
                 candidate = renderingCamera;
 
@@ -52,25 +52,25 @@ namespace UBOAT.Mods.RadioNavigation
             if (candidate != lastLoggedCamera)
             {
                 lastLoggedCamera = candidate;
-                if (candidate.IsNull())
+                    if (candidate == null)
                     Debug.LogWarning("[RadioNav][CameraResolver] no rendering camera found");
                 else
                     Debug.Log("[RadioNav][CameraResolver] camera: '" + candidate.name + "' rt=" + (candidate.targetTexture != null));
             }
 
             cam = candidate;
-            return cam.IsNotNull();
+            return cam != null;
         }
 
         public static float SafeRadius(Camera cam)
         {
-            if (cam.IsNull()) return WorldRadiusM;
+            if (cam == null) return WorldRadiusM;
             return Mathf.Min(WorldRadiusM, cam.farClipPlane * 0.85f);
         }
 
         public static bool IsMapMode()
         {
-            if (gameMainCamera.IsNull()) return false;
+            if (gameMainCamera == null) return false;
             try { return gameMainCamera.CurrentMode.ToString() == "Map"; } catch { return false; }
         }
 
@@ -95,7 +95,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static Camera ResolveDeviceCamera()
         {
-            if (gameMainCamera.IsNull()) return null;
+            if (gameMainCamera == null) return null;
             try
             {
                 // CameraMode enum сравниваем строкой, чтобы не зависеть от точного типа в сборке игры
@@ -105,7 +105,7 @@ namespace UBOAT.Mods.RadioNavigation
                     pc.IsNotNull() && pc.Periscope.IsNotNull())
                 {
                     Camera cam = pc.Periscope.PeriscopeCamera;
-                    if (cam.IsNotNull() && cam.gameObject.activeInHierarchy)
+                    if (cam != null && cam.gameObject.activeInHierarchy)
                         return cam;
                 }
             }
@@ -118,7 +118,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static bool IsUtilityCamera(Camera cam)
         {
-            if (cam.IsNull()) return false;
+            if (cam == null) return false;
             string name = cam.name;
             return name == "Loading Camera" ||
                    name == "Utility GUI Camera" ||

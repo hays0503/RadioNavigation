@@ -323,7 +323,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
-            if (dotCanvas.IsNotNull())
+            // Unity destroyed-object references compare equal to null only through
+            // Unity's operator; custom IsNotNull can still pass during scene unload.
+            if (dotCanvas != null)
             {
                 Object.Destroy(dotCanvas.gameObject);
             }
