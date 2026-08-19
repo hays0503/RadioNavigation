@@ -43,6 +43,8 @@
     <Compile Include="LighthouseProfileTests.cs" />
     <Compile Include="DspPipelineTests.cs" />
     <Compile Include="ShieldTests.cs" />
+    <Compile Include="AstroMathTests.cs" />
+    <Compile Include="StarCatalogTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -69,6 +71,8 @@
     <Compile Include="..\Source\UI\PanelStateStore.cs" Link="Source\UI\PanelStateStore.cs" />
     <Compile Include="..\Source\Data\LighthouseProfile.cs" Link="Source\Data\LighthouseProfile.cs" />
     <Compile Include="..\Source\Data\LighthouseProfiles.cs" Link="Source\Data\LighthouseProfiles.cs" />
+    <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />
+    <Compile Include="..\Source\Data\StarCatalog.cs" Link="Source\Data\StarCatalog.cs" />
   </ItemGroup>
 
 </Project>
