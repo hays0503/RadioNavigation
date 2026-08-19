@@ -99,5 +99,25 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             Assert.True(nonZero >= 3, "Orbital inclination and obliquity must affect declination");
         }
+
+        [Fact]
+        public void MoonRaDec_ReturnsFiniteCoordinates()
+        {
+            double jd = AstroMath.ToJulianDay(new DateTime(1942, 6, 15, 0, 0, 0, DateTimeKind.Utc));
+            Assert.True(AstroMath.MoonRaDec(jd, out var ra, out var dec));
+            Assert.InRange(ra, 0, 2 * Math.PI);
+            Assert.InRange(dec, -Math.PI / 2, Math.PI / 2);
+            Assert.False(double.IsNaN(ra) || double.IsInfinity(ra));
+            Assert.False(double.IsNaN(dec) || double.IsInfinity(dec));
+        }
+
+        [Fact]
+        public void MoonIllumination_NewAndFullMoonAreOpposite()
+        {
+            double newMoon = AstroMath.MoonIllumination(2451550.25972);
+            double fullMoon = AstroMath.MoonIllumination(2451550.25972 + 29.530588853 / 2);
+            Assert.InRange(newMoon, 0, 0.01);
+            Assert.InRange(fullMoon, 0.99, 1.0);
+        }
     }
 }

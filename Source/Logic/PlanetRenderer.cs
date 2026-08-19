@@ -11,7 +11,7 @@ namespace UBOAT.Mods.RadioNavigation
     [RequireComponent(typeof(MeshRenderer))]
     public sealed class PlanetRenderer : MonoBehaviour
     {
-        private const int PlanetCount = 4;
+        private const int PlanetCount = 5;
         private const float MinPlanetSize = 0.35f;
         private const float MaxPlanetSize = 1.25f;
 
@@ -20,7 +20,8 @@ namespace UBOAT.Mods.RadioNavigation
             new Color(1.00f, 0.98f, 0.92f, 0.95f), // Venus
             new Color(1.00f, 0.42f, 0.24f, 0.95f), // Mars
             new Color(1.00f, 0.88f, 0.62f, 0.95f), // Jupiter
-            new Color(1.00f, 0.82f, 0.48f, 0.95f)  // Saturn
+            new Color(1.00f, 0.82f, 0.48f, 0.95f), // Saturn
+            new Color(0.85f, 0.88f, 0.95f, 1.00f)  // Moon
         };
 
         private MeshFilter meshFilter;
@@ -108,7 +109,10 @@ namespace UBOAT.Mods.RadioNavigation
             for (int planetId = 0; planetId < PlanetCount; planetId++)
             {
                 double ra, dec;
-                if (!AstroMath.PlanetRaDec(planetId, jd, out ra, out dec))
+                bool hasCoordinates = planetId == 4
+                    ? AstroMath.MoonRaDec(jd, out ra, out dec)
+                    : AstroMath.PlanetRaDec(planetId, jd, out ra, out dec);
+                if (!hasCoordinates)
                     continue;
 
                 AstroMath.RaDecToEnu(ra, dec, lstDeg, latitude,
@@ -118,7 +122,10 @@ namespace UBOAT.Mods.RadioNavigation
 
                 Vector3 direction = new Vector3((float)e, (float)u, (float)n).normalized;
                 Vector3 center = cam.transform.position + direction * radius;
-                AddBillboardQuad(center, direction, SizeForPlanet(planetId), PlanetColors[planetId]);
+                Color color = PlanetColors[planetId];
+                if (planetId == 4)
+                    color.a *= (float)AstroMath.MoonIllumination(jd);
+                AddBillboardQuad(center, direction, SizeForPlanet(planetId), color);
             }
 
             Mesh mesh = meshFilter.mesh;
@@ -138,6 +145,7 @@ namespace UBOAT.Mods.RadioNavigation
                 case 0: return MaxPlanetSize;
                 case 2: return 1.05f;
                 case 3: return 0.8f;
+                case 4: return 1.5f;
                 default: return MinPlanetSize;
             }
         }

@@ -223,6 +223,61 @@ namespace UBOAT.Mods.RadioNavigation
             return true;
         }
 
+        /// <summary>
+        /// Низкоточная геоцентрическая RA/Dec Луны (Meeus гл.47 orbital approximation).
+        /// Даёт визуально пригодное положение, но не заменяет усечённый ELP2000.
+        /// </summary>
+        public static bool MoonRaDec(double jd, out double raRad, out double decRad)
+        {
+            raRad = 0;
+            decRad = 0;
+            if (double.IsNaN(jd) || double.IsInfinity(jd)) return false;
+
+            double days = jd - 2451543.5;
+            double node = (125.1228 - 0.0529538083 * days) * Deg2Rad;
+            double inclination = 5.1454 * Deg2Rad;
+            double periapsis = (318.0634 + 0.1643573223 * days) * Deg2Rad;
+            double eccentricity = 0.0549;
+            double meanAnomaly = NormalizeDegrees(115.3654 + 13.0649929509 * days) * Deg2Rad;
+            double semiMajorAxis = 60.2666;
+
+            double eccentricAnomaly = meanAnomaly;
+            for (int i = 0; i < 8; i++)
+                eccentricAnomaly -= (eccentricAnomaly - eccentricity * Math.Sin(eccentricAnomaly) - meanAnomaly)
+                    / (1 - eccentricity * Math.Cos(eccentricAnomaly));
+
+            double xv = semiMajorAxis * (Math.Cos(eccentricAnomaly) - eccentricity);
+            double yv = semiMajorAxis * Math.Sqrt(1 - eccentricity * eccentricity) * Math.Sin(eccentricAnomaly);
+            double trueAnomaly = Math.Atan2(yv, xv);
+            double distance = Math.Sqrt(xv * xv + yv * yv);
+            double argument = trueAnomaly + periapsis;
+            double cosNode = Math.Cos(node), sinNode = Math.Sin(node);
+            double cosArgument = Math.Cos(argument), sinArgument = Math.Sin(argument);
+            double cosInclination = Math.Cos(inclination), sinInclination = Math.Sin(inclination);
+
+            double xEcliptic = distance * (cosNode * cosArgument - sinNode * sinArgument * cosInclination);
+            double yEcliptic = distance * (sinNode * cosArgument + cosNode * sinArgument * cosInclination);
+            double zEcliptic = distance * (sinArgument * sinInclination);
+            double obliquity = (23.439291 - 0.013004166 * ((jd - 2451545.0) / 36525.0)) * Deg2Rad;
+            double xEquatorial = xEcliptic;
+            double yEquatorial = yEcliptic * Math.Cos(obliquity) - zEcliptic * Math.Sin(obliquity);
+            double zEquatorial = yEcliptic * Math.Sin(obliquity) + zEcliptic * Math.Cos(obliquity);
+
+            raRad = Math.Atan2(yEquatorial, xEquatorial);
+            if (raRad < 0) raRad += 2 * Math.PI;
+            decRad = Math.Atan2(zEquatorial, Math.Sqrt(xEquatorial * xEquatorial + yEquatorial * yEquatorial));
+            return true;
+        }
+
+        /// <summary>Approximate illuminated fraction, 0=new moon and 1=full moon.</summary>
+        public static double MoonIllumination(double jd)
+        {
+            double synodicDays = 29.530588853;
+            double phase = (jd - 2451550.25972) % synodicDays;
+            if (phase < 0) phase += synodicDays;
+            return 0.5 * (1.0 - Math.Cos(2 * Math.PI * phase / synodicDays));
+        }
+
         private static void SolveKepler(double e, double M_deg, out double v)
         {
             // Упрощённое решение уравнения Кеплера (итерация Ньютона)
