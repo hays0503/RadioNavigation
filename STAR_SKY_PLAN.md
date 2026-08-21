@@ -428,7 +428,7 @@ L☾ = 218.3165 + 481267.8813·T       (средняя долгота Луны)
 - [ ] 1. `Tools/StarCatalogConverter/` — конвертер (§5) + самопроверка по Сириусу
 - [x] 2. Сгенерировать `Source/Data/StarCatalog.cs`, `Source/Data/ConstellationLines.cs` — 5046 звёзд, 215 линий
 - [x] 3. `Source/Logic/AstroMath.cs` + unit-тесты (§11.1) — JD/GMST/LST, прецессия, нутация, Alt/Az, планеты, Луна
-- [ ] 4. Phase 0 лог-патч (§10) → вердикт по Луне
+- [~] 4. Phase 0 лог-патч (§10) → вердикт по Луне — probe `Source/Logic/StarSkyPhase0Probe.cs` готов (PlayerPrefs `RadioNav.Phase0Probe=1`, лог Sun/Moon/farClip/shader/Lerp/pos), живые замеры в игре pending
 - [~] 5. `StarSkyRenderer` + `StarsMesh` — корень, куллинг, fade, меш звёзд, `TryGetAltitude`; нет runtime quaternion epoch turn
 - [~] 6. `ConstellationMesh` — линии и цвет Stellarium реализованы; тумблер хоткей/GUI ещё не добавлен
 - [~] 7. `PlanetRenderer` — 4 планеты и low-precision Луна; Phase 0/ELP2000 точность не подтверждены

@@ -34,10 +34,11 @@
 
 ## Статус
 
-- [ ] Лог-патч создан (ветка `phase0-log`)
-- [ ] 2 даты замерены, `farClip` лог снят
-- [ ] ADR-020 → Accepted, `STAR_SKY_PLAN` шаг 4 закрыт
-- Следующий: `ADR-021` `AstroMath` + `StarCatalog` конвертер (Ф7)
+- [x] Лог-патч создан — `Source/Logic/StarSkyPhase0Probe.cs` (PlayerPrefs `RadioNav.Phase0Probe=1`, throttle 2с, лог SunZenith/SunAlt/MoonAlt/MoonAz/farClip/shader/visibility/pos/north)
+- [ ] 2 даты замерены (1942-06-15, 1943-01-10 00:00/06:00 UT), `farClip` лог снят в игре vs Stellarium → вердикт ELP2000 Луна
+- [ ] ADR-020 → Accepted (после живого замера), `STAR_SKY_PLAN` шаг 4 закрыт
+- Инструкция: `PlayerPrefs.SetInt("RadioNav.Phase0Probe",1)` в консоли игры → смотреть `[RadioNav][Phase0]` в `Player.log` каждые 2с; сравнить `MoonAlt/MoonAz` со Stellarium на тех же UTC
+- Следующий: живые замеры → `ADR-021` уже выполнен, далее `STAR_SKY_PLAN:10` п.11 полировка
 
 ```json
 {"id":"ADR-020","decision":"Phase0 только лог (farClip/Shader/Sun/Moon) — 0 прод кода","reason":"Без живого farClip нельзя выбрать R=3900, без Stellarium — Луна","alternatives":["Сразу генерить каталог","Пропустить Phase0"],"tradeoff":"1 вечер логов vs риск клипа/Луны 0.3°"}

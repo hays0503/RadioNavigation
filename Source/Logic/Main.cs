@@ -263,6 +263,9 @@ namespace UBOAT.Mods.RadioNavigation
                 }
 
                 LighthousePlacer.EnsureRunning();
+
+                // Phase0 probe (STAR_SKY_PLAN:10, ADR-020) — only when PlayerPrefs RadioNav.Phase0Probe=1
+                StarSkyPhase0Probe.EnsureRunning();
             }
             catch (Exception e)
             {
