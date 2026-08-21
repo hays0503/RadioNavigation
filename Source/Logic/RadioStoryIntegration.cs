@@ -5,23 +5,19 @@ using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
+    /// <summary>
+    /// Facade for RadioStory integration — thin wrapper around StoryDecisionGateway (F04 slice 1).
+    /// Owns: locale labels, language resolution, panel lifecycle (keepPanelOpenAfterStoryStop).
+    /// Delegates: all decision reflection (G1-G4) to StoryDecisionGateway — single reflection source of truth.
+    /// </summary>
     internal static class RadioStoryIntegration
     {
         private const string LocaleKey = "Radio/OpenT3PLL38";
         private const string LeaveStationKey = "Radio/LeaveStation";
         private const string LocalePrefix = "Stories/";
-        private const string StageFieldName = "stage";
         private const bool AllowOriginal = true;
         private const bool PreventOriginal = false;
 
-        private static Type decisionType;
-        private static ConstructorInfo decisionCtor;
-        private static FieldInfo localizationKeyField;
-        private static PropertyInfo localizationKeyProp;
-        private static FieldInfo stageField;
-        private static PropertyInfo decisionsProp;
-        private static MethodInfo insertMethod;
-        private static MethodInfo onUpdatedMethod;
         private static bool initialized;
         private static bool keepPanelOpenAfterStoryStop;
         private static PropertyInfo languageProp;
@@ -32,17 +28,10 @@ namespace UBOAT.Mods.RadioNavigation
         {
             initialized = false;
             keepPanelOpenAfterStoryStop = false;
-            decisionType = null;
-            decisionCtor = null;
-            localizationKeyField = null;
-            localizationKeyProp = null;
-            stageField = null;
-            decisionsProp = null;
-            insertMethod = null;
-            onUpdatedMethod = null;
             languageProp = null;
             loadSingletonMethod = null;
             localeType = null;
+            StoryDecisionGateway.Reset();
         }
 
         private static bool TryInit()
@@ -53,79 +42,13 @@ namespace UBOAT.Mods.RadioNavigation
             return initialized;
         }
 
-        // GetMethod does NOT trace base types for NonPublic members, but InsertDecision
-        // (Story.cs:377) and OnUpdated (Story.cs:438) are declared two levels above
-        // RadioStory. Walk the whole hierarchy instead (G2/G3).
-        private static MethodInfo FindMethodDeep(Type start, string name, Type[] argTypes)
-        {
-            for (Type t = start; t.IsNotNull(); t = t.BaseType)
-            {
-                var m = argTypes == null
-                    ? t.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)
-                    : t.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance, null, argTypes, null);
-                if (m.IsNotNull())
-                    return m;
-            }
-            return null;
-        }
-
         private static void Init()
         {
             if (initialized)
                 return;
 
-            string gameVersion = Application.version;
-            Debug.Log("[RadioNav] UBOAT version: " + gameVersion);
-
-            var storyType = typeof(RadioStory).BaseType;
-            if (storyType.IsNull())
-            {
-                Debug.LogError("[RadioNav] RadioStory.BaseType is null \u2014 game types may have changed in v" + gameVersion);
+            if (!StoryDecisionGateway.TryEnsureInitialized())
                 return;
-            }
-
-            insertMethod = FindMethodDeep(typeof(RadioStory), "InsertDecision", null);
-            if (insertMethod.IsNotNull())
-                decisionType = insertMethod.GetParameters()[1].ParameterType;
-            if (decisionType.IsNull())
-            {
-                Debug.LogError("[RadioNav] Decision type not found \u2014 check game version " + gameVersion);
-                return;
-            }
-
-            Debug.Log("[RadioNav] Decision type: " + decisionType.FullName);
-            localizationKeyField = decisionType.GetField("LocalizationKey", BindingFlags.Public | BindingFlags.Instance);
-            if (localizationKeyField.IsNull())
-                localizationKeyProp = decisionType.GetProperty("LocalizationKey");
-
-            foreach (var ctor in decisionType.GetConstructors(BindingFlags.Public | BindingFlags.Instance))
-            {
-                var pars = ctor.GetParameters();
-                if (pars.Length < 6 || pars[0].ParameterType != typeof(string))
-                    continue;
-                if (pars[3].ParameterType == typeof(Action))
-                {
-                    decisionCtor = ctor;
-                    Debug.Log("[RadioNav] Decision ctor selected: " + pars.Length + " params");
-                    break;
-                }
-            }
-
-            if (decisionCtor.IsNull())
-            {
-                Debug.LogError("[RadioNav] No suitable Decision constructor found in v" + gameVersion);
-                return;
-            }
-
-            // G1 corrected: "stage" EXISTS (RadioStory.cs:83) but is typed
-            // RadioStoryStage (enum), not int. The old (int) cast threw
-            // InvalidCastException on the boxed enum, killing injection.
-            stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
-
-            decisionsProp = storyType.GetProperty("Decisions",
-                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
-
-            onUpdatedMethod = FindMethodDeep(typeof(RadioStory), "OnUpdated", Type.EmptyTypes);
 
             ResolveRuntimeTypes();
             languageProp = GetLanguageProperty();
@@ -137,167 +60,41 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                if (!TryInit() || decisionCtor.IsNull() || stageField.IsNull())
+                if (!TryInit() || StoryDecisionGateway.DecisionCtor.IsNull() || StoryDecisionGateway.StageField.IsNull())
                 {
                     Debug.LogWarning("[RadioNav] Init failed, cannot inject T3PLL38");
                     return;
                 }
 
-                if (!IsStageMainChoices(__instance))
+                if (!StoryDecisionGateway.IsStageMainChoices(__instance))
                     return;
 
-                var decisions = GetDecisions(__instance);
+                var decisions = StoryDecisionGateway.GetDecisions(__instance);
                 if (decisions.IsNull())
                     return;
 
                 var decisionsList = decisions as System.Collections.IList;
-                int count = GetDecisionCount(decisions, decisionsList);
+                int count = StoryDecisionGateway.GetDecisionCount(decisions, decisionsList);
                 if (count.IsNegative()) return;
 
                 Debug.Log("[RadioNav] Decision count=" + count);
 
-                if (DecisionAlreadyExists(decisions, decisionsList, count))
+                if (StoryDecisionGateway.DecisionAlreadyExists(decisions, decisionsList, count, LocaleKey))
                 {
                     Debug.Log("[RadioNav] T3PLL38 decision already exists, skipping injection");
                     return;
                 }
 
                 int insertIndex = count.IsPositive() ? count - 1 : 0;
-                object decision = CreateDecision();
+                object decision = StoryDecisionGateway.CreateDecision(LocaleKey, new Action(OpenRadio));
                 if (decision.IsNull()) return;
 
-                InsertDecision(__instance, insertIndex, decision);
-                NotifyUpdated(__instance);
+                StoryDecisionGateway.InsertDecision(__instance, insertIndex, decision);
+                StoryDecisionGateway.NotifyUpdated(__instance);
             }
             catch (Exception ex)
             {
                 Debug.LogError("[RadioNav] InjectT3PLL38Decision error: " + ex);
-            }
-        }
-
-        private static bool IsStageMainChoices(RadioStory __instance)
-        {
-            // Convert.ToInt32 works on boxed enums ((int) would throw
-            // InvalidCastException). RadioStoryStage: Unknown=0, MainChoices=1.
-            int stageValue = Convert.ToInt32(stageField.GetValue(__instance));
-            Debug.Log("[RadioNav] stage=" + stageValue + " (1=MainChoices)");
-            return stageValue == 1;
-        }
-
-        private static object GetDecisions(RadioStory __instance)
-        {
-            if (decisionsProp.IsNull())
-            {
-                Debug.LogError("[RadioNav] Decisions property not found");
-                return null;
-            }
-
-            var decisions = decisionsProp.GetValue(__instance);
-            if (decisions.IsNull())
-                Debug.LogWarning("[RadioNav] Decisions is null");
-            return decisions;
-        }
-
-        private static int GetDecisionCount(object decisions, System.Collections.IList list)
-        {
-            if (list.IsNotNull())
-                return list.Count;
-
-            if (decisions.IsNull()) return -1;
-            int count = (int)decisions.GetType().GetProperty("Count").GetValue(decisions);
-            Debug.LogWarning("[RadioNav] Decisions does not implement IList, using reflection fallback");
-            return count;
-        }
-
-        private static bool DecisionAlreadyExists(object decisions, System.Collections.IList list, int count)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                object item = list.IsNotNull() ? list[i] : decisions.GetType().GetProperty("Item")?.GetValue(decisions, new object[] { i });
-                if (item.IsNotNull())
-                {
-                    string key = GetLocalizationKey(item);
-#if DEBUG
-                    Debug.Log("[RadioNav]   Menu[" + i + "] key=" + key);
-#endif
-                    if (key == LocaleKey)
-                        return true;
-                }
-            }
-            return false;
-        }
-
-        // G4: Decision.LocalizationKey is a public readonly FIELD (Story.cs:24),
-        // not a property. Prefer field, keep property as fallback.
-        private static string GetLocalizationKey(object decision)
-        {
-            if (localizationKeyField.IsNotNull())
-                return localizationKeyField.GetValue(decision) as string;
-            if (localizationKeyProp.IsNotNull())
-                return localizationKeyProp.GetValue(decision) as string;
-            return null;
-        }
-
-        private static object CreateDecision()
-        {
-            int paramCount = decisionCtor.GetParameters().Length;
-            object[] ctorArgs = new object[paramCount];
-            ctorArgs[0] = LocaleKey;
-            ctorArgs[1] = null;
-            ctorArgs[2] = true;
-            ctorArgs[3] = new Action(OpenRadio);
-            ctorArgs[4] = 0;
-            ctorArgs[5] = null;
-            var ctorParams = decisionCtor.GetParameters();
-            for (int i = 6; i < paramCount; i++)
-            {
-                var paramType = ctorParams[i].ParameterType;
-                if (paramType == typeof(object[]))
-                    ctorArgs[i] = Array.Empty<object>();
-                else if (paramType == typeof(string))
-                    ctorArgs[i] = null;
-                else if (paramType.IsValueType)
-                    ctorArgs[i] = Activator.CreateInstance(paramType);
-                else
-                    ctorArgs[i] = null;
-            }
-
-            object decision = decisionCtor.Invoke(ctorArgs);
-            if (decision.IsNull())
-                Debug.LogWarning("[RadioNav] Decision creation returned null");
-            return decision;
-        }
-
-        private static void InsertDecision(RadioStory __instance, int index, object decision)
-        {
-            try
-            {
-                insertMethod.Invoke(__instance, new object[] { index, decision });
-                Debug.Log("[RadioNav] Decision inserted at " + index);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[RadioNav] InsertDecision failed: " + ex);
-            }
-        }
-
-        private static void NotifyUpdated(RadioStory __instance)
-        {
-            if (onUpdatedMethod.IsNotNull())
-            {
-                try
-                {
-                    onUpdatedMethod.Invoke(__instance, null);
-                    Debug.Log("[RadioNav] OnUpdated called");
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError("[RadioNav] OnUpdated invoke failed: " + ex);
-                }
-            }
-            else
-            {
-                Debug.LogWarning("[RadioNav] OnUpdated method not found \u2014 UI may not reflect new decision");
             }
         }
 
@@ -376,10 +173,10 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 if (!TryInit())
                     return AllowOriginal;
-                if (localizationKeyField.IsNull() && localizationKeyProp.IsNull())
+                if (StoryDecisionGateway.LocalizationKeyField.IsNull() && StoryDecisionGateway.LocalizationKeyProp.IsNull())
                     return AllowOriginal;
 
-                string key = GetLocalizationKey(decision);
+                string key = StoryDecisionGateway.GetLocalizationKey(decision);
 
                 if (key == LeaveStationKey)
                 {
