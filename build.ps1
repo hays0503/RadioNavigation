@@ -36,8 +36,40 @@ $refs = @(
     "$GamePath\UBOAT_Data\Managed\Unity.TextMeshPro.dll"
 )
 
-$refArgs = $refs | ForEach-Object { "/reference:`"$_`"" }
-$srcFiles = Get-ChildItem $srcDir -Filter "*.cs" -Recurse | ForEach-Object { "`"" + $_.FullName + "`"" }
+# csc is not on PATH in every shell; locate a compiler before invoking.
+# Prefer Roslyn (modern C#) over the C# 5 framework compiler.
+$cscPath = $null
+$roslyn = Get-ChildItem "$env:ProgramFiles\dotnet\sdk" -Filter "csc.dll" -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match "Roslyn" } | Sort-Object FullName -Descending | Select-Object -First 1
+if ($roslyn) {
+    $cscPath = $roslyn.FullName
+} else {
+    $csc = Get-Command csc -ErrorAction SilentlyContinue
+    if ($csc) {
+        $cscPath = $csc.Source
+    } elseif (Test-Path "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe") {
+        $cscPath = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+    }
+}
+if (-not $cscPath) {
+    Write-Error "[RadioNavigation] csc not found. Install .NET SDK or add csc to PATH."
+    exit 1
+}
+
+if ($cscPath.EndsWith(".dll")) {
+    # Roslyn csc.dll needs explicit core-framework references; the game's
+    # Managed facades are incomplete (e.g. missing SortedList forwards).
+    $fx = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
+    $refs += @(
+        "$fx\mscorlib.dll",
+        "$fx\System.dll",
+        "$fx\System.Core.dll",
+        "$fx\System.Xml.dll"
+    )
+}
+
+$refArgs = $refs | ForEach-Object { "/reference:$_" }
+$srcFiles = @(Get-ChildItem $srcDir -Filter "*.cs" -Recurse | ForEach-Object { $_.FullName })
 
 $outPath = Join-Path $OutputDir "radionavigation.dll"
 
@@ -50,13 +82,20 @@ $defineSymbol = if ($Configuration -eq "Debug") { "DEBUG" } else { "RELEASE" }
 $debugFlag = if ($Configuration -eq "Debug") { "/debug:full" } else { "/debug:pdbonly" }
 $optimizeFlag = if ($Configuration -eq "Debug") { "/optimize-" } else { "/optimize+" }
 
-csc /target:library `
-    /out:$outPath `
-    $debugFlag `
-    $optimizeFlag `
-    /define:$defineSymbol `
-    $refArgs `
-    $srcFiles
+if ($cscPath.EndsWith(".dll")) {
+    $allArgs = @("/target:library", "/out:$outPath", $debugFlag, $optimizeFlag, "/define:$defineSymbol", "/noconfig")
+    $allArgs += $refArgs
+    $allArgs += $srcFiles
+    & dotnet $cscPath $allArgs
+} else {
+    & $cscPath /target:library `
+        /out:$outPath `
+        $debugFlag `
+        $optimizeFlag `
+        /define:$defineSymbol `
+        $refArgs `
+        $srcFiles
+}
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[RadioNavigation] Build OK -> $outPath"

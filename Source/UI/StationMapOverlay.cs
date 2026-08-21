@@ -16,6 +16,10 @@ namespace UBOAT.Mods.RadioNavigation
     public sealed class StationMapOverlay : MonoBehaviour
     {
         private const string MarkerNamePrefix = "RadioNavStationMarker_";
+        private const string LighthouseMarkerName = "RadioNavLighthouseMarker";
+        private const string LighthouseLabel = "Lighthouse Wangerooge";
+        private const float LighthouseLatitude = 53.519973f;
+        private const float LighthouseLongitude = 8.127701f;
         private const float LegacyPositionTolerance = 0.05f;
 
         private static readonly FieldInfo PointPrefabField = typeof(MapChartingUI).GetField(
@@ -70,16 +74,16 @@ namespace UBOAT.Mods.RadioNavigation
         private void TryCreateMarkers()
         {
             MapChartingUI charting = FindObjectOfType<MapChartingUI>();
-            if (charting.IsNull())
+            if (charting == null)
                 return;
 
-            MapPointUI pointPrefab = PointPrefabField.IsNotNull()
+            MapPointUI pointPrefab = PointPrefabField != null
                 ? PointPrefabField.GetValue(charting) as MapPointUI
                 : null;
-            Transform linesContainer = LinesContainerField.IsNotNull()
+            Transform linesContainer = LinesContainerField != null
                 ? LinesContainerField.GetValue(charting) as Transform
                 : null;
-            if (pointPrefab.IsNull() || linesContainer.IsNull())
+            if (pointPrefab == null || linesContainer == null)
             {
                 Debug.LogWarning("[RadioNav][Map] native MapPointUI prefab/container not ready");
                 return;
@@ -111,7 +115,8 @@ namespace UBOAT.Mods.RadioNavigation
                 ClearOwnedMarkers();
 
             int count = BeaconData.Stations.Length;
-            var created = new List<MapPointUI>(count);
+            int total = count + 1;
+            var created = new List<MapPointUI>(total);
             try
             {
                 for (int i = 0; i < count; i++)
@@ -123,7 +128,7 @@ namespace UBOAT.Mods.RadioNavigation
                         Name = station.Name
                     };
                     MapPointUI point = pointPrefab.Duplicate(data);
-                    if (point.IsNull())
+                    if (point == null)
                         throw new InvalidOperationException("MapPointUI.Duplicate returned null");
 
                     point.gameObject.name = MarkerNamePrefix + i;
@@ -138,16 +143,36 @@ namespace UBOAT.Mods.RadioNavigation
                         + " active=" + point.gameObject.activeInHierarchy);
                 }
 
+                Vector2 lighthousePosition = Coordinates.ToWorldPosition(LighthouseLatitude, LighthouseLongitude);
+                var lighthouseData = new MapPointData(lighthousePosition)
+                {
+                    Name = LighthouseLabel
+                };
+                MapPointUI lighthousePoint = pointPrefab.Duplicate(lighthouseData);
+                if (lighthousePoint == null)
+                    throw new InvalidOperationException("MapPointUI.Duplicate returned null for lighthouse");
+
+                lighthousePoint.gameObject.name = LighthouseMarkerName;
+                lighthousePoint.Interactive = false;
+                lighthousePoint.transform.SetParent(linesContainer, false);
+                created.Add(lighthousePoint);
+                Debug.Log("[RadioNav][Map] lighthouse marker name='" + LighthouseLabel
+                    + "' lat=" + LighthouseLatitude.ToString("F6")
+                    + " lon=" + LighthouseLongitude.ToString("F6")
+                    + " encounter=" + lighthousePosition
+                    + " active=" + lighthousePoint.gameObject.activeInHierarchy);
+
                 MapPointUI.UpdatePoints(created);
                 markers.AddRange(created);
                 markersCreated = true;
-                Debug.Log("[RadioNav][Map] transient station markers created=" + count);
+                Debug.Log("[RadioNav][Map] transient station markers created=" + count
+                    + " lighthouse=" + 1);
             }
             catch (Exception ex)
             {
                 for (int i = 0; i < created.Count; i++)
                 {
-                    if (created[i].IsNotNull())
+                    if (created[i] != null)
                         Destroy(created[i].gameObject);
                 }
 
@@ -157,12 +182,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private bool AreMarkersAlive()
         {
-            if (markers.Count != BeaconData.Stations.Length)
+            if (markers.Count != BeaconData.Stations.Length + 1)
                 return false;
 
             for (int i = 0; i < markers.Count; i++)
             {
-                if (markers[i].IsNull())
+                if (markers[i] == null)
                     return false;
             }
 
@@ -173,7 +198,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             for (int i = 0; i < markers.Count; i++)
             {
-                if (markers[i].IsNotNull())
+                if (markers[i] != null)
                     Destroy(markers[i].gameObject);
             }
 
@@ -188,7 +213,7 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < points.Length; i++)
             {
                 MapPointUI point = points[i];
-                if (point.IsNull()
+                if (point == null
                     || point.Data == null
                     || point.gameObject.name.StartsWith(MarkerNamePrefix, StringComparison.Ordinal))
                 {

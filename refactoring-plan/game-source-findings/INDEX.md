@@ -14,3 +14,6 @@
 Детали каждого — в файлах `G1_stageField_dead.md` … `G4_localizationKeyProp_null.md`. Связи с гипотезами: F23 (подтверждена усиленно), F104/F186 (→ rejected, см. `../rejected/`).
 
 Справочник API игры (мод ↔ игра, file:line) — `GAME_SOURCE_REFERENCE.md`. Общий отчёт — `../VERIFICATION_REPORT.md`, секция 5.
+
+
+**Дополнение 2026-08-13:** размещение 3D-префаба мода на географической точке + точка с подписью на карте (проверенные API песочницы, 8 находок-граблей, верификация) — LIGHTHOUSE_PLACEMENT.md.
