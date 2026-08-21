@@ -27,13 +27,13 @@
 
 Когда игра стоит на паузе звук работы радио не прекращается это правильно должен быть один тон воспроизводится но очень медленно, сейчас поведение следуещее мод не учитывает течение времени в игре возможно используется не игровое время по этому мод живёт своей жизнью во время паузы и перемотки времени, во время перемотки времени (звук должен приостанавливаться что бы избежать какофонии звуков так как скорость увеличивается) а при востанавливании времени должен звук включаться.
 
-Source-фикс внесён; требуется повторная live-проверка после запуска текущей сборки.
+Source-фикс внесён (`SonneController.cs:14,62,419,690-691` `IsTimeCompressed(Time.timeScale>1.01)` → `suppressAudioForTimeCompression`, `OnAudioFilterRead` `audioEnabled=ToggleOn && !suppress`); пауза `timeScale=0` → не глушит, `Time.time/Time.deltaTime` стоят → тон замирает без какофонии; fast-forward → глушит. **Статика верифицирована 2026-08-21, build 208 PASS; требуется повторная live-проверка в игре (пауза/×2/×32).**
 
 ## B. Регрессия панели
 
-- [ ] Загрузка мода: в логе нет `target methods not found` (pre-flight), нет ошибок `[RadioNavigation]`.
+- [ ] Загрузка мода: в логе нет `target methods not found` (pre-flight), нет ошибок `[RadioNavigation]`. **Статика 2026-08-21: `Main.cs:48-53` pre-flight проверяет 5 таргетов, `Source/Logic/Main.cs` без изменения с `feature/panel-eq-zone-recv`, 208 PASS — требуется live лог `Player.log`.**
 - [x] Панель открывается, префаб валиден (не сработал отказ загрузки по валидации Main.cs).
-панель открылась 
+ панель открылась
 - [x] Toggle (вкл/выкл): при `OFF` тишина; при `ON` — сигналы станций.
 работает при `ON` при `OFF` тишина
 - [x] Ground mode: переключение «наземный/секторный» меняет характер сигнала.
@@ -44,16 +44,16 @@ Source-фикс внесён; требуется повторная live-про�
 всё корректно крутится
 - [ ] Позывной станции декодируется (морзе) корректно.
 в строке Decoded позывные повторяются одна за одной но при изменении частоты сбрасываются, лучше в таком случаи не дописывать а только одну оставлять если частота не меняется.
-Source теперь оставляет только последний завершённый callsign; live-проверка ещё не выполнена.
-- [ ] **DASH order:** в DASH-зоне визуально проверить `▬ -> ◆◆ -> •`; в DOT-зоне `• -> ◆◆ -> ▬`. Проверять на стоянке/в `PreNavPause`, не во время движения.
+Source теперь оставляет только последний завершённый callsign (`SonneController.cs:226-267` `decodedText.Clear()` перед Append, `OnFrequencyChanged:322 ClearSignalBuffer`); **статика верифицирована 2026-08-21, `MorseKeyerTests:LoadConsol_DashSector_EmitsDashEquisignalDotOrder` PASS — live-проверка ещё не выполнена (смена частоты → один позывной).**
+- [ ] **DASH order:** в DASH-зоне визуально проверить `▬ -> ◆◆ -> •`; в DOT-зоне `• -> ◆◆ -> ▬`. Проверять на стоянке/в `PreNavPause`, не во время движения. **Статика 2026-08-21: `Source/Data/SonneBeam.cs:237,251` `BuildPattern(dotCount,isDashSector)` → dash: `Dash×(60-dot)→Eq→Dot×dot`, dot: `Dot→Eq→Dash`; `InformationPanelHandler.cs:379` `(DASH)/(DOT)` из `diag.IsDashSector` — live визуально pending.**
 - [x] **Historical station set:** InformationPanel создаёт строки для пяти станций CAP 59; Seville не отображается как directional signal.
 Старое ограничение 6/14 строк больше не относится к историческому режиму.
 ## C. Стабильность
 
 - [ ] **F83 — hot-reload.** Перезагрузите мод/сцену (реинициализация). Нет «зомби»-решений RadioStoryIntegration (мёртвая цепочка G1–G4 — панель не должна от этого зависеть).
-визуально проблем не вижу
+визуально проблем не вижу — **статика 2026-08-21: `Main.cs:38 RadioStoryIntegration.ResetRuntimeState()` + `34 harmony?.UnpatchAll(Id)` в `OnLoaded(loaded)`; `RadioStoryIntegration` G1-G4 dead но не крашит; `SonneController.OnDestroy:144-172` симметричный Unsubscribe — live перезагрузка pending.**
 - [ ] Утечки событий: многократное открытие/закрытие панели не дублирует обработчики (Double.Subscribe → N подписок).
-визуально проблем не вижу
+визуально проблем не вижу — **статика 2026-08-21: `InformationPanelHandler`/`SonneController` `Awake` Subscribe ↔ `OnDestroy` Unsubscribe сбалансированы (`SonneController.cs:65,136-137,156-170`, `InformationPanelHandler` аналогично) — live multi open/close pending.**
 
 Static Source check: `InformationPanelHandler` и `SonneController` симметрично отписываются; live-проверка остаётся.
 ## Замечания / результаты
