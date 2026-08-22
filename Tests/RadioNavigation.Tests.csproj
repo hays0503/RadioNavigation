@@ -21,6 +21,7 @@
     <Compile Include="Stubs\UnityEngineMathf.cs" />
     <Compile Include="Stubs\UnityEngineDebug.cs" />
     <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />
+    <Compile Include="Stubs\UnityEngineTransform.cs" />
     <Compile Include="Stubs\GameStubs.cs" />
     <Compile Include="StoryDecisionGatewayTests.cs" />
     <Compile Include="SkipTestException.cs" />
@@ -47,6 +48,10 @@
     <Compile Include="ShieldTests.cs" />
     <Compile Include="AstroMathTests.cs" />
     <Compile Include="StarCatalogTests.cs" />
+    <Compile Include="LighthouseVisualModelTests.cs" />
+    <Compile Include="LighthouseMarkerSizingTests.cs" />
+    <Compile Include="RadioNavDiagnosticsTests.cs" />
+    <Compile Include="TransformHelpersTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -76,6 +81,10 @@
     <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />
     <Compile Include="..\Source\Data\StarCatalog.cs" Link="Source\Data\StarCatalog.cs" />
     <Compile Include="..\Source\Logic\StoryDecisionGateway.cs" Link="Source\Logic\StoryDecisionGateway.cs" />
+    <Compile Include="..\Source\Logic\LighthouseVisualModel.cs" Link="Source\Logic\LighthouseVisualModel.cs" />
+    <Compile Include="..\Source\Logic\LighthouseMarkerSizing.cs" Link="Source\Logic\LighthouseMarkerSizing.cs" />
+    <Compile Include="..\Source\Logic\RadioNavDiagnostics.cs" Link="Source\Logic\RadioNavDiagnostics.cs" />
+    <Compile Include="..\Source\Logic\TransformHelpers.cs" Link="Source\Logic\TransformHelpers.cs" />
   </ItemGroup>
 
 </Project>

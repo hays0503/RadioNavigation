@@ -79,6 +79,14 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            // Planets follow the star sky: only outside the boat.
+            bool outside = SkyVisibilityResolver.IsPlayerOutside();
+            if (!outside)
+            {
+                meshRenderer.enabled = false;
+                return;
+            }
+
             if (material != null)
                 material.color = new Color(1f, 1f, 1f, SkyVisibilityResolver.GetVisibility());
 

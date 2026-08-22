@@ -49,6 +49,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static LighthousePlacer instance;
 
+        /// <summary>
+        /// The most recently placed lighthouse sandbox entity. The mod's own
+        /// map marker (LighthouseMapMarker) uses it for positioning.
+        /// </summary>
+        public static SandboxEntity LighthouseEntity;
+
         private sealed class Placement
         {
             public readonly LighthouseProfile Profile;
@@ -184,6 +190,14 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 placement.Group = existing;
                 placement.RotatorWaitAttempts = 0;
+                LighthouseEntity = existing.Entities.Count > 0 ? existing.Entities[0] : null;
+                // Old saves may carry the entity with DisplayInUI/IsPublic
+                // true — reset so the game stops creating its own marker.
+                for (int i = 0; i < existing.Entities.Count; i++)
+                {
+                    existing.Entities[i].DisplayInUI = false;
+                    existing.Entities[i].IsPublic = false;
+                }
                 Debug.Log(LogPrefix + " '" + placement.GroupName +
                     "': group already exists; reusing (entities=" + existing.Entities.Count + ")");
                 return true;
@@ -221,9 +235,13 @@ namespace UBOAT.Mods.RadioNavigation
 
                 SandboxEntity entity = SandboxEntity.Create(placement.GroupName, blueprint);
                 entity.Enabled = true;
+                // The map marker is the mod's own (LighthouseMapMarker) — keep
+                // the entity out of the game's EntityMarkersManager so no
+                // duplicate Unknown-icon marker is created.
                 entity.DisplayInUI = false;
                 entity.IsPublic = false;
                 entity.RandomizeSpawnPosition = false;
+                LighthouseEntity = entity;
 
                 group.AddEntity(entity);
                 entity.Position = position;
@@ -283,7 +301,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            Transform rotator = FindChildRecursive(container.transform, placement.Profile.RotatorObjectName);
+            Transform rotator = TransformHelpers.FindChildRecursive(container.transform, placement.Profile.RotatorObjectName);
             if (rotator.IsNull())
             {
                 placement.RotatorWaitAttempts++;
@@ -450,27 +468,6 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Debug.Log(LogPrefix + " prefab resolved: '" + prefabName + "'");
                 return prefabName;
-            }
-            return null;
-        }
-
-        private static Transform FindChildRecursive(Transform root, string name)
-        {
-            if (root.IsNull())
-            {
-                return null;
-            }
-            if (root.name == name)
-            {
-                return root;
-            }
-            for (int i = 0; i < root.childCount; i++)
-            {
-                Transform found = FindChildRecursive(root.GetChild(i), name);
-                if (found.IsNotNull())
-                {
-                    return found;
-                }
             }
             return null;
         }

@@ -228,9 +228,11 @@ namespace UBOAT.Mods.RadioNavigation
                     }
                 }
 
-                RadioInstaller.Instantiate(radio, viewport);
+RadioInstaller.Instantiate(radio, viewport);
                 if (radio.GetComponent<StationMapOverlay>().IsNull())
                     radio.AddComponent<StationMapOverlay>();
+                if (radio.GetComponent<LighthouseMapMarker>().IsNull())
+                    radio.AddComponent<LighthouseMapMarker>();
 
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +

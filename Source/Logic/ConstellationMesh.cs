@@ -24,6 +24,7 @@ namespace UBOAT.Mods.RadioNavigation
         private Vector3 lastCamPos;
         private double lastLstDeg;
         private float lastLat;
+        private float lastLogTime;
 
         private readonly List<Vector3> vertices = new List<Vector3>();
         private readonly List<int> triangles = new List<int>();
@@ -63,6 +64,13 @@ namespace UBOAT.Mods.RadioNavigation
         {
             Camera cam;
             if (!CameraResolver.TryResolve(out cam))
+                return;
+
+            // Constellation lines follow the star sky: only outside the boat.
+            bool outside = SkyVisibilityResolver.IsPlayerOutside();
+            if (meshRenderer.enabled != outside)
+                meshRenderer.enabled = outside;
+            if (!outside)
                 return;
 
             float lat, lon;
@@ -147,8 +155,11 @@ namespace UBOAT.Mods.RadioNavigation
             mesh.SetColors(colors);
             mesh.RecalculateBounds();
 
-            if (visibleSegments > 0)
+            if (visibleSegments > 0 && Time.time - lastLogTime > 5f)
+            {
+                lastLogTime = Time.time;
                 Debug.Log($"[RadioNav][ConstellationMesh] Rendered {visibleSegments} line segments");
+            }
         }
 
         private void AddLineSegment(Vector3 p0, Vector3 p1, float width)

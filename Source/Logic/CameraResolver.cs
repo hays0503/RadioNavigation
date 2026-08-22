@@ -21,8 +21,11 @@ namespace UBOAT.Mods.RadioNavigation
         private const float WorldRadiusM = 3900f;
 
         /// <summary>
-        /// Резолвит камеру текущего вида. Приоритет как у LighthouseBeamGlow:
-        /// 1. Camera.main 2. Periscope device 3. hook 4. FindScreenCamera
+        /// Резолвит камеру текущего вида. Приоритет:
+        /// 1. Periscope/device camera (Generic mode) — она реально рисует
+        ///    картинку в перископе/бинокле/UZO, позиционирование по ней
+        ///    совпадает с экраном.
+        /// 2. Camera.main 3. hook 4. FindScreenCamera
         /// </summary>
         public static bool TryResolve(out Camera cam)
         {
@@ -33,12 +36,17 @@ namespace UBOAT.Mods.RadioNavigation
 
             Camera candidate = null;
 
-            Camera main = Camera.main;
-            if (main != null && main.gameObject.activeInHierarchy && !IsUtilityCamera(main))
-                candidate = main;
+            // Device cameras (periscope/binocular/UZO render into a
+            // RenderTexture) must win over Camera.main: the screen shows
+            // their output, so WorldToScreenPoint must use them.
+            candidate = ResolveDeviceCamera();
 
             if (candidate == null)
-                candidate = ResolveDeviceCamera();
+            {
+                Camera main = Camera.main;
+                if (main != null && main.gameObject.activeInHierarchy && !IsUtilityCamera(main))
+                    candidate = main;
+            }
 
             if (candidate == null && renderingCamera != null &&
                 renderingCamera.gameObject.activeInHierarchy && !IsUtilityCamera(renderingCamera))
@@ -72,6 +80,35 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (gameMainCamera == null) return false;
             try { return gameMainCamera.CurrentMode.ToString() == "Map"; } catch { return false; }
+        }
+
+        /// <summary>
+        /// True when the camera is the active periscope/binocular device
+        /// camera (Generic mode with a PeriscopeController external
+        /// controller). Shared with LighthouseBeamGlow (ADR-018 follow-up:
+        /// the device-camera check lived in two places).
+        /// </summary>
+        public static bool IsDeviceCamera(MainCamera mainCamera, Camera cam)
+        {
+            if (mainCamera == null || cam == null)
+            {
+                return false;
+            }
+            try
+            {
+                if (mainCamera.CurrentMode.ToString() == "Generic" &&
+                    mainCamera.GenericController.IsNotNull() &&
+                    mainCamera.GenericController.ExternalController is UBOAT.Game.Scene.Camera.ExternalControllers.PeriscopeController pc &&
+                    pc.IsNotNull() && pc.Periscope.IsNotNull())
+                {
+                    return ReferenceEquals(pc.Periscope.PeriscopeCamera, cam);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[RadioNav][CameraResolver] device camera check failed: " + e.Message);
+            }
+            return false;
         }
 
         public static void InstallOnce()

@@ -298,8 +298,49 @@ Audio Thread:
 
 **Note**: 0% test coverage (no test project exists). See F22, F45 (ADR-007 — changed to Deferred).
 
+## 9. Lighthouse Subsystem (добавлено 2026-08-22)
+
+### 9.1 Компоненты
+
+| Компонент | Файл | Ответственность |
+|-----------|------|-----------------|
+| **LighthousePlacer** | `Source/Logic/LighthousePlacer.cs` | Спавн prefab `lighthouse` как sandbox-сущности (группа публичная, сущность `DisplayInUI=false`/`IsPublic=false`), attach `LighthouseRotator`, связывание с `LighthouseBeamGlow`; статик `LighthouseEntity` для маркера |
+| **LighthouseRotator** | `Source/Logic/LighthouseRotator.cs` | Вращение фонарной сборки (`LighthouseRotator` child) на `RotationDegreesPerSecond` |
+| **LighthouseBeamGlow** | `Source/Logic/LighthouseBeamGlow.cs` | Свет маяка: HDRPLensFlare (без лимита дистанции в device-режиме, +25% размер), screen-space dot+streak fallback, Spot Light boost, `_RotationOffset` окон; позиция света = `Spot Light` (ADR-028) |
+| **LighthouseMapMarker** | `Source/UI/LighthouseMapMarker.cs` | Собственный маркер на карте: world-space canvas под `EntityMarkersManager`, pixel-сайзинг 25→50 px, hover(имя)/click(имя+характеристика), зачистка стейловых игровых маркеров (ADR-027) |
+| **StationMapOverlay** | `Source/UI/StationMapOverlay.cs` | Точки станций Consol/Sonne на карте (MapPointUI-дубликаты, без записи в charting DB) |
+| **CameraResolver** | `Source/Logic/CameraResolver.cs` | Общий резолвер камеры для маяка и звезды (ADR-018) |
+
+### 9.2 Зависимости
+
+```
+LighthousePlacer
+  ├──► LighthouseProfiles (данные профилей)
+  ├──► LighthouseRotator (attach)
+  └──► LighthouseBeamGlow (Initialize)
+
+LighthouseMapMarker
+  ├──► LighthousePlacer.LighthouseEntity (позиция)
+  ├──► LighthouseProfiles (имя + характеристика для тултипа)
+  ├──► EntityMarkersManager (родитель-канвас, масштаб)
+  └──► ResourceManager (спрайт IconLighthouse из бандла)
+
+LighthouseBeamGlow
+  ├──► CameraResolver (рендер-камера)
+  ├──► LighthouseVisualModel (перцепционная модель света)
+  └──► SkyVisibilityResolver (туман)
+```
+
+### 9.3 Тестируемость
+
+| Компонент | Тестируемость | Примечание |
+|-----------|---------------|------------|
+| LighthouseVisualModel | ✅ High | Чистая математика (LighthouseVisualModelTests) |
+| LighthouseProfile(s) | ✅ High | Данные (LighthouseProfileTests) |
+| LighthousePlacer/BeamGlow/MapMarker | ❌ Low | MonoBehaviour + игра |
+
 ----
 
-*Document Version: 1.2*  
-*Last Updated: 2026-08-01*  
+*Document Version: 1.3*  
+*Last Updated: 2026-08-22*  
 *Corrections: Fixed component hierarchy (flat structure, added ComparisonExtensions), fixed array sizes 4→14 (F48), file counts (F49), added missing classes (F52). See F65–F199 (total 199 issues). See F45–F52 for SAD drift corrections.*

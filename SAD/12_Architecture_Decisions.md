@@ -32,6 +32,8 @@
 | ADR-024 | Луна (low-precision RA/Dec + фаза) | Accepted | 2026-08-19 |
 | ADR-025 | STAR_SKY использует GameTime.GmtDateTime | Accepted | 2026-08-19 |
 | ADR-026 | STAR_SKY visibility по Weather.Sky | Accepted | 2026-08-19 |
+| ADR-027 | Собственный маркер маяка на карте (LighthouseMapMarker) | Accepted | 2026-08-22 |
+| ADR-028 | Геометрия бандла = истина; свет на Spot Light; flare без лимита в device-режиме | Accepted | 2026-08-22 |
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 

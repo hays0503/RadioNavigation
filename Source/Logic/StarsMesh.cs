@@ -26,6 +26,7 @@ namespace UBOAT.Mods.RadioNavigation
         private Quaternion lastCamRot;
         private double lastLstDeg;
         private float lastLat;
+        private float lastLogTime;
 
         private readonly List<Vector3> vertices = new List<Vector3>();
         private readonly List<int> triangles = new List<int>();
@@ -70,6 +71,14 @@ namespace UBOAT.Mods.RadioNavigation
         {
             Camera cam;
             if (!CameraResolver.TryResolve(out cam))
+                return;
+
+            // Star sky is visible only from outside the boat (bridge/deck):
+            // hidden inside (periscope, interior) and on the map.
+            bool outside = SkyVisibilityResolver.IsPlayerOutside();
+            if (meshRenderer.enabled != outside)
+                meshRenderer.enabled = outside;
+            if (!outside)
                 return;
 
             float lat, lon;
@@ -147,8 +156,11 @@ namespace UBOAT.Mods.RadioNavigation
             mesh.SetUVs(0, uvs);
             mesh.RecalculateBounds();
 
-            if (visibleCount > 0)
+            if (visibleCount > 0 && Time.time - lastLogTime > 5f)
+            {
+                lastLogTime = Time.time;
                 Debug.Log($"[RadioNav][StarsMesh] Rendered {visibleCount}/{StarCatalog.Stars.Length} stars");
+            }
         }
 
         private void AddBillboardQuad(Vector3 center, Vector3 forward, float size, Color color)
