@@ -1,11 +1,17 @@
-﻿namespace UBOAT.Mods.RadioNavigation
+﻿using System;
+
+namespace UBOAT.Mods.RadioNavigation
 {
     public struct ConsolCycleConfig
     {
+        public float CycleDurationSeconds;
         public float DotSoundMs;
         public float DashSoundMs;
         public float ElementPeriodMs;
         public float EquisignalMs;
+        public float CallsignDotSoundMs;
+        public float CallsignDashSoundMs;
+        public float CallsignElementPeriodMs;
         public float PreNavPauseMs;
         public float PostNavSilenceMs;
         public int MaxNavigationCount;
@@ -18,25 +24,68 @@
         // SonneSignalGenerator carries its own sector constants.
         public static readonly ConsolCycleConfig Cycle120s = new ConsolCycleConfig
         {
-            DotSoundMs = 125f,
-            DashSoundMs = 875f,
+            CycleDurationSeconds = 120f,
+            DotSoundMs = 200f,
+            DashSoundMs = 400f,
             ElementPeriodMs = 1000f,
             EquisignalMs = 1000f,
+            CallsignDotSoundMs = 125f,
+            CallsignDashSoundMs = 875f,
+            CallsignElementPeriodMs = 1000f,
             PreNavPauseMs = 3000f,
-            PostNavSilenceMs = 1000f,
+            PostNavSilenceMs = 3000f,
             MaxNavigationCount = 60,
             DegPerSign = 5f / 60f,
             SectorWidthDeg = 5f
         };
 
-        public static ConsolCycleConfig GetForCycleDuration(int cycleDurationSeconds)
+        public static readonly ConsolCycleConfig Cycle40s = new ConsolCycleConfig
+        {
+            CycleDurationSeconds = 40f,
+            DotSoundMs = 200f,
+            DashSoundMs = 400f,
+            ElementPeriodMs = 1000f,
+            EquisignalMs = 1000f,
+            CallsignDotSoundMs = 62.5f,
+            CallsignDashSoundMs = 437.5f,
+            CallsignElementPeriodMs = 500f,
+            PreNavPauseMs = 3000f,
+            PostNavSilenceMs = 3000f,
+            MaxNavigationCount = 60,
+            DegPerSign = 5f / 60f,
+            SectorWidthDeg = 5f
+        };
+
+        public static readonly ConsolCycleConfig Cycle60s = new ConsolCycleConfig
+        {
+            CycleDurationSeconds = 60f,
+            DotSoundMs = 200f,
+            DashSoundMs = 400f,
+            ElementPeriodMs = 1000f,
+            EquisignalMs = 1000f,
+            CallsignDotSoundMs = 125f,
+            CallsignDashSoundMs = 875f,
+            CallsignElementPeriodMs = 1000f,
+            PreNavPauseMs = 3000f,
+            PostNavSilenceMs = 3000f,
+            MaxNavigationCount = 60,
+            DegPerSign = 5f / 60f,
+            SectorWidthDeg = 5f
+        };
+
+        public static ConsolCycleConfig GetForCycleDuration(float cycleDurationSeconds)
         {
             if (!Cycle120s.IsValid())
                 UnityEngine.Debug.LogWarning("[RadioNav] ConsolCycleConfig.Cycle120s is invalid");
-            // F164: only the 120 s cycle is implemented; surface any other
-            // request so a future cycle silently mapping onto 120 s is visible.
-            if (cycleDurationSeconds != 120)
-                UnityEngine.Debug.LogWarning("[RadioNav] ConsolCycleConfig: only the 120 s cycle is supported, got " + cycleDurationSeconds + " s");
+
+            if (Math.Abs(cycleDurationSeconds - 40f) < 0.01f)
+                return Cycle40s;
+            if (Math.Abs(cycleDurationSeconds - 60f) < 0.01f)
+                return Cycle60s;
+            if (Math.Abs(cycleDurationSeconds - 120f) < 0.01f)
+                return Cycle120s;
+
+            UnityEngine.Debug.LogWarning("[RadioNav] Unsupported Consol cycle duration: " + cycleDurationSeconds + " s");
             return Cycle120s;
         }
 
@@ -49,6 +98,10 @@
                 && ElementPeriodMs >= DotSoundMs
                 && ElementPeriodMs >= DashSoundMs
                 && EquisignalMs > 0
+                && CallsignDotSoundMs > 0
+                && CallsignDashSoundMs > 0
+                && CallsignElementPeriodMs >= CallsignDotSoundMs
+                && CallsignElementPeriodMs >= CallsignDashSoundMs
                 && PreNavPauseMs >= 0
                 && PostNavSilenceMs >= 0
                 && MaxNavigationCount > 0

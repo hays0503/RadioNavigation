@@ -1,6 +1,6 @@
 namespace UBOAT.Mods.RadioNavigation
 {
-    // F200: world units <-> degrees, exactly mirrored by the game's
+    // World units <-> degrees, exactly mirrored by the game's
     // WorldPosition (x = longitude, y = latitude; 1 unit = 1/111.3198888888889 degree).
     // Pure static so the fix pipeline stays testable without the game installed.
     public static class GeoPositionConverter

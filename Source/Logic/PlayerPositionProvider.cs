@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
-    // F200: feeds the player submarine's world position into the fix pipeline.
+    // Feeds the player submarine's world position into bearing calculations.
     // The game keeps the ship in the static field Entity.playerShip;
     // PlayerShip.SandboxPlayerShip.Position is a Vector2 in world units where
     // 1 unit = 1/111.3198888888889 degree (the exact factor mirrored by
@@ -40,8 +40,14 @@ namespace UBOAT.Mods.RadioNavigation
                     return false;
 
                 Vector2 position = (Vector2)ResolvePositionProperty(sandbox.GetType()).GetValue(sandbox, null);
+                // SandboxGroup starts with an uninitialized (NaN, NaN) position
+                // before the scene finishes placing the player ship. Do not let
+                // that value mark the fix pipeline as available permanently.
+                if (!IsFinite(position.x) || !IsFinite(position.y))
+                    return false;
+
                 GeoPositionConverter.ToLatLong(position.x, position.y, out latitude, out longitude);
-                return true;
+                return IsFinite(latitude) && IsFinite(longitude);
             }
             catch
             {
@@ -74,5 +80,8 @@ namespace UBOAT.Mods.RadioNavigation
                     BindingFlags.Public | BindingFlags.Instance);
             return positionProperty;
         }
+
+        private static bool IsFinite(float value) =>
+            !float.IsNaN(value) && !float.IsInfinity(value);
     }
 }

@@ -1,6 +1,6 @@
 # RadioNavigation
 
-Мод для UBOAT: панель радионавигационных маяков CONSOLE/Sonne с синтезом звука и вычислением позиции.
+Мод для UBOAT: панель радионавигационных маяков CONSOLE/Sonne с синтезом звука.
 
 - **Версия:** 2.1
 - **Автор:** testui
@@ -11,7 +11,6 @@
 - Панель радио: включение приёмника, переключение наземного/секторного режима (ground/zone), настройка громкости и обратной связи
 - 14 маяков Consol/Sonne (5 диапазонов), сигналы синтезируются DSP-кодом (`OnAudioFilterRead`, без аудиофайлов)
 - Декодирование позывных азбукой Морзе, анализ сигнальных паттернов
-- Определение позиции (секторные пересечения, геодезические расчёты)
 
 ## Установка
 
@@ -22,14 +21,14 @@
 ## Сборка
 
 ```powershell
-powershell -File build.ps1 [-GamePath <path>]  # локальная DLL (для IDE-проверок)
-dotnet build radionavigation.csproj            # Release+Debug, эталонный билд
-dotnet run --project "Tests\Runner\Runner.csproj"   # тесты (170/170)
+powershell -ExecutionPolicy Bypass -File build.ps1 [-GamePath <path>]  # локальная DLL (для IDE-проверок)
+dotnet build radionavigation.csproj -c Release -c Debug        # Release+Debug, эталонный билд (0 errors, MSB3277 warn ожидаем)
+powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (182/182, baseline ADR-014)
 ```
 
 ## Структура репозитория
 
-- `Source/` — код мода: `Data/` (конфиги маяков/диапазонов), `Logic/` (ядро: морзе, паттерны, позиционирование), `Sound/` (DSP-синтез), `UI/` (обработчики uGUI)
+- `Source/` — код мода: `Data/` (конфиги маяков/диапазонов), `Logic/` (ядро: морзе, паттерны, пеленги), `Sound/` (DSP-синтез), `UI/` (обработчики uGUI)
 - `Tests/` — юнит-тесты (без Unity)
 - `SAD/` — документ архитектуры (16 глав)
 - `refactoring-plan/` — аудит: 207 гипотез, статусы в `hypothesis/INDEX.md`, неисправленное в `DEFERRED.md`
@@ -38,7 +37,7 @@ dotnet run --project "Tests\Runner\Runner.csproj"   # тесты (170/170)
 ## Статус качества
 
 - Аудит рефакторинга: **207/207 гипотез закрыты** (163 исправлено, 23 отложено, 8 подтверждено без правок, 13 отклонено)
-- Тесты: **170/170 PASS**, сборка Release+Debug без ошибок
+- Тесты: **182/182 PASS** (baseline `baseline-182-20260819` на `8b3021fa`, ADR-014), сборка Release+Debug без ошибок
 - Отложено (live-проверка в игре): угол ручки спиннера (F202), селективность приёмника (F203), характер шума (F71)
 
 ## История

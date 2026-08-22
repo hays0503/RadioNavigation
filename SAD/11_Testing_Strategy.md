@@ -1,12 +1,12 @@
 # Testing Strategy — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-02):** Инфраструктура тестов РЕАЛИЗОВАНА (F22): xunit 2.9 + собственный раннер (`Tests/Runner`), **167 тестов PASS** (157 базовых + GeoMath после F12/F73). Команда: `dotnet run --project "Tests\Runner\Runner.csproj"`. ADR-007 имеет статус «Deferred» (F45, исправлено) — полный охват интеграционных/производительных тестов остаётся целевым. Всего **207 проблем** (F01–F207), статусы — в `refactoring-plan/hypothesis/INDEX.md`. Секции 3.x содержат целевые примеры тестов (не обязательно совпадают с реальными файлами); актуальные тесты — в `Tests/`.
+> **⚠️ Baseline (2026-08-19, ADR-014):** Инфраструктура тестов РЕАЛИЗОВАНА (F22): xunit 2.9 + собственный раннер (`Tests/Runner`), **182 теста PASS** (`baseline-182-20260819` на `8b3021fa`, `powershell -ExecutionPolicy Bypass -File tests.ps1`). `dotnet build -c Release -c Debug` 0 errors. ADR-007 «Deferred» (F45) — полный охват интеграционных/производительных тестов целевой (см. `docs/adr/ADR-014-baseline.md`). Секции 3.x — целевые примеры (могут не совпадать с `Tests/`).
 
 ## 1. Testing Overview
 
 | Test Type | Coverage Target | Current | Priority |
 |-----------|-----------------|---------|----------|
-| Unit Tests | >60% | 167 PASS (core logic, без Unity) | High |
+| Unit Tests | >60% | 182 PASS (baseline ADR-014, core logic без Unity) | High |
 | Integration Tests | >80% | Частично (DspPipeline, StationScheduler) | Medium |
 | Manual Testing | 100% | Partial (см. Фазу live-валидации) | Medium |
 | Performance Tests | Baseline + 10% | None | Low |
@@ -19,7 +19,7 @@ Tests/  [xunit 2.9 + собственный раннер Tests/Runner; без Un
 ├── ConsolCycleConfigTests.cs   ├── MorseTimingTests.cs
 ├── ComparisonExtensionsTests.cs├── NavigationPatternTests.cs
 ├── DialConfigTests.cs          ├── PlayerPositionProviderTests.cs
-├── DspPipelineTests.cs         ├── PositionFixCalculatorTests.cs
+├── DspPipelineTests.cs         ├── SonneBeamTests.cs
 ├── GeoMathTests.cs             ├── SignalRichTextFormatterTests.cs
 ├── MorseAlphabetTests.cs       ├── SignalTypesTests.cs
 ├── AudioSynthesisEngineTests.cs├── SonneSignalGeneratorTests.cs
@@ -96,67 +96,6 @@ public class DialConfigTests {
 ```
 
 ### 3.2 Logic Layer Tests
-
-#### PositionFixCalculatorTests.cs
-
-```csharp
-[TestFixture]
-public class PositionFixCalculatorTests {
-    [Test]
-    public void Calculate_TwoStations_FindsIntersection() {
-        var measurements = new List<Measurement> {
-            new Measurement { StationLat = 54.79f, StationLon = 9.43f, Bearing = 45f },
-            new Measurement { StationLat = 54.09f, StationLon = 8.89f, Bearing = 135f }
-        };
-        
-        var result = PositionFixCalculator.Calculate(measurements);
-        
-        Assert.That(result, Is.Not.Null);
-        Assert.That(result.Latitude, Is.InRange(53f, 56f));
-        Assert.That(result.Longitude, Is.InRange(8f, 11f));
-    }
-    
-    [Test]
-    public void Calculate_PerpendicularBearings_MinimalError() {
-        var measurements = new List<Measurement> {
-            new Measurement { StationLat = 54.79f, StationLon = 9.43f, Bearing = 0f },
-            new Measurement { StationLat = 54.09f, StationLon = 8.89f, Bearing = 90f }
-        };
-        
-        var result = PositionFixCalculator.Calculate(measurements);
-        
-        Assert.That(result.ErrorKm, Is.LessThan(5f));
-    }
-    
-    [Test]
-    public void Calculate_SameBearing_DegenerateCase() {
-        var measurements = new List<Measurement> {
-            new Measurement { StationLat = 54.79f, StationLon = 9.43f, Bearing = 45f },
-            new Measurement { StationLat = 54.09f, StationLon = 8.89f, Bearing = 45f }
-        };
-        
-        var result = PositionFixCalculator.Calculate(measurements);
-        
-        Assert.That(result, Is.Not.Null);
-        Assert.That(result.ErrorKm, Is.GreaterThan(10f));
-    }
-    
-    [Test]
-    public void GetDistanceKm_SamePoint_ReturnsZero() {
-        float distance = PositionFixCalculator.GetDistanceKm(
-            54.79f, 9.43f, 54.79f, 9.43f);
-        Assert.That(distance, Is.EqualTo(0f));
-    }
-    
-    [Test]
-    public void GetDistanceKm_KnownDistance_ReturnsCorrect() {
-        // Approximate distance between Flensburg and Kiel
-        float distance = PositionFixCalculator.GetDistanceKm(
-            54.79f, 9.43f, 54.32f, 10.14f);
-        Assert.That(distance, Is.InRange(40f, 60f));
-    }
-}
-```
 
 #### MorseAlphabetTests.cs
 
@@ -289,7 +228,6 @@ public class DspPipelineTests {
 | AudioPipelineTests.cs | ✘ отклонено (F47) | AudioPipeline не существует |
 | StationManagerTests.cs | ✘ отклонено (F47) | StationManager не существует |
 | SignalDecoderTests.cs | ✘ отклонено (F47) | SignalDecoder не существует |
-| PositionTrackerTests.cs | ✘ отклонено (F47) | PositionTracker не существует |
 
 Реальные цели интеграции: `SonneController.UpdateStationGains()`, `StationScheduler.Tick()`, `AudioSynthesisEngine.Tick()` — покрыты соответствующими тестовыми файлами (насколько возможно без Unity-рантайма).
 
@@ -393,8 +331,8 @@ public static class TestMeasurements {
 ```bash
 # xunit + самописный раннер (dotnet test неприменим: тестовый проект линкует
 # исходники мода напрямую, без сборки игровой DLL)
-dotnet run --project "Tests\Runner\Runner.csproj"
-# ожидаемый результат: "Passed: 167, Failed: 0"
+powershell -ExecutionPolicy Bypass -File tests.ps1
+# ожидаемый результат: "Passed: 182, Failed: 0" (baseline ADR-014)
 ```
 
 ### 8.2 Run Specific Test Category
@@ -431,6 +369,6 @@ dotnet run --project "Tests\Runner\Runner.csproj"
 
 ---
 
-*Document Version: 2.0*  
-*Last Updated: 2026-08-02*  
-*Updated: инфраструктура реализована (F22), 167 тестов PASS; статусы F01–F207 в `refactoring-plan/hypothesis/INDEX.md`.*
+*Document Version: 2.1*  
+*Last Updated: 2026-08-19 (ADR-014 baseline 182, tag baseline-182-20260819)*  
+*Updated: 182 PASS; статусы F01–F207 в `refactoring-plan/hypothesis/INDEX.md`.*

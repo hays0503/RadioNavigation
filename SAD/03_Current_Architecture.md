@@ -34,7 +34,7 @@
 │  │  • Navigation Calculation                      │                  │
 │  │  • Signal Decoding                             │                  │
 │  │  • Audio Coordination                          │                  │
-│  │  • Position Tracking                           │                  │
+│  │  • Bearing Diagnostics                         │                  │
 │  └──────┬───────────────┬───────────────┬───────┘                  │
 │         │               │               │                          │
 │  ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐                  │
@@ -42,11 +42,11 @@
 │  │ (Scheduler) │ │ (Keyer)     │ │ (Morse)     │                  │
 │  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
 │         │               │               │                          │
-│  ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐                  │
-│  │NavPattern   │ │SonneSignal  │ │PositionFix  │                  │
-│  │ (Patterns)  │ │Generator    │ │Calculator   │                  │
-│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
-│         │               │               │                          │
+│  ┌──────┴──────┐ ┌──────┴──────┐                            │
+│  │NavPattern   │ │SonneSignal  │                            │
+│  │ (Patterns)  │ │Generator    │                            │
+│  └──────┬──────┘ └──────┬──────┘                            │
+│         │               │                                    │
 │  ┌──────┴──────┐ ┌──────┴──────┐                                 │
 │  │RadioStory   │ │Comparison   │                                 │
 │  │Integration  │ │Extensions   │                                 │
@@ -90,15 +90,15 @@
 
 ## 2. File Statistics
 
-**NOTE**: Corrected from original SAD which had wrong counts (see F49).
+**NOTE**: Corrected from original SAD which had wrong counts (see F49). Counts refreshed 2026-08-22 (lighthouse + star sky subsystems added).
 
 | Layer | Files | Total Lines | Avg Lines/File |
 |-------|-------|-------------|----------------|
-| UI | 15 | ~1,280 | ~85 |
-| Logic | 12 | ~2,340 | ~195 |
-| Data | 5 | ~660 | ~132 |
-| Sound | 2 | ~340 | ~170 |
-| **Total** | **34** | **~4,197** | **~123** |
+| UI | 21 | ~3,494 | ~166 |
+| Logic | 29 | ~6,423 | ~221 |
+| Data | 10 | ~6,495 | ~650 |
+| Sound | 2 | ~367 | ~184 |
+| **Total** | **62** | **~16,779** | **~271** |
 
 ## 3. Component Details
 
@@ -216,11 +216,6 @@
 - **Lines**: 146
 - **Responsibility**: Generate bearing tables and signal data
 - **Issues**: Duplicates BeaconData.GetDotCountToBearingTable(). BearingTable is dead code (F34/F35)
-
-#### PositionFixCalculator.cs (Position Calculator)
-- **Lines**: 224
-- **Responsibility**: Calculate position from bearing measurements
-- **Issues**: ErrorKm always returns 0, mutable struct measurements
 
 #### RadioStoryIntegration.cs (Game Integration)
 - **Lines**: 381

@@ -51,7 +51,6 @@ Community 1: Logic Layer (12 nodes)
 ├── MorseAlphabet
 ├── NavigationPattern
 ├── SonneSignalGenerator
-├── PositionFixCalculator
 ├── MorseTiming
 ├── ComparisonExtensions
 ├── NavigationElementType

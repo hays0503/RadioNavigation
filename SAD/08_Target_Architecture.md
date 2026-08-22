@@ -32,12 +32,12 @@
 │  │ ⚠ IRadioState │ │ ⚠ IStationData│ │ ⚠ IAudioOutput│               │
 │  └──────┬───────┘ └──────┬───────┘ └──────┬───────┘               │
 │         │               │               │                          │
-│  ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐                  │
-│  │ ⚠ IGameServ │ │ ⚠ IPositionC│ │ ⚠ IMorseDec │                  │
-│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                  │
-└─────────┼───────────────┼───────────────┼──────────────────────────┘
-          │               │               │
-          ▼               ▼               ▼
+│  ┌──────┴──────┐ ┌──────┴──────┐                            │
+│  │ ⚠ IGameServ │ │ ⚠ IMorseDec │                            │
+│  └──────┬──────┘ └──────┬──────┘                            │
+└─────────┼───────────────┼────────────────────────────────────┘
+          │               │
+          ▼               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │          Logic Layer (⚠ proposed classes NOT implemented)           │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐               │
@@ -142,12 +142,6 @@ public interface IGameServices {
     void NotifyUpdated(object story);
 }
 
-// ⚠ IPositionCalculator.cs — NOT implemented (F18)
-public interface IPositionCalculator {
-    FixResult Calculate(List<Measurement> measurements);
-    float GetDistanceKm(float lat1, float lon1, float lat2, float lon2);
-}
-
 // ⚠ IMorseDecoder.cs — NOT implemented
 public interface IMorseDecoder {
     char[] DecodeElements(int[] elements);
@@ -218,12 +212,6 @@ BEFORE: SonneController (508 lines — ⚠ F50: was 506 in SAD)
     │   ├── OnStationElementCompleted()
     │   ├── DecodeCallsignBuffer()
     │   └── GetSignalRichText()
-    │
-    ├── ⚠ PositionTracker.cs (~60 lines) [proposed, F47]
-    │   ├── measurements
-    │   ├── lastFix
-    │   ├── UpdatePosition()
-    │   └── GetPositionFix()
     │
     └── ⚠ DiagnosticsCollector.cs (~30 lines) [⚠ proposed, F47]
         ├── GetStationDiagnostics()

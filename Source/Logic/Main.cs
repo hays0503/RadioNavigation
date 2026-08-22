@@ -19,8 +19,11 @@ namespace UBOAT.Mods.RadioNavigation
     {
         // F176: single source of truth for the game UI container lookup.
         private const string MainSceneViewportPath = "/GUI/Viewport";
+        private const string RadioRootName = "RadioNavigationPanel";
 
-        [Inject] private static ResourceManager resourceManager;
+        // DI assigns this field during mod initialization; explicit default
+        // keeps standalone Roslyn builds free of CS0649.
+        [Inject] private static ResourceManager resourceManager = null;
         [NonSerializedInGameState] private Harmony harmony;
         private static bool loaded;
 
@@ -32,6 +35,9 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 harmony?.UnpatchAll(harmony.Id); // F139: bare UnpatchAll() removes other mods' patches; 0Harmony 2.2.2 has no UnpatchSelf
                 RadioStoryIntegration.ResetRuntimeState();
+                LighthousePlacer.Reset();
+                LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
+                GameTimeResolver.Reset();
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
             }
 
@@ -174,6 +180,12 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
 
+                if (viewport.Find(RadioRootName).IsNotNull())
+                {
+                    Debug.Log("[RadioNav][Main] Existing stable RadioNavigation panel found");
+                    return;
+                }
+
                 Debug.Log("[RadioNav][Main] InstantiatePrefab(\"Radio\") from resourceManager \u2014 AssetBundle Bundles/testui expected to be loaded by game mod loader");
                 GameObject radio = resourceManager.InstantiatePrefab("Radio");
                 if (radio.IsNull())
@@ -182,7 +194,20 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
 
-                string[] requiredChildren = { "CursorSpinner", "Toggle", "Ground", "Ground/Background", "Ground/Background/GroundCheckmark", "Expander", "RadioZone", "VolumeSpinner", "FeedbackSpinner" };
+                radio.name = RadioRootName;
+
+                // ADR-019: централизовано через PrefabNames (best practice, не строковые литералы) + degraded open
+                string[] requiredChildren = {
+                    PrefabNames.Cursor,
+                    PrefabNames.Toggle,
+                    PrefabNames.Ground,
+                    PrefabNames.Ground + "/" + PrefabNames.Background,
+                    PrefabNames.Ground + "/" + PrefabNames.Background + "/" + PrefabNames.GroundCheckmark,
+                    PrefabNames.Expander,
+                    PrefabNames.RadioZone,
+                    PrefabNames.VolumeSpinner,
+                    PrefabNames.FeedbackSpinner
+                };
                 var missing = new System.Collections.Generic.List<string>();
                 foreach (var path in requiredChildren)
                 {
@@ -191,14 +216,23 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 if (missing.Count.IsPositive())
                 {
-                    Debug.LogError("[RadioNav][Main] Prefab structure validation FAILED. Missing: " + string.Join(", ", missing));
-                    Object.Destroy(radio);
-                    return;
+                    string msg = "[RadioNav][Main] Prefab structure validation FAILED. Missing: " + string.Join(", ", missing);
+                    // PlayerPrefs RadioNav.SkipValidation=1 → degraded open (ловим бандл-расхождение без краша)
+                    if (PlayerPrefs.GetInt("RadioNav.SkipValidation", 0) == 1)
+                        Debug.LogWarning(msg + " — SkipValidation=1, continuing degraded");
+                    else
+                    {
+                        Debug.LogError(msg);
+                        Object.Destroy(radio);
+                        return;
+                    }
                 }
 
-                RadioInstaller.Instantiate(radio, viewport);
+RadioInstaller.Instantiate(radio, viewport);
                 if (radio.GetComponent<StationMapOverlay>().IsNull())
                     radio.AddComponent<StationMapOverlay>();
+                if (radio.GetComponent<LighthouseMapMarker>().IsNull())
+                    radio.AddComponent<LighthouseMapMarker>();
 
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +
@@ -208,6 +242,32 @@ namespace UBOAT.Mods.RadioNavigation
 #if DEBUG
                 DumpHierarchy(radio.transform, "[RadioNav][Main] Prefab hierarchy: ");
 #endif
+
+                // STAR_SKY: create star sky renderer (ADR-021)
+                GameObject starSkyRoot = new GameObject("StarSkyRoot");
+                starSkyRoot.AddComponent<StarsMesh>();
+                Object.DontDestroyOnLoad(starSkyRoot);
+                Debug.Log("[RadioNav][Main] StarSkyRoot created with StarsMesh component");
+
+                // STAR_SKY: create constellation lines renderer
+                GameObject constellationRoot = new GameObject("ConstellationRoot");
+                constellationRoot.AddComponent<ConstellationMesh>();
+                Object.DontDestroyOnLoad(constellationRoot);
+                Debug.Log("[RadioNav][Main] ConstellationRoot created with ConstellationMesh component");
+
+                // STAR_SKY: create planetary billboard renderer once
+                if (GameObject.Find("PlanetRoot").IsNull())
+                {
+                    GameObject planetRoot = new GameObject("PlanetRoot");
+                    planetRoot.AddComponent<PlanetRenderer>();
+                    Object.DontDestroyOnLoad(planetRoot);
+                    Debug.Log("[RadioNav][Main] PlanetRoot created with PlanetRenderer component");
+                }
+
+                LighthousePlacer.EnsureRunning();
+
+                // Phase0 probe (STAR_SKY_PLAN:10, ADR-020) — only when PlayerPrefs RadioNav.Phase0Probe=1
+                StarSkyPhase0Probe.EnsureRunning();
             }
             catch (Exception e)
             {

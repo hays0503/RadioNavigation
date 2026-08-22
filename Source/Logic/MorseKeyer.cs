@@ -18,7 +18,6 @@ namespace UBOAT.Mods.RadioNavigation
         private int ticksInState;
         private State state;
         private ConsolCycleConfig config;
-        private int callsignLength;
 
         // F01/F29: read from the audio thread — volatile, no torn reads.
         private volatile bool keyOn;
@@ -27,7 +26,10 @@ namespace UBOAT.Mods.RadioNavigation
         public bool KeyOn => keyOn;
         public bool IsActive => isActive;
         public bool IsTone => state == State.Tone;
-        public bool IsCallsignElement => consolPattern.IsNotNull() && elementIndex < callsignLength;
+        public bool IsCallsignElement =>
+            sequence.IsNotNull()
+            && scheduler.IsNotNull()
+            && scheduler.CurrentPhase == StationScheduler.Phase.Callsign;
 
         public event Action<NavigationElementType, bool> OnElementCompleted;
         public event Action OnSequenceFinished;
@@ -41,7 +43,6 @@ namespace UBOAT.Mods.RadioNavigation
             elementIndex = 0;
             ticksInState = 0;
             SetState(State.Idle);
-            callsignLength = 0;
             isActive = sequence.IsNotNull() && sequence.ElementCount.IsPositive();
 
             if (isActive)
@@ -53,7 +54,7 @@ namespace UBOAT.Mods.RadioNavigation
             Load((IKeySequence)pattern, scheduler, config);
         }
 
-        public void LoadConsol(NavigationElementType[] pattern, StationScheduler scheduler = null, ConsolCycleConfig config = default(ConsolCycleConfig), int callsignLength = 0)
+        public void LoadConsol(NavigationElementType[] pattern, StationScheduler scheduler = null, ConsolCycleConfig config = default(ConsolCycleConfig))
         {
             sequence = null;
             this.scheduler = scheduler;
@@ -62,7 +63,6 @@ namespace UBOAT.Mods.RadioNavigation
             ticksInState = 0;
             SetState(State.Idle);
             consolPattern = pattern;
-            this.callsignLength = callsignLength;
             isActive = pattern.IsNotNull() && pattern.Length.IsPositive();
 
             if (isActive)
@@ -177,9 +177,6 @@ namespace UBOAT.Mods.RadioNavigation
                         consolPattern = nextPattern;
                         sequence = null;
                         elementIndex = 0;
-                        // F113: keep the callsign classification of the new
-                        // pattern — 0 would merge callsign into navigation.
-                        callsignLength = scheduler.CallsignElementCount;
                         StartElement();
                         return;
                     }
@@ -205,10 +202,9 @@ namespace UBOAT.Mods.RadioNavigation
                     if (nextSeq.IsNotNull() && nextSeq.ElementCount.IsPositive())
                     {
                         // F175: entering a plain sequence must clear any stale
-                        // consol pattern and callsign classification.
+                        // consol pattern.
                         sequence = nextSeq;
                         consolPattern = null;
-                        callsignLength = 0;
                         elementIndex = 0;
                         StartElement();
                         return;
@@ -258,6 +254,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         private int GetCurrentSoundTicks()
         {
+            if (IsCallsignTiming())
+            {
+                return IsCurrentElementDash()
+                    ? MorseTiming.GetCallsignDashSoundTicks(config)
+                    : MorseTiming.GetCallsignDotSoundTicks(config);
+            }
+
             return IsCurrentElementDash()
                 ? MorseTiming.GetDashSoundTicks(config)
                 : MorseTiming.GetDotSoundTicks(config);
@@ -265,9 +268,23 @@ namespace UBOAT.Mods.RadioNavigation
 
         private int GetCurrentSilenceTicks()
         {
+            if (IsCallsignTiming())
+            {
+                return IsCurrentElementDash()
+                    ? MorseTiming.GetCallsignDashSilenceTicks(config)
+                    : MorseTiming.GetCallsignDotSilenceTicks(config);
+            }
+
             return IsCurrentElementDash()
                 ? MorseTiming.GetDashSilenceTicks(config)
                 : MorseTiming.GetDotSilenceTicks(config);
+        }
+
+        private bool IsCallsignTiming()
+        {
+            return sequence.IsNotNull()
+                && scheduler.IsNotNull()
+                && scheduler.CurrentPhase == StationScheduler.Phase.Callsign;
         }
 
 

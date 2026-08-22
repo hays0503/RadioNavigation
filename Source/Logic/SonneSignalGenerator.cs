@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -13,6 +12,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             public int DotCount;
             public bool IsDashSector;
+            public int SectorNumber;
             public float LocalAngle;
             public float SectorBase;
         }
@@ -21,7 +21,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             float delta = ((bearing - baseAngle) % 360f + 360f) % 360f;
             float localAngle = delta % SectorWidthDeg;
-            int sectorNumber = (int)(delta / SectorWidthDeg);
+            int sectorNumber = CalculateSectorNumber(bearing, baseAngle);
             bool isDashSector = (sectorNumber % 2 == 1);
 
             int dotCount;
@@ -36,6 +36,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 DotCount = dotCount,
                 IsDashSector = isDashSector,
+                SectorNumber = sectorNumber,
                 LocalAngle = localAngle,
                 SectorBase = bearing - localAngle
             };
@@ -52,61 +53,10 @@ namespace UBOAT.Mods.RadioNavigation
             return sectorBase + correctedDots * DegPerSign;
         }
 
-        public static int[] GenerateBearingTable(BeaconStation station)
+        public static int CalculateSectorNumber(float bearing, float baseAngle)
         {
-            // F127: derive the cycle config from the station instead of
-            // hardcoding Cycle120s (all 14 stations are 120s today, but the
-            // table must follow the station's own cycle duration).
-            var config = ConsolCycleConfig.GetForCycleDuration(station.CycleDurationSeconds);
-            int maxCount = config.MaxNavigationCount;
-            var table = new int[maxCount + 1];
-
-            for (int i = 0; i <= maxCount; i++)
-            {
-                float ratio = maxCount.IsPositive() ? (float)i / maxCount : 0f;
-                float localAngle = ratio * SectorWidthDeg;
-                float bearing = station.BaseAngle + localAngle;
-                table[i] = (int)((bearing + 360f) % 360f);
-            }
-
-            return table;
-        }
-
-        public static NavigationElementType[] GenerateConsolPattern(
-            string callsign,
-            int dotCount,
-            ConsolCycleConfig config)
-        {
-            var result = new List<NavigationElementType>();
-
-            if (!string.IsNullOrEmpty(callsign))
-            {
-                foreach (char c in callsign.ToUpperInvariant())
-                {
-                    string mc = MorseAlphabet.GetMorse(c);
-                    for (int b = 0; b < mc.Length; b++)
-                    {
-                        if (mc[b] == '-')
-                            result.Add(NavigationElementType.Dash);
-                        else
-                            result.Add(NavigationElementType.Dot);
-                    }
-                }
-            }
-
-            for (int i = 0; i < dotCount; i++)
-            {
-                result.Add(NavigationElementType.Dot);
-            }
-
-            result.Add(NavigationElementType.Equisignal);
-
-            for (int i = dotCount; i < config.MaxNavigationCount; i++)
-            {
-                result.Add(NavigationElementType.Dash);
-            }
-
-            return result.ToArray();
+            float delta = ((bearing - baseAngle) % 360f + 360f) % 360f;
+            return (int)(delta / SectorWidthDeg);
         }
 
         // F36: this counts dots, not pattern transitions — the old name
@@ -147,6 +97,12 @@ namespace UBOAT.Mods.RadioNavigation
             if (angleDiff > 180f)
                 angleDiff = 360f - angleDiff;
             return angleDiff <= sectorWidthDeg / 2f;
+        }
+
+        public static float AngularDistance(float first, float second)
+        {
+            float distance = Math.Abs(((first - second) % 360f + 360f) % 360f);
+            return distance > 180f ? 360f - distance : distance;
         }
 
         // F77: pack a generated consol element array into a NavigationPattern

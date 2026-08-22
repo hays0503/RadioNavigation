@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using UnityEngine;
 
@@ -10,6 +11,8 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private const int SonneZoneIndex = 1;
         private const float BfoBase = Constants.BfoBaseHz;
+        private const float TimeCompressionThreshold = 1.01f;
+        private const float NavigationBearingChangeThresholdDeg = 0.2f;
 
         private static readonly AudioClip silentClip = AudioClip.Create("SonneSilent", AudioSynthesisEngine.SampleRate * 2, 1, AudioSynthesisEngine.SampleRate, false);
 
@@ -26,11 +29,9 @@ namespace UBOAT.Mods.RadioNavigation
         private int currentZoneIndex;
         private float playerLatitude;
         private float playerLongitude;
-        private bool positionAvailable; // F200: a fix without a position feed must not be shown
+        private bool positionAvailable;
         private bool positionProviderFailureLogged;
         private bool positionProviderSuccessLogged;
-        private int lastLoggedMeasurementCount = -1;
-        private bool lastLoggedFixValid;
         private bool bearingDiagnosticsLogged;
         private float lastBearingLogLatitude;
         private float lastBearingLogLongitude;
@@ -56,15 +57,21 @@ namespace UBOAT.Mods.RadioNavigation
         private const float NavUpdateInterval = 0.2f;
         private const float TuningUpdateInterval = 0.016f;
 
-        private readonly List<PositionFixCalculator.Measurement> measurements = new List<PositionFixCalculator.Measurement>(BeaconData.Stations.Length);
-        private PositionFixCalculator.FixResult lastFix;
-        private bool fixValid;
-
         private void Awake()
         {
+            suppressAudioForTimeCompression = IsTimeCompressed(Time.timeScale);
             audioEngine = new AudioSynthesisEngine();
 
             RadioHandler.OnFrequencyChanged += OnFrequencyChanged;
+
+            string tableDirectory = Path.Combine(
+                Application.persistentDataPath,
+                "Mods",
+                "RadioNavigation",
+                "Source",
+                "Data");
+            if (!SonneBeam.Initialize(tableDirectory))
+                Debug.LogError("[RadioNav][SONNE] Failed to load bearing tables: " + SonneBeam.LastLoadError);
 
             var beaconStations = BeaconData.Stations;
             stations = new StationState[beaconStations.Length];
@@ -79,15 +86,13 @@ namespace UBOAT.Mods.RadioNavigation
                 TryGetCallsignFromHistory(beaconStations[i], out string callsign);
 
                 var config = ConsolCycleConfig.GetForCycleDuration(beaconStations[i].CycleDurationSeconds);
-                var bearingTable = SonneSignalGenerator.GenerateBearingTable(beaconStations[i]);
-                int callsignLen = SonneSignalGenerator.GetCallsignElementCount(callsign);
+                var initialPattern = SonneBeam.BuildPattern(0, false);
 
                 var scheduler = new StationScheduler(callsign)
                 {
                     Config = config,
-                    BearingTable = bearingTable
+                    CurrentConsolPattern = initialPattern
                 };
-                scheduler.CurrentConsolPattern = SonneSignalGenerator.GenerateConsolPattern(callsign, 0, config); // F145: pre-compute so the first callsign cycle has a pattern with a valid callsign length
                 var keyer = new MorseKeyer();
                 var carrier = new CarrierGenerator(AudioSynthesisEngine.SampleRate);
 
@@ -105,8 +110,7 @@ namespace UBOAT.Mods.RadioNavigation
                     DotCount = 0,
                     CurrentBearing = 0,
                     BearingToBoat = 0,
-                    Pattern = new NavigationPattern(Array.Empty<Group>(), 8),
-                    CallsignLength = callsignLen
+                    Pattern = SonneSignalGenerator.ToNavigationPattern(initialPattern)
                 };
 
                 int stationIndex = i;
@@ -212,6 +216,9 @@ namespace UBOAT.Mods.RadioNavigation
             if (!IsProcessingDominantStation(stationIndex))
                 return;
 
+            if (morseDecoderBuffer.Length.IsPositive())
+                DecodeCallsignBuffer(stationIndex);
+
             signalEntries.Add(new SignalEntry(' ', SignalCharType.Separator));
             SignalRichTextFormatter.TrimEntries(signalEntries, ref morseCharCount);
         }
@@ -278,6 +285,38 @@ namespace UBOAT.Mods.RadioNavigation
             return decodedText.ToString();
         }
 
+        /// <summary>
+        /// Counts dots in the current emission window (at most 20 characters).
+        /// This is not the CAP observer count from the 60-character cycle.
+        /// Recv can be much smaller than CAP count and is zero during callsign phase by design.
+        /// </summary>
+        public int GetReceivedNavigationDotCount()
+        {
+            int count = 0;
+            for (int i = 0; i < signalEntries.Count; i++)
+            {
+                if (signalEntries[i].Type == SignalCharType.Dot)
+                    count++;
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Counts dashes in the current emission window (at most 20 characters).
+        /// This is not the CAP observer count from the 60-character cycle.
+        /// Recv can be much smaller than CAP count and is zero during callsign phase by design.
+        /// </summary>
+        public int GetReceivedNavigationDashCount()
+        {
+            int count = 0;
+            for (int i = 0; i < signalEntries.Count; i++)
+            {
+                if (signalEntries[i].Type == SignalCharType.Dash)
+                    count++;
+            }
+            return count;
+        }
+
         private void OnFrequencyChanged(float frequencyKHz, int zoneIndex)
         {
             ClearSignalBuffer();
@@ -323,12 +362,18 @@ namespace UBOAT.Mods.RadioNavigation
                 Name = station.Name,
                 Callsign = callsign,
                 InBeam = s.InBeam,
+                IsDashSector = s.IsDashSector,
+                SectorNumber = s.SectorNumber,
                 Gain = s.Gain,
                 BeatFrequency = s.BeatFrequency,
                 TransitionIndex = s.TransitionIndex,
                 Pattern = s.Pattern,
                 SchedulerPhase = schedulers[index].CurrentPhase,
                 DotCount = s.DotCount,
+                // EqSignIndex is the actual position of the equisignal in the
+                // 60-element emitted pattern, after the lost-sign correction.
+                EqSignIndex = s.TransitionIndex,
+                DashCount = s.Config.MaxNavigationCount - s.DotCount,
                 CurrentBearing = s.CurrentBearing,
                 BearingToBoat = s.BearingToBoat,
                 NavigationElapsed = elapsed
@@ -340,12 +385,16 @@ namespace UBOAT.Mods.RadioNavigation
             public string Name;
             public string Callsign;
             public bool InBeam;
+            public bool IsDashSector;
+            public int SectorNumber;
             public float Gain;
             public float BeatFrequency;
             public int TransitionIndex;
             public NavigationPattern Pattern;
             public StationScheduler.Phase SchedulerPhase;
             public int DotCount;
+            public int EqSignIndex;
+            public int DashCount;
             public float CurrentBearing;
             public float BearingToBoat;
             public float NavigationElapsed;
@@ -353,25 +402,24 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void UpdatePosition(float latitude, float longitude)
         {
+            if (!IsFinite(latitude) || !IsFinite(longitude))
+            {
+                positionAvailable = false;
+                return;
+            }
+
             playerLatitude = latitude;
             playerLongitude = longitude;
-            positionAvailable = true; // F200: the (0,0) fallback is never a valid fix
+            positionAvailable = true;
             UpdateStationNavigation();
         }
 
-        public bool HasFix => fixValid && positionAvailable;
-        public float FixLatitude => lastFix.Latitude;
-        public float FixLongitude => lastFix.Longitude;
-        public float FixErrorKm => lastFix.ErrorKm;
-        public int MeasurementCount => measurements.Count;
-
         private void Update()
         {
-            suppressAudioForTimeCompression = Time.timeScale > 1.01f;
+            suppressAudioForTimeCompression = IsTimeCompressed(Time.timeScale);
 
-            // F200: poll the position feed; UpdatePosition is invoked on
-            // significant movement (threshold ~11 m). Without a feed the fix
-            // stays unavailable and the UI shows "--- Position Fix: ---".
+            // Poll the position feed; UpdatePosition is invoked on significant
+            // movement (threshold ~11 m). Without a feed diagnostics stay stale.
             float posLat, posLon;
             if (positionProvider.IsNotNull() && positionProvider.TryGetPosition(out posLat, out posLon))
             {
@@ -389,7 +437,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             else if (!positionProviderFailureLogged)
             {
-                Debug.LogWarning("[RadioNav][POSITION] player position unavailable; position fix will remain hidden");
+                Debug.LogWarning("[RadioNav][POSITION] player position unavailable; bearing diagnostics will remain stale");
                 positionProviderFailureLogged = true;
             }
 
@@ -441,6 +489,12 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i < beaconStations.Length; i++)
             {
+                if (beaconStations[i].Role != BeaconStationRole.DirectionalSonne)
+                {
+                    stations[i].Gain = 0f;
+                    continue;
+                }
+
                 float? freq = beaconStations[i].History?[0].FrequencyKHz;
                 if (freq.IsNull())
                 {
@@ -485,114 +539,76 @@ namespace UBOAT.Mods.RadioNavigation
         private void UpdateStationNavigation()
         {
             var beaconStations = BeaconData.Stations;
-            measurements.Clear();
 
             for (int i = 0; i < beaconStations.Length; i++)
             {
-                float bearing = CalculateBearing(
+                float mapBoatToStation = CalculateMapBearing(
                     playerLatitude, playerLongitude,
                     (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude);
-                float bearingToBoat = CalculateBearing(
-                    (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude,
-                    playerLatitude, playerLongitude);
                 float mapBearingToBoat = CalculateMapBearing(
                     (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude,
                     playerLatitude, playerLongitude);
 
-                var sector = SonneSignalGenerator.CalculateSector(bearing, beaconStations[i].BaseAngle);
+                if (beaconStations[i].Role != BeaconStationRole.DirectionalSonne)
+                {
+                    stations[i].InBeam = false;
+                    stations[i].DotCount = 0;
+                    stations[i].IsDashSector = false;
+                    stations[i].SectorNumber = 0;
+                    stations[i].CurrentBearing = mapBoatToStation;
+                    stations[i].BearingToBoat = mapBearingToBoat;
+                    stations[i].HasNavigationBearing = false;
+                    stations[i].LastNavigationBearing = 0f;
+                    stations[i].TransitionIndex = 0;
+                    stations[i].Pattern = new NavigationPattern(Array.Empty<Group>(), 8, 255);
+                    continue;
+                }
 
-                stations[i].InBeam = SonneSignalGenerator.CalculateInBeam(bearing, (float)beaconStations[i].BaseAngle, stations[i].Config.SectorWidthDeg);
-                stations[i].DotCount = sector.DotCount;
-                stations[i].CurrentBearing = (bearing + 360f) % 360f;
+                stations[i].CurrentBearing = mapBoatToStation;
                 stations[i].BearingToBoat = mapBearingToBoat;
-                stations[i].TransitionIndex = sector.DotCount;
+                float signalBearing = (mapBearingToBoat + 360f) % 360f;
+                stations[i].InBeam = SonneSignalGenerator.CalculateInBeam(
+                    signalBearing,
+                    (float)beaconStations[i].BaseAngle,
+                    stations[i].Config.SectorWidthDeg);
+                stations[i].SectorNumber = SonneSignalGenerator.CalculateSectorNumber(
+                    signalBearing,
+                    (float)beaconStations[i].BaseAngle);
 
-                string callsign;
-                TryGetCallsignFromHistory(beaconStations[i], out callsign);
-
-                var config = stations[i].Config;
-                var consolPattern = SonneSignalGenerator.GenerateConsolPattern(
-                    callsign, sector.DotCount, config);
-
-                if (IsKeyerAvailableForPatternUpdate(i))
+                bool bearingChanged = !stations[i].HasNavigationBearing
+                    || SonneSignalGenerator.AngularDistance(
+                        stations[i].LastNavigationBearing,
+                        signalBearing) > NavigationBearingChangeThresholdDeg;
+                if (bearingChanged)
                 {
-                    schedulers[i].CurrentConsolPattern = consolPattern;
-                }
+                    stations[i].HasNavigationBearing = true;
+                    stations[i].LastNavigationBearing = signalBearing;
 
-                stations[i].Pattern = SonneSignalGenerator.ToNavigationPattern(consolPattern); // F77: diagnostics Pattern was never updated after init
-
-                // F131: a station without a receivable frequency (History
-                // empty or no value) must not contribute phantom bearings.
-                if (HasStationFrequency(beaconStations[i]))
-                {
-                    measurements.Add(new PositionFixCalculator.Measurement
+                    NavigationElementType[] pattern;
+                    SonneBeamSignal signal;
+                    if (SonneBeam.TryGetNavigationPattern(
+                        beaconStations[i].Name,
+                        signalBearing,
+                        out pattern,
+                        out signal))
                     {
-                        StationIndex = i,
-                        Latitude = (float)beaconStations[i].Latitude,
-                        Longitude = (float)beaconStations[i].Longitude,
-                        // PositionFixCalculator intersects rays from each
-                        // station toward the boat, not boat-to-station bearings.
-                        Bearing = bearingToBoat,
-                        Weight = 1f
-                    });
+                        stations[i].DotCount = signal.DotCount;
+                        // DotCount/DashCount are corrected CAP counts. TransitionIndex
+                        // is the actual element index where the equisignal starts.
+                        stations[i].IsDashSector = signal.IsDashSector;
+                        stations[i].TransitionIndex = signal.LeadingCount;
+                        stations[i].Pattern = SonneSignalGenerator.ToNavigationPattern(pattern);
+
+                        // The active keyer owns its current array. Replacing the
+                        // scheduler reference is safe and makes the latest table
+                        // result available for the next navigation phase.
+                        schedulers[i].CurrentConsolPattern = pattern;
+                    }
                 }
+
             }
 
             LogBearingDiagnostics(beaconStations);
-
-            if (HasEnoughMeasurementsForFix())
-            {
-                lastFix = PositionFixCalculator.Calculate(measurements);
-                fixValid = lastFix.Valid;
-                if (measurements.Count != lastLoggedMeasurementCount || fixValid != lastLoggedFixValid)
-                {
-                    LogPositionMeasurements();
-                    Debug.Log("[RadioNav][POSITION] measurements=" + measurements.Count
-                        + " valid=" + fixValid
-                        + " lat=" + lastFix.Latitude.ToString("F5")
-                        + " lon=" + lastFix.Longitude.ToString("F5")
-                        + " errorKm=" + lastFix.ErrorKm.ToString("F2"));
-                    lastLoggedMeasurementCount = measurements.Count;
-                    lastLoggedFixValid = fixValid;
-                }
-            }
-            else
-            {
-                fixValid = false;
-                if (lastLoggedMeasurementCount != measurements.Count || lastLoggedFixValid)
-                {
-                    LogPositionMeasurements();
-                    Debug.Log("[RadioNav][POSITION] measurements=" + measurements.Count + "; at least 2 required");
-                    lastLoggedMeasurementCount = measurements.Count;
-                    lastLoggedFixValid = false;
-                }
-            }
-        }
-
-        private void LogPositionMeasurements()
-        {
-            var details = new StringBuilder();
-            details.Append("[RadioNav][POSITION] player=")
-                .Append(playerLatitude.ToString("F6"))
-                .Append(',').Append(playerLongitude.ToString("F6"))
-                .Append(" freqKHz=").Append(currentFrequencyKHz.ToString("F3"))
-                .Append(" zone=").Append(currentZoneIndex);
-
-            for (int i = 0; i < measurements.Count; i++)
-            {
-                var measurement = measurements[i];
-                string name = measurement.StationIndex >= 0 && measurement.StationIndex < BeaconData.Stations.Length
-                    ? BeaconData.Stations[measurement.StationIndex].Name
-                    : "?";
-                details.Append(" | ").Append(measurement.StationIndex)
-                    .Append(':').Append(name)
-                    .Append(" lat=").Append(measurement.Latitude.ToString("F5"))
-                    .Append(" lon=").Append(measurement.Longitude.ToString("F5"))
-                    .Append(" bearing=").Append(measurement.Bearing.ToString("F1"))
-                    .Append(" weight=").Append(measurement.Weight.ToString("F2"));
-            }
-
-            Debug.Log(details.ToString());
         }
 
         private void LogBearingDiagnostics(BeaconStation[] beaconStations)
@@ -609,19 +625,19 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 0; i < beaconStations.Length; i++)
             {
                 BeaconStation station = beaconStations[i];
-                float boatToStation = stations[i].CurrentBearing;
-                float stationToBoat = stations[i].BearingToBoat;
+                float mapBoatToStation = stations[i].CurrentBearing;
+                float mapStationToBoat = stations[i].BearingToBoat;
+                float trueBoatToStation = CalculateBearing(
+                    playerLatitude, playerLongitude,
+                    (float)station.Latitude, (float)station.Longitude);
                 float trueStationToBoat = CalculateBearing(
                     (float)station.Latitude, (float)station.Longitude,
                     playerLatitude, playerLongitude);
                 float trueReciprocal = (trueStationToBoat + 180f) % 360f;
-                float trueReciprocalDelta = Math.Abs(trueReciprocal - boatToStation);
+                float trueReciprocalDelta = Math.Abs(trueReciprocal - trueBoatToStation);
                 if (trueReciprocalDelta > 180f)
                     trueReciprocalDelta = 360f - trueReciprocalDelta;
-                float mapBoatToStation = CalculateMapBearing(
-                    playerLatitude, playerLongitude,
-                    (float)station.Latitude, (float)station.Longitude);
-                float mapReciprocal = (stationToBoat + 180f) % 360f;
+                float mapReciprocal = (mapStationToBoat + 180f) % 360f;
                 float mapReciprocalDelta = Math.Abs(mapReciprocal - mapBoatToStation);
                 if (mapReciprocalDelta > 180f)
                     mapReciprocalDelta = 360f - mapReciprocalDelta;
@@ -631,9 +647,15 @@ namespace UBOAT.Mods.RadioNavigation
                     + " callsign=" + (station.History.IsNotNull() && station.History.Length.IsPositive()
                         ? station.History[0].Callsign : "?")
                     + " station=" + station.Latitude.ToString("F6") + "," + station.Longitude.ToString("F6")
-                    + " boatToStation=" + boatToStation.ToString("F1")
+                    + " mapBoatToStation=" + mapBoatToStation.ToString("F1")
+                    + " trueBoatToStation=" + trueBoatToStation.ToString("F1")
                     + " trueStationToBoat=" + trueStationToBoat.ToString("F1")
-                    + " mapStationToBoat=" + stationToBoat.ToString("F1")
+                    + " mapStationToBoat=" + mapStationToBoat.ToString("F1")
+                    + " distanceKm=" + GeoMath.HaversineKm(
+                        (float)station.Latitude,
+                        (float)station.Longitude,
+                        playerLatitude,
+                        playerLongitude).ToString("F1")
                     + " trueReciprocalDelta=" + trueReciprocalDelta.ToString("F1")
                     + " mapReciprocalDelta=" + mapReciprocalDelta.ToString("F1")
                     + " baseAngle=" + station.BaseAngle.ToString("F1")
@@ -665,11 +687,11 @@ namespace UBOAT.Mods.RadioNavigation
             schedulers[index].CurrentPhase == StationScheduler.Phase.Navigation
             && stations[index].NavigationStartTime.IsPositive();
 
-        private bool HasEnoughMeasurementsForFix() => measurements.Count >= 2;
+        private static bool IsTimeCompressed(float timeScale) =>
+            timeScale > TimeCompressionThreshold;
 
-        private bool IsKeyerAvailableForPatternUpdate(int i) =>
-            !keyers[i].IsActive
-            || schedulers[i].CurrentPhase != StationScheduler.Phase.Navigation;
+        private static bool IsFinite(float value) =>
+            !float.IsNaN(value) && !float.IsInfinity(value);
 
         private static bool TryGetCallsignFromHistory(BeaconStation station, out string callsign)
         {
@@ -682,18 +704,11 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             // F87: no history callsign -> report absence instead of fabricating
-            // a fake one (e.g. "PL" from "Plougourvest"); GenerateConsolPattern
-            // skips the callsign phase and DecodeCallsignBuffer clears the
-            // buffer. F66: station.Name may be null and is not used here.
+            // a fake one (e.g. "PL" from "Plougourvest"); the scheduler skips
+            // the callsign phase and the decoder clears the buffer. F66:
+            // station.Name may be null and is not used here.
             callsign = null;
             return false;
-        }
-
-        private static bool HasStationFrequency(BeaconStation station)
-        {
-            return station.History.IsNotNull()
-                && station.History.Length.IsPositive()
-                && station.History[0].FrequencyKHz.IsNotNull();
         }
 
         public static float CalculateBearing(float lat1, float lon1, float lat2, float lon2)

@@ -1,7 +1,7 @@
 # Appendix C: Sequence Diagrams — RadioNavigation Mod
 
 > **⚠️ Deep Scan Update (2026-08-01):** Sequence diagrams содержат ссылки на несуществующие классы, annotated `⚠ phantom`. Всего **199 проблем** (F01–F199).
-> - **F47:** `StationManager` → `SonneController.UpdateStationGains()`; `SignalDecoder` → `SonneController.DecodeCallsignBuffer()`; `PositionTracker` → `SonneController.UpdatePosition()`; `StationStateBuffer` → нет sync; `GameReflectionCache` → `RadioStoryIntegration`
+> - **F47:** `StationManager` → `SonneController.UpdateStationGains()`; `SignalDecoder` → `SonneController.DecodeCallsignBuffer()`; `PlayerPositionProvider` → `SonneController.UpdatePosition()`; `StationStateBuffer` → нет sync; `GameReflectionCache` → `RadioStoryIntegration`
 > - **F51:** `Atmosphere.GenerateNoise()` → `Apply(sample, sampleRate)`; `ReceiverDsp.ApplyAGC()` → `Process()`; `CarrierBank` doesn't exist (CarrierGenerator is nested in DspPipeline)
 > - **F45:** ADR-002/003/004/005/007 changed «Accepted» → «Deferred»
 >
@@ -252,62 +252,7 @@
       │                │                 │                 │
 ```
 
-## 6. Position Fix Calculation
-
-```
-┌────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│SonneControl│  │⚠ PositionTracker│ │PositionFix   │  │BeaconData    │
-│ler         │  │phantom       │  │Calculator    │  │              │
-└─────┬──────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
-      │                │                 │                 │
-⚠ F47: UpdatePosition — phantom PositionTracker → SonneController.UpdatePosition()
-       │───────────────►│                 │                 │
-      │                │                 │                 │
-      │                │ Get measurements│                 │
-      │                │──────┐          │                 │
-      │                │      │          │                 │
-      │                │◄─────┘          │                 │
-      │                │                 │                 │
-      │                │ For each station│                 │
-      │                │────────────────►│                 │
-      │                │                 │                 │
-      │                │                 │ Get bearing     │
-      │                │                 │────────────────►│
-      │                │                 │                 │
-      │                │                 │ Bearing table   │
-      │                │                 │◄────────────────│
-      │                │                 │                 │
-      │                │                 │ Calculate angle │
-      │                │                 │──────┐          │
-      │                │                 │      │          │
-      │                │                 │◄─────┘          │
-      │                │                 │                 │
-      │                │ Measurement     │                 │
-      │                │◄────────────────│                 │
-      │                │                 │                 │
-      │                │ Calculate()     │                 │
-      │                │────────────────►│                 │
-      │                │                 │                 │
-      │                │                 │ Weighted least  │
-      │                │                 │ squares         │
-      │                │                 │──────┐          │
-      │                │                 │      │          │
-      │                │                 │◄─────┘          │
-      │                │                 │                 │
-      │                │                 │ Find intersection│
-      │                │                 │──────┐          │
-      │                │                 │      │          │
-      │                │                 │◄─────┘          │
-      │                │                 │                 │
-      │                │ FixResult       │                 │
-      │                │◄────────────────│                 │
-      │                │                 │                 │
-      │ lastFix updated│                 │                 │
-      │◄───────────────│                 │                 │
-      │                │                 │                 │
-```
-
-## 7. Game Story Integration
+## 6. Game Story Integration
 
 ```
 ┌────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐

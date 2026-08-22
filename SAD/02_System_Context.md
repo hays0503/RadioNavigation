@@ -99,10 +99,10 @@ Game Version: 2026.1
 │                              │                                  │
 │              ┌───────────────┼───────────────┐                  │
 │              ▼               ▼               ▼                  │
-│     [StationScheduler] [AudioSynthesisEngine] [FixCalculator]   │
+│     [StationScheduler] [AudioSynthesisEngine] [SonneSignal]     │
 │              │               │               │                  │
 │              ▼               ▼               ▼                  │
-│     [BeaconData]    [DspPipeline]  [PositionFixCalculator]      │
+│     [BeaconData]    [DspPipeline]  [SonneBeam tables]            │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```

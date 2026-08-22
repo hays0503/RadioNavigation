@@ -14,7 +14,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests.Runner
 
         private static int Main()
         {
-            var assembly = typeof(UBOAT.Mods.RadioNavigation.Tests.PositionFixCalculatorTests).Assembly;
+            var assembly = typeof(UBOAT.Mods.RadioNavigation.Tests.GeoMathTests).Assembly;
 
             Console.WriteLine("== RadioNavigation tests (F22 baseline) ==");
             Console.WriteLine("Assembly: " + assembly.Location);

@@ -25,7 +25,7 @@ RadioNavigation Mod (Source/)
 │    ├── RadioInstaller.cs (UI instantiation)
 │    └── PrefabNames.cs (Prefab path constants)
 │
-├─── Logic Components (12 files — flat in Source/Logic/)
+├─── Logic Components (11 files — flat in Source/Logic/)
 │    ├── SonneController.cs (Main controller — God Class)
 │    ├── RadioStoryIntegration.cs (Game story/locale patches)
 │    ├── StationScheduler.cs (Station cycle state machine)
@@ -33,7 +33,6 @@ RadioNavigation Mod (Source/)
 │    ├── NavigationPattern.cs (Consol patterns)
 │    ├── NavigationElementType.cs (Enum)
 │    ├── SonneSignalGenerator.cs (Signal generation)
-│    ├── PositionFixCalculator.cs (Position calculation)
 │    ├── MorseAlphabet.cs (Morse code data)
 │    ├── MorseTiming.cs (Timing calculations)
 │    ├── ComparisonExtensions.cs (Float comparison helpers)
@@ -51,7 +50,7 @@ RadioNavigation Mod (Source/)
      └── DspPipeline.cs (DSP utilities — 3 classes: CarrierGenerator, Atmosphere, ReceiverDsp)
 ```
 
-**NOTE**: Physical directory structure is flat — files are organized by layer in `Source/{UI,Logic,Data,Sound}/` with no subfolders. Subfolder names in the original SAD (RadioUI/, Spinners/, Installation/, Integration/, Core/, Navigation/, Morse/) were conceptual groupings, not physical directories. Removed non-existent classes: GameStrings, TickScheduler, StationManager, SignalDecoder, PositionTracker, AudioPipeline, CarrierBank, AudioController (see F47).
+**NOTE**: Physical directory structure is flat — files are organized by layer in `Source/{UI,Logic,Data,Sound}/` with no subfolders. Subfolder names in the original SAD (RadioUI/, Spinners/, Installation/, Integration/, Core/, Navigation/, Morse/) were conceptual groupings, not physical directories. Removed non-existent classes: GameStrings, TickScheduler, StationManager, SignalDecoder, AudioPipeline, CarrierBank, AudioController (see F47).
 
 ## 2. Component Responsibilities
 
@@ -69,7 +68,6 @@ RadioNavigation Mod (Source/)
 |-----------|----------------|--------|---------|
 | **NavigationPattern** | Generate consol patterns | Station config | Pattern sequences |
 | **SonneSignalGenerator** | Calculate bearing tables | Station positions | Dot counts, sectors |
-| **PositionFixCalculator** | Calculate position fix | Bearing measurements | Lat/Lon coordinates |
 
 ### 2.3 Data Components
 
@@ -129,12 +127,6 @@ public interface IAudioOutput {
         int currentZoneIndex, int sonneZoneIndex);
 }
 
-// IPositionTracker — extract from PositionFixCalculator
-public interface IPositionTracker {
-    FixResult Calculate(List<Measurement> measurements);
-    float GetDistanceKm(float lat1, float lon1, float lat2, float lon2);
-}
-
 // IMorseDecoder — extract from MorseKeyer (and MorseAlphabet)
 public interface IMorseDecoder {
     char[] DecodeElements(int[] elements);
@@ -191,7 +183,6 @@ RadioHandler
 | InformationPanelHandler | 474 | 20+ | 15+ | Very High |
 | RadioStoryIntegration | 381 | 15+ | 8+ | High |
 | BeaconData | 373 | 3 | 1 | Low |
-| PositionFixCalculator | 224 | 5 | 2 | Medium |
 | MorseKeyer | 240 | 10+ | 8 | Medium |
 | DialConfig | 158 | 3 | 2 | Medium |
 | SonneSignalGenerator | 146 | 6 | 0 | Medium |
@@ -289,7 +280,6 @@ Audio Thread:
 
 | Component | Testability | Notes |
 |-----------|-------------|-------|
-| PositionFixCalculator | ✅ High | Pure math, no Unity deps |
 | MorseAlphabet | ✅ High | Pure data, no deps |
 | MorseTiming | ✅ High | Pure logic |
 | NavigationPattern | ✅ High | Pure data |
@@ -308,8 +298,49 @@ Audio Thread:
 
 **Note**: 0% test coverage (no test project exists). See F22, F45 (ADR-007 — changed to Deferred).
 
+## 9. Lighthouse Subsystem (добавлено 2026-08-22)
+
+### 9.1 Компоненты
+
+| Компонент | Файл | Ответственность |
+|-----------|------|-----------------|
+| **LighthousePlacer** | `Source/Logic/LighthousePlacer.cs` | Спавн prefab `lighthouse` как sandbox-сущности (группа публичная, сущность `DisplayInUI=false`/`IsPublic=false`), attach `LighthouseRotator`, связывание с `LighthouseBeamGlow`; статик `LighthouseEntity` для маркера |
+| **LighthouseRotator** | `Source/Logic/LighthouseRotator.cs` | Вращение фонарной сборки (`LighthouseRotator` child) на `RotationDegreesPerSecond` |
+| **LighthouseBeamGlow** | `Source/Logic/LighthouseBeamGlow.cs` | Свет маяка: HDRPLensFlare (без лимита дистанции в device-режиме, +25% размер), screen-space dot+streak fallback, Spot Light boost, `_RotationOffset` окон; позиция света = `Spot Light` (ADR-028) |
+| **LighthouseMapMarker** | `Source/UI/LighthouseMapMarker.cs` | Собственный маркер на карте: world-space canvas под `EntityMarkersManager`, pixel-сайзинг 25→50 px, hover(имя)/click(имя+характеристика), зачистка стейловых игровых маркеров (ADR-027) |
+| **StationMapOverlay** | `Source/UI/StationMapOverlay.cs` | Точки станций Consol/Sonne на карте (MapPointUI-дубликаты, без записи в charting DB) |
+| **CameraResolver** | `Source/Logic/CameraResolver.cs` | Общий резолвер камеры для маяка и звезды (ADR-018) |
+
+### 9.2 Зависимости
+
+```
+LighthousePlacer
+  ├──► LighthouseProfiles (данные профилей)
+  ├──► LighthouseRotator (attach)
+  └──► LighthouseBeamGlow (Initialize)
+
+LighthouseMapMarker
+  ├──► LighthousePlacer.LighthouseEntity (позиция)
+  ├──► LighthouseProfiles (имя + характеристика для тултипа)
+  ├──► EntityMarkersManager (родитель-канвас, масштаб)
+  └──► ResourceManager (спрайт IconLighthouse из бандла)
+
+LighthouseBeamGlow
+  ├──► CameraResolver (рендер-камера)
+  ├──► LighthouseVisualModel (перцепционная модель света)
+  └──► SkyVisibilityResolver (туман)
+```
+
+### 9.3 Тестируемость
+
+| Компонент | Тестируемость | Примечание |
+|-----------|---------------|------------|
+| LighthouseVisualModel | ✅ High | Чистая математика (LighthouseVisualModelTests) |
+| LighthouseProfile(s) | ✅ High | Данные (LighthouseProfileTests) |
+| LighthousePlacer/BeamGlow/MapMarker | ❌ Low | MonoBehaviour + игра |
+
 ----
 
-*Document Version: 1.2*  
-*Last Updated: 2026-08-01*  
+*Document Version: 1.3*  
+*Last Updated: 2026-08-22*  
 *Corrections: Fixed component hierarchy (flat structure, added ComparisonExtensions), fixed array sizes 4→14 (F48), file counts (F49), added missing classes (F52). See F65–F199 (total 199 issues). See F45–F52 for SAD drift corrections.*

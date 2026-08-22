@@ -166,7 +166,6 @@ CursorHandler
 | AudioSynthesisEngine | 7 | High |
 | StationScheduler | 4 | Medium |
 | MorseKeyer | 3 | Low |
-| PositionFixCalculator | 2 | **Good** |
 | MorseAlphabet | 0 | **Excellent** |
 
 ### 4.2 Afferent Coupling (Ca) — Who depends on me
@@ -269,7 +268,6 @@ public interface IStationDataSource {
 | Interactable state | `ToggleHandler.IsInteractable` | `IRadioContext` | ⚠ proposed (F05) |
 | Audio output | `AudioSynthesisEngine.ProcessAudio` | `IAudioOutput` | ⚠ proposed (ADR-002 Deferred) |
 | Game integration | Direct reflection | `IGameServices` | ⚠ proposed (F04/ADR-004 Deferred) |
-| Position calc | `PositionFixCalculator` | `IPositionCalculator` | ⚠ proposed (F18) |
 | Morse decoder | `MorseKeyer`/`MorseAlphabet` | `IMorseDecoder` | ⚠ proposed (F04) |
 
 ---

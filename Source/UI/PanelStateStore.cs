@@ -16,6 +16,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void Save(float volumeAngle, float feedbackAngle, int zoneIndex, float cursorAngle)
         {
+            // ADR-019: clamp чтобы битый вызов не затёр Prefs нулями/мусором (best practice)
+            volumeAngle = Mathf.Clamp(volumeAngle, 0f, 140f);
+            feedbackAngle = Mathf.Clamp(feedbackAngle, 0f, 140f);
+            zoneIndex = zoneIndex < 0 ? 0 : zoneIndex > 4 ? 4 : zoneIndex;
+            cursorAngle = Mathf.Clamp(cursorAngle, -90f, 90f);
             PlayerPrefs.SetFloat(KeyVolume, volumeAngle);
             PlayerPrefs.SetFloat(KeyFeedback, feedbackAngle);
             PlayerPrefs.SetInt(KeyZone, zoneIndex);
@@ -25,10 +30,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void Load(out float volumeAngle, out float feedbackAngle, out int zoneIndex, out float cursorAngle)
         {
-            volumeAngle = PlayerPrefs.GetFloat(KeyVolume, 0f);
-            feedbackAngle = PlayerPrefs.GetFloat(KeyFeedback, 0f);
-            zoneIndex = PlayerPrefs.GetInt(KeyZone, 0);
-            cursorAngle = PlayerPrefs.GetFloat(KeyCursor, 0f);
+            volumeAngle = Mathf.Clamp(PlayerPrefs.GetFloat(KeyVolume, 0f), 0f, 140f);
+            feedbackAngle = Mathf.Clamp(PlayerPrefs.GetFloat(KeyFeedback, 0f), 0f, 140f);
+            int zi = PlayerPrefs.GetInt(KeyZone, 0);
+            zoneIndex = zi < 0 ? 0 : zi > 4 ? 4 : zi;
+            cursorAngle = Mathf.Clamp(PlayerPrefs.GetFloat(KeyCursor, 0f), -90f, 90f);
         }
 
         public static void Clear()

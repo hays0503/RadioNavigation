@@ -317,3 +317,14 @@ keyer активен && фаза = Navigation → паттерн не обнов
 ## Вердикт сверки
 
 План **полностью консистентен** с текущим Source/. Все 38 ссылок совпадают точно; три зарегистрированных расхождения (путь SignalRichTextFormatter → UI, сигнатура CalculateSector :20 vs :24, диапазон OnFrequencyChanged :281-285) задокументированы и точны. Предлагаемые изменения (поля в `SectorResult`/`StationState`/`StationDiagnostics`, Recv-геттеры, правка `UpdatePatterns`) структурно реализуемы без конфликтов. **План готов к ветвлению и реализации.**
+
+## Поправка реализации исторического DASH (2026-08-04)
+
+Историческое руководство и Fig. 1b требуют zone-aware directional order:
+
+- DOT: `Dot × DotCount -> Equisignal -> Dash × DashCount`.
+- DASH: `Dash × DashCount -> Equisignal -> Dot × DotCount`.
+
+`GenerateConsolPattern` принимает `isDashSector` и реализует этот порядок. Callsign prefix и текущие scheduler-фазы сохранены намеренно; полная перестановка исторического `T` (keying), `D` (equisignal) и `R` (identification) остаётся отдельной задачей.
+
+Исторические P3/D8 формулировки о неизбежном dash-визуальном расхождении с `◆◆` относятся к старому dot-first генератору и superseded. `EqSignIndex` по-прежнему является CAP observer count, а `Recv` остаётся окном фактически принятых `SignalEntry`.

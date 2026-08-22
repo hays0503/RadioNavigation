@@ -18,7 +18,22 @@
 | ADR-004 | Interface-based integration | Deferred | 2026-07-26 |
 | ADR-005 | Centralize constants | Deferred | 2026-07-26 |
 | ADR-006 | JSON configuration files | Proposed | 2026-07-26 |
-| ADR-007 | Unit testing strategy | Deferred | 2026-07-26 |
+| ADR-007 | Unit testing strategy | Accepted (F22 baseline 182) | 2026-08-19 |
+| ADR-014 | Baseline 182 + farClip tag | Accepted | 2026-08-19 |
+| ADR-015 | Test Shield Gain/Geo | Accepted | 2026-08-19 |
+| ADR-016 | Bushmills 89.9 data fix | Accepted | 2026-08-19 |
+| ADR-017 | Lighthouse ResetStatics | Accepted | 2026-08-19 |
+| ADR-018 | CameraResolver (маяк+звезда) | Accepted | 2026-08-19 |
+| ADR-019 | Panel Hardening (PrefabNames+clamp) | Accepted | 2026-08-19 |
+| ADR-020 | StarSky Phase0 log only | Proposed | 2026-08-19 |
+| ADR-021 | StarSky catalog (5046 звёзд) | Accepted | 2026-08-19 |
+| ADR-022 | Созвездия (215 линий) | Accepted | 2026-08-19 |
+| ADR-023 | Планеты (кеплеровы элементы + renderer) | Accepted | 2026-08-19 |
+| ADR-024 | Луна (low-precision RA/Dec + фаза) | Accepted | 2026-08-19 |
+| ADR-025 | STAR_SKY использует GameTime.GmtDateTime | Accepted | 2026-08-19 |
+| ADR-026 | STAR_SKY visibility по Weather.Sky | Accepted | 2026-08-19 |
+| ADR-027 | Собственный маркер маяка на карте (LighthouseMapMarker) | Accepted | 2026-08-22 |
+| ADR-028 | Геометрия бандла = истина; свет на Spot Light; flare без лимита в device-режиме | Accepted | 2026-08-22 |
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 
@@ -160,7 +175,6 @@ Decompose God Classes into focused, single-responsibility classes.
 |-----------|----------------|-------|--------|
 | ⚠ StationManager | Station management | ~100 | Proposed |
 | ⚠ SignalDecoder | Signal processing | ~90 | Proposed |
-| ⚠ PositionTracker | Position calculation | ~60 | Proposed |
 | DiagnosticsCollector | Diagnostics | ~30 | Existing (inline) |
 | SonneController | Orchestration | ~136 | Existing (508 LOC) |
 
@@ -345,7 +359,9 @@ Move configuration data to JSON files.
 ## 8. ADR-007: Unit Testing Strategy
 
 ### Status
-Deferred
+Accepted (2026-08-19, baseline ADR-014: 182 PASS)
+
+> **Update 2026-08-19 (ADR-014):** F22 закрыто — `Tests/Runner` 182 PASS `powershell -ExecutionPolicy Bypass -File tests.ps1`, `dotnet build Release/Debug` 0 errors, tag `baseline-182-20260819` на `8b3021fa`. Цель `SAD/11` >80% Data / >70% Logic — частично достигнута (чистая математика покрыта, UI 0% — см. `docs/adr/ADR-014-baseline.md`).
 
 ### Context
 No unit tests exist (0% coverage). Bugs are discovered in production.
@@ -370,9 +386,9 @@ Implement unit tests for all pure C# logic.
 
 ```csharp
 [TestFixture]
-public class PositionFixCalculatorTests {
+public class SonneBeamTests {
     [Test]
-    public void Calculate_TwoStations_FindsIntersection() {
+    public void BuildPattern_UsesSixtyElements() {
         // Test implementation
     }
 }

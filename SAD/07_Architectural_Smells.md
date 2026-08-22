@@ -190,7 +190,6 @@ switch (phase) {
 
 | Location | Code | Issue |
 |----------|------|-------|
-| `PositionFixCalculator.ErrorKm` | Always returns 0 | Never implemented |
 | `ToggleHandler.ImgState()` | Defined but never called | Dead method |
 | `ConsolCycleConfig.GetForCycleDuration()` | Ignores parameter | Dead parameter |
 | `ComparisonExtensions.IsNull()` | Duplicates `== null` | Unnecessary |
@@ -290,7 +289,6 @@ SonneController.cs                12      ██████████ Critica
 InformationPanelHandler.cs        8       ████████   Critical
 RadioStoryIntegration.cs          7       ███████    High
 AudioSynthesisEngine.cs           6       █████      High
-PositionFixCalculator.cs          5       ██████     High
 MorseKeyer.cs                     4       █████      Medium
 StationScheduler.cs               4       █████      Medium
 DspPipeline.cs                    3       ████       Medium

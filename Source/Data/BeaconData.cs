@@ -1,7 +1,41 @@
-﻿using System;
+using System;
 
 namespace UBOAT.Mods.RadioNavigation
 {
+    public enum BeaconStationRole : byte
+    {
+        DirectionalSonne,
+        RadioBeaconOnly
+    }
+
+    public struct BeaconOperatingSchedule
+    {
+        public int DailyStartMinutesUtc;
+        public int DailyEndMinutesUtc;
+        public int DailyMaintenanceStartMinutesUtc;
+        public int DailyMaintenanceEndMinutesUtc;
+        public int WednesdayMaintenanceStartMinutesUtc;
+        public int WednesdayMaintenanceEndMinutesUtc;
+
+        public bool IsOperationalAt(DateTime utc)
+        {
+            int minutes = utc.Hour * 60 + utc.Minute;
+            if (minutes < DailyStartMinutesUtc || minutes >= DailyEndMinutesUtc)
+                return false;
+
+            if (IsInside(minutes, DailyMaintenanceStartMinutesUtc, DailyMaintenanceEndMinutesUtc))
+                return false;
+            if (utc.DayOfWeek == DayOfWeek.Wednesday
+                && IsInside(minutes, WednesdayMaintenanceStartMinutesUtc, WednesdayMaintenanceEndMinutesUtc))
+                return false;
+
+            return true;
+        }
+
+        private static bool IsInside(int value, int start, int end) =>
+            start >= 0 && end > start && value >= start && value < end;
+    }
+
     public struct BeaconHistoryEntry
     {
         public DateTime? From;
@@ -19,30 +53,48 @@ namespace UBOAT.Mods.RadioNavigation
         public DateTime Commissioned;
         public DateTime? Decommissioned;
         public int PowerW;
+        public BeaconStationRole Role;
         public float BeamHeadingDegTrue;
+        public float NormalBearingForwardDegTrue;
+        public float NormalBearingBackwardDegTrue;
         public float BeamHalfWidthDeg;
         public int CycleDurationSeconds;
         public float BaseAngle;
+        public BeaconOperatingSchedule Schedule;
         public BeaconHistoryEntry[] History;
     }
 
     public static class BeaconData
     {
+        // Historical CAP 59 Appendix I set. Later/post-war stations are not
+        // part of the real Sonne profile and are intentionally excluded.
         public static readonly BeaconStation[] Stations =
         {
             new BeaconStation
             {
                 Name = "Bushmills",
                 Country = "UK",
-                Latitude = 55.2028,
-                Longitude = -6.5,
+                Latitude = 55.205556,
+                Longitude = -6.467222,
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                Role = BeaconStationRole.DirectionalSonne,
                 BeamHeadingDegTrue = 310.2f,
+                NormalBearingForwardDegTrue = 130.2f,
+                NormalBearingBackwardDegTrue = 310.2f,
                 BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
+                CycleDurationSeconds = 40,
                 BaseAngle = 310.2f,
+                Schedule = new BeaconOperatingSchedule
+                {
+                    DailyStartMinutesUtc = 0,
+                    DailyEndMinutesUtc = 1440,
+                    DailyMaintenanceStartMinutesUtc = 960,
+                    DailyMaintenanceEndMinutesUtc = 975,
+                    WednesdayMaintenanceStartMinutesUtc = 660,
+                    WednesdayMaintenanceEndMinutesUtc = 720
+                },
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -55,17 +107,29 @@ namespace UBOAT.Mods.RadioNavigation
             },
             new BeaconStation
             {
-                Name = "Ploneis (Quimper)",
+                Name = "Quimper/Ploneis",
                 Country = "France",
                 Latitude = 48.018333,
-                Longitude = -4.215278,
+                Longitude = -4.215000,
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
-                PowerW = 2000,
+                PowerW = 1500,
+                Role = BeaconStationRole.DirectionalSonne,
                 BeamHeadingDegTrue = 286.2f,
+                NormalBearingForwardDegTrue = 106.2f,
+                NormalBearingBackwardDegTrue = 286.2f,
                 BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 110.0f,
+                CycleDurationSeconds = 40,
+                BaseAngle = 286.2f,
+                Schedule = new BeaconOperatingSchedule
+                {
+                    DailyStartMinutesUtc = 0,
+                    DailyEndMinutesUtc = 1440,
+                    DailyMaintenanceStartMinutesUtc = 450,
+                    DailyMaintenanceEndMinutesUtc = 465,
+                    WednesdayMaintenanceStartMinutesUtc = -1,
+                    WednesdayMaintenanceEndMinutesUtc = -1
+                },
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -78,17 +142,29 @@ namespace UBOAT.Mods.RadioNavigation
             },
             new BeaconStation
             {
-                Name = "Stavanger-Varhaug",
+                Name = "Stavanger",
                 Country = "Norway",
-                Latitude = 58.625556,
+                Latitude = 58.625278,
                 Longitude = 5.630278,
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                Role = BeaconStationRole.DirectionalSonne,
                 BeamHeadingDegTrue = 247f,
+                NormalBearingForwardDegTrue = 67f,
+                NormalBearingBackwardDegTrue = 247f,
                 BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 230.0f,
+                CycleDurationSeconds = 60,
+                BaseAngle = 247f,
+                Schedule = new BeaconOperatingSchedule
+                {
+                    DailyStartMinutesUtc = 0,
+                    DailyEndMinutesUtc = 1440,
+                    DailyMaintenanceStartMinutesUtc = -1,
+                    DailyMaintenanceEndMinutesUtc = -1,
+                    WednesdayMaintenanceStartMinutesUtc = -1,
+                    WednesdayMaintenanceEndMinutesUtc = -1
+                },
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -101,17 +177,29 @@ namespace UBOAT.Mods.RadioNavigation
             },
             new BeaconStation
             {
-                Name = "Lugo (Outeiro de Rei)",
+                Name = "Lugo",
                 Country = "Spain",
                 Latitude = 43.248056,
                 Longitude = -7.482222,
                 Commissioned = new DateTime(1942, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                Role = BeaconStationRole.DirectionalSonne,
                 BeamHeadingDegTrue = 270f,
+                NormalBearingForwardDegTrue = 90f,
+                NormalBearingBackwardDegTrue = 270f,
                 BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 310.0f,
+                CycleDurationSeconds = 60,
+                BaseAngle = 270f,
+                Schedule = new BeaconOperatingSchedule
+                {
+                    DailyStartMinutesUtc = 0,
+                    DailyEndMinutesUtc = 1440,
+                    DailyMaintenanceStartMinutesUtc = -1,
+                    DailyMaintenanceEndMinutesUtc = -1,
+                    WednesdayMaintenanceStartMinutesUtc = -1,
+                    WednesdayMaintenanceEndMinutesUtc = -1
+                },
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -124,17 +212,29 @@ namespace UBOAT.Mods.RadioNavigation
             },
             new BeaconStation
             {
-                Name = "Sevilla",
+                Name = "Seville",
                 Country = "Spain",
-                Latitude = 37.521389,
-                Longitude = -6.021667,
+                Latitude = 37.521667,
+                Longitude = -6.030000,
                 Commissioned = new DateTime(1940, 1, 1),
                 Decommissioned = null,
                 PowerW = 1500,
+                Role = BeaconStationRole.RadioBeaconOnly,
                 BeamHeadingDegTrue = 261f,
+                NormalBearingForwardDegTrue = 81f,
+                NormalBearingBackwardDegTrue = 261f,
                 BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 80.0f,
+                CycleDurationSeconds = 60,
+                BaseAngle = 261f,
+                Schedule = new BeaconOperatingSchedule
+                {
+                    DailyStartMinutesUtc = 360,
+                    DailyEndMinutesUtc = 1200,
+                    DailyMaintenanceStartMinutesUtc = -1,
+                    DailyMaintenanceEndMinutesUtc = -1,
+                    WednesdayMaintenanceStartMinutesUtc = -1,
+                    WednesdayMaintenanceEndMinutesUtc = -1
+                },
                 History = new[]
                 {
                     new BeaconHistoryEntry
@@ -142,213 +242,6 @@ namespace UBOAT.Mods.RadioNavigation
                         From = new DateTime(1940, 1, 1),
                         Callsign = "SL",
                         FrequencyKHz = 315.0f
-                    }
-                }
-            },
-            new BeaconStation
-            {
-                Name = "Andoya",
-                Country = "Norway",
-                Latitude = 69.148056,
-                Longitude = 15.883333,
-                Commissioned = new DateTime(1941, 1, 1),
-                Decommissioned = null,
-                PowerW = 3000,
-                BeamHeadingDegTrue = 315f,
-                BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 315f,
-                History = new[]
-                {
-                    new BeaconHistoryEntry
-                    {
-                        From = new DateTime(1941, 1, 1),
-                        Callsign = "LEX",
-                        FrequencyKHz = 332.5f
-                    }
-                }
-            },
-            new BeaconStation
-            {
-                Name = "Bjornoya",
-                Country = "Norway",
-                Latitude = 74.492778,
-                Longitude = 19.059722,
-                Commissioned = new DateTime(1941, 1, 1),
-                Decommissioned = null,
-                PowerW = 3000,
-                BeamHeadingDegTrue = 180f,
-                BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 180f,
-                History = new[]
-                {
-                    new BeaconHistoryEntry
-                    {
-                        From = new DateTime(1941, 1, 1),
-                        Callsign = "LJS",
-                        FrequencyKHz = 332.5f
-                    }
-                }
-            },
-            new BeaconStation
-            {
-                Name = "Jan Mayen",
-                Country = "Norway",
-                Latitude = 71.05,
-                Longitude = -8.233333,
-                Commissioned = new DateTime(1941, 1, 1),
-                Decommissioned = null,
-                PowerW = 1500,
-                BeamHeadingDegTrue = 112.5f,
-                BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 112.5f,
-                History = new[]
-                {
-                    new BeaconHistoryEntry
-                    {
-                        From = new DateTime(1941, 1, 1),
-                        Callsign = "LMC",
-                        FrequencyKHz = 332.5f
-                    }
-                }
-            },
-            new BeaconStation
-            {
-                Name = "Beauvais",
-                Country = "France",
-                Latitude = 49.682222,
-                Longitude = 2.745556,
-                Commissioned = new DateTime(1944, 1, 1),
-                Decommissioned = null,
-                PowerW = 1500,
-                BeamHeadingDegTrue = 300f,
-                BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 300f,
-                History = new[]
-                {
-                    new BeaconHistoryEntry
-                    {
-                        From = new DateTime(1944, 1, 1),
-                        Callsign = null,
-                        FrequencyKHz = 307.0f
-                    }
-                }
-            },
-            new BeaconStation
-            {
-                Name = "Bayeux",
-                Country = "France",
-                Latitude = 49.283333,
-                Longitude = -0.7,
-                Commissioned = new DateTime(1944, 1, 1),
-                Decommissioned = null,
-                PowerW = 1500,
-                BeamHeadingDegTrue = 315f,
-                BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 315f,
-                History = new[]
-                {
-                    new BeaconHistoryEntry
-                    {
-                        From = new DateTime(1944, 1, 1),
-                        Callsign = null,
-                        FrequencyKHz = 306.0f
-                    }
-                }
-            },
-            new BeaconStation
-            {
-                Name = "Petten",
-                Country = "Netherlands",
-                Latitude = 52.766667,
-                Longitude = 4.666667,
-                Commissioned = new DateTime(1944, 1, 1),
-                Decommissioned = null,
-                PowerW = 1500,
-                BeamHeadingDegTrue = 315f,
-                BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 315f,
-                History = new[]
-                {
-                    new BeaconHistoryEntry
-                    {
-                        From = new DateTime(1944, 1, 1),
-                        Callsign = null,
-                        FrequencyKHz = 481.0f
-                    }
-                }
-            },
-            new BeaconStation
-            {
-                Name = "Plougourvest",
-                Country = "France",
-                Latitude = 48.55,
-                Longitude = -4.083333,
-                Commissioned = new DateTime(1944, 1, 1),
-                Decommissioned = null,
-                PowerW = 1500,
-                BeamHeadingDegTrue = 300f,
-                BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 300f,
-                History = new[]
-                {
-                    new BeaconHistoryEntry
-                    {
-                        From = new DateTime(1944, 1, 1),
-                        Callsign = null,
-                        FrequencyKHz = null
-                    }
-                }
-            },
-            new BeaconStation
-            {
-                Name = "Brieg",
-                Country = "Germany",
-                Latitude = 50.85,
-                Longitude = 17.483333,
-                Commissioned = new DateTime(1944, 1, 1),
-                Decommissioned = null,
-                PowerW = 1500,
-                BeamHeadingDegTrue = 330f,
-                BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 330f,
-                History = new[]
-                {
-                    new BeaconHistoryEntry
-                    {
-                        From = new DateTime(1944, 1, 1),
-                        Callsign = null,
-                        FrequencyKHz = 316.0f
-                    }
-                }
-            },
-            new BeaconStation
-            {
-                Name = "Husum",
-                Country = "Germany",
-                Latitude = 54.483333,
-                Longitude = 9.05,
-                Commissioned = new DateTime(1944, 1, 1),
-                Decommissioned = null,
-                PowerW = 1500,
-                BeamHeadingDegTrue = 300f,
-                BeamHalfWidthDeg = 90f,
-                CycleDurationSeconds = 120,
-                BaseAngle = 300f,
-                History = new[]
-                {
-                    new BeaconHistoryEntry
-                    {
-                        From = new DateTime(1944, 1, 1),
-                        Callsign = null,
-                        FrequencyKHz = 481.0f
                     }
                 }
             }

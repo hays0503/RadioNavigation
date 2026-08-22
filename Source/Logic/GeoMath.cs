@@ -2,9 +2,7 @@ using System;
 
 namespace UBOAT.Mods.RadioNavigation
 {
-    // F12/F73: single home for spherical geo math; SonneController and
-    // PositionFixCalculator previously each carried a private ToRadians and
-    // the Haversine distance was duplicated across classes.
+    // Single home for spherical geo math used by navigation diagnostics.
     public static class GeoMath
     {
         public const double EarthRadiusKm = 6371.0;

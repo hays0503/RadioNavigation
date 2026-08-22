@@ -21,17 +21,20 @@
     <Compile Include="Stubs\UnityEngineMathf.cs" />
     <Compile Include="Stubs\UnityEngineDebug.cs" />
     <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />
+    <Compile Include="Stubs\UnityEngineTransform.cs" />
+    <Compile Include="Stubs\GameStubs.cs" />
+    <Compile Include="StoryDecisionGatewayTests.cs" />
     <Compile Include="SkipTestException.cs" />
     <Compile Include="GameContractTests.cs" />
     <Compile Include="GeoMathTests.cs" />
     <Compile Include="PanelStateStoreTests.cs" />
-    <Compile Include="PositionFixCalculatorTests.cs" />
     <Compile Include="MorseAlphabetTests.cs" />
     <Compile Include="MorseKeyerTests.cs" />
     <Compile Include="MorseTimingTests.cs" />
     <Compile Include="NavigationPatternTests.cs" />
     <Compile Include="DialConfigTests.cs" />
     <Compile Include="SonneSignalGeneratorTests.cs" />
+    <Compile Include="SonneBeamTests.cs" />
     <Compile Include="AudioSynthesisEngineTests.cs" />
     <Compile Include="PlayerPositionProviderTests.cs" />
     <Compile Include="StationSchedulerTests.cs" />
@@ -40,7 +43,15 @@
     <Compile Include="ComparisonExtensionsTests.cs" />
     <Compile Include="SignalTypesTests.cs" />
 <Compile Include="SignalRichTextFormatterTests.cs" />
+    <Compile Include="LighthouseProfileTests.cs" />
     <Compile Include="DspPipelineTests.cs" />
+    <Compile Include="ShieldTests.cs" />
+    <Compile Include="AstroMathTests.cs" />
+    <Compile Include="StarCatalogTests.cs" />
+    <Compile Include="LighthouseVisualModelTests.cs" />
+    <Compile Include="LighthouseMarkerSizingTests.cs" />
+    <Compile Include="RadioNavDiagnosticsTests.cs" />
+    <Compile Include="TransformHelpersTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -58,13 +69,22 @@
     <Compile Include="..\Source\Logic\MorseTiming.cs" Link="Source\Logic\MorseTiming.cs" />
     <Compile Include="..\Source\Logic\NavigationElementType.cs" Link="Source\Logic\NavigationElementType.cs" />
     <Compile Include="..\Source\Logic\NavigationPattern.cs" Link="Source\Logic\NavigationPattern.cs" />
-    <Compile Include="..\Source\Logic\PositionFixCalculator.cs" Link="Source\Logic\PositionFixCalculator.cs" />
     <Compile Include="..\Source\Logic\SonneSignalGenerator.cs" Link="Source\Logic\SonneSignalGenerator.cs" />
+    <Compile Include="..\Source\Data\SonneBeam.cs" Link="Source\Data\SonneBeam.cs" />
     <Compile Include="..\Source\Logic\StationScheduler.cs" Link="Source\Logic\StationScheduler.cs" />
     <Compile Include="..\Source\Logic\GeoPositionConverter.cs" Link="Source\Logic\GeoPositionConverter.cs" />
     <Compile Include="..\Source\Sound\AudioSynthesisEngine.cs" Link="Source\Sound\AudioSynthesisEngine.cs" />
     <Compile Include="..\Source\Sound\DspPipeline.cs" Link="Source\Sound\DspPipeline.cs" />
     <Compile Include="..\Source\UI\PanelStateStore.cs" Link="Source\UI\PanelStateStore.cs" />
+    <Compile Include="..\Source\Data\LighthouseProfile.cs" Link="Source\Data\LighthouseProfile.cs" />
+    <Compile Include="..\Source\Data\LighthouseProfiles.cs" Link="Source\Data\LighthouseProfiles.cs" />
+    <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />
+    <Compile Include="..\Source\Data\StarCatalog.cs" Link="Source\Data\StarCatalog.cs" />
+    <Compile Include="..\Source\Logic\StoryDecisionGateway.cs" Link="Source\Logic\StoryDecisionGateway.cs" />
+    <Compile Include="..\Source\Logic\LighthouseVisualModel.cs" Link="Source\Logic\LighthouseVisualModel.cs" />
+    <Compile Include="..\Source\Logic\LighthouseMarkerSizing.cs" Link="Source\Logic\LighthouseMarkerSizing.cs" />
+    <Compile Include="..\Source\Logic\RadioNavDiagnostics.cs" Link="Source\Logic\RadioNavDiagnostics.cs" />
+    <Compile Include="..\Source\Logic\TransformHelpers.cs" Link="Source\Logic\TransformHelpers.cs" />
   </ItemGroup>
 
 </Project>
