@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using DWS.Common.InjectionFramework;
 using UBOAT.Game.Core.Input;
@@ -67,12 +67,11 @@ namespace UBOAT.Mods.RadioNavigation
         private bool scaleCaptured;
         private bool chronometerExpanded;
         private int lastScaleToggleFrame = -1;
-        private bool scaleHovered;
-        private bool appliedHoverValue;
-        private bool appliedExpanded;
-        private bool appliedHoverInitialized;
-        private bool appliedMoveValue;
-        private bool appliedMoveInitialized;
+        private readonly ChronometerCursorPolicy cursorPolicy = new ChronometerCursorPolicy();
+        private bool reqScaleValid;
+        private bool reqScaleHover;
+        private bool reqMoveValid;
+        private bool reqMoveHover;
         private bool chronoPointerInsideCached;
         private static readonly Vector2 ScaleCursorHotspot = new Vector2(16f, 16f);
 
@@ -347,7 +346,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (localDragActive)
                 return;
-            SetScaleHoverInternal(value);
+            reqScaleHover = value;
+            reqScaleValid = true;
+            RefreshCursor();
             ForwardChronometerPointerInside();
         }
 
@@ -355,7 +356,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (localDragActive)
                 return;
-            SetMoveHoverInternal(moveHovered);
+            reqMoveHover = moveHovered;
+            reqMoveValid = true;
+            RefreshCursor();
             ForwardChronometerPointerInside();
         }
 
@@ -363,7 +366,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             // PanelDragHandler must not paint its own move cursor while the
             // pointer is over any chronometer zone - the zone cursors win.
-            bool inside = scaleHovered || appliedMoveValue;
+            bool inside = reqMoveValid && reqMoveHover;
             if (inside == chronoPointerInsideCached)
                 return;
             chronoPointerInsideCached = inside;
@@ -371,66 +374,56 @@ namespace UBOAT.Mods.RadioNavigation
                 panelDragHandler.SetChronometerPointerInside(inside);
         }
 
-        private void SetScaleHoverInternal(bool value)
+        // Single application point: the pure policy decides, this translates
+        // the command to the available backend. GameDefault always goes
+        // through ApplyGameDefaultCursor - foreign UnsetCustomCursor calls
+        // desync the manager's mode and its guarded SetDefaultCursor would
+        // early-out, leaving a custom texture stuck on screen.
+        private void RefreshCursor()
         {
-            // Etalon-conform policy through the game's CursorManager: hover
-            // shows the custom expand/reduce arrows as Mode.Custom, leave
-            // restores the default texture via SetDefaultCursor.
-            if (cursorManager.IsNotNull())
+            var cmd = cursorPolicy.Evaluate(reqScaleHover, reqMoveHover, chronometerExpanded);
+            switch (cmd)
             {
-                bool expandedChanged = value && appliedExpanded != chronometerExpanded;
-                if (!appliedHoverInitialized || appliedHoverValue != value || expandedChanged)
-                {
+                case ChronometerCursorCommand.ArrowsExpand:
+                case ChronometerCursorCommand.ArrowsReduce:
                     EnsureScaleCursors();
-                    if (value)
-                    {
-                        Texture2D cursor = chronometerExpanded ? reduceCursor : expandCursor;
-                        cursorManager.SetCustomCursor(cursor, ScaleCursorHotspot);
-                    }
+                    Texture2D arrows = cmd == ChronometerCursorCommand.ArrowsReduce
+                        ? reduceCursor
+                        : expandCursor;
+                    if (cursorManager.IsNotNull())
+                        cursorManager.SetCustomCursor(arrows, ScaleCursorHotspot);
+                    else if (panelDragHandler.IsNotNull())
+                        panelDragHandler.SetCursorOverride(arrows, ScaleCursorHotspot);
                     else
-                    {
-                        // UnsetCustomCursor anywhere on the map flips the
-                        // manager's mode to Default without touching the
-                        // texture, so SetDefaultCursor's guard early-outs and
-                        // our arrows stay stuck. Sync the mode AND force the
-                        // game's normal texture directly.
+                        Cursor.SetCursor(arrows, ScaleCursorHotspot, CursorMode.Auto);
+                    break;
+
+                case ChronometerCursorCommand.Crosshair:
+                    Texture2D moveTexture = panelDragHandler.IsNotNull()
+                        ? panelDragHandler.MoveCursorTexture
+                        : null;
+                    Vector2 moveHotspot = panelDragHandler.IsNotNull()
+                        ? panelDragHandler.MoveCursorHotspot
+                        : new Vector2(16f, 16f);
+                    if (moveTexture.IsNull())
+                        break; // no crosshair source - keep current cursor
+                    if (cursorManager.IsNotNull())
+                        cursorManager.SetCustomCursor(moveTexture, moveHotspot);
+                    else if (panelDragHandler.IsNotNull())
+                        panelDragHandler.SetCursorOverride(moveTexture, moveHotspot);
+                    else
+                        Cursor.SetCursor(moveTexture, moveHotspot, CursorMode.Auto);
+                    break;
+
+                case ChronometerCursorCommand.GameDefault:
+                    if (cursorManager.IsNotNull())
                         ApplyGameDefaultCursor();
-                    }
-
-                    appliedHoverValue = value;
-                    appliedExpanded = chronometerExpanded;
-                    appliedHoverInitialized = true;
-                }
-                scaleHovered = value;
-                return;
-            }
-
-            // Fallback without the singleton: direct application plus a
-            // periodic heal so foreign SetCursor calls cannot kill the hint.
-            if (!appliedHoverInitialized || appliedHoverValue != value || Time.frameCount % 45 == 0)
-            {
-                EnsureScaleCursors();
-                if (value)
-                {
-                    Texture2D cursor = chronometerExpanded ? reduceCursor : expandCursor;
-                    if (panelDragHandler.IsNotNull())
-                        panelDragHandler.SetCursorOverride(cursor, ScaleCursorHotspot);
+                    else if (panelDragHandler.IsNotNull())
+                        panelDragHandler.ClearCursorOverride();
                     else
-                        Cursor.SetCursor(cursor, ScaleCursorHotspot, CursorMode.Auto);
-                }
-                else if (panelDragHandler.IsNotNull())
-                {
-                    panelDragHandler.ClearCursorOverride();
-                }
-                else
-                {
-                    Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
-                }
-
-                appliedHoverValue = value;
-                appliedHoverInitialized = true;
+                        Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+                    break;
             }
-            scaleHovered = value;
         }
 
         private static FieldInfo normalCursorTexField;
@@ -471,75 +464,6 @@ namespace UBOAT.Mods.RadioNavigation
             return chronometerDragContainer;
         }
 
-        private void SetMoveHoverInternal(bool moveHovered)
-        {
-            if (localDragActive)
-                return;
-
-            // Scale hint owns the center; the crosshair covers only the rest
-            // of the body. While the center is hovered the crosshair state is
-            // marked stale so re-entering the body reapplies it.
-            if (moveHovered && scaleHovered)
-                return;
-            if (scaleHovered)
-            {
-                appliedMoveValue = false;
-                appliedMoveInitialized = false;
-                return;
-            }
-
-            if (cursorManager.IsNotNull())
-            {
-                if (!appliedMoveInitialized || appliedMoveValue != moveHovered)
-                {
-                    Texture2D moveTexture = panelDragHandler.IsNotNull()
-                        ? panelDragHandler.MoveCursorTexture
-                        : null;
-                    Vector2 hotspot = panelDragHandler.IsNotNull()
-                        ? panelDragHandler.MoveCursorHotspot
-                        : new Vector2(16f, 16f);
-                    if (moveHovered && moveTexture.IsNotNull())
-                        cursorManager.SetCustomCursor(moveTexture, hotspot);
-                    else
-                        ApplyGameDefaultCursor();
-
-                    appliedMoveValue = moveHovered;
-                    appliedMoveInitialized = true;
-                }
-                return;
-            }
-
-            // Fallback without the singleton: direct application plus a
-            // periodic heal so foreign SetCursor calls cannot kill the hint.
-            if (!appliedMoveInitialized || appliedMoveValue != moveHovered || Time.frameCount % 45 == 0)
-            {
-                Texture2D moveTexture = panelDragHandler.IsNotNull()
-                    ? panelDragHandler.MoveCursorTexture
-                    : null;
-                Vector2 hotspot = panelDragHandler.IsNotNull()
-                    ? panelDragHandler.MoveCursorHotspot
-                    : new Vector2(16f, 16f);
-                if (moveHovered && moveTexture.IsNotNull())
-                {
-                    if (panelDragHandler.IsNotNull())
-                        panelDragHandler.SetCursorOverride(moveTexture, hotspot);
-                    else
-                        Cursor.SetCursor(moveTexture, hotspot, CursorMode.Auto);
-                }
-                else if (panelDragHandler.IsNotNull())
-                {
-                    panelDragHandler.ClearCursorOverride();
-                }
-                else
-                {
-                    Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
-                }
-
-                appliedMoveValue = moveHovered;
-                appliedMoveInitialized = true;
-            }
-        }
-
         internal void ToggleChronometerScale()
         {
             if (lastScaleToggleFrame == Time.frameCount)
@@ -558,9 +482,9 @@ namespace UBOAT.Mods.RadioNavigation
             chronometerDragContainer.localScale = chronometerExpanded
                 ? attachedChronometerScale * 2.5f
                 : attachedChronometerScale;
-            // Arrow swap (expand/reduce) is re-applied by the sensor's
-            // SetScaleHover path via appliedExpanded; no manual nudge here -
-            // it would fight the frozen-cursor window during a hold.
+            // Expanded changed -> the policy re-emits reduce/expand arrows on
+            // this refresh even though hover state did not move.
+            RefreshCursor();
         }
 
         private void EnsureScaleCursors()

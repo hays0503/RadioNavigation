@@ -37,7 +37,7 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 
 ## Gotchas
 
-- Tests: 252 PASS `powershell -ExecutionPolicy Bypass -File tests.ps1` (xunit 2.9 + Runner, baseline ADR-014 `baseline-182-20260819`; 232 с 2026-08-22, 253 с 2026-08-22, 255 с 2026-08-23 — golden audio render `AudioRenderPauseTests`, офлайн рендер движка + огибающая, без Unity; 257 с 2026-08-23 — морзе-канон 1:3 (`DashSoundMs=600`, `CallsignDashSoundMs=375`) + pitch-split точка/тире/экви ±150 Гц вокруг `BeatFrequency`, `DashGainBoost=1.25`; 252 с 2026-08-23 — P5.0 dead sweep убрал 5 тестов мёртвого кода). `dotnet build -c Release/Debug` 0 errors. SAD 11 — 252 PASS.
+- Tests: 260 PASS `powershell -ExecutionPolicy Bypass -File tests.ps1` (xunit 2.9 + Runner, baseline ADR-014 `baseline-182-20260819`; 232 с 2026-08-22, 253 с 2026-08-22, 255 с 2026-08-23 — golden audio render `AudioRenderPauseTests`, офлайн рендер движка + огибающая, без Unity; 257 с 2026-08-23 — морзе-канон 1:3 (`DashSoundMs=600`, `CallsignDashSoundMs=375`) + pitch-split точка/тире/экви ±150 Гц вокруг `BeatFrequency`, `DashGainBoost=1.25`; 252 с 2026-08-23 — P5.0 dead sweep убрал 5 тестов мёртвого кода; 260 с 2026-08-23 — `ChronometerCursorPolicyTests` пиннят двухзонную курсорную политику хронометра (стрелки центра/крестик тела/игровой дефолт, приоритет масштаба, emit-only-on-change)). `dotnet build -c Release/Debug` 0 errors. SAD 11 — 260 PASS.
 - No lint, formatter, `.editorconfig`. Refactoring plans propose adding one.
 - Harmony patches fail silently on game version change вЂ” targets renamed/removed. Check pre-flight log (`target methods not found`) on load.
 - AssetBundle required at `Bundles/testui` relative to mod root. Unity editor builds it; mod loader expects it at runtime.

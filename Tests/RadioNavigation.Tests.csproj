@@ -37,6 +37,7 @@
     <Compile Include="SonneBeamTests.cs" />
     <Compile Include="AudioSynthesisEngineTests.cs" />
     <Compile Include="AudioRenderPauseTests.cs" />
+    <Compile Include="ChronometerCursorPolicyTests.cs" />
     <Compile Include="Helpers\KeyingEnvelope.cs" />
     <Compile Include="Helpers\WavWriter.cs" />
     <Compile Include="PlayerPositionProviderTests.cs" />
@@ -79,6 +80,7 @@
     <Compile Include="..\Source\Sound\AudioSynthesisEngine.cs" Link="Source\Sound\AudioSynthesisEngine.cs" />
     <Compile Include="..\Source\Sound\DspPipeline.cs" Link="Source\Sound\DspPipeline.cs" />
     <Compile Include="..\Source\UI\PanelStateStore.cs" Link="Source\UI\PanelStateStore.cs" />
+    <Compile Include="..\Source\UI\ChronometerCursorPolicy.cs" Link="Source\UI\ChronometerCursorPolicy.cs" />
     <Compile Include="..\Source\Data\LighthouseProfile.cs" Link="Source\Data\LighthouseProfile.cs" />
     <Compile Include="..\Source\Data\LighthouseProfiles.cs" Link="Source\Data\LighthouseProfiles.cs" />
     <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />
