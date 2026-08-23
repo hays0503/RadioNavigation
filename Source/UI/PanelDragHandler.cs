@@ -17,8 +17,20 @@ namespace UBOAT.Mods.RadioNavigation
         private bool moveCursorActive;
         private bool isDragging;
         private int activePointerId = -1;
+        private bool chronometerPointerInside;
         private ExpanderHandler expander;
         private ChronometerOverlayHandler chronometerOverlay;
+
+        internal Texture2D MoveCursorTexture => moveCursorTexture;
+        internal Vector2 MoveCursorHotspot => cursorHotspot;
+
+        // While the pointer is over any chronometer zone, the zone cursors
+        // (arrows / crosshair) own the pointer - the panel move cursor and
+        // its clears must not fight them.
+        internal void SetChronometerPointerInside(bool value)
+        {
+            chronometerPointerInside = value;
+        }
 
         private void Start()
         {
@@ -140,6 +152,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnPointerEnter(PointerEventData eventData)
         {
+            if (chronometerPointerInside)
+                return;
             if (eventData.dragging)
                 return;
 
