@@ -493,6 +493,18 @@ namespace UBOAT.Mods.RadioNavigation
             ToggleChronometerScale();
         }
 
+        internal bool IsLocalDragActive => localDragActive;
+
+        // Native (pre-raise) chronometer drag on the map: the game moves the
+        // container itself; we only swap in the move cursor for the gesture.
+        internal void OnScaleNativeDragChanged(bool dragging)
+        {
+            if (dragging)
+                AcquireDragCursor();
+            else
+                ReleaseDragCursor();
+        }
+
         private void CaptureDefaultPosition()
         {
             if (defaultPositionCaptured || ChronometerDefaultPositionField.IsNull())

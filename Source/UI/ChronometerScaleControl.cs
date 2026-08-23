@@ -20,6 +20,11 @@ namespace UBOAT.Mods.RadioNavigation
         // must never toggle the scale.
         private bool pressPending;
         private Vector2 pressScreenPos;
+        // Native-drag observation: before the first raise there is no mod
+        // drag shield, so the game itself moves the chronometer. The sensor
+        // still sees the gesture and reports it so the owner can swap in the
+        // move cursor without touching native drag mechanics.
+        private bool nativeDragNotified;
 
         public void SetOwner(ChronometerOverlayHandler value)
         {
@@ -40,7 +45,14 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             if (!pressPending)
+            {
+                if (!Input.GetMouseButton(0) && nativeDragNotified)
+                {
+                    nativeDragNotified = false;
+                    owner.OnScaleNativeDragChanged(false);
+                }
                 return;
+            }
 
             float threshold = EventSystem.current != null
                 ? EventSystem.current.pixelDragThreshold
@@ -48,6 +60,11 @@ namespace UBOAT.Mods.RadioNavigation
             if (Vector2.Distance(mouse, pressScreenPos) > threshold)
             {
                 pressPending = false;
+                if (!nativeDragNotified && !owner.IsLocalDragActive)
+                {
+                    nativeDragNotified = true;
+                    owner.OnScaleNativeDragChanged(true);
+                }
                 return;
             }
 
