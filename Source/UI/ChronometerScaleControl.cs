@@ -6,11 +6,10 @@ namespace UBOAT.Mods.RadioNavigation
     /// <summary>
     /// Single input sensor for the chronometer scale zone. Everything is
     /// geometric (rect vs mouse position): hover hint, click, drag
-    /// observation. uGUI pointer events are not used because native graphics
-    /// above the transparent control can occlude the raycast, which would
-    /// kill the hover hint exactly where it matters. Click = press + release
-    /// inside the rect without exceeding the drag threshold; press-drag is a
-    /// move gesture and never toggles the scale.
+    /// discrimination. uGUI pointer events are not used because native
+    /// graphics above the transparent control can occlude the raycast.
+    /// Cursor policy lives in the owner and mirrors the native radio-room
+    /// etalon: hand cursor on hover, no cursor change during drags.
     /// </summary>
     public sealed class ChronometerScaleControl : MonoBehaviour
     {
@@ -19,7 +18,6 @@ namespace UBOAT.Mods.RadioNavigation
         private bool canvasResolved;
         private bool pressPending;
         private Vector2 pressScreenPos;
-        private bool nativeDragNotified;
 
         public void SetOwner(ChronometerOverlayHandler value)
         {
@@ -33,18 +31,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             Vector2 mouse = Input.mousePosition;
             bool hovered = RectTransformContains(mouse);
-
-            if (nativeDragNotified || owner.IsLocalDragActive)
-            {
-                // A drag owns the cursor; hover must not fight it.
-                if (!Input.GetMouseButton(0))
-                {
-                    nativeDragNotified = false;
-                    owner.OnScaleNativeDragChanged(false);
-                }
-                return;
-            }
-
             owner.SetScaleHover(hovered);
 
             if (Input.GetMouseButtonDown(0))
@@ -62,9 +48,9 @@ namespace UBOAT.Mods.RadioNavigation
                 : 10f;
             if (Vector2.Distance(mouse, pressScreenPos) > threshold)
             {
+                // Drag gesture: the game moves the chronometer, the scale
+                // toggle is cancelled and the cursor stays as-is (etalon).
                 pressPending = false;
-                nativeDragNotified = true;
-                owner.OnScaleNativeDragChanged(true);
                 return;
             }
 

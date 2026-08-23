@@ -23,6 +23,10 @@ namespace UBOAT.Mods.RadioNavigation
             "chronometerToolDragState", BindingFlags.Instance | BindingFlags.NonPublic);
 
         private ShipControlUI shipControlUI;
+
+        // Etalon (native radio-room UX): hovering an interactive element
+        // shows the game-wide hand cursor via CursorManager.
+        [Inject] private static CursorManager cursorManager;
         private RadioHandler radioHandler;
         private GameInput gameInput;
         private RectTransform chronometerDragContainer;
@@ -341,6 +345,20 @@ namespace UBOAT.Mods.RadioNavigation
             if (scaleHovered == value)
                 return;
             scaleHovered = value;
+
+            // Etalon path: the game's hand cursor, same as every interactive
+            // element in the radio room.
+            if (cursorManager.IsNotNull())
+            {
+                if (value)
+                    cursorManager.SetHoverCursor();
+                else
+                    cursorManager.SetDefaultCursor();
+                return;
+            }
+
+            // Fallback when the game singleton is unavailable: legacy custom
+            // expand/reduce arrows.
             if (!value)
             {
                 if (panelDragHandler.IsNotNull())
@@ -495,16 +513,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal bool IsLocalDragActive => localDragActive;
 
-        // Native (pre-raise) chronometer drag on the map: the game moves the
-        // container itself; we only swap in the move cursor for the gesture.
-        internal void OnScaleNativeDragChanged(bool dragging)
-        {
-            if (dragging)
-                AcquireDragCursor();
-            else
-                ReleaseDragCursor();
-        }
-
         private void CaptureDefaultPosition()
         {
             if (defaultPositionCaptured || ChronometerDefaultPositionField.IsNull())
@@ -564,7 +572,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             localDragActive = true;
             CancelNativeDrag();
-            AcquireDragCursor();
         }
 
         internal void DragLocal(PointerEventData eventData)
@@ -594,23 +601,6 @@ namespace UBOAT.Mods.RadioNavigation
         {
             localDragActive = false;
             CancelNativeDrag();
-            ReleaseDragCursor();
-        }
-
-        // While the chronometer is being dragged, the move cursor owns the
-        // pointer; scale-hover cursor changes are frozen until release.
-        private void AcquireDragCursor()
-        {
-            if (panelDragHandler.IsNull())
-                return;
-            panelDragHandler.SetCursorOverride(
-                panelDragHandler.MoveCursorTexture,
-                panelDragHandler.MoveCursorHotspot);
-        }
-
-        private void ReleaseDragCursor()
-        {
-            SetScaleHover(scaleHovered);
         }
 
         private void CancelNativeDrag()

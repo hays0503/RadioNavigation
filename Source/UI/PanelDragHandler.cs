@@ -165,9 +165,6 @@ namespace UBOAT.Mods.RadioNavigation
             moveCursorActive = false;
         }
 
-        internal Texture2D MoveCursorTexture => moveCursorTexture;
-        internal Vector2 MoveCursorHotspot => cursorHotspot;
-
         internal void SetCursorOverride(Texture2D texture, Vector2 hotspot)
         {
             cursorOverrideTexture = texture;
