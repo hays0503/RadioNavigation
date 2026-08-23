@@ -95,11 +95,10 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             SyncChronometerLayer(IsRadioVisible && isOpen);
-            // Hover cursor is owned by the scale-control sensor; reset it
-            // here only when the chronometer context disappears (deactivation
-            // does not raise OnPointerExit).
-            if (!chronometerRaised || !IsRadioVisible)
-                SetScaleHover(false);
+            // Hover is re-asserted by the sensor every frame; the restore
+            // path (ResetChronometerScale) clears it when the chronometer
+            // context actually goes away. No per-frame reset here - on the
+            // map chronometerRaised is false and it would kill the hint.
             previousOpenState = isOpen;
             hasPreviousOpenState = true;
             nativeChangedThisFrame = false;
@@ -342,20 +341,26 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (localDragActive)
                 return;
-            if (scaleHovered == value)
-                return;
-            scaleHovered = value;
 
             // Etalon path: the game's hand cursor, same as every interactive
-            // element in the radio room.
+            // element in the radio room. Re-asserted every frame on purpose:
+            // foreign pointer-exits call SetDefaultCursor globally and would
+            // otherwise permanently kill the hint while we stay hovered.
+            // SetHoverCursor/SetDefaultCursor early-out internally when the
+            // mode already matches, so this is cheap.
             if (cursorManager.IsNotNull())
             {
+                scaleHovered = value;
                 if (value)
                     cursorManager.SetHoverCursor();
                 else
                     cursorManager.SetDefaultCursor();
                 return;
             }
+
+            if (scaleHovered == value)
+                return;
+            scaleHovered = value;
 
             // Fallback when the game singleton is unavailable: legacy custom
             // expand/reduce arrows.
