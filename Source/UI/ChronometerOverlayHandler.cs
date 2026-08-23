@@ -426,106 +426,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static FieldInfo normalCursorTexField;
         private static Texture2D gameDefaultCursor;
-        private static FieldInfo userSettingsField;
-        private static MemberInfo controlSettingsMember;
-        private static MemberInfo uiScaleMember;
-
-        // Temporary [ChronoDbg]: native HandleDialDragging hits a fixed
-        // radius circle around the container pivot (sqrt(30625) * uiScale /
-        // 1.45), not the visual rect - when we scale x2.5 most of the face
-        // falls outside it. This dump captures pivot, corners and the exact
-        // effective radius so the drag-zone fix can be sized from real data.
-        private void DumpChronometerDragGeometry(string stage)
-        {
-            RectTransform t = chronometerDragContainer;
-            if (t.IsNull())
-                return;
-
-            Vector2 pivotPos = t.position;
-            var corners = new Vector3[4];
-            t.GetWorldCorners(corners);
-            string[] cornerNames = { "BL", "TL", "TR", "BR" };
-
-            var sb = new System.Text.StringBuilder();
-            sb.Append("[RadioNav][Chronometer][ChronoDbg] ").Append(stage)
-              .Append(" expanded=").Append(chronometerExpanded)
-              .Append(" pivot=").Append(pivotPos.x.ToString("F0")).Append(',').Append(pivotPos.y.ToString("F0"))
-              .Append(" rect=").Append(t.rect.width.ToString("F0")).Append('x').Append(t.rect.height.ToString("F0"))
-              .Append(" pivotUV=(").Append(t.pivot.x.ToString("F2")).Append(',').Append(t.pivot.y.ToString("F2")).Append(')')
-              .Append(" lossy=").Append(t.lossyScale.x.ToString("F2"));
-
-            float farthestCornerPx = 0f;
-            for (int i = 0; i < 4; i++)
-            {
-                float dist = Vector2.Distance(pivotPos, corners[i]);
-                if (dist > farthestCornerPx)
-                    farthestCornerPx = dist;
-                sb.Append(' ').Append(cornerNames[i]).Append('=').Append(dist.ToString("F0")).Append("px");
-            }
-
-            float? uiScale = ProbeUiScale();
-            float scaleNum = uiScale.HasValue ? uiScale.Value / 1.45f : 1f;
-            float maxRadiusPx = Mathf.Sqrt(30625f) * scaleNum;
-            float coverage = Mathf.Clamp01(maxRadiusPx / Mathf.Max(1f, farthestCornerPx));
-            sb.Append(" farthest=").Append(farthestCornerPx.ToString("F0")).Append("px")
-              .Append(" nativeMaxR=").Append(maxRadiusPx.ToString("F0")).Append("px")
-              .Append(" uiScale=").Append(uiScale.HasValue ? uiScale.Value.ToString("F2") : "?")
-              .Append(" faceCoverage=").Append((coverage * 100f).ToString("F0")).Append('%');
-            Debug.Log(sb.ToString());
-        }
-
-        private float? ProbeUiScale()
-        {
-            try
-            {
-                if (shipControlUI.IsNull())
-                    return null;
-                if (userSettingsField == null)
-                    userSettingsField = typeof(ShipControlUI).GetField(
-                        "userSettings", BindingFlags.Instance | BindingFlags.NonPublic);
-                object userSettings = userSettingsField?.GetValue(shipControlUI);
-                if (userSettings == null)
-                    return null;
-
-                Type usType = userSettings.GetType();
-                if (controlSettingsMember == null)
-                {
-                    var csProp = usType.GetProperty("ControlSettings", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    var csField = usType.GetField("ControlSettings", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    controlSettingsMember = (MemberInfo)csProp ?? (MemberInfo)csField;
-                    controlSettingsGetter = csProp != null
-                        ? o => csProp.GetValue(o)
-                        : (csField != null ? o => csField.GetValue(o) : (Func<object, object>)null);
-                }
-                if (controlSettingsGetter == null)
-                    return null;
-                object controlSettings = controlSettingsGetter(userSettings);
-                if (controlSettings == null)
-                    return null;
-
-                Type csType = controlSettings.GetType();
-                if (uiScaleMember == null)
-                {
-                    var sProp = csType.GetProperty("uiScale", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    var sField = csType.GetField("uiScale", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    uiScaleMember = (MemberInfo)sProp ?? (MemberInfo)sField;
-                    uiScaleGetter = sProp != null
-                        ? o => (float)sProp.GetValue(o)
-                        : (sField != null ? o => (float)sField.GetValue(o) : (Func<object, float>)null);
-                }
-                if (uiScaleGetter == null)
-                    return null;
-                return uiScaleGetter(controlSettings);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[RadioNav][Chronometer][ChronoDbg] uiScale probe failed: " + e.Message);
-                return null;
-            }
-        }
-
-        private static Func<object, object> controlSettingsGetter;
-        private static Func<object, float> uiScaleGetter;
 
         // Sync the manager's mode to Default AND force the texture: foreign
         // UnsetCustomCursor calls can leave the mode at Default while our
@@ -712,7 +612,6 @@ namespace UBOAT.Mods.RadioNavigation
                 attachedChronometerScale = chronometerDragContainer.localScale;
             }
 
-            DumpChronometerDragGeometry("pre-toggle");
             lastScaleToggleFrame = Time.frameCount;
             chronometerExpanded = !chronometerExpanded;
             chronometerDragContainer.localScale = chronometerExpanded
@@ -721,7 +620,6 @@ namespace UBOAT.Mods.RadioNavigation
             // Expanded changed -> the policy re-emits reduce/expand arrows on
             // this refresh even though hover state did not move.
             RefreshCursor();
-            DumpChronometerDragGeometry("post-toggle");
         }
 
         private void EnsureScaleCursors()
