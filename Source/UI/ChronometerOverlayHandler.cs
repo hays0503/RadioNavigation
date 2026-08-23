@@ -70,16 +70,6 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (localDragActive)
                 CancelNativeDrag();
-
-            if (!TryResolveChronometer())
-                return;
-
-            bool isOpen = shipControlUI.IsChronometerOpen;
-            if (hasPreviousOpenState && isOpen != previousOpenState)
-                nativeChangedThisFrame = true;
-
-            SyncChronometerLayer(IsRadioVisible && isOpen);
-            UpdateScaleInteraction();
         }
 
         private void LateUpdate()
@@ -337,6 +327,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void SetScaleHover(bool value)
         {
+            if (scaleHovered == value)
+                return;
             scaleHovered = value;
             if (!value)
             {
@@ -482,29 +474,13 @@ namespace UBOAT.Mods.RadioNavigation
             SetScaleHover(false);
         }
 
+        // Hover/click come from the ChronometerScaleControl satellite events;
+        // this only resets the cursor when the scale control disappears
+        // (deactivation does not raise OnPointerExit).
         private void UpdateScaleInteraction()
         {
             if (!chronometerRaised || !IsRadioVisible || chronometerScaleControlRect.IsNull())
-            {
                 SetScaleHover(false);
-                return;
-            }
-
-            Canvas canvas = chronometerCanvas.IsNotNull() ? chronometerCanvas : parentCanvas;
-            Camera eventCamera = canvas.IsNotNull() && canvas.renderMode != RenderMode.ScreenSpaceOverlay
-                ? canvas.worldCamera
-                : null;
-            bool hovered = RectTransformUtility.RectangleContainsScreenPoint(
-                chronometerScaleControlRect,
-                Input.mousePosition,
-                eventCamera);
-            SetScaleHover(hovered);
-
-            if (hovered && Input.GetMouseButtonDown(0))
-            {
-                CancelNativeDrag();
-                ToggleChronometerScale();
-            }
         }
 
         private void CaptureDefaultPosition()

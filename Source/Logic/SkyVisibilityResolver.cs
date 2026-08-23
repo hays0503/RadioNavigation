@@ -10,6 +10,9 @@ namespace UBOAT.Mods.RadioNavigation
     internal static class SkyVisibilityResolver
     {
         private static readonly Dictionary<string, MemberInfo> memberCache = new Dictionary<string, MemberInfo>();
+        // P5.1: Type.GetType with assembly-qualified name is a string parse +
+        // assembly scan per call; IsPlayerOutside hits it every frame.
+        private static readonly Dictionary<string, Type> typeCache = new Dictionary<string, Type>();
 
         [Inject] private static Weather weather;
 
@@ -92,7 +95,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static object ReadStatic(string typeName, string memberName)
         {
-            Type type = Type.GetType(typeName + ", com.uboat.game");
+            if (!typeCache.TryGetValue(typeName, out Type type))
+            {
+                type = Type.GetType(typeName + ", com.uboat.game");
+                typeCache[typeName] = type;
+            }
             if (type == null)
                 return null;
 

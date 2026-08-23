@@ -39,7 +39,8 @@ namespace UBOAT.Mods.RadioNavigation
             // Device cameras (periscope/binocular/UZO render into a
             // RenderTexture) must win over Camera.main: the screen shows
             // their output, so WorldToScreenPoint must use them.
-            candidate = ResolveDeviceCamera();
+            ProbeDeviceCamera(gameMainCamera);
+            candidate = deviceProbeCamera;
 
             if (candidate == null)
             {
@@ -82,27 +83,29 @@ namespace UBOAT.Mods.RadioNavigation
         /// controller). Shared with LighthouseBeamGlow (ADR-018 follow-up:
         /// the device-camera check lived in two places).
         /// </summary>
+        // P5.1: per-frame memo for the device-camera probe. Enum.ToString()
+        // allocates on Mono and both TryResolve and IsDeviceCamera used to
+        // pay it every frame; the probe result is identical within a frame.
+        private static int deviceProbeFrame = -1;
+        private static Camera deviceProbeCamera;
+
         public static bool IsDeviceCamera(MainCamera mainCamera, Camera cam)
         {
             if (mainCamera == null || cam == null)
             {
                 return false;
             }
-            try
-            {
-                if (mainCamera.CurrentMode.ToString() == "Generic" &&
-                    mainCamera.GenericController.IsNotNull() &&
-                    mainCamera.GenericController.ExternalController is UBOAT.Game.Scene.Camera.ExternalControllers.PeriscopeController pc &&
-                    pc.IsNotNull() && pc.Periscope.IsNotNull())
-                {
-                    return ReferenceEquals(pc.Periscope.PeriscopeCamera, cam);
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[RadioNav][CameraResolver] device camera check failed: " + e.Message);
-            }
-            return false;
+            ProbeDeviceCamera(mainCamera);
+            return deviceProbeCamera != null && ReferenceEquals(deviceProbeCamera, cam);
+        }
+
+        private static void ProbeDeviceCamera(MainCamera mainCamera)
+        {
+            if (Time.frameCount == deviceProbeFrame)
+                return;
+            deviceProbeFrame = Time.frameCount;
+            gameMainCamera = mainCamera;
+            deviceProbeCamera = ResolveDeviceCamera();
         }
 
         public static void InstallOnce()
@@ -122,6 +125,8 @@ namespace UBOAT.Mods.RadioNavigation
             renderingCamera = null;
             lastLoggedCamera = null;
             gameMainCamera = null;
+            deviceProbeFrame = -1;
+            deviceProbeCamera = null;
         }
 
         private static Camera ResolveDeviceCamera()

@@ -472,6 +472,15 @@ namespace UBOAT.Mods.RadioNavigation
             return null;
         }
 
+        // P5.1: the failing-attempt retry path calls this every frame; without
+        // reused buffers that is a List(18)+string[18]+int[18]+row churn per
+        // frame. Rows are transient (discarded on the throwing attempt), so
+        // buffer reuse is safe.
+        private static readonly List<string> entityTypeValues = new List<string>(18);
+        private static readonly string[] entityTypeKeys = new string[18];
+        private static readonly int[] entityTypeKeyHashes = new int[18];
+        private static bool entityTypeBuffersPrimed;
+
         /// <summary>
         /// Builds an EntityType (category "Structure", so the game keeps the
         /// prefab's own Y and treats it as a terrain object) whose prefab path
@@ -481,34 +490,35 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         private static EntityType CreateEntityType(string typeName, string prefabPath)
         {
-            var values = new List<string>(18)
+            if (!entityTypeBuffersPrimed)
             {
-                typeName,       // 0: name
-                "Structure",    // 1: category
-                "0",            // 2: speed
-                "0",            // 3: standard displacement
-                "0",            // 4: full displacement
-                "0",            // 5: length
-                "0",            // 6: beam
-                "0",            // 7: draught
-                "0",            // 8: mast height
-                prefabPath,     // 9: keyed as "Prefab Path"
-                "0",            // 10: range
-                "0",            // 11: crew
-                "0",            // 12: threat
-                "False",        // 13: military
-                "False",        // 14: is class
-                "0",            // 15: reward
-                "0",            // 16: iron cross
-                "0"             // 17: estimated durability
-            };
+                entityTypeKeys[9] = "Prefab Path";
+                entityTypeKeyHashes[9] = "Prefab Path".GetHashCode();
+                entityTypeBuffersPrimed = true;
+            }
 
-            string[] keys = new string[values.Count];
-            int[] keyHashes = new int[values.Count];
-            keys[9] = "Prefab Path";
-            keyHashes[9] = "Prefab Path".GetHashCode();
+            List<string> values = entityTypeValues;
+            values.Clear();
+            values.Add(typeName);       // 0: name
+            values.Add("Structure");    // 1: category
+            values.Add("0");            // 2: speed
+            values.Add("0");            // 3: standard displacement
+            values.Add("0");            // 4: full displacement
+            values.Add("0");            // 5: length
+            values.Add("0");            // 6: beam
+            values.Add("0");            // 7: draught
+            values.Add("0");            // 8: mast height
+            values.Add(prefabPath);     // 9: keyed as "Prefab Path"
+            values.Add("0");            // 10: range
+            values.Add("0");            // 11: crew
+            values.Add("0");            // 12: threat
+            values.Add("False");        // 13: military
+            values.Add("False");        // 14: is class
+            values.Add("0");            // 15: reward
+            values.Add("0");            // 16: iron cross
+            values.Add("0");            // 17: estimated durability
 
-            var row = new GameDataRow("Entities/Types", keys, keyHashes, values);
+            var row = new GameDataRow("Entities/Types", entityTypeKeys, entityTypeKeyHashes, values);
             return new EntityType(row);
         }
 

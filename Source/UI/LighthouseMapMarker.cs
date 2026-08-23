@@ -157,7 +157,7 @@ namespace UBOAT.Mods.RadioNavigation
             // +Z (default forward) to face straight up.
             markerRoot.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
 
-            if (RadioNavDiagnostics.IsEnabled(RadioNavDiagnostics.LighthouseMapMarkerPositionKey, true))
+            if (RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseMapMarkerPositionKey, true))
             {
                 positionLogTimer += Time.unscaledDeltaTime;
                 if (positionLogTimer >= PositionLogIntervalSeconds)

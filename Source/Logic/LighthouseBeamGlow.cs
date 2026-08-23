@@ -89,6 +89,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static readonly Color DotColor = new Color(1f, 0.94f, 0.84f);
         private static readonly int RotationOffsetId = Shader.PropertyToID("_RotationOffset");
+        private static PropertyInfo imageColorProperty;
 
         [Inject] private static Weather weather = null;
 
@@ -225,7 +226,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// behavior unchanged).
         /// </summary>
         private static bool VerboseDiagnostics =>
-            RadioNavDiagnostics.IsEnabled(RadioNavDiagnostics.LighthouseGlowVerboseKey, true);
+            RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseGlowVerboseKey, true);
 
         private void UpdateDot(Vector3 worldPosition)
         {
@@ -270,7 +271,9 @@ namespace UBOAT.Mods.RadioNavigation
             Vector3 screen = GetExternalViewScreenPoint(worldPosition);
             if (screen.z <= 0f)
             {
-                SetDotEnabled(false, "behind camera (screen.z=" + screen.z.ToString("F1") + ")");
+                SetDotEnabled(false, DotWillLog(false)
+                    ? "behind camera (screen.z=" + screen.z.ToString("F1") + ")"
+                    : null);
                 return;
             }
 
@@ -285,7 +288,9 @@ namespace UBOAT.Mods.RadioNavigation
             float beamFactor = GetBeamVisibilityFactor(worldPosition);
             if (beamFactor <= 0.01f)
             {
-                SetDotEnabled(false, "beam factor " + beamFactor.ToString("F2"));
+                SetDotEnabled(false, DotWillLog(false)
+                    ? "beam factor " + beamFactor.ToString("F2")
+                    : null);
                 return;
             }
 
@@ -311,9 +316,11 @@ namespace UBOAT.Mods.RadioNavigation
                     " farY=" + worldPosition.y.ToString("F1"));
             }
 
-            SetDotEnabled(true, "I=" + iVisual.ToString("F2") +
-                " screen=" + screen.x.ToString("F0") + "," + screen.y.ToString("F0") +
-                " onScreen=" + (screen.x >= 0f && screen.x <= Screen.width && screen.y >= 0f && screen.y <= Screen.height));
+            SetDotEnabled(true, DotWillLog(true)
+                ? "I=" + iVisual.ToString("F2") +
+                  " screen=" + screen.x.ToString("F0") + "," + screen.y.ToString("F0") +
+                  " onScreen=" + (screen.x >= 0f && screen.x <= Screen.width && screen.y >= 0f && screen.y <= Screen.height)
+                : null);
             float size = (float)LighthouseVisualModel.DotSizePx(distance) * DotSizeScale;
             lastDotSize = size;
             float sx = screen.x - Screen.width * 0.5f;
@@ -358,9 +365,22 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 string camName = renderingCamera.IsNotNull() ? renderingCamera.name : "null";
                 Debug.Log("[RadioNav][Lighthouse] glow: dot " + (enabled ? "ON" : "OFF") +
-                    " [" + reason + "] cam='" + camName + "'" +
+                    (string.IsNullOrEmpty(reason) ? "" : " [" + reason + "]") +
+                    " cam='" + camName + "'" +
                     " flareRendering=" + FlareRenderingNow());
             }
+        }
+
+        // P5.1: transition-gated reason formatting — the expensive detail
+        // strings are built only on the frame the state actually flips.
+        private bool DotWillLog(bool enabled)
+        {
+            return dotCanvas.IsNotNull() && dotWasActive != enabled;
+        }
+
+        private bool FlareWillLog(GameObject flareObject, bool enabled)
+        {
+            return flareObject.IsNotNull() && flareWasActive != enabled;
         }
 
         private bool FlareRenderingNow()
@@ -469,7 +489,13 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 return;
             }
-            imageType.GetProperty("color", BindingFlags.Public | BindingFlags.Instance)
+            // Hot path (dot + halo + streak every frame): resolve the
+            // reflection property once instead of per call.
+            if (imageColorProperty == null)
+            {
+                imageColorProperty = imageType.GetProperty("color", BindingFlags.Public | BindingFlags.Instance);
+            }
+            imageColorProperty
                 ?.SetValue(image, new Color(DotColor.r, DotColor.g, DotColor.b, alpha), null);
         }
 
@@ -999,7 +1025,9 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject flareObject = lensFlare.gameObject;
             if (!isNight || renderingCamera == null || rotator.IsNull())
             {
-                SetFlareActive(flareObject, false, "night=" + isNight + " cam=" + (renderingCamera.IsNotNull()) + " rot=" + rotator.IsNotNull());
+                SetFlareActive(flareObject, false, FlareWillLog(flareObject, false)
+                    ? "night=" + isNight + " cam=" + (renderingCamera.IsNotNull()) + " rot=" + rotator.IsNotNull()
+                    : null);
                 return;
             }
 
@@ -1013,8 +1041,10 @@ namespace UBOAT.Mods.RadioNavigation
             bool deviceView = IsDeviceCamera(renderingCamera);
             if (!deviceView && distance > FlareMaxDistanceM)
             {
-                SetFlareActive(flareObject, false, "beyond " + FlareMaxDistanceM.ToString("F0") +
-                    "m (dist=" + distance.ToString("F0") + ")");
+                SetFlareActive(flareObject, false, FlareWillLog(flareObject, false)
+                    ? "beyond " + FlareMaxDistanceM.ToString("F0") +
+                      "m (dist=" + distance.ToString("F0") + ")"
+                    : null);
                 return;
             }
             if (deviceView && distance > FlareMaxDistanceM && Time.unscaledTime >= nextDiagnosticTime)
@@ -1028,11 +1058,15 @@ namespace UBOAT.Mods.RadioNavigation
             float wideGate = GetBeamVisibilityFactor(worldPosition);
             if (wideGate <= 0.01f)
             {
-                SetFlareActive(flareObject, false, "beam not aligned (wide=" + wideGate.ToString("F2") + ")");
+                SetFlareActive(flareObject, false, FlareWillLog(flareObject, false)
+                    ? "beam not aligned (wide=" + wideGate.ToString("F2") + ")"
+                    : null);
                 return;
             }
 
-            SetFlareActive(flareObject, true, "aligned wide=" + wideGate.ToString("F2"));
+            SetFlareActive(flareObject, true, FlareWillLog(flareObject, true)
+                ? "aligned wide=" + wideGate.ToString("F2")
+                : null);
             if (flareIntensityProperty.IsNotNull())
             {
                 Vector3 directionToCamera = (renderingCamera.transform.position - worldPosition).normalized;
@@ -1079,7 +1113,8 @@ namespace UBOAT.Mods.RadioNavigation
                     ? (renderingCamera.transform.position - GetWorldPosition()).magnitude
                     : -1f;
                 Debug.Log("[RadioNav][Lighthouse] glow: flare " + (active ? "ON" : "OFF") +
-                    " [" + reason + "] cam='" + camName + "' dist=" + distance.ToString("F0"));
+                    (string.IsNullOrEmpty(reason) ? "" : " [" + reason + "]") +
+                    " cam='" + camName + "' dist=" + distance.ToString("F0"));
             }
         }
 
