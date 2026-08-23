@@ -4,14 +4,13 @@ using UnityEngine;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Single input sensor for the chronometer scale toggle. Combines uGUI
-    /// pointer events with a geometric per-frame poll so clicks register even
-    /// when the EventSystem path is unreliable (canvas re-parenting between
-    /// the native hierarchy and the raised radio layer). The owner only
-    /// reacts; it never probes input itself.
+    /// Single input sensor for the chronometer scale toggle. uGUI pointer
+    /// events drive only the hover cursor; the click itself is emitted by
+    /// the geometric per-frame poll on the button-DOWN edge, so one physical
+    /// press is exactly one toggle regardless of canvas re-parenting.
     /// </summary>
     public sealed class ChronometerScaleControl : MonoBehaviour,
-        IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
+        IPointerEnterHandler, IPointerExitHandler
     {
         private ChronometerOverlayHandler owner;
         private Canvas canvas;
@@ -56,12 +55,6 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (owner.IsNotNull())
                 owner.SetScaleHover(false);
-        }
-
-        public void OnPointerClick(PointerEventData eventData)
-        {
-            if (owner.IsNotNull() && eventData.button == PointerEventData.InputButton.Left)
-                owner.OnScaleClicked();
         }
     }
 }
