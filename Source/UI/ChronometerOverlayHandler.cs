@@ -69,6 +69,8 @@ namespace UBOAT.Mods.RadioNavigation
         private int lastScaleToggleFrame = -1;
         private bool scaleHovered;
         private bool hoverDbgInit;
+        private bool appliedHoverValue;
+        private bool appliedHoverInitialized;
         private static readonly Vector2 ScaleCursorHotspot = new Vector2(16f, 16f);
 
         private void Update()
@@ -363,50 +365,31 @@ namespace UBOAT.Mods.RadioNavigation
             if (localDragActive)
                 return;
 
-            // Etalon path: the game's hand cursor, same as every interactive
-            // element in the radio room. Re-asserted every frame on purpose:
-            // foreign pointer-exits call SetDefaultCursor globally and would
-            // otherwise permanently kill the hint while we stay hovered.
-            // SetHoverCursor/SetDefaultCursor early-out internally when the
-            // mode already matches, so this is cheap.
-            if (cursorManager.IsNotNull())
+            // Distinct arrows are the primary hint (user-visible, unlike the
+            // game's hand which reads as the normal cursor). Applied on
+            // change plus a periodic heal so foreign SetCursor calls cannot
+            // kill it while hovered.
+            if (!appliedHoverInitialized || appliedHoverValue != value || Time.frameCount % 45 == 0)
             {
-                scaleHovered = value;
-                if (value)
+                EnsureScaleCursors();
+                Texture2D cursor = value ? (chronometerExpanded ? reduceCursor : expandCursor) : null;
+                if (panelDragHandler.IsNotNull())
                 {
-                    cursorManager.SetHoverCursor();
-                    if (!changed && Time.frameCount % 120 == 0)
-                        Debug.Log("[RadioNav][Chronometer][HoverDbg] reassert Hover frame=" + Time.frameCount);
+                    if (value)
+                        panelDragHandler.SetCursorOverride(cursor, ScaleCursorHotspot);
+                    else
+                        panelDragHandler.ClearCursorOverride();
                 }
                 else
-                    cursorManager.SetDefaultCursor();
-                return;
+                    Cursor.SetCursor(cursor, ScaleCursorHotspot, CursorMode.Auto);
+
+                if (Time.frameCount % 180 == 0)
+                    Debug.Log("[RadioNav][Chronometer][HoverDbg] arrows apply value=" + value
+                        + " frame=" + Time.frameCount);
             }
-
-            if (changed)
-                Debug.Log("[RadioNav][Chronometer][HoverDbg] legacy fallback branch, value=" + value);
-
-            if (scaleHovered == value)
-                return;
+            appliedHoverValue = value;
+            appliedHoverInitialized = true;
             scaleHovered = value;
-
-            // Fallback when the game singleton is unavailable: legacy custom
-            // expand/reduce arrows.
-            if (!value)
-            {
-                if (panelDragHandler.IsNotNull())
-                    panelDragHandler.ClearCursorOverride();
-                else
-                    Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
-                return;
-            }
-
-            EnsureScaleCursors();
-            Texture2D cursor = chronometerExpanded ? reduceCursor : expandCursor;
-            if (panelDragHandler.IsNotNull())
-                panelDragHandler.SetCursorOverride(cursor, ScaleCursorHotspot);
-            else
-                Cursor.SetCursor(cursor, ScaleCursorHotspot, CursorMode.Auto);
         }
 
         internal void ToggleChronometerScale()
