@@ -577,6 +577,10 @@ namespace UBOAT.Mods.RadioNavigation
             }
             mapDragActive = true;
             CancelNativeDrag();
+            // Mirror native HandleDialDragging: the GameInput blockade keeps
+            // the map pan and other input consumers from eating the same
+            // left-drag gesture while we move the expanded face.
+            AcquireInputBlockade();
         }
 
         internal void OnMapDragDelta(Vector2 delta)
@@ -598,18 +602,39 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void OnMapDragEnd()
         {
-            if (!mapDragActive)
-                return;
-            mapDragActive = false;
-            CancelNativeDrag();
-            PersistExpandedChronometerPosition();
+            EndMapDrag();
         }
 
         private void EndMapDrag()
         {
+            bool wasActive = mapDragActive;
             mapDragActive = false;
+
+            if (wasActive)
+            {
+                CancelNativeDrag();
+                PersistExpandedChronometerPosition();
+                ReleaseInputBlockade();
+            }
+
             if (chronometerScaleControl.IsNotNull())
                 chronometerScaleControl.CancelMapDrag();
+        }
+
+        private void AcquireInputBlockade()
+        {
+            if (gameInput.IsNull() && InjectionFramework.Instance.IsNotNull())
+                gameInput = InjectionFramework.Instance.GetInstance<GameInput>();
+            if (gameInput.IsNotNull())
+                gameInput.AddBlockade(this);
+        }
+
+        private void ReleaseInputBlockade()
+        {
+            if (gameInput.IsNull() && InjectionFramework.Instance.IsNotNull())
+                gameInput = InjectionFramework.Instance.GetInstance<GameInput>();
+            if (gameInput.IsNotNull())
+                gameInput.RemoveBlockade(this);
         }
 
         private static FieldInfo uiDialsDataHolderField;
