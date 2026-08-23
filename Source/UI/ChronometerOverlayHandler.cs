@@ -69,6 +69,7 @@ namespace UBOAT.Mods.RadioNavigation
         private int lastScaleToggleFrame = -1;
         private bool scaleHovered;
         private bool appliedHoverValue;
+        private bool appliedExpanded;
         private bool appliedHoverInitialized;
         private static readonly Vector2 ScaleCursorHotspot = new Vector2(16f, 16f);
 
@@ -344,10 +345,36 @@ namespace UBOAT.Mods.RadioNavigation
             if (localDragActive)
                 return;
 
-            // Distinct arrows while hovering the scale zone; on leave the
-            // game's own default cursor takes over (etalon - the OS arrow is
-            // never shown inside the game UI). Applied on change plus a
-            // 45-frame heal so foreign SetCursor calls cannot kill the hint.
+            // Etalon-conform policy through the game's CursorManager: hover
+            // shows the custom expand/reduce arrows as Mode.Custom, leave
+            // restores the default texture via SetDefaultCursor. Routing
+            // through the manager keeps its internal mode in sync - setting
+            // Cursor.SetCursor directly desyncs it and SetDefaultCursor
+            // would early-out, leaving the arrows stuck on exit.
+            if (cursorManager.IsNotNull())
+            {
+                bool expandedChanged = value && appliedExpanded != chronometerExpanded;
+                if (!appliedHoverInitialized || appliedHoverValue != value || expandedChanged)
+                {
+                    EnsureScaleCursors();
+                    if (value)
+                    {
+                        Texture2D cursor = chronometerExpanded ? reduceCursor : expandCursor;
+                        cursorManager.SetCustomCursor(cursor, ScaleCursorHotspot);
+                    }
+                    else
+                        cursorManager.SetDefaultCursor();
+
+                    appliedHoverValue = value;
+                    appliedExpanded = chronometerExpanded;
+                    appliedHoverInitialized = true;
+                }
+                scaleHovered = value;
+                return;
+            }
+
+            // Fallback without the singleton: direct application plus a
+            // periodic heal so foreign SetCursor calls cannot kill the hint.
             if (!appliedHoverInitialized || appliedHoverValue != value || Time.frameCount % 45 == 0)
             {
                 EnsureScaleCursors();
@@ -359,10 +386,6 @@ namespace UBOAT.Mods.RadioNavigation
                     else
                         Cursor.SetCursor(cursor, ScaleCursorHotspot, CursorMode.Auto);
                 }
-                else if (cursorManager.IsNotNull())
-                {
-                    cursorManager.SetDefaultCursor();
-                }
                 else if (panelDragHandler.IsNotNull())
                 {
                     panelDragHandler.ClearCursorOverride();
@@ -371,9 +394,10 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
                 }
+
+                appliedHoverValue = value;
+                appliedHoverInitialized = true;
             }
-            appliedHoverValue = value;
-            appliedHoverInitialized = true;
             scaleHovered = value;
         }
 
