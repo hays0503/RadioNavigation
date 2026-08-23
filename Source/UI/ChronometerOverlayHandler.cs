@@ -68,6 +68,7 @@ namespace UBOAT.Mods.RadioNavigation
         private bool chronometerExpanded;
         private int lastScaleToggleFrame = -1;
         private bool scaleHovered;
+        private bool hoverDbgInit;
         private static readonly Vector2 ScaleCursorHotspot = new Vector2(16f, 16f);
 
         private void Update()
@@ -339,6 +340,26 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void SetScaleHover(bool value)
         {
+            if (!hoverDbgInit)
+            {
+                hoverDbgInit = true;
+                Debug.Log("[RadioNav][Chronometer][HoverDbg] init: cursorManager="
+                    + (cursorManager.IsNull() ? "NULL" : "ok#" + cursorManager.GetInstanceID())
+                    + " panelDragHandler=" + (panelDragHandler.IsNull() ? "null" : "ok")
+                    + " frame=" + Time.frameCount);
+                if (cursorManager.IsNull() && InjectionFramework.Instance.IsNotNull())
+                {
+                    cursorManager = InjectionFramework.Instance.GetInstance<CursorManager>();
+                    Debug.Log("[RadioNav][Chronometer][HoverDbg] fallback GetInstance<CursorManager> -> "
+                        + (cursorManager.IsNull() ? "NULL" : "ok#" + cursorManager.GetInstanceID()));
+                }
+            }
+
+            bool changed = scaleHovered != value;
+            if (changed)
+                Debug.Log("[RadioNav][Chronometer][HoverDbg] SetScaleHover(" + value + ")"
+                    + " drag=" + localDragActive + " frame=" + Time.frameCount);
+
             if (localDragActive)
                 return;
 
@@ -352,11 +373,18 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 scaleHovered = value;
                 if (value)
+                {
                     cursorManager.SetHoverCursor();
+                    if (!changed && Time.frameCount % 120 == 0)
+                        Debug.Log("[RadioNav][Chronometer][HoverDbg] reassert Hover frame=" + Time.frameCount);
+                }
                 else
                     cursorManager.SetDefaultCursor();
                 return;
             }
+
+            if (changed)
+                Debug.Log("[RadioNav][Chronometer][HoverDbg] legacy fallback branch, value=" + value);
 
             if (scaleHovered == value)
                 return;

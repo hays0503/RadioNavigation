@@ -18,19 +18,45 @@ namespace UBOAT.Mods.RadioNavigation
         private bool canvasResolved;
         private bool pressPending;
         private Vector2 pressScreenPos;
+        private bool dbgLastHovered;
+        private bool dbgEnabledLogged;
 
         public void SetOwner(ChronometerOverlayHandler value)
         {
             owner = value;
         }
 
+        private void OnEnable()
+        {
+            Debug.Log("[RadioNav][Chronometer][HoverDbg] sensor OnEnable frame=" + Time.frameCount);
+        }
+
+        private void OnDisable()
+        {
+            Debug.Log("[RadioNav][Chronometer][HoverDbg] sensor OnDisable frame=" + Time.frameCount);
+        }
+
         private void Update()
         {
+            if (!dbgEnabledLogged)
+            {
+                dbgEnabledLogged = true;
+                Debug.Log("[RadioNav][Chronometer][HoverDbg] sensor first Update frame=" + Time.frameCount
+                    + " activeInHierarchy=" + gameObject.activeInHierarchy
+                    + " rect=" + ((RectTransform)transform).rect);
+            }
+
             if (owner.IsNull())
                 return;
 
             Vector2 mouse = Input.mousePosition;
             bool hovered = RectTransformContains(mouse);
+            if (hovered != dbgLastHovered)
+            {
+                Debug.Log("[RadioNav][Chronometer][HoverDbg] sensor hover " + dbgLastHovered + "->" + hovered
+                    + " frame=" + Time.frameCount + " mouse=" + mouse);
+                dbgLastHovered = hovered;
+            }
             owner.SetScaleHover(hovered);
 
             if (Input.GetMouseButtonDown(0))
