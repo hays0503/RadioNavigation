@@ -22,10 +22,14 @@ namespace UBOAT.Mods.RadioNavigation
         // F01/F29: read from the audio thread — volatile, no torn reads.
         private volatile bool keyOn;
         private volatile bool isActive;
+        // Pitch-split support: element type of the currently keyed sound,
+        // published for the audio thread the same way as keyOn/isActive.
+        private volatile bool currentIsDash;
 
         public bool KeyOn => keyOn;
         public bool IsActive => isActive;
         public bool IsTone => state == State.Tone;
+        public bool CurrentElementIsDash => currentIsDash;
         public bool IsCallsignElement =>
             sequence.IsNotNull()
             && scheduler.IsNotNull()
@@ -77,6 +81,7 @@ namespace UBOAT.Mods.RadioNavigation
             ticksInState = 0;
             SetState(State.Idle);
             isActive = false;
+            currentIsDash = false;
             // F165: clear both sources like Load/LoadConsol do — a stale
             // sequence must not keep feeding GetCurrentElementType() after
             // a reset.
@@ -129,6 +134,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void StartElement()
         {
+            currentIsDash = IsCurrentElementDash();
             if (elementIndex < consolPattern?.Length)
             {
                 var elem = consolPattern[elementIndex];

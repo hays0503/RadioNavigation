@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using Xunit;
 
 namespace UBOAT.Mods.RadioNavigation.Tests
@@ -42,11 +42,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var stations = CreateStation(1f);
             var schedulers = new[] { CreateSchedulerInPreNavPause() };
             var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
 
             // 3.05 s = 61 logical ticks with margin; exactly 60 ticks would
             // sit on the float/double rounding boundary (F94) and could
             // deliver only 59.
-            engine.UpdateStations(3.05f, 123.45f, stations, schedulers, keyers, true);
+            engine.UpdateStations(3.05f, 123.45f, stations, schedulers, keyers, carriers, true);
 
             Assert.Equal(StationScheduler.Phase.Navigation, schedulers[0].CurrentPhase);
             Assert.Equal(123.45f, stations[0].NavigationStartTime);
@@ -60,11 +61,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var stations = CreateStation(1f);
             var schedulers = new[] { CreateSchedulerInPreNavPause() };
             var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
 
-            engine.UpdateStations(59 * 0.05f, 1f, stations, schedulers, keyers, true);
+            engine.UpdateStations(59 * 0.05f, 1f, stations, schedulers, keyers, carriers, true);
             Assert.Equal(StationScheduler.Phase.PreNavPause, schedulers[0].CurrentPhase);
 
-            engine.UpdateStations(1 * 0.05f, 2f, stations, schedulers, keyers, true);
+            engine.UpdateStations(1 * 0.05f, 2f, stations, schedulers, keyers, carriers, true);
             Assert.Equal(StationScheduler.Phase.Navigation, schedulers[0].CurrentPhase);
         }
 
@@ -76,13 +78,14 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var stations = CreateStation(1f);
             var schedulers = new[] { new StationScheduler("TEST") };
             var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
 
-            engine.UpdateStations(0.05f, 1f, stations, schedulers, keyers, true);
+            engine.UpdateStations(0.05f, 1f, stations, schedulers, keyers, carriers, true);
 
             Assert.Equal(StationScheduler.Phase.Callsign, schedulers[0].CurrentPhase);
         }
 
-        // F132: radio off — scheduler state machine must not advance.
+        // F132: radio off вЂ” scheduler state machine must not advance.
         [Fact]
         public void UpdateStations_RadioOff_KeepsSchedulerPaused()
         {
@@ -90,16 +93,17 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var stations = CreateStation(1f);
             var schedulers = new[] { new StationScheduler("TEST") };
             var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
 
-            engine.UpdateStations(10f, 1f, stations, schedulers, keyers, false);
+            engine.UpdateStations(10f, 1f, stations, schedulers, keyers, carriers, false);
 
             Assert.Equal(StationScheduler.Phase.Pause, schedulers[0].CurrentPhase);
 
-            engine.UpdateStations(0.05f, 2f, stations, schedulers, keyers, true);
+            engine.UpdateStations(0.05f, 2f, stations, schedulers, keyers, carriers, true);
             Assert.Equal(StationScheduler.Phase.Callsign, schedulers[0].CurrentPhase);
         }
 
-        // F132 + F01: radio off — audio buffer must be silent, not stale data.
+        // F132 + F01: radio off вЂ” audio buffer must be silent, not stale data.
         [Fact]
         public void ProcessAudio_RadioOff_ClearsBuffer()
         {
@@ -140,7 +144,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             // Tick 1: Pause -> Callsign. Tick 2: the callsign sequence is loaded
             // and the keyer starts the first element.
-            engine.UpdateStations(0.1f, 1f, stations, schedulers, keyers, true);
+            engine.UpdateStations(0.1f, 1f, stations, schedulers, keyers, carriers, true);
             Assert.Equal(StationScheduler.Phase.Callsign, schedulers[0].CurrentPhase);
             Assert.True(keyers[0].KeyOn, "after loading the callsign the first element must be keyed on");
 
@@ -148,6 +152,50 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             engine.ProcessAudio(data, 1, stations, keyers, carriers, true, 0, 0);
 
             Assert.True(data.Any(sample => sample != 0f), "keyed signal must not be silent");
+        }
+
+        // Pitch-split: with a BeatFrequency set, the carrier target must move
+        // above the beat for dots and below it for dashes; equisignal and
+        // silence stay on the beat. Stations without BeatFrequency are not
+        // touched (ProcessAudio_KeyOn_ProducesSignal covers that path).
+        [Fact]
+        public void UpdateStations_CarrierPitch_FollowsDashDotSplit()
+        {
+            var engine = CreateEngine();
+            var stations = new StationState[1];
+            stations[0].Gain = 1f;
+            stations[0].BeatFrequency = 600f;
+            stations[0].Config = ConsolCycleConfig.Cycle120s;
+
+            var pattern = new[] { NavigationElementType.Dot, NavigationElementType.Dash };
+            var scheduler = new StationScheduler("")
+            {
+                Config = ConsolCycleConfig.Cycle120s,
+                Navigation = SonneSignalGenerator.ToNavigationPattern(pattern),
+                CurrentConsolPattern = pattern
+            };
+
+            var schedulers = new[] { scheduler };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            // Empty callsign (F87) starts in PreNavPause; drive out of it into
+            // Navigation where the consol pattern loads and keys a Dot first.
+            bool sawDotPitch = false;
+            bool sawBeatDuringSilence = false;
+            bool sawDashPitch = false;
+            for (int tick = 0; tick < 80; tick++)
+            {
+                engine.UpdateStations(0.05f, tick * 0.05f + 1f, stations, schedulers, keyers, carriers, true);
+                float f = carriers[0].Frequency;
+                if (f == 600f + Constants.DotPitchOffsetHz) sawDotPitch = true;
+                if (f == 600f && !keyers[0].KeyOn) sawBeatDuringSilence = true;
+                if (f == 600f - Constants.DashPitchOffsetHz) sawDashPitch = true;
+            }
+
+            Assert.True(sawDotPitch, "dot element must key the carrier above the beat");
+            Assert.True(sawBeatDuringSilence, "silence must return the carrier to the beat");
+            Assert.True(sawDashPitch, "dash element must key the carrier below the beat");
         }
     }
 }

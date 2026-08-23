@@ -17,7 +17,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [Fact]
         public void GetDashSoundTicks_DefaultConfig()
         {
-            Assert.Equal(8, MorseTiming.GetDashSoundTicks(Default()));
+            Assert.Equal(12, MorseTiming.GetDashSoundTicks(Default()));
         }
 
         [Fact]
@@ -29,7 +29,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [Fact]
         public void GetDashSilenceTicks_DefaultConfig()
         {
-            Assert.Equal(12, MorseTiming.GetDashSilenceTicks(Default()));
+            Assert.Equal(8, MorseTiming.GetDashSilenceTicks(Default()));
         }
 
         [Fact]
@@ -91,9 +91,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var c = Default();
 
             Assert.Equal(2, MorseTiming.GetCallsignDotSoundTicks(c));
-            Assert.Equal(18, MorseTiming.GetCallsignDashSoundTicks(c));
+            Assert.Equal(8, MorseTiming.GetCallsignDashSoundTicks(c));
             Assert.Equal(18, MorseTiming.GetCallsignDotSilenceTicks(c));
-            Assert.Equal(2, MorseTiming.GetCallsignDashSilenceTicks(c));
+            Assert.Equal(12, MorseTiming.GetCallsignDashSilenceTicks(c));
         }
     }
 }

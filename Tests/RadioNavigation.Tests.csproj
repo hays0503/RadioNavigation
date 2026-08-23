@@ -36,6 +36,9 @@
     <Compile Include="SonneSignalGeneratorTests.cs" />
     <Compile Include="SonneBeamTests.cs" />
     <Compile Include="AudioSynthesisEngineTests.cs" />
+    <Compile Include="AudioRenderPauseTests.cs" />
+    <Compile Include="Helpers\KeyingEnvelope.cs" />
+    <Compile Include="Helpers\WavWriter.cs" />
     <Compile Include="PlayerPositionProviderTests.cs" />
     <Compile Include="StationSchedulerTests.cs" />
     <Compile Include="BeaconDataTests.cs" />

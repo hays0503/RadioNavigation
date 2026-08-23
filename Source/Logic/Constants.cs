@@ -10,6 +10,14 @@ namespace UBOAT.Mods.RadioNavigation
         public const float BfoMinHz = 300f;
         public const float BfoMaxHz = 1800f;
 
+        // Morse legibility: dot/dash tones split around the station beat
+        // frequency so the two elements are distinguishable by pitch, not
+        // only by duration; equisignal stays on the base beat. Dash is also
+        // slightly louder for a second duration-independent cue.
+        public const float DotPitchOffsetHz = 150f;
+        public const float DashPitchOffsetHz = 150f;
+        public const float DashGainBoost = 1.25f;
+
         // Receiver selectivity: Q-factor of the band-pass stage; feedback
         // raises Q by this many units per squared feedback value.
         public const float QualityFactorBase = 20f;

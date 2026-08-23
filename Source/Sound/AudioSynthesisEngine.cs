@@ -63,7 +63,7 @@ namespace UBOAT.Mods.RadioNavigation
         // off. currentTime stamps NavigationStartTime on the PreNavPause ->
         // Navigation transition (F13 design: never Time.time on the audio
         // thread; here everything already runs on the main thread).
-        public void UpdateStations(float deltaSeconds, float currentTime, StationState[] stations, StationScheduler[] schedulers, MorseKeyer[] keyers, bool radioOn)
+        public void UpdateStations(float deltaSeconds, float currentTime, StationState[] stations, StationScheduler[] schedulers, MorseKeyer[] keyers, CarrierGenerator[] carriers, bool radioOn)
         {
             if (!radioOn)
                 return;
@@ -118,6 +118,8 @@ namespace UBOAT.Mods.RadioNavigation
                         keyers[s].Advance();
                     }
 
+                    UpdateCarrierPitch(carriers[s], stations[s], keyers[s]);
+
                     if (phaseBefore == StationScheduler.Phase.PreNavPause &&
                         sched.CurrentPhase == StationScheduler.Phase.Navigation)
                     {
@@ -125,6 +127,24 @@ namespace UBOAT.Mods.RadioNavigation
                     }
                 }
             }
+        }
+
+        // Pitch-split: dot/dash tones sit above/below the station beat so the
+        // elements are distinguishable by pitch, not only duration; equisignal
+        // stays on the base beat. Main-thread only, and element boundaries are
+        // tick-aligned so the switch never lands mid-tone. Stations without a
+        // BeatFrequency keep whatever carrier frequency was set manually.
+        private static void UpdateCarrierPitch(CarrierGenerator carrier, StationState station, MorseKeyer keyer)
+        {
+            float beat = station.BeatFrequency;
+            if (beat.IsNegligible(0.001f))
+                return;
+            if (!keyer.KeyOn || keyer.IsTone)
+                carrier.Frequency = beat;
+            else if (keyer.CurrentElementIsDash)
+                carrier.Frequency = beat - Constants.DashPitchOffsetHz;
+            else
+                carrier.Frequency = beat + Constants.DotPitchOffsetHz;
         }
 
         // Audio thread: read-only. Only volatile MorseKeyer flags are sampled;
@@ -151,7 +171,9 @@ namespace UBOAT.Mods.RadioNavigation
                     if (stations[s].Gain.IsNegligible(0.001f))
                         continue;
                     if (keyers[s].KeyOn)
-                        sample += stations[s].Gain * carriers[s].NextSample();
+                        sample += stations[s].Gain
+                            * (keyers[s].CurrentElementIsDash ? Constants.DashGainBoost : 1f)
+                            * carriers[s].NextSample();
                     else
                         carriers[s].NextSample();
                 }

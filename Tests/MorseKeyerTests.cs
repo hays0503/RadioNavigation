@@ -102,5 +102,33 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Assert.Equal(NavigationElementType.Equisignal, completed[i]);
             Assert.Equal(NavigationElementType.Dot, completed[24]);
         }
+
+        // Pitch-split support: the audio thread reads CurrentElementIsDash to
+        // move the carrier; the flag must track the keyed element exactly.
+        [Fact]
+        public void CurrentElementIsDash_FollowsConsolPattern()
+        {
+            var config = new ConsolCycleConfig
+            {
+                DotSoundMs = 200f,
+                DashSoundMs = 600f,
+                ElementPeriodMs = 1000f,
+                EquisignalMs = 1000f
+            };
+            var keyer = new MorseKeyer();
+            keyer.LoadConsol(new[] { NavigationElementType.Dot, NavigationElementType.Dash });
+
+            keyer.Advance();
+            Assert.False(keyer.CurrentElementIsDash);
+
+            for (int i = 0; i < MorseTiming.GetDotSoundTicks(config); i++)
+                keyer.Advance();
+            Assert.False(keyer.CurrentElementIsDash);
+
+            for (int i = 0; i < MorseTiming.GetDotSilenceTicks(config); i++)
+                keyer.Advance();
+            Assert.True(keyer.CurrentElementIsDash);
+            Assert.True(keyer.KeyOn);
+        }
     }
 }

@@ -10,11 +10,11 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var c = ConsolCycleConfig.Cycle120s;
             Assert.Equal(120f, c.CycleDurationSeconds);
             Assert.Equal(200f, c.DotSoundMs);
-            Assert.Equal(400f, c.DashSoundMs);
+            Assert.Equal(600f, c.DashSoundMs);
             Assert.Equal(1000f, c.ElementPeriodMs);
             Assert.Equal(1000f, c.EquisignalMs);
             Assert.Equal(125f, c.CallsignDotSoundMs);
-            Assert.Equal(875f, c.CallsignDashSoundMs);
+            Assert.Equal(375f, c.CallsignDashSoundMs);
             Assert.Equal(1000f, c.CallsignElementPeriodMs);
             Assert.Equal(3000f, c.PreNavPauseMs);
             Assert.Equal(3000f, c.PostNavSilenceMs);
@@ -30,10 +30,10 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(40f, c.CycleDurationSeconds);
             Assert.Equal(1000f, c.ElementPeriodMs);
             Assert.Equal(200f, c.DotSoundMs);
-            Assert.Equal(400f, c.DashSoundMs);
+            Assert.Equal(600f, c.DashSoundMs);
             Assert.Equal(500f, c.CallsignElementPeriodMs);
             Assert.Equal(62.5f, c.CallsignDotSoundMs);
-            Assert.Equal(437.5f, c.CallsignDashSoundMs);
+            Assert.Equal(187.5f, c.CallsignDashSoundMs);
             Assert.Equal(ConsolCycleConfig.Cycle120s.MaxNavigationCount, c.MaxNavigationCount);
         }
 
