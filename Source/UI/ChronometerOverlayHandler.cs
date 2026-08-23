@@ -394,10 +394,7 @@ namespace UBOAT.Mods.RadioNavigation
                         // texture, so SetDefaultCursor's guard early-outs and
                         // our arrows stay stuck. Sync the mode AND force the
                         // game's normal texture directly.
-                        cursorManager.SetDefaultCursor();
-                        Texture2D normal = GetGameDefaultCursorTexture();
-                        if (normal.IsNotNull())
-                            Cursor.SetCursor(normal, Vector2.zero, CursorMode.Auto);
+                        ApplyGameDefaultCursor();
                     }
 
                     appliedHoverValue = value;
@@ -438,6 +435,18 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static FieldInfo normalCursorTexField;
         private static Texture2D gameDefaultCursor;
+
+        // Sync the manager's mode to Default AND force the texture: foreign
+        // UnsetCustomCursor calls can leave the mode at Default while our
+        // custom texture is still on screen, and the guarded SetDefaultCursor
+        // would early-out and keep it there.
+        private void ApplyGameDefaultCursor()
+        {
+            cursorManager.SetDefaultCursor();
+            Texture2D normal = GetGameDefaultCursorTexture();
+            if (normal.IsNotNull())
+                Cursor.SetCursor(normal, Vector2.zero, CursorMode.Auto);
+        }
 
         private static Texture2D GetGameDefaultCursorTexture()
         {
@@ -492,7 +501,7 @@ namespace UBOAT.Mods.RadioNavigation
                     if (moveHovered && moveTexture.IsNotNull())
                         cursorManager.SetCustomCursor(moveTexture, hotspot);
                     else
-                        cursorManager.SetDefaultCursor();
+                        ApplyGameDefaultCursor();
 
                     appliedMoveValue = moveHovered;
                     appliedMoveInitialized = true;
