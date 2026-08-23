@@ -336,6 +336,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void SetScaleHover(bool value)
         {
+            if (localDragActive)
+                return;
             if (scaleHovered == value)
                 return;
             scaleHovered = value;
@@ -550,6 +552,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             localDragActive = true;
             CancelNativeDrag();
+            AcquireDragCursor();
         }
 
         internal void DragLocal(PointerEventData eventData)
@@ -579,6 +582,23 @@ namespace UBOAT.Mods.RadioNavigation
         {
             localDragActive = false;
             CancelNativeDrag();
+            ReleaseDragCursor();
+        }
+
+        // While the chronometer is being dragged, the move cursor owns the
+        // pointer; scale-hover cursor changes are frozen until release.
+        private void AcquireDragCursor()
+        {
+            if (panelDragHandler.IsNull())
+                return;
+            panelDragHandler.SetCursorOverride(
+                panelDragHandler.MoveCursorTexture,
+                panelDragHandler.MoveCursorHotspot);
+        }
+
+        private void ReleaseDragCursor()
+        {
+            SetScaleHover(scaleHovered);
         }
 
         private void CancelNativeDrag()
