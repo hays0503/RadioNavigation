@@ -562,6 +562,118 @@ namespace UBOAT.Mods.RadioNavigation
             return chronometerDragContainer;
         }
 
+        internal bool IsChronometerExpanded => chronometerExpanded;
+        internal bool IsChronometerRaised => chronometerRaised;
+
+        private bool mapDragActive;
+
+        internal void OnMapDragBegin()
+        {
+            if (!chronometerExpanded || chronometerRaised)
+            {
+                if (chronometerScaleControl.IsNotNull())
+                    chronometerScaleControl.CancelMapDrag();
+                return;
+            }
+            mapDragActive = true;
+            CancelNativeDrag();
+        }
+
+        internal void OnMapDragDelta(Vector2 delta)
+        {
+            if (!mapDragActive)
+                return;
+            if (!chronometerExpanded || chronometerRaised)
+            {
+                EndMapDrag();
+                return;
+            }
+            // Native HandleDialDragging would fight us for the same gesture.
+            CancelNativeDrag();
+            chronometerDragContainer.position += new Vector3(delta.x, delta.y, 0f);
+            UpdateDefaultPositionForRadioParent();
+            if (Time.frameCount % 30 == 0)
+                PersistExpandedChronometerPosition();
+        }
+
+        internal void OnMapDragEnd()
+        {
+            if (!mapDragActive)
+                return;
+            mapDragActive = false;
+            CancelNativeDrag();
+            PersistExpandedChronometerPosition();
+        }
+
+        private void EndMapDrag()
+        {
+            mapDragActive = false;
+            if (chronometerScaleControl.IsNotNull())
+                chronometerScaleControl.CancelMapDrag();
+        }
+
+        private static FieldInfo uiDialsDataHolderField;
+        private static PropertyInfo chronoPosOverrideProp;
+        private static MethodInfo applyToolPositionLimitsMethod;
+
+        // Expanded drag bypasses native HandleDialDragging (its fixed-radius
+        // circle cannot reach the scaled face), so the position override is
+        // written here exactly like the game does: normalized screen coords
+        // plus its own edge clamping via ApplyToolPositionLimits.
+        private bool ResolveNativePositionBridge()
+        {
+            if (chronoPosOverrideProp != null)
+                return true;
+            try
+            {
+                if (uiDialsDataHolderField == null)
+                    uiDialsDataHolderField = typeof(ShipControlUI).GetField(
+                        "uiDialsDataHolder", BindingFlags.Static | BindingFlags.NonPublic);
+                object holder = uiDialsDataHolderField?.GetValue(null);
+                if (holder.IsNull())
+                    return false;
+
+                Type iface = holder.GetType().GetInterface("IUserInterfaceDialsDataHolder");
+                if (iface != null)
+                    chronoPosOverrideProp = iface.GetProperty("ChronometerPosOverride");
+                if (applyToolPositionLimitsMethod == null)
+                    applyToolPositionLimitsMethod = typeof(ShipControlUI).GetMethod(
+                        "ApplyToolPositionLimits", BindingFlags.Static | BindingFlags.NonPublic);
+
+                if (chronoPosOverrideProp == null || applyToolPositionLimitsMethod == null)
+                {
+                    Debug.LogWarning("[RadioNav][Chronometer] expanded-drag position bridge incomplete");
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[RadioNav][Chronometer] expanded-drag position bridge failed: " + e.Message);
+                return false;
+            }
+        }
+
+        private void PersistExpandedChronometerPosition()
+        {
+            if (chronometerDragContainer.IsNull() || !ResolveNativePositionBridge())
+                return;
+            try
+            {
+                object holder = uiDialsDataHolderField.GetValue(null);
+                Vector2 current = (Vector2)chronoPosOverrideProp.GetValue(holder, null);
+                Vector2 screenPos = chronometerDragContainer.position;
+                current = ChronometerMapDragMath.ToNormalizedOverride(screenPos, Screen.width, Screen.height);
+                Vector2 limited = (Vector2)applyToolPositionLimitsMethod.Invoke(
+                    null, new object[] { current, chronometerDragContainer });
+                chronoPosOverrideProp.SetValue(holder, limited, null);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[RadioNav][Chronometer] expanded-drag persist failed: " + e.Message);
+            }
+        }
+
         internal void ToggleChronometerScale()
         {
             if (lastScaleToggleFrame == Time.frameCount)

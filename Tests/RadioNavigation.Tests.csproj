@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <Compile Include="Stubs\UnityEngineMathf.cs" />
+    <Compile Include="Stubs\UnityEngineVector2.cs" />
     <Compile Include="Stubs\UnityEngineDebug.cs" />
     <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />
     <Compile Include="Stubs\UnityEngineTransform.cs" />
@@ -38,6 +39,7 @@
     <Compile Include="AudioSynthesisEngineTests.cs" />
     <Compile Include="AudioRenderPauseTests.cs" />
     <Compile Include="ChronometerCursorPolicyTests.cs" />
+    <Compile Include="ChronometerMapDragMathTests.cs" />
     <Compile Include="Helpers\KeyingEnvelope.cs" />
     <Compile Include="Helpers\WavWriter.cs" />
     <Compile Include="PlayerPositionProviderTests.cs" />
@@ -81,6 +83,7 @@
     <Compile Include="..\Source\Sound\DspPipeline.cs" Link="Source\Sound\DspPipeline.cs" />
     <Compile Include="..\Source\UI\PanelStateStore.cs" Link="Source\UI\PanelStateStore.cs" />
     <Compile Include="..\Source\UI\ChronometerCursorPolicy.cs" Link="Source\UI\ChronometerCursorPolicy.cs" />
+    <Compile Include="..\Source\UI\ChronometerMapDragMath.cs" Link="Source\UI\ChronometerMapDragMath.cs" />
     <Compile Include="..\Source\Data\LighthouseProfile.cs" Link="Source\Data\LighthouseProfile.cs" />
     <Compile Include="..\Source\Data\LighthouseProfiles.cs" Link="Source\Data\LighthouseProfiles.cs" />
     <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />

@@ -10,7 +10,9 @@ namespace UBOAT.Mods.RadioNavigation
     /// crosshair. While a press that started inside the body is held, hover
     /// notifications are frozen so the cursor stays stable through drags; a
     /// release inside the center without exceeding the drag threshold is a
-    /// scale click.
+    /// scale click. An expanded-body press additionally streams mouse deltas
+    /// to the owner as a map-drag takeover (the native fixed-radius circle
+    /// cannot reach most of the scaled face).
     /// </summary>
     public sealed class ChronometerScaleControl : MonoBehaviour
     {
@@ -21,10 +23,19 @@ namespace UBOAT.Mods.RadioNavigation
         private bool downInScale;
         private bool dragExceeded;
         private Vector2 pressScreenPos;
+        private bool mapDragActive;
+        private Vector2 lastMapDragMouse;
 
         public void SetOwner(ChronometerOverlayHandler value)
         {
             owner = value;
+        }
+
+        // Owner cancels the takeover when its context dies mid-hold
+        // (collapse via F7/native toggle, raise to radio room).
+        internal void CancelMapDrag()
+        {
+            mapDragActive = false;
         }
 
         private void Update()
@@ -52,6 +63,20 @@ namespace UBOAT.Mods.RadioNavigation
             bool frozen = pressedFromZone && lmbHeld && !lmbUp;
             if (frozen)
             {
+                // Expanded-body press: the mod takes over the drag.
+                if (!downInScale && owner.IsChronometerExpanded)
+                {
+                    if (!mapDragActive)
+                    {
+                        mapDragActive = true;
+                        lastMapDragMouse = mouse;
+                        owner.OnMapDragBegin();
+                    }
+                    owner.OnMapDragDelta(mouse - lastMapDragMouse);
+                    lastMapDragMouse = mouse;
+                    return;
+                }
+
                 // A press from inside the body is in progress (drag or
                 // pending click): the last cursor stays until release.
                 float threshold = EventSystem.current != null
@@ -60,6 +85,12 @@ namespace UBOAT.Mods.RadioNavigation
                 if (Vector2.Distance(mouse, pressScreenPos) > threshold)
                     dragExceeded = true;
                 return;
+            }
+
+            if (mapDragActive)
+            {
+                mapDragActive = false;
+                owner.OnMapDragEnd();
             }
 
             owner.SetScaleHover(scaleHovered);
