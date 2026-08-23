@@ -91,7 +91,11 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             SyncChronometerLayer(IsRadioVisible && isOpen);
-            UpdateScaleInteraction();
+            // Hover cursor is owned by the scale-control sensor; reset it
+            // here only when the chronometer context disappears (deactivation
+            // does not raise OnPointerExit).
+            if (!chronometerRaised || !IsRadioVisible)
+                SetScaleHover(false);
             previousOpenState = isOpen;
             hasPreviousOpenState = true;
             nativeChangedThisFrame = false;
@@ -131,6 +135,10 @@ namespace UBOAT.Mods.RadioNavigation
                 if (parentCanvas.IsNull())
                     parentCanvas = GetComponentInParent<Canvas>(true);
                 ResolveChronometerButton();
+                // Scale input exists from scene start: the container is a
+                // native serialized child, so the control can live under the
+                // game canvas immediately instead of waiting for a raise.
+                EnsureScaleControl();
                 return true;
             }
 
@@ -149,6 +157,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             parentCanvas = GetComponentInParent<Canvas>(true);
             ResolveChronometerButton();
+            EnsureScaleControl();
             Debug.Log("[RadioNav][Chronometer] native ShipControlUI bridge resolved");
             return true;
         }
@@ -474,13 +483,12 @@ namespace UBOAT.Mods.RadioNavigation
             SetScaleHover(false);
         }
 
-        // Hover/click come from the ChronometerScaleControl satellite events;
-        // this only resets the cursor when the scale control disappears
-        // (deactivation does not raise OnPointerExit).
-        private void UpdateScaleInteraction()
+        // Single reaction point for scale input: the sensor (satellite)
+        // reports clicks, this decides what a click means.
+        internal void OnScaleClicked()
         {
-            if (!chronometerRaised || !IsRadioVisible || chronometerScaleControlRect.IsNull())
-                SetScaleHover(false);
+            CancelNativeDrag();
+            ToggleChronometerScale();
         }
 
         private void CaptureDefaultPosition()
