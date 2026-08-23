@@ -95,14 +95,12 @@ namespace UBOAT.Mods.RadioNavigation
         private static Texture2D dotTexture;
         private static Texture2D streakTexture;
         private static Camera renderingCamera;
-        private static bool renderHookInstalled;
 
         private Transform container;
         private Transform rotator;
         private Vector3 rotatorLocalPosition;
         private Light spotLight;
         private Light sun;
-        private Camera lastLoggedCamera;
         private Component lensFlare;
         private PropertyInfo flareIntensityProperty;
         private MeshFilter flareMeshFilter;
@@ -662,8 +660,6 @@ namespace UBOAT.Mods.RadioNavigation
                 renderingCamera = cam;
             else
                 renderingCamera = null;
-            // lastLoggedCamera теперь внутри Resolver, локальный не нужен — синхронизируем для совместимости
-            lastLoggedCamera = renderingCamera;
             // gameMainCamera никогда не присваивался (CS0649) — из-за этого
             // IsDeviceCamera/EnsureDeviceCameraFarClip были мёртвыми. Берём
             // инстанс из резолвера (тот же FindObjectOfType внутри).
@@ -712,52 +708,6 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// The game's periscope/binocular view: Generic camera mode driven by
-        /// a PeriscopeController; the actual rendered camera is the device's
-        /// PeriscopeCamera (renders into a RenderTexture in windowed mode).
-        /// Resolution lives in CameraResolver (ADR-018).
-        /// </summary>
-        private static bool IsUtilityCamera(Camera cam)
-        {
-            if (cam.IsNull())
-            {
-                return false;
-            }
-            string name = cam.name;
-            return name == "Loading Camera" ||
-                name == "Utility GUI Camera" ||
-                name.IndexOf("GUI", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                name.IndexOf("Portrait", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static Camera FindScreenCamera()
-        {
-            Camera best = null;
-            Camera[] cameras = Camera.allCameras;
-            for (int i = 0; i < cameras.Length; i++)
-            {
-                Camera cam = cameras[i];
-                if (!cam.isActiveAndEnabled || cam.orthographic || cam.targetTexture != null || IsUtilityCamera(cam))
-                {
-                    continue;
-                }
-                if (best == null || cam.depth > best.depth)
-                {
-                    best = cam;
-                }
-            }
-            return best;
-        }
-
-        private static void InstallRenderHook()
-        {
-            // ADR-018: общий хук в CameraResolver, не дублируем
-            CameraResolver.InstallOnce();
-            // Для совместимости отметим локальный флаг, чтобы старый ResetStatics не висел
-            renderHookInstalled = true;
-        }
-
-        /// <summary>
         /// ADR-017/018: уносит статику маяка при hot-reload. Best practice — 1 подписчик onPreCull, без GPU утечки.
         /// Вызывается только на main thread из Main.OnLoaded (loaded==true), когда все glow-GO уже уничтожены.
         /// </summary>
@@ -773,24 +723,8 @@ namespace UBOAT.Mods.RadioNavigation
                 Object.Destroy(streakTexture);
                 streakTexture = null;
             }
-            // Чистим локальную статику + общий резолвер (1 хук)
-            if (renderHookInstalled)
-            {
-                try { Camera.onPreCull -= OnAnyCameraPreCull; } catch { }
-                renderHookInstalled = false;
-            }
             renderingCamera = null;
-            // lastLoggedCamera — instance поле, чистим только на instance (не в static Reset)
             CameraResolver.ResetForReload();
-        }
-
-        private static void OnAnyCameraPreCull(Camera cam)
-        {
-            if (cam.orthographic || IsUtilityCamera(cam))
-            {
-                return;
-            }
-            renderingCamera = cam;
         }
 
         private void FindSun()

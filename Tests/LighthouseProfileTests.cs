@@ -6,32 +6,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
     public class LighthouseProfileTests
     {
         [Fact]
-        public void ParseFireHeight_ParsesMeterStrings()
-        {
-            Assert.Equal(59f, LighthouseProfile.ParseFireHeight("59 m"));
-            Assert.Equal(13f, LighthouseProfile.ParseFireHeight("13 m"));
-            Assert.Equal(5f, LighthouseProfile.ParseFireHeight("5 m"));
-            Assert.Equal(62f, LighthouseProfile.ParseFireHeight("62 m"));
-        }
-
-        [Fact]
-        public void ParseFireHeight_ToleratesDecimalAndNoUnit()
-        {
-            Assert.Equal(6.5f, LighthouseProfile.ParseFireHeight("6.5 m"));
-            Assert.Equal(6.5f, LighthouseProfile.ParseFireHeight("6,5 m"));
-            Assert.Equal(12f, LighthouseProfile.ParseFireHeight("12"));
-        }
-
-        [Fact]
-        public void ParseFireHeight_ReturnsZeroOnGarbage()
-        {
-            Assert.Equal(0f, LighthouseProfile.ParseFireHeight(null));
-            Assert.Equal(0f, LighthouseProfile.ParseFireHeight(""));
-            Assert.Equal(0f, LighthouseProfile.ParseFireHeight("   "));
-            Assert.Equal(0f, LighthouseProfile.ParseFireHeight("F.R.6.5m"));
-        }
-
-        [Fact]
         public void Profiles_CodesAreUnique()
         {
             var codes = LighthouseProfiles.All.Select(p => p.Code);

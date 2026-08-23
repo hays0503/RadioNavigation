@@ -36,14 +36,5 @@ namespace UBOAT.Mods.RadioNavigation
             zoneIndex = zi < 0 ? 0 : zi > 4 ? 4 : zi;
             cursorAngle = Mathf.Clamp(PlayerPrefs.GetFloat(KeyCursor, 0f), -90f, 90f);
         }
-
-        public static void Clear()
-        {
-            PlayerPrefs.DeleteKey(KeyVolume);
-            PlayerPrefs.DeleteKey(KeyFeedback);
-            PlayerPrefs.DeleteKey(KeyZone);
-            PlayerPrefs.DeleteKey(KeyCursor);
-            PlayerPrefs.Save();
-        }
     }
 }

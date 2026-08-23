@@ -28,18 +28,5 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(0, zone);
             Assert.Equal(0f, cursor, 2);
         }
-
-        [Fact]
-        public void Clear_RemovesSavedState()
-        {
-            PlayerPrefs.DeleteAll();
-            PanelStateStore.Save(10f, 20f, 1, 30f);
-            PanelStateStore.Clear();
-            PanelStateStore.Load(out float vol, out float fb, out int zone, out float cursor);
-            Assert.Equal(0f, vol, 2);
-            Assert.Equal(0f, fb, 2);
-            Assert.Equal(0, zone);
-            Assert.Equal(0f, cursor, 2);
-        }
     }
 }

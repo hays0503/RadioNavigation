@@ -114,8 +114,6 @@ namespace UBOAT.Mods.RadioNavigation
             OnToggleChanged(toggleComp.isOn);
         }
 
-        private string ImgState(GameObject go) => go.IsNotNull() ? go.activeSelf.ToString() : "null";
-
         public void OnPointerClick(PointerEventData eventData)
         {
 #if DEBUG

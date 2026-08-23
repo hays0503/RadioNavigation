@@ -103,11 +103,6 @@ namespace UBOAT.Mods.RadioNavigation
             IsVisible = false;
         }
 
-        public void ToggleVisibility()
-        {
-            IsVisible = !IsVisible;
-        }
-
         private void OnZoneChanged(int index)
         {
             currentZoneIndex = index;

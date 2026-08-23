@@ -59,22 +59,6 @@ namespace UBOAT.Mods.RadioNavigation
             return (int)(delta / SectorWidthDeg);
         }
 
-        // F36: this counts dots, not pattern transitions — the old name
-        // promised transition semantics it never had.
-        public static int GetDotCount(NavigationElementType[] pattern)
-        {
-            if (pattern.IsNull())
-                return 0;
-
-            int count = 0;
-            for (int i = 0; i < pattern.Length; i++)
-            {
-                if (pattern[i] == NavigationElementType.Dot)
-                    count++;
-            }
-            return count;
-        }
-
         public static int GetCallsignElementCount(string callsign)
         {
             if (string.IsNullOrEmpty(callsign))

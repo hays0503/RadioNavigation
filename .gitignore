@@ -19,3 +19,6 @@ graphify-out/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# pause_check audio artifacts (regenerable)
+Tools/pause_check/*.wav

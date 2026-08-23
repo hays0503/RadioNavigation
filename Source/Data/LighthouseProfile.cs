@@ -58,37 +58,5 @@ namespace UBOAT.Mods.RadioNavigation
             RotationDegreesPerSecond = rotationDegreesPerSecond;
             Enabled = enabled;
         }
-
-        /// <summary>
-        /// Parses a fire height string from the Leuchtfeuer registry, e.g.
-        /// "59 m" or "13 m". Only the leading numeric part is read, so
-        /// malformed units do not break the parse. Returns 0 when the string
-        /// contains no number.
-        /// </summary>
-        public static float ParseFireHeight(string fireHeight)
-        {
-            if (string.IsNullOrWhiteSpace(fireHeight))
-            {
-                return 0f;
-            }
-
-            string text = fireHeight.Trim().Replace(',', '.');
-            int end = 0;
-            while (end < text.Length && (char.IsDigit(text[end]) || text[end] == '.' || text[end] == ','))
-            {
-                end++;
-            }
-            if (end == 0)
-            {
-                return 0f;
-            }
-
-            float value;
-            if (float.TryParse(text.Substring(0, end), NumberStyles.Float, CultureInfo.InvariantCulture, out value))
-            {
-                return value;
-            }
-            return 0f;
-        }
     }
 }

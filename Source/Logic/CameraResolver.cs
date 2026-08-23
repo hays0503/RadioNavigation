@@ -76,12 +76,6 @@ namespace UBOAT.Mods.RadioNavigation
             return Mathf.Min(WorldRadiusM, cam.farClipPlane * 0.85f);
         }
 
-        public static bool IsMapMode()
-        {
-            if (gameMainCamera == null) return false;
-            try { return gameMainCamera.CurrentMode.ToString() == "Map"; } catch { return false; }
-        }
-
         /// <summary>
         /// True when the camera is the active periscope/binocular device
         /// camera (Generic mode with a PeriscopeController external

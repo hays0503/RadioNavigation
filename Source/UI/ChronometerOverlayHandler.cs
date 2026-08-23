@@ -368,9 +368,6 @@ namespace UBOAT.Mods.RadioNavigation
                 attachedChronometerScale = chronometerDragContainer.localScale;
             }
 
-            if (!scaleCaptured || chronometerDragContainer.IsNull())
-                return;
-
             lastScaleToggleFrame = Time.frameCount;
             chronometerExpanded = !chronometerExpanded;
             chronometerDragContainer.localScale = chronometerExpanded

@@ -123,20 +123,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void GetDotCount_CountsOnlyDots()
-        {
-            var pattern = new[]
-            {
-                NavigationElementType.Dot,
-                NavigationElementType.Dot,
-                NavigationElementType.Dash,
-                NavigationElementType.Equisignal
-            };
-
-            Assert.Equal(2, SonneSignalGenerator.GetDotCount(pattern));
-        }
-
-        [Fact]
         public void GetCallsignElementCount_Empty_Zero()
         {
             Assert.Equal(0, SonneSignalGenerator.GetCallsignElementCount(""));
