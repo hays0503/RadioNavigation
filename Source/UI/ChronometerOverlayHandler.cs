@@ -68,7 +68,6 @@ namespace UBOAT.Mods.RadioNavigation
         private bool chronometerExpanded;
         private int lastScaleToggleFrame = -1;
         private bool scaleHovered;
-        private bool hoverDbgInit;
         private bool appliedHoverValue;
         private bool appliedHoverInitialized;
         private static readonly Vector2 ScaleCursorHotspot = new Vector2(16f, 16f);
@@ -342,50 +341,36 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void SetScaleHover(bool value)
         {
-            if (!hoverDbgInit)
-            {
-                hoverDbgInit = true;
-                Debug.Log("[RadioNav][Chronometer][HoverDbg] init: cursorManager="
-                    + (cursorManager.IsNull() ? "NULL" : "ok#" + cursorManager.GetInstanceID())
-                    + " panelDragHandler=" + (panelDragHandler.IsNull() ? "null" : "ok")
-                    + " frame=" + Time.frameCount);
-                if (cursorManager.IsNull() && InjectionFramework.Instance.IsNotNull())
-                {
-                    cursorManager = InjectionFramework.Instance.GetInstance<CursorManager>();
-                    Debug.Log("[RadioNav][Chronometer][HoverDbg] fallback GetInstance<CursorManager> -> "
-                        + (cursorManager.IsNull() ? "NULL" : "ok#" + cursorManager.GetInstanceID()));
-                }
-            }
-
-            bool changed = scaleHovered != value;
-            if (changed)
-                Debug.Log("[RadioNav][Chronometer][HoverDbg] SetScaleHover(" + value + ")"
-                    + " drag=" + localDragActive + " frame=" + Time.frameCount);
-
             if (localDragActive)
                 return;
 
-            // Distinct arrows are the primary hint (user-visible, unlike the
-            // game's hand which reads as the normal cursor). Applied on
-            // change plus a periodic heal so foreign SetCursor calls cannot
-            // kill it while hovered.
+            // Distinct arrows while hovering the scale zone; on leave the
+            // game's own default cursor takes over (etalon - the OS arrow is
+            // never shown inside the game UI). Applied on change plus a
+            // 45-frame heal so foreign SetCursor calls cannot kill the hint.
             if (!appliedHoverInitialized || appliedHoverValue != value || Time.frameCount % 45 == 0)
             {
                 EnsureScaleCursors();
-                Texture2D cursor = value ? (chronometerExpanded ? reduceCursor : expandCursor) : null;
-                if (panelDragHandler.IsNotNull())
+                if (value)
                 {
-                    if (value)
+                    Texture2D cursor = chronometerExpanded ? reduceCursor : expandCursor;
+                    if (panelDragHandler.IsNotNull())
                         panelDragHandler.SetCursorOverride(cursor, ScaleCursorHotspot);
                     else
-                        panelDragHandler.ClearCursorOverride();
+                        Cursor.SetCursor(cursor, ScaleCursorHotspot, CursorMode.Auto);
+                }
+                else if (cursorManager.IsNotNull())
+                {
+                    cursorManager.SetDefaultCursor();
+                }
+                else if (panelDragHandler.IsNotNull())
+                {
+                    panelDragHandler.ClearCursorOverride();
                 }
                 else
-                    Cursor.SetCursor(cursor, ScaleCursorHotspot, CursorMode.Auto);
-
-                if (Time.frameCount % 180 == 0)
-                    Debug.Log("[RadioNav][Chronometer][HoverDbg] arrows apply value=" + value
-                        + " frame=" + Time.frameCount);
+                {
+                    Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+                }
             }
             appliedHoverValue = value;
             appliedHoverInitialized = true;
