@@ -5,9 +5,9 @@ namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
     /// Single input sensor for the chronometer scale toggle. uGUI pointer
-    /// events drive only the hover cursor; the click itself is emitted by
-    /// the geometric per-frame poll on the button-DOWN edge, so one physical
-    /// press is exactly one toggle regardless of canvas re-parenting.
+    /// events drive only the hover cursor; the click is detected here as
+    /// press + release inside the rect without a drag, so dragging moves the
+    /// chronometer and never toggles the scale.
     /// </summary>
     public sealed class ChronometerScaleControl : MonoBehaviour,
         IPointerEnterHandler, IPointerExitHandler
@@ -15,6 +15,11 @@ namespace UBOAT.Mods.RadioNavigation
         private ChronometerOverlayHandler owner;
         private Canvas canvas;
         private bool canvasResolved;
+        // Click = press inside rect + release inside rect without exceeding
+        // the drag threshold. Press-drag-release moves the chronometer and
+        // must never toggle the scale.
+        private bool pressPending;
+        private Vector2 pressScreenPos;
 
         public void SetOwner(ChronometerOverlayHandler value)
         {
@@ -25,9 +30,33 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (owner.IsNull())
                 return;
-            if (!Input.GetMouseButtonDown(0) || !RectTransformContains(Input.mousePosition))
+
+            Vector2 mouse = Input.mousePosition;
+            if (Input.GetMouseButtonDown(0))
+            {
+                pressPending = RectTransformContains(mouse);
+                pressScreenPos = mouse;
                 return;
-            owner.OnScaleClicked();
+            }
+
+            if (!pressPending)
+                return;
+
+            float threshold = EventSystem.current != null
+                ? EventSystem.current.pixelDragThreshold
+                : 10f;
+            if (Vector2.Distance(mouse, pressScreenPos) > threshold)
+            {
+                pressPending = false;
+                return;
+            }
+
+            if (Input.GetMouseButtonUp(0))
+            {
+                pressPending = false;
+                if (RectTransformContains(mouse))
+                    owner.OnScaleClicked();
+            }
         }
 
         private bool RectTransformContains(Vector2 screenPoint)
