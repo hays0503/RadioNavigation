@@ -4,26 +4,21 @@ using UnityEngine;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Single input sensor for the chronometer scale toggle. uGUI pointer
-    /// events drive only the hover cursor; the click is detected here as
-    /// press + release inside the rect without a drag, so dragging moves the
-    /// chronometer and never toggles the scale.
+    /// Single input sensor for the chronometer scale zone. Everything is
+    /// geometric (rect vs mouse position): hover hint, click, drag
+    /// observation. uGUI pointer events are not used because native graphics
+    /// above the transparent control can occlude the raycast, which would
+    /// kill the hover hint exactly where it matters. Click = press + release
+    /// inside the rect without exceeding the drag threshold; press-drag is a
+    /// move gesture and never toggles the scale.
     /// </summary>
-    public sealed class ChronometerScaleControl : MonoBehaviour,
-        IPointerEnterHandler, IPointerExitHandler
+    public sealed class ChronometerScaleControl : MonoBehaviour
     {
         private ChronometerOverlayHandler owner;
         private Canvas canvas;
         private bool canvasResolved;
-        // Click = press inside rect + release inside rect without exceeding
-        // the drag threshold. Press-drag-release moves the chronometer and
-        // must never toggle the scale.
         private bool pressPending;
         private Vector2 pressScreenPos;
-        // Native-drag observation: before the first raise there is no mod
-        // drag shield, so the game itself moves the chronometer. The sensor
-        // still sees the gesture and reports it so the owner can swap in the
-        // move cursor without touching native drag mechanics.
         private bool nativeDragNotified;
 
         public void SetOwner(ChronometerOverlayHandler value)
@@ -37,16 +32,12 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             Vector2 mouse = Input.mousePosition;
-            if (Input.GetMouseButtonDown(0))
-            {
-                pressPending = RectTransformContains(mouse);
-                pressScreenPos = mouse;
-                return;
-            }
+            bool hovered = RectTransformContains(mouse);
 
-            if (!pressPending)
+            if (nativeDragNotified || owner.IsLocalDragActive)
             {
-                if (!Input.GetMouseButton(0) && nativeDragNotified)
+                // A drag owns the cursor; hover must not fight it.
+                if (!Input.GetMouseButton(0))
                 {
                     nativeDragNotified = false;
                     owner.OnScaleNativeDragChanged(false);
@@ -54,24 +45,33 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            owner.SetScaleHover(hovered);
+
+            if (Input.GetMouseButtonDown(0))
+            {
+                pressPending = hovered;
+                pressScreenPos = mouse;
+                return;
+            }
+
+            if (!pressPending)
+                return;
+
             float threshold = EventSystem.current != null
                 ? EventSystem.current.pixelDragThreshold
                 : 10f;
             if (Vector2.Distance(mouse, pressScreenPos) > threshold)
             {
                 pressPending = false;
-                if (!nativeDragNotified && !owner.IsLocalDragActive)
-                {
-                    nativeDragNotified = true;
-                    owner.OnScaleNativeDragChanged(true);
-                }
+                nativeDragNotified = true;
+                owner.OnScaleNativeDragChanged(true);
                 return;
             }
 
             if (Input.GetMouseButtonUp(0))
             {
                 pressPending = false;
-                if (RectTransformContains(mouse))
+                if (hovered)
                     owner.OnScaleClicked();
             }
         }
@@ -89,18 +89,6 @@ namespace UBOAT.Mods.RadioNavigation
             RectTransform rect = transform as RectTransform;
             return rect != null &&
                 RectTransformUtility.RectangleContainsScreenPoint(rect, screenPoint, eventCamera);
-        }
-
-        public void OnPointerEnter(PointerEventData eventData)
-        {
-            if (owner.IsNotNull())
-                owner.SetScaleHover(true);
-        }
-
-        public void OnPointerExit(PointerEventData eventData)
-        {
-            if (owner.IsNotNull())
-                owner.SetScaleHover(false);
         }
     }
 }
