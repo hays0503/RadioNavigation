@@ -361,9 +361,13 @@ namespace UBOAT.Mods.RadioNavigation
                     {
                         Texture2D cursor = chronometerExpanded ? reduceCursor : expandCursor;
                         cursorManager.SetCustomCursor(cursor, ScaleCursorHotspot);
+                        LogCursor("apply Custom cursor=" + (chronometerExpanded ? "reduce" : "expand"));
                     }
                     else
+                    {
                         cursorManager.SetDefaultCursor();
+                        LogCursor("apply Default (game) cursor on exit");
+                    }
 
                     appliedHoverValue = value;
                     appliedExpanded = chronometerExpanded;
@@ -385,20 +389,28 @@ namespace UBOAT.Mods.RadioNavigation
                         panelDragHandler.SetCursorOverride(cursor, ScaleCursorHotspot);
                     else
                         Cursor.SetCursor(cursor, ScaleCursorHotspot, CursorMode.Auto);
+                    LogCursor("fallback apply override cursor=" + (chronometerExpanded ? "reduce" : "expand"));
                 }
                 else if (panelDragHandler.IsNotNull())
                 {
                     panelDragHandler.ClearCursorOverride();
+                    LogCursor("fallback clear override on exit");
                 }
                 else
                 {
                     Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+                    LogCursor("fallback null cursor on exit");
                 }
 
                 appliedHoverValue = value;
                 appliedHoverInitialized = true;
             }
             scaleHovered = value;
+        }
+
+        private static void LogCursor(string message)
+        {
+            Debug.Log("[RadioNav][Chronometer][Cursor] " + message + " frame=" + Time.frameCount);
         }
 
         internal void ToggleChronometerScale()
@@ -532,8 +544,10 @@ namespace UBOAT.Mods.RadioNavigation
         // reports clicks, this decides what a click means.
         internal void OnScaleClicked()
         {
+            LogCursor("click received -> cancel native drag + toggle scale");
             CancelNativeDrag();
             ToggleChronometerScale();
+            LogCursor("toggle done, expanded=" + chronometerExpanded);
         }
 
         internal bool IsLocalDragActive => localDragActive;
@@ -597,6 +611,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             localDragActive = true;
             CancelNativeDrag();
+            LogCursor("drag START (shield path)");
         }
 
         internal void DragLocal(PointerEventData eventData)
@@ -626,6 +641,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             localDragActive = false;
             CancelNativeDrag();
+            LogCursor("drag END (shield path)");
         }
 
         private void CancelNativeDrag()
