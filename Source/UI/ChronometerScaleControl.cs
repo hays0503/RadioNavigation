@@ -18,7 +18,6 @@ namespace UBOAT.Mods.RadioNavigation
         private bool canvasResolved;
         private bool pressPending;
         private Vector2 pressScreenPos;
-        private bool lastLoggedHovered;
 
         public void SetOwner(ChronometerOverlayHandler value)
         {
@@ -32,12 +31,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             Vector2 mouse = Input.mousePosition;
             bool hovered = RectTransformContains(mouse);
-            if (hovered != lastLoggedHovered)
-            {
-                Debug.Log("[RadioNav][Chronometer][Cursor] hover " + (hovered ? "ENTER" : "EXIT")
-                    + " frame=" + Time.frameCount + " mouse=" + mouse);
-                lastLoggedHovered = hovered;
-            }
             owner.SetScaleHover(hovered);
 
             if (Input.GetMouseButtonDown(0))

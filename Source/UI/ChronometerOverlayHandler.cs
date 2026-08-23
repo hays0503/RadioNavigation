@@ -347,10 +347,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             // Etalon-conform policy through the game's CursorManager: hover
             // shows the custom expand/reduce arrows as Mode.Custom, leave
-            // restores the default texture via SetDefaultCursor. Routing
-            // through the manager keeps its internal mode in sync - setting
-            // Cursor.SetCursor directly desyncs it and SetDefaultCursor
-            // would early-out, leaving the arrows stuck on exit.
+            // restores the default texture via SetDefaultCursor.
             if (cursorManager.IsNotNull())
             {
                 bool expandedChanged = value && appliedExpanded != chronometerExpanded;
@@ -361,12 +358,18 @@ namespace UBOAT.Mods.RadioNavigation
                     {
                         Texture2D cursor = chronometerExpanded ? reduceCursor : expandCursor;
                         cursorManager.SetCustomCursor(cursor, ScaleCursorHotspot);
-                        LogCursor("apply Custom cursor=" + (chronometerExpanded ? "reduce" : "expand"));
                     }
                     else
                     {
+                        // UnsetCustomCursor anywhere on the map flips the
+                        // manager's mode to Default without touching the
+                        // texture, so SetDefaultCursor's guard early-outs and
+                        // our arrows stay stuck. Sync the mode AND force the
+                        // game's normal texture directly.
                         cursorManager.SetDefaultCursor();
-                        LogCursor("apply Default (game) cursor on exit");
+                        Texture2D normal = GetGameDefaultCursorTexture();
+                        if (normal.IsNotNull())
+                            Cursor.SetCursor(normal, Vector2.zero, CursorMode.Auto);
                     }
 
                     appliedHoverValue = value;
@@ -389,17 +392,14 @@ namespace UBOAT.Mods.RadioNavigation
                         panelDragHandler.SetCursorOverride(cursor, ScaleCursorHotspot);
                     else
                         Cursor.SetCursor(cursor, ScaleCursorHotspot, CursorMode.Auto);
-                    LogCursor("fallback apply override cursor=" + (chronometerExpanded ? "reduce" : "expand"));
                 }
                 else if (panelDragHandler.IsNotNull())
                 {
                     panelDragHandler.ClearCursorOverride();
-                    LogCursor("fallback clear override on exit");
                 }
                 else
                 {
                     Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
-                    LogCursor("fallback null cursor on exit");
                 }
 
                 appliedHoverValue = value;
@@ -408,9 +408,25 @@ namespace UBOAT.Mods.RadioNavigation
             scaleHovered = value;
         }
 
-        private static void LogCursor(string message)
+        private static FieldInfo normalCursorTexField;
+        private static Texture2D gameDefaultCursor;
+
+        private static Texture2D GetGameDefaultCursorTexture()
         {
-            Debug.Log("[RadioNav][Chronometer][Cursor] " + message + " frame=" + Time.frameCount);
+            if (gameDefaultCursor.IsNotNull() || cursorManager.IsNull())
+                return gameDefaultCursor;
+            try
+            {
+                if (normalCursorTexField == null)
+                    normalCursorTexField = typeof(CursorManager).GetField(
+                        "normalCursorTex", BindingFlags.Instance | BindingFlags.NonPublic);
+                gameDefaultCursor = normalCursorTexField?.GetValue(cursorManager) as Texture2D;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[RadioNav][Chronometer] default cursor texture probe failed: " + e.Message);
+            }
+            return gameDefaultCursor;
         }
 
         internal void ToggleChronometerScale()
@@ -544,10 +560,8 @@ namespace UBOAT.Mods.RadioNavigation
         // reports clicks, this decides what a click means.
         internal void OnScaleClicked()
         {
-            LogCursor("click received -> cancel native drag + toggle scale");
             CancelNativeDrag();
             ToggleChronometerScale();
-            LogCursor("toggle done, expanded=" + chronometerExpanded);
         }
 
         internal bool IsLocalDragActive => localDragActive;
@@ -611,7 +625,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             localDragActive = true;
             CancelNativeDrag();
-            LogCursor("drag START (shield path)");
         }
 
         internal void DragLocal(PointerEventData eventData)
@@ -639,9 +652,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void EndLocalDrag()
         {
+            // The shield receives OnEndDrag for every drag over the container
+            // even when our Begin gates rejected it - only real drags matter.
+            if (!localDragActive)
+                return;
             localDragActive = false;
             CancelNativeDrag();
-            LogCursor("drag END (shield path)");
         }
 
         private void CancelNativeDrag()
