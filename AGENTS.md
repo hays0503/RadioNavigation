@@ -13,7 +13,7 @@ Rules:
 
 ## Project identity
 
-C# .NET Standard 2.0 Unity mod for [UBOAT](https://www.deepwaterstudio.com/uboot) (WW2 submarine sim). Consol/Sonne radio nav beacon panel, audio synthesis, bearing diagnostics. Namespace: `UBOAT.Mods.RadioNavigation`. Author: testui, Version: 2.0.
+C# .NET Standard 2.0 Unity mod for [UBOAT](https://www.deepwaterstudio.com/uboot) (WW2 submarine sim). Consol/Sonne radio nav beacon panel, audio synthesis, bearing diagnostics, accurate star sky. Namespace: `UBOAT.Mods.RadioNavigation`. Author: testui, Version: 2.1 (= Manifest.json).
 
 ## Build system
 
@@ -32,7 +32,7 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 - **Entry point**: `Source/Logic/Main.cs` вЂ” `IUserMod`, Harmony patching, DI injection, prefab instantiation
 - **Harmony patches** target: `RadioStory.ContinueStory`, `Locale.RetrieveString` (2 overloads), `RadioStory.OnDecisionSelected`, `RadioStory.OnStopped`
 - **DI framework**: UBOAT custom `DWS.Common.InjectionFramework` вЂ” needs Reflection permission in Manifest.json. Mod assembly injected explicitly via `InjectIntoAssembly` (`Mod.cs InitializeAssembly`), not framework `"uboat"` auto-injection (assembly name `radionavigation` doesn't match). `OnSceneAwake` handler injects scene objects.
-- **UI**: Unity uGUI prefabs from AssetBundle (`Bundles/testui`). Hierarchy validated against hardcoded paths at runtime (Main.cs:165); destroyed+skipped on failure.
+- **UI**: Unity uGUI prefabs from AssetBundle (`Bundles/testui`). Hierarchy validated against hardcoded paths at runtime (Main.cs:~200, `requiredChildren[]` из констант `PrefabNames.*`); destroyed+skipped on failure.
 - **Source layout**: `Data/` (static configs вЂ” 14 beacons, 5 radio bands), `Logic/` (core sim вЂ” morse keyer, nav patterns, bearing diagnostics), `Sound/` (DSP audio synthesis via `OnAudioFilterRead`), `UI/` (MonoBehaviour handlers)
 
 ## Gotchas
@@ -43,16 +43,17 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 - AssetBundle required at `Bundles/testui` relative to mod root. Unity editor builds it; mod loader expects it at runtime.
 - `#if DEBUG` blocks in Main.cs dump prefab hierarchy but stripped from Release builds.
 - **Game source**: `C:\code\projects\uboat` (full C# project, assembly `com.uboat.game`, Unity 2021.3.45f2, 0Harmony 2.2.2). All 5 Harmony targets verified statically (2026-08-01). API map: `refactoring-plan/game-source-findings/GAME_SOURCE_REFERENCE.md`.
-- **RadioStoryIntegration dead (G1-G4, verified 2026-08-01)**: `stage` field missing (RSI.cs:95 в†’ null); `InsertDecision`/`OnUpdated` looked up on `RadioStory.BaseType` (=GenericStory) but declared in `Story` (GetMethod doesn't traverse bases); `LocalizationKey` readonly *field* in game, not property (RSI.cs:74 в†’ null). Panel can't open via radio story. Details: `refactoring-plan/game-source-findings/`.
+- **RadioStoryIntegration dead chain (G1-G4, verified 2026-08-01, FIXED 2026-08-23 via `StoryDecisionGateway.cs`, commit 28f4a62)**: `stage` field EXISTS (`RadioStory.cs:83`, enum) — реальная причина падения: `(int)`-каст boxed-перечисления → InvalidCastException; `InsertDecision`/`OnUpdated` looked up on `RadioStory.BaseType` (=GenericStory) but declared in `Story` (GetMethod doesn't traverse bases); `LocalizationKey` readonly *field* in game, not property. Details: `refactoring-plan/game-source-findings/`.
 - `supportedGameVersions` in Manifest.json **not validated** by game (ModManager parses, never checks).
 - AssetBundle built with Unity 2021.3.33f1 вЂ” compatible with game's 2021.3.45f2.
 - Game does no own Harmony patching (0Harmony.dll ships for mods only); mod's `new Harmony("UBOAT.Mods.RadioNavigation")` в†’ `UnpatchAll()` hits only its own patches.
 
 ## Documentation sources
 
-- `SAD/` вЂ” 16-chapter architecture doc (decisions, code smells, refactoring roadmap)
-- `refactoring-plan/` вЂ” 20 incremental refactoring plans (`REFACTORING_PLAN.md` through `REFACTORING_PLAN20.md`)
+- `SAD/` вЂ” 11-chapter architecture doc (decisions, code smells; приложения A–C и старый roadmap — в `archive/`)
+- `refactoring-plan/` вЂ” активные планы: `PLAN_Phase5.md` (живой), `PLAN_Phase4_GodObjects.md`, `PLAN_InfoPanel_ZoneDebug.md`, `LIVE_VALIDATION_CHECKLIST.md`, `DEFERRED.md`, `VERIFICATION_REPORT.md`
 - `refactoring-plan/hypothesis/INDEX.md` вЂ” 207 verified findings (194 confirmed, 13 rejected) with status column
+- `refactoring-plan/RESOLVED_LEDGER.md` вЂ” закрытие гипотез с доказательствами (теги file:line, коммиты)
 - `refactoring-plan/VERIFICATION_REPORT.md` вЂ” verdicts, duplicates, Phase 5 game-source verification
 - `refactoring-plan/game-source-findings/` вЂ” G1-G4 (dead RadioStoryIntegration chain) + `GAME_SOURCE_REFERENCE.md` (modв†”game API map)
 - `.opencode/opencode.json` вЂ” graphify.js plugin config for OpenCode

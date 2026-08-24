@@ -68,7 +68,7 @@ Sub-panels within the main UI follow a **card-like stacking order**:
 4. Expandable Information Panel (bottom/below toggle)  Morse decode history, nav position
 
 ### Motion & Feedback
-- **Dial rotation:** smooth angular interpolation matched to user drag speed; angular snap zones at each of the 8 frequency bands  
+- **Dial rotation:** smooth angular interpolation matched to user drag speed; angular snap zones at each of the 5 frequency bands (`DialConfig.Bands`, I–V)  
 - **Cursor needle:** continuous real-time update synced to zone selection + angle input  
 - **'Ground check' indicator:** binary pass/fail with brief color flash (transition duration ~200ms)  mirrors actual Consol audio discrimination  
 
@@ -107,7 +107,7 @@ All UI text is **technical, terse, signal-report style**. No explanatory prose i
 
 ### uGUI Architecture
 - **One prefab root** loaded via AssetBundle (`Bundles/testui`, prefab name `"Radio"`)  
-- Panel hierarchy validated against hardcoded child paths at runtime (Main.cs:165)  maintain strict naming: `CursorSpinner`, `Toggle`, `Ground`, `Ground/Background/GroundCheckmark`, `Expander`, `RadioZone`, `VolumeSpinner`, `FeedbackSpinner`  
+- Panel hierarchy validated against hardcoded child paths at runtime (Main.cs:200, `requiredChildren[]`, константы `PrefabNames.*`)  maintain strict naming: `Cursor`, `Toggle`, `Ground`, `Ground/Background/GroundCheckmark`, `Expander`, `RadioZone`, `VolumeSpinner`, `FeedbackSpinner`  
 - **Do NOT add new top-level children** to the validated hierarchy; extend via sibling placement or nested child objects with stable paths  
 
 ### Component Boundaries
@@ -177,11 +177,11 @@ The following describes the main panel artifact as a single reading-order flow f
 ```
  Parent: "Radio" GameObject  Fixed width 380-420px, anchored lower-right viewport
                                               
-   ZONE SELECTOR ROW                         Child #7: RadioZone (horizontal strip, Zones A through I)
+   ZONE SELECTOR ROW                         Child #7: RadioZone (horizontal strip, Bands I through V)
                                              Active button  amber highlight (#f0c040), inactive  secondary text only  
              
- [Z1]   [Z2 ] [Z3]   ...  [ZI]              
- Zone-A  Zone-B Zone-C...   Zone-I      Child #7: ZoneHandler.cs  maps zone index (1..8) to frequency range via DialConfig.Bands[]  active state toggled visually
+ [Z1]   [Z2 ] [Z3]   ...  [ZV]              
+ Zone-I  Zone-II Zone-III... Zone-V     Child #7: ZoneHandler.cs  maps zone index (0..4, `DialConfig.Bands.Length`) to frequency range via DialConfig.Bands[]  active state toggled visually
  Frequency Strip (right edge of Row)            
                                   
     72.4 kHz                                Size: inheritable with Mono typeface, right-aligned  
@@ -205,25 +205,25 @@ The following describes the main panel artifact as a single reading-order flow f
 | Prefab Node | C# Handler | Role |
 |---|---|---|
 | CursorSpinner | `CursorHandler` | Draggable dial 90 from zone center; drives `SonneController.EmitFrequency()` |
-| RadioZone | `ZoneHandler` | Zone AI band selection; maps index  frequency range via `DialConfig.Bands[]` |
+| RadioZone | `ZoneHandler` | Zone band selection (I–V); maps index  frequency range via `DialConfig.Bands[]` |
 | Toggle (child #3) | `ToggleHandler` | Panel open/close + info panel expand/collapse state |
 | Ground/Background/GroundCheckmark | `GroundHandler` | Binary OK/BAD signal decode indicator driven by ground detection logic |
 | RadioZone strip | Various zone scripts | Horizontal band selector strip, zone AI visual toggle active/inactive state |
 | VolumeSpinner (child #8) | `VolumeSpinnerHandler` | Receiver gain volume level  same spinner archetype as feedback, injected `DebugTag` differs |
 | FeedbackSpinner (child #9) | `FeedbackSpinnerHandler` | Receiver sensitivity/bias feedback control |
 | Expander (child #5) | `ExpanderHandler` | Expand/collapse animation for Info Panel region; nested Canvas Group |
-| **MISSING** | *FrequencyDisplay?* | Live frequency readout with zone label  NOT in `requiredChildren[]`; must add to Main.cs:165 before any refactoring |
+| **MISSING** | *FrequencyDisplay?* | Live frequency readout with zone label  NOT in `requiredChildren[]`; must add to Main.cs:200 array before any refactoring |
 
 ---
 
 ### Critical Missing Element Note
 
-The current `requiredChildren[]` array in `Main.cs` line 165 does not include a dedicated container for the **Information Panel itself**  only "Expander" (the toggle button). The info panel region that holds decoded text + position data either:
+The current `requiredChildren[]` array in `Main.cs` (line ~200, константы `PrefabNames.*`) does not include a dedicated container for the **Information Panel itself**  only "Expander" (the toggle button). The info panel region that holds decoded text + position data either:
 - Is an implicit sibling of Radio with no named path check, or
 - Hangs under Expander as unnamed child, or  
 - Exists in a separate prefab entirely.
 
-This must be resolved before implementing any info-panel expansion  **P2.M3_HardcodedPrefabPaths** already documents this fragility.
+This must be resolved before implementing any info-panel expansion  гипотеза о хрупкости хардкод-путей задокументирована в `refactoring-plan/hypothesis/INDEX.md` (F180); исходные файлы плана `P0.C4_ReflectionFragility.md`/`P2.M3_HardcodedPrefabPaths.md` не существуют (архив старых планов).
 
 ---
 
@@ -335,13 +335,13 @@ Each entry records a non-obvious design choice in JSON format, with rationale ti
 ```json
 {
   "id": "D8",
-  "decision": "Prefab children validated against hardcoded paths in Main.cs:165 requiredChildren[] array; any missing child triggers silent destroy-and-skip rather than graceful degradation.",
+  "decision": "Prefab children validated against hardcoded paths in Main.cs (~line 200) requiredChildren[] array built from PrefabNames.* constants (ADR-019); any missing child triggers silent destroy-and-skip rather than graceful degradation.",
   "reason": "Broken partial instantiation produces inconsistent runtime errors downstream (e.g., CursorHandler attached but no Child transform for angle mapping).",
   "alternatives": [
     "Null-check each child at handler Start  fail silently per-component, continue panel load",
     "Soft degrade where missing UI just means nonfunctional button without destroying the entire panel"
   ],
-  "tradeoff": "If UBOAT updates its GUI scene hierarchy and reorders children, this validation causes silent asset bundle failures (exactly P0.C4_ReflectionFragility.md flag). Hard to recover from once AssetBundle is missing the prefab."
+  "tradeoff": "If UBOAT updates its GUI scene hierarchy and reorders children, this validation causes silent asset bundle failures (fragility flagged by old plan P0.C4_ReflectionFragility.md — файл архивирован; см. F180 в refactoring-plan/hypothesis/INDEX.md). Hard to recover from once AssetBundle is missing the prefab."
 }
 ```
 

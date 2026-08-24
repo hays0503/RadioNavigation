@@ -1,12 +1,12 @@
 # Testing Strategy — RadioNavigation Mod
 
-> **⚠️ Baseline (2026-08-19, ADR-014):** Инфраструктура тестов РЕАЛИЗОВАНА (F22): xunit 2.9 + собственный раннер (`Tests/Runner`), **182 теста PASS** (`baseline-182-20260819` на `8b3021fa`, `powershell -ExecutionPolicy Bypass -File tests.ps1`). `dotnet build -c Release -c Debug` 0 errors. ADR-007 «Deferred» (F45) — полный охват интеграционных/производительных тестов целевой (см. `docs/adr/ADR-014-baseline.md`). Секции 3.x — целевые примеры (могут не совпадать с `Tests/`).
+> **⚠️ Baseline (2026-08-19, ADR-014) → актуализировано 2026-08-24:** Инфраструктура тестов РЕАЛИЗОВАНА (F22): xunit 2.9 + собственный раннер (`Tests/Runner`), **263 теста PASS** (`powershell -ExecutionPolicy Bypass -File tests.ps1`; история роста: baseline-182 `8b3021fa` → 232 → 253 → 255 → 257 → 260 → 263, детали в AGENTS.md). `dotnet build -c Release -c Debug` 0 errors. ADR-007 «Deferred» (F45) — полный охват интеграционных/производительных тестов целевой (см. `docs/adr/ADR-014-baseline.md`). Секции 3.x — целевые примеры (могут не совпадать с `Tests/`).
 
 ## 1. Testing Overview
 
 | Test Type | Coverage Target | Current | Priority |
 |-----------|-----------------|---------|----------|
-| Unit Tests | >60% | 182 PASS (baseline ADR-014, core logic без Unity) | High |
+| Unit Tests | >60% | 263 PASS (baseline ADR-014 → рост 2026-08-22/23; core logic + DSP без Unity) | High |
 | Integration Tests | >80% | Частично (DspPipeline, StationScheduler) | Medium |
 | Manual Testing | 100% | Partial (см. Фазу live-валидации) | Medium |
 | Performance Tests | Baseline + 10% | None | Low |
@@ -15,16 +15,24 @@
 
 ```
 Tests/  [xunit 2.9 + собственный раннер Tests/Runner; без Unity-рантайма]
-├── BeaconDataTests.cs          ├── MorseKeyerTests.cs
-├── ConsolCycleConfigTests.cs   ├── MorseTimingTests.cs
-├── ComparisonExtensionsTests.cs├── NavigationPatternTests.cs
-├── DialConfigTests.cs          ├── PlayerPositionProviderTests.cs
-├── DspPipelineTests.cs         ├── SonneBeamTests.cs
-├── GeoMathTests.cs             ├── SignalRichTextFormatterTests.cs
-├── MorseAlphabetTests.cs       ├── SignalTypesTests.cs
-├── AudioSynthesisEngineTests.cs├── SonneSignalGeneratorTests.cs
-│                               └── StationSchedulerTests.cs
-├── Stubs/            [UnityEngineMathf, UnityEngineDebug — фейки]
+├── AudioRenderPauseTests.cs       ├── MorseKeyerTests.cs
+├── AudioSynthesisEngineTests.cs   ├── MorseTimingTests.cs
+├── AstroMathTests.cs              ├── NavigationPatternTests.cs
+├── BeaconDataTests.cs             ├── PanelStateStoreTests.cs
+├── ChronometerCursorPolicyTests.cs├── PlayerPositionProviderTests.cs
+├── ChronometerMapDragMathTests.cs ├── RadioNavDiagnosticsTests.cs
+├── ComparisonExtensionsTests.cs   ├── ShieldTests.cs
+├── ConsolCycleConfigTests.cs      ├── SignalRichTextFormatterTests.cs
+├── DialConfigTests.cs             ├── SignalTypesTests.cs
+├── DspPipelineTests.cs            ├── SonneBeamTests.cs
+├── GameContractTests.cs           ├── SonneSignalGeneratorTests.cs
+├── GeoMathTests.cs                ├── StarCatalogTests.cs
+├── LighthouseMarkerSizingTests.cs ├── StationSchedulerTests.cs
+├── LighthouseProfileTests.cs      ├── StoryDecisionGatewayTests.cs
+├── LighthouseVisualModelTests.cs  └── TransformHelpersTests.cs
+├── MorseAlphabetTests.cs
+├── Helpers/    [WavWriter, KeyingEnvelope — golden-audio рендер]
+├── Stubs/      [UnityEngineMathf/Debug/Mathf/Transform/Vector2/PlayerPrefs, GameStubs]
 └── Runner/Program.cs [самописный запускатель xunit (dotnet test неприменим:
                       тесты подключают исходники мода напрямую)]
 ```
@@ -332,7 +340,7 @@ public static class TestMeasurements {
 # xunit + самописный раннер (dotnet test неприменим: тестовый проект линкует
 # исходники мода напрямую, без сборки игровой DLL)
 powershell -ExecutionPolicy Bypass -File tests.ps1
-# ожидаемый результат: "Passed: 182, Failed: 0" (baseline ADR-014)
+# ожидаемый результат: "Passed: 263, Failed: 0" (текущий; baseline-история — ADR-014)
 ```
 
 ### 8.2 Run Specific Test Category
@@ -370,5 +378,5 @@ powershell -ExecutionPolicy Bypass -File tests.ps1
 ---
 
 *Document Version: 2.1*  
-*Last Updated: 2026-08-19 (ADR-014 baseline 182, tag baseline-182-20260819)*  
-*Updated: 182 PASS; статусы F01–F207 в `refactoring-plan/hypothesis/INDEX.md`.*
+*Last Updated: 2026-08-24 (263 PASS; baseline-история в ADR-014, tag baseline-182-20260819)*  
+*Updated: 263 PASS; статусы F01–F207 в `refactoring-plan/hypothesis/INDEX.md`, закрытие — `refactoring-plan/RESOLVED_LEDGER.md`.*  

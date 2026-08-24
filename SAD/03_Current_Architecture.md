@@ -320,5 +320,5 @@ Sound               Low   High    Low    -
 ---
 
 *Document Version: 2.0*  
-*Last Updated: 2026-08-01*  
+*Last Updated: 2026-08-24 (счётчики тела обновлялись 2026-08-22; футер синхронизирован)*  
 *Corrections: Fixed UBOOT→UBOAT, reflection handler count 8→9, updated footer to 199 problems. See F45-F52, F65-F199.*

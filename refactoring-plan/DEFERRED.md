@@ -2,17 +2,19 @@
 
 These findings require validation on the live in-game panel. Status synchronized 2026-08-04:
 
+> **2026-08-24:** полная сверка решённости всех гипотез — в `RESOLVED_LEDGER.md`. Открытыми остаются 22; записи ниже сохраняют историческую формулировку.
+
 Position Fix chain (`PositionFixCalculator`, measurement aggregation, and panel
 output) was removed on 2026-08-08. Historical position-fix findings remain in
 the audit archive only.
 
 - **F202** SpinnerHandlerBase 90 deg angle offset — ✅ live-validated by checklist; no strange knob behavior observed, no code change required.
 - **F203** Receiver default QF=20 causes cross-talk of neighbouring stations at 59-99% loudness (307/306, 316/315, 266/257 kHz) — ✅ live-validated by checklist; useful Morse was audible without cross-talk, no tuning change required.
-- **F163** mutable struct (F17-adjacent), **F179/F180/F181** architectural refactors (Main.cs SRP split, typed references, log levels), **F186** RadioStoryIntegration (dead chain G1-G4).
+- **F163** mutable struct (F17-adjacent), **F179/F180/F181** architectural refactors (Main.cs SRP split, typed references, log levels), **F186** RadioStoryIntegration — *ядро G1-G4 закрыто 2026-08-23 через `StoryDecisionGateway.cs` (commit 28f4a62); в `rejected\F186_*.md` отвергнут только param-bounds подпункт — это разные объёмы одного номера.*
 
 ## Deferred findings (architectural / data / docs, no code change, 2026-08-02)
 
-Resolved without code edits — each entry lists the reason:
+Resolved without code edits — each entry lists the reason. *Построчные доказательства закрытия смежных гипотез: `RESOLVED_LEDGER.md`.*
 
 - **F02** SonneController god-object (9 responsibilities) — architectural refactor, SAD 08 roadmap.
 - **F03** InformationPanelHandler god-object (474 LOC, 9 responsibilities) — architectural refactor, SAD 08 roadmap.

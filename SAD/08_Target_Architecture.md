@@ -1,6 +1,6 @@
 # Target Architecture — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-01):** Этот документ описывает целевую архитектуру — **все классы и интерфейсы, отмеченные `⚠ proposed`, не реализованы**. Всего **199 проблем** (F01–F199). ADR-002/003/004/005/007 changed «Accepted» → «Deferred» (F45, исправлено). Пропущены `RadioStoryIntegration` (381 LOC), `SonneSignalGenerator` (146), `SignalRichTextFormatter` (86) теперь добавлены в текущую архитектуру вместо phantom классов. Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
+> **⚠️ Deep Scan Update (2026-08-01):** Этот документ описывает целевую архитектуру — **все классы и интерфейсы, отмеченные `⚠ proposed`, не реализованы**. Всего **207 проблем** (F01–F207). ADR-002/003/004/005/007 changed «Accepted» → «Deferred» (F45, исправлено). Пропущены `RadioStoryIntegration` (замещён фасадом + `StoryDecisionGateway.cs`, 2026-08-23), `SonneSignalGenerator` (146), `SignalRichTextFormatter` (86) теперь добавлены в текущую архитектуру вместо phantom классов. Полные описания: `refactoring-plan/hypothesis/INDEX.md`.
 
 ## 1. Target Layer Architecture
 

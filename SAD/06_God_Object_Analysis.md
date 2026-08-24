@@ -1,6 +1,6 @@
 # God Object Analysis — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Актуальные god-объекты, отложенные в roadmap SAD 08/09 (Фаза 4): `SonneController` (F02), `InformationPanelHandler` (F03), `RadioStoryIntegration` (F04/F83 — мёртвая цепочка G1–G4), `Main.cs` (F21), `AudioSynthesisEngine` (F25). Реальные кандидаты на выделение: `SonneSignalGenerator` (146 LOC), `SignalRichTextFormatter` (86). Причины отложения — в `refactoring-plan/DEFERRED.md`. Несуществующие классы extraction plan (F47: `StationManager`, `SignalDecoder`, `AudioController`, `UIElementFactory`, `StationInfoDisplay`, `StationFinder`) — отклонены.
+> **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Актуальные god-объекты, отложенные в roadmap SAD 08 (Фаза 4): `SonneController` (F02), `InformationPanelHandler` (F03), `Main.cs` (F21), `AudioSynthesisEngine` (F25); + новое поколение из graph-аудита (`LighthouseBeamGlow`, `ChronometerOverlayHandler` — см. `refactoring-plan/PLAN_Phase5.md`). `RadioStoryIntegration` (F04/F83) — мёртвая цепочка G1–G4 **закрыта 2026-08-23** через `StoryDecisionGateway.cs` (commit 28f4a62). Реальные кандидаты на выделение: `SonneSignalGenerator` (146 LOC), `SignalRichTextFormatter` (86). Причины отложения — в `refactoring-plan/DEFERRED.md`. Несуществующие классы extraction plan (F47: `StationManager`, `SignalDecoder`, `AudioController`, `UIElementFactory`, `StationInfoDisplay`, `StationFinder`) — отклонены.
 
 ## 1. God Objects Identified
 
@@ -302,4 +302,4 @@ BEFORE: InformationPanelHandler (474 lines) — Source/UI/InformationPanelHandle
 
 *Document Version: 2.0*  
 *Last Updated: 2026-08-01*  
-*Corrected: LOC 506→508 (F50), Harmony targets StoryManager→RadioStory.ContinueStory (F46), Reflection chain matches actual code (F23/F68). Phantom extraction classes annotated `⚠ proposed` (F47). Updated for 199 problems (F65–F199).*
+*Corrected: LOC 506→508 (F50), Harmony targets StoryManager→RadioStory.ContinueStory (F46), Reflection chain matches actual code (F23/F68). Phantom extraction classes annotated `⚠ proposed` (F47). Updated for 207 problems (F01–F207). Last Updated: 2026-08-24.*

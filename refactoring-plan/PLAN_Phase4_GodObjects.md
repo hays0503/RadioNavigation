@@ -1,5 +1,7 @@
 # Phase 4: God-Object декомпозиция (SAD 08/09) — план без кода
 
+> **Статус 2026-08-24:** Slice 4.1 (F04 → `StoryDecisionGateway.cs`) ВЫПОЛНЕН — commit 28f4a62; остаток слайсов superseded планом `PLAN_Phase5.md` (P5.1–P5.8). Этот документ — исторический.
+
 > Дата: 2026-08-21. Статус: план, код не трогаем до green live 1-3.
 > Принцип: 1 PR = 1 god-object slice + 208 PASS + Build OK (best practice).
 

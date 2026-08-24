@@ -34,6 +34,10 @@
 | ADR-026 | STAR_SKY visibility по Weather.Sky | Accepted | 2026-08-19 |
 | ADR-027 | Собственный маркер маяка на карте (LighthouseMapMarker) | Accepted | 2026-08-22 |
 | ADR-028 | Геометрия бандла = истина; свет на Spot Light; flare без лимита в device-режиме | Accepted | 2026-08-22 |
+| ADR-023* | Хронометр: двухзонная курсорная политика + expanded drag (`ADR-023-chronometer-cursor-and-expanded-drag.md`) | Accepted | 2026-08-23 |
+| ADR-029 | Coupling Assessment: 3 концентратора + static mutable; лечение через слайсы PLAN_Phase5, big-bang перенос отвергнут | Accepted | 2026-08-24 |
+
+> **⚠️ Конфликт номеров:** существуют **два** файла с номером ADR-023 — `ADR-023-planets.md` (планеты, 2026-08-19) и `ADR-023-chronometer-cursor-and-expanded-drag.md` (хронометр, 2026-08-23). Различать по имени файла, не по номеру.
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 
@@ -362,6 +366,8 @@ Move configuration data to JSON files.
 Accepted (2026-08-19, baseline ADR-014: 182 PASS)
 
 > **Update 2026-08-19 (ADR-014):** F22 закрыто — `Tests/Runner` 182 PASS `powershell -ExecutionPolicy Bypass -File tests.ps1`, `dotnet build Release/Debug` 0 errors, tag `baseline-182-20260819` на `8b3021fa`. Цель `SAD/11` >80% Data / >70% Logic — частично достигнута (чистая математика покрыта, UI 0% — см. `docs/adr/ADR-014-baseline.md`).
+>
+> **Текущее состояние (2026-08-24):** 263 PASS (история роста — AGENTS.md); числа выше — факт на дату принятия ADR-014, не изменяются.
 
 ### Context
 No unit tests exist (0% coverage). Bugs are discovered in production.

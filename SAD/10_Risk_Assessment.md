@@ -1,6 +1,6 @@
 # Risk Assessment — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-01):** Глобальный аудит выявил **199 проблем** (F01–F199). Добавлены критические риски из F65–F199:
+> **⚠️ Deep Scan Update (2026-08-01):** Глобальный аудит выявил **207 проблем** (F01–F207). Добавлены критические риски из F65–F199:
 > - **F45 (P0):** SAD документирует 5 ADR как «Accepted» — ни один не реализован
 > - **F46 (P0):** SAD описывает неверные Harmony patch targets
 > - **F47 (P1):** 14+ несуществующих классов в SAD — документацию невозможно использовать как reference
@@ -10,7 +10,7 @@
 > - **F200-F207 (новое 2026-08-01):** 8 дополнительных проблем. F200 (P0): устаревшая цепочка position fix удалена; F201-F202 (P1): двойная передача Consol-паттерна за цикл; сдвиг 90° у спиннеров. F203/F204/F207 (P2): кросс-талки при QF=20; антимеридиан-среднее долгот; перехват drag с дочерних контролов. F205-F206 (P3): кириллическая «В°»; тики по кадрам. Итого **207 проблем**.
 >
 > **Итого:** 207 проблем, ~95-130 часов рефакторинга + тестовая инфраструктура (F22: 8-12 часов) + F200-F207 (~4-6 часов).
-> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`, `F200.md`..`F207.md`.
+> Полные описания: `refactoring-plan/hypothesis/INDEX.md` (роллап F01–F207; детали в `confirmed\`/`rejected\`).
 
 ## 1. Risk Overview
 
@@ -49,6 +49,7 @@ Audio thread (`OnAudioFilterRead`) and main thread (`Update()`) share mutable `S
 
 **Effort**: 8-12 hours
 **Owner**: Audio Team
+**Status 2026-08-24**: частично закрыт — volatile-флаги (F01/F29), keyer/scheduler переведены на main thread (F189-redesign), `Debug.Log` из аудио-треда убран (F106/F171). Полный double-buffer не требуется в текущей архитектуре; остаточный риск пересматривается в Phase 5 (`refactoring-plan/PLAN_Phase5.md`).
 
 ### 2.2 Reflection Fragility
 
@@ -450,5 +451,5 @@ UI handlers subscribe to events but don't unsubscribe in `OnDestroy` (F14, F30, 
 ---
 
 *Document Version: 2.0*  
-*Last Updated: 2026-08-01*  
+*Last Updated: 2026-08-24 — TECH-001 получил статус частичного закрытия; счётчик проблем приведён к 207.*  
 *Updated: Risk catalog expanded from 22 to 33 items. Added TECH-007 (NaN), TECH-008 (event leaks), TECH-009 (dead code), PROC-005 (build config). Risk budget increased to 53-72 hours. Documentation category added.*

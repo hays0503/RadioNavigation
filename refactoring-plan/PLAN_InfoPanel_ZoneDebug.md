@@ -1,6 +1,8 @@
 # План: зона/эквисигнал + счётчики в InformationPanel
 
-Активный план реализации. История ревизий, сверка номеров строк (snapshot 2026-08-03) и обоснования решений — в **`AUDIT_InfoPanel_ZoneDebug.md`**.
+> **Статус 2026-08-24:** реализация завершена 2026-08-04 (блок ниже); live-проверки — `LIVE_VALIDATION_CHECKLIST.md`; история ревизий — `../archive/AUDIT_InfoPanel_ZoneDebug.md`.
+
+Активный план реализации. История ревизий, сверка номеров строк (snapshot 2026-08-03) и обоснования решений — в **`../archive/AUDIT_InfoPanel_ZoneDebug.md`**.
 
 > **game-model ≠ real system.** `documents-readonly/CONSOL_SONNE_досье.md` описывает реальную CONSOL/SONNE; план реализует внутреннюю модель игры (`GenerateConsolPattern`/`CalculateSector`). Расхождения (число лучей, ±1 счёт, поправка наблюдателя) — `game-упрощения`, intentional, в критерии не вносятся (см. D2/D6).
 
@@ -32,7 +34,7 @@
 | `InformationPanelHandler.cs` | `UpdatePatterns`: убрать гейт `if (diag.InBeam)` для счётчиков; добавить строку `Recv: X• Y▬` только для `i == dominantStationIndex` | `diag` из `GetStationDiagnostics` |
 | `Tests/*.cs` | Проверить DOT/DASH order, equisignal position, keyer emission и rich-text order | `GenerateConsolPattern`, `MorseKeyer`, `SignalRichTextFormatter` |
 
-> Номера строк на момент аудита — в `AUDIT_InfoPanel_ZoneDebug.md` (snapshot 2026-08-03).
+> Номера строк на момент аудита — в `../archive/AUDIT_InfoPanel_ZoneDebug.md` (snapshot 2026-08-03).
 
 ## Инварианты
 

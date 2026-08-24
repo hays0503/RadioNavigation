@@ -23,22 +23,22 @@
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1 [-GamePath <path>]  # локальная DLL (для IDE-проверок)
 dotnet build radionavigation.csproj -c Release -c Debug        # Release+Debug, эталонный билд (0 errors, MSB3277 warn ожидаем)
-powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (182/182, baseline ADR-014)
+powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (263 PASS; baseline-история ADR-014)
 ```
 
 ## Структура репозитория
 
 - `Source/` — код мода: `Data/` (конфиги маяков/диапазонов), `Logic/` (ядро: морзе, паттерны, пеленги), `Sound/` (DSP-синтез), `UI/` (обработчики uGUI)
 - `Tests/` — юнит-тесты (без Unity)
-- `SAD/` — документ архитектуры (16 глав)
+- `SAD/` — документ архитектуры (11 глав; приложения A–C и старый roadmap — в `archive/`)
 - `refactoring-plan/` — аудит: 207 гипотез, статусы в `hypothesis/INDEX.md`, неисправленное в `DEFERRED.md`
 - `DESIGN.md` — спецификация дизайна
 
 ## Статус качества
 
-- Аудит рефакторинга: **207/207 гипотез закрыты** (163 исправлено, 23 отложено, 8 подтверждено без правок, 13 отклонено)
-- Тесты: **182/182 PASS** (baseline `baseline-182-20260819` на `8b3021fa`, ADR-014), сборка Release+Debug без ошибок
-- Отложено (live-проверка в игре): угол ручки спиннера (F202), селективность приёмника (F203), характер шума (F71)
+- Аудит рефакторинга: **207 гипотез** — ~160 закрыто (доказательства построчно в `refactoring-plan/RESOLVED_LEDGER.md`), 22 открыто (`DEFERRED.md` + `PLAN_Phase5.md`), ~10 частично, 13 отклонено
+- Тесты: **263 PASS** (baseline `baseline-182-20260819` на `8b3021fa`, ADR-014; рост 232→253→255→257→260→263 — 2026-08-22/23), сборка Release+Debug без ошибок
+- Отложено (live-проверка в игре): характер шума (F71); архитектурные F163/F179–F181 (см. `refactoring-plan/DEFERRED.md`)
 
 ## История
 

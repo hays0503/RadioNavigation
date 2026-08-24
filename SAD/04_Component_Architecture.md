@@ -759,8 +759,20 @@ LighthouseBeamGlow
   - Sirius самый яркий и первый (`StarCatalog_Sirius_IsBrightest`).
   - Canopus (южная звезда) невидим на широте +50° (`StarCatalog_Canopus_NotVisibleAt50N`).
 
+### 10.11 StoryDecisionGateway (добавлено 2026-08-24)
+
+- Generated: 2026-08-24 · проверять по исходнику
+- Файл: `Source/Logic/StoryDecisionGateway.cs` (~263 ln, static class)
+- Назначение: вся reflection-работа с игровыми `RadioStory`/`Story` в одном месте — замена god-object `RadioStoryIntegration` (F04, цепочка G1–G4). Введён 2026-08-23 (commit 28f4a62).
+- Ключевые ответственности:
+  - Поиск методов/полей по иерархии типов (`FindMethodDeep` — трассирует базовые классы; G2/G3).
+  - Инжекция кастомных решений (`InsertDecision`), stage-гейт с enum-безопасным чтением (`Convert.ToInt32`, G1), локализация через readonly-поле `LocalizationKey` (G4).
+  - Кэширование всех `Type`/`MethodInfo`/`FieldInfo` при инициализации (F68/F107/F124).
+- Связи: фасад `RadioStoryIntegration` → gateway; pre-flight проверка таргетов в `Main`.
+- Тесты: `Tests/StoryDecisionGatewayTests.cs` + контракт игры в `Tests/GameContractTests.cs`.
+
 ----
 
-*Document Version: 1.4*  
-*Last Updated: 2026-08-23*  
-*Corrections: Fixed component hierarchy (flat structure, added ComparisonExtensions), fixed array sizes 4→14 (F48), file counts (F49), added missing classes (F52). See F65–F199 (total 199 issues). See F45–F52 for SAD drift corrections. v1.4: merged class dossiers from docs/dossiers/ into §10 (lossless).*
+*Document Version: 1.5*  
+*Last Updated: 2026-08-24*  
+*Corrections: Fixed component hierarchy (flat structure, added ComparisonExtensions), fixed array sizes 4→14 (F48), file counts (F49), added missing classes (F52). See F01–F207 (total 207 issues) — статусы в `hypothesis/INDEX.md`, закрытие в `RESOLVED_LEDGER.md`. v1.4: merged class dossiers from docs/dossiers/ into §10 (lossless). v1.5: added StoryDecisionGateway (§10.11).*

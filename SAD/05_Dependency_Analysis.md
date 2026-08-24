@@ -1,6 +1,6 @@
 # Dependency Analysis — RadioNavigation Mod
 
-> **⚠️ Deep Scan Update (2026-08-01):** Проведён тотальный перекрёстный аудит (SAD vs code, git, build/config, cross-file consistency). Всего **199 проблем** (F01–F199).
+> **⚠️ Deep Scan Update (2026-08-01):** Проведён тотальный перекрёстный аудит (SAD vs code, git, build/config, cross-file consistency). Всего **207 проблем** (F01–F207); статусы — `refactoring-plan/hypothesis/INDEX.md`, закрытие — `refactoring-plan/RESOLVED_LEDGER.md`.
 > - **F45:** ADR-002/003/004/005/007 статус «Deferred» (был «Accepted» — 0% реализовано)
 > - **F46:** Harmony patch targets исправлены — `Game.OnLoaded` → реальность `RadioStory.ContinueStory` (5 патчей)
 > - **F47:** 14+ несуществующих классов помечены `⚠ proposed` в секциях реализации, удалены из анализа зависимостей
@@ -9,7 +9,7 @@
 > - **F50:** LOC неверны для 10+ файлов
 > - **F52:** Добавлены пропущенные классы: `RadioStoryIntegration`, `SonneSignalGenerator`, `SignalRichTextFormatter`
 >
-> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`.
+> Полные описания: `refactoring-plan/hypothesis/INDEX.md` (роллап F01–F207).
 
 ## 1. Dependency Overview
 
@@ -274,4 +274,4 @@ public interface IStationDataSource {
 
 *Document Version: 2.0*  
 *Last Updated: 2026-08-01*  
-*Updated: 199 problems cataloged (F01–F199). Reflection chain corrected to match actual code. Phantom classes annotated `⚠ proposed`. Harmony targets corrected (F46).*
+*Updated: 207 problems cataloged (F01–F207). Reflection chain corrected to match actual code. Phantom classes annotated `⚠ proposed`. Harmony targets corrected (F46). Last Updated: 2026-08-24.*

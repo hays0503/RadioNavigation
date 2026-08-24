@@ -12,7 +12,7 @@
 > - **F77-F199:** 122 дополнительных smells (NaN, truncation, dead code, missing default cases, etc.)
 > - **F200-F207 (новое 2026-08-01):** 8 дополнительных проблем (мёртвый фид позиции, двойная передача паттерна, сдвиг 90° у спиннеров, кросс-талки QF, антимеридиан-среднее, кириллический градус, тики по кадрам, перехват drag). Итого **207 проблем**.
 >
-> Полные описания: `refactoring-plan/F45.md`..`F52.md`, `F65.md`..`F199.md`, `F200.md`..`F207.md`.
+> Полные описания: `refactoring-plan/hypothesis/INDEX.md` (роллап F01–F207; детали в `confirmed\`/`rejected\`).
 
 ## 1. Smell Categories
 
@@ -23,7 +23,7 @@
 | Architecture Smells | 10 | Critical |
 | **Total** | **73** | — |
 
-> **_NOTE_**: Individual F-numbers (F01–F199) map to specific smell instances. Not every F-number is a unique smell — some are duplicates, variants, or quick-fix corrections of the same underlying issue. Smell count (73) ≤ problem count (199) because many F-numbers are trivial one-line fixes or documentation corrections.
+> **_NOTE_**: Individual F-numbers (F01–F199) map to specific smell instances. Not every F-number is a unique smell — some are duplicates, variants, or quick-fix corrections of the same underlying issue. Smell count (73) ≤ problem count (207) because many F-numbers are trivial one-line fixes or documentation corrections.
 
 ## 2. Critical Architecture Smells
 
@@ -350,4 +350,4 @@ DebugAngleHandler.cs              1       ██         Low
 
 *Document Version: 2.0*  
 *Last Updated: 2026-08-01*  
-*Updated: Smell catalog expanded from 28 to 73 (F65–F199). Added NaN/guard, dead code, event leak categories. Smell heatmap and metrics updated for 199 problems. See `refactoring-plan/INDEX.md` for full F-number mapping.*
+*Updated: Smell catalog expanded from 28 to 73 (F65–F199). Added NaN/guard, dead code, event leak categories. Smell heatmap and metrics updated for 207 problems. See `refactoring-plan/hypothesis/INDEX.md` for full F-number mapping. Last Updated: 2026-08-24.*

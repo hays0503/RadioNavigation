@@ -6,16 +6,16 @@
 
 ## Current State Assessment
 
-| Metric | Current (SAD v2.0) | Actual (2026-08-01) |
+| Metric | Current (SAD v2.0) | Actual (2026-08-24) |
 |--------|--------------------|---------------------|
 | Overall Rating | 4/10 | 4/10 |
-| God Classes (>300 lines) | 2 | 2 |
-| Unit Test Coverage | 0% | 0% |
-| Magic Numbers | ~40 | ~40 |
-| Code Duplication Groups | 7 | 7+ |
-| Thread Safety Issues | Widespread | 0 sync primitives |
+| God Classes (>300 lines) | 2 | 6+ (SonneController, IPH, ChronometerOverlayHandler, LighthouseBeamGlow, LighthousePlacer, LighthouseMapMarker — см. `refactoring-plan/PLAN_Phase5.md`) |
+| Unit Test Coverage | 0% | **263 PASS** (xunit, baseline ADR-014; математика/DSP покрыты, UI — нет) |
+| Magic Numbers | ~40 | частично вынесены в `Constants.cs` (F28) |
+| Code Duplication Groups | 7 | сокращены (GeoMath/Constants, F12/F73) |
+| Thread Safety Issues | Widespread | смягчено (volatile-флаги, main-thread keyer); остаток — Phase 5 |
 | Static Singletons | 3 | 3 |
-| Documented Problems | — | **199** (F01–F199) |
+| Documented Problems | — | **207** (F01–F207), статусы в `hypothesis/INDEX.md`, закрытие в `RESOLVED_LEDGER.md` |
 | Total Refactoring Effort | — | ~95–130 hours |
 
 ## Key Findings
@@ -29,15 +29,16 @@
 
 ### Critical Issues
 
-1. **Thread Safety (P0)**: Audio thread (`OnAudioFilterRead`) and main thread (`Update()`) share mutable `StationState[]` without synchronization — potential crashes and audio artifacts
+1. **Thread Safety (P0)**: Audio thread (`OnAudioFilterRead`) and main thread (`Update()`) share mutable `StationState[]` without synchronization — potential crashes and audio artifacts. *Статус 2026-08-24: смягчено — volatile-флаги, keyer переведён на main thread (F189-redesign); остаток в Phase 5.*
 
 2. **God Classes (P0)**:
-   - `SonneController` (508 lines, ~29 methods, ~20 fields) — mixes navigation, audio, UI, and decoding
-   - `InformationPanelHandler` (474 lines) — mixes UI creation, station finding, and diagnostics
+   - `SonneController` (~724 lines) — mixes navigation, audio, UI, and decoding
+   - `InformationPanelHandler` (~502 lines) — mixes UI creation, station finding, and diagnostics
+   - *Новое поколение (PLAN_Phase5):* `LighthouseBeamGlow` 1369, `ChronometerOverlayHandler` 572, `LighthousePlacer` 541, `LighthouseMapMarker` 458
 
-   3. **Reflection Fragility (P0)**: `RadioStoryIntegration` (381 lines) uses 9 reflection members that will break on game updates (F23, F68)
+3. **Reflection Fragility (P0)**: `RadioStoryIntegration` used 9 reflection members that broke on game updates (F23, F68; цепочка G1–G4). ***FIXED 2026-08-23*** — заменён фасадом + `StoryDecisionGateway.cs` (commit 28f4a62).
 
-4. **Debug.Log in Audio Thread (P0)**: Non-thread-safe Unity logging in `AudioSynthesisEngine.ProcessAudio()`
+4. **Debug.Log in Audio Thread (P0)**: Non-thread-safe Unity logging in `AudioSynthesisEngine.ProcessAudio()`. *FIXED — логи удалены/обёрнуты в `#if DEBUG`.*
 
 ### SAD Documentation Status
 
@@ -46,7 +47,7 @@
 - Harmony patch targets corrected: `Game.OnLoaded` → `RadioStory.ContinueStory` + 4 others (F46, исправлено)
 - 14+ non-existent classes annotated `⚠ proposed` (F47, исправлено)
 - File counts, LOC, array sizes, method signatures corrected (F48-F52, исправлено)
-- Added F65–F199 (всего **199 проблем**) across all layers: documentation, data, localization, UI, sound, logic
+- Added F65–F199 (аудит завершён на **207 проблемах**, F01–F207) across all layers: documentation, data, localization, UI, sound, logic
 
 ## Recommended Approach
 
@@ -82,7 +83,7 @@
 
 ## Investment Summary
 
-- **Total Effort**: ~95–130 hours (12 phases, 199 tasks)
+- **Total Effort**: ~95–130 hours (12 phases, 207 tasks)
 - **Risk Level**: Medium-High (audio thread changes require careful testing)
 - **Expected ROI**: 3-4x faster feature development post-refactoring
 - **SAD Overhaul**: ~8 hours (completed — this update)
@@ -96,10 +97,10 @@
 | Phase 2 | Safety & correctness | 15-25h | F01, F13, F29: Thread safety |
 | Phase 3 | Architecture blockers | 12-18h | F05, F23: Static state, reflection |
 | Phase 4 | God-object decomposition | 12-20h | F02, F03: Class extraction |
-| Phase 5 | API design & polish | 10-15h | F65-F199: Dead code, clamping, consistency |
+| Phase 5 | API design & polish | 10-15h | F65-F207: Dead code, clamping, consistency |
 
 ---
 
-*Document Version: 2.0*  
-*Last Updated: 2026-08-01*  
-*Note: This document was updated to reflect actual code analysis. Fixed F45-F52 inaccuracies. All phantom classes annotated `⚠ proposed`. Updated for 199 problems (F01–F199). See `refactoring-plan/INDEX.md` for full task breakdown.*
+*Document Version: 2.1*  
+*Last Updated: 2026-08-24*  
+*Note: Updated for 207 problems (F01–F207). Статусы каждой гипотезы — `refactoring-plan/hypothesis/INDEX.md`; закрытие с доказательствами — `refactoring-plan/RESOLVED_LEDGER.md`.*
