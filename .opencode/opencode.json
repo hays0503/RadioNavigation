@@ -2,5 +2,11 @@
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
     ".opencode/plugins/graphify.js"
-  ]
+  ],
+  "references": {
+    "uboat-kb": {
+      "path": "C:\\Users\\Sergey Pimenov\\AppData\\LocalLow\\Deep Water Studio\\UBOAT\\Mods\\RadioNavigation\\knowledge",
+      "description": "Compiled UBOAT game/modding knowledge base: patch-surface inventory (all virtual methods), event inventory, reflection contracts, locale keys, class dossiers (Sandbox/Story/PlayerShip/Characters/DI), integration playbooks (map markers, save persistence, story decisions, camera-mode UI, weather/time events). Read README.md first for the index."
+    }
+  }
 }

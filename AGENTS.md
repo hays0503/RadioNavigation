@@ -10,6 +10,30 @@ Rules:
 - graphify-out/wiki/index.md exists в†’ use it for broad navigation, not raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain insufficient.
 - After code changes, run `graphify update .` (AST-only, no API cost).
+- MCP server gotcha (2026-08-24): server default project path resolves to sibling `testui` mod dir — always pass explicit `project_path` = this project root to query/stats/god-nodes tools.
+- **Game-source graph** (2026-08-24): second graph at `C:\code\projects\uboat\graphify-out\` (32140 nodes / 78914 edges / 814 communities, full inference). For game-code questions pass `project_path = C:\code\projects\uboat`. Game digests (Stories/Mods/DI/Time+Weather/Map/Camera/AI/Characters/Sandbox/Serialization/DWS infra) — in supermemory.
+- **Cross-repo graph** (2026-08-24): merged mod+game graph at `C:\code\projects\cross-graph\graphify-out\` (36360 nodes / 84570 edges) — use `project_path = C:\code\projects\cross-graph` for questions spanning both codebases (mod↔game patch-target links). Rebuild after either source graph changes: `graphify merge-graphs <mod graph.json> <game graph.json> --out C:\code\projects\cross-graph\graphify-out\graph.json`.
+
+## supermemory
+
+Persistent memory (MCP tool `supermemory`), project scope tagged radio-navigation. Server: WSL `supermemory-server` at http://localhost:6767 (start script `C:\Users\SERGEY~1\AppData\Local\Temp\opencode\sm\smstart3.sh`, needs OPENAI_MODEL=ox-alpha-free). Plugin: `opencode-supermemory` (global opencode.jsonc), config `~/.config/opencode/supermemory.json`.
+
+Rules:
+- Auto-capture ON: `captureEveryNTurns: 5` — conversation batches saved automatically every 5 turns; verify via `[capture]` entries in `~/.opencode-supermemory.log`.
+- As of 2026-08-24 memory holds ~58 architecture-type records: SAD digests, all ADRs (001-029), subsystem internals (bearing math, DSP chain, astro math, lighthouse, chronometer, radio stories, morse timing, zones), data files (Leuchtfeuer.json registry, Sonne tables), build/test/UI infrastructure, tooling gotchas. Search before re-deriving facts.
+- Manual adds for verified findings: `supermemory(mode:"add", scope:"project", type:"architecture")`; user preferences go to scope:"user".
+- Recall directive auto-injected per message; fold recalled facts into answers instead of re-reading files.
+
+## knowledge/
+
+Compiled game/modding knowledge base (built 2026-08-24 during free-token window):
+- `knowledge/inventory/patch-surface.md` — все virtual-методы игрового кода (2562 файла, цели Harmony)
+- `knowledge/inventory/events.md` — все события игры (наблюдение без патчей)
+- `knowledge/inventory/reflection-contracts.md` — рефлексия мода vs декларации игры
+- `knowledge/catalogs/locale-keys.md` — 236 кандидатов locale-ключей
+- `knowledge/classes/` — досье: Sandbox, Story, PlayerShip, Characters, DI+Resources
+- `knowledge/playbooks/` — рецепты: маркеры карты, сейв-персистентность, решения RadioStory, гейтинг UI по камере, погода/время через события
+Подключено как opencode reference `uboat-kb` + skill `uboat-game-api`. Проверяй KB до чтения исходников игры.
 
 ## Project identity
 
