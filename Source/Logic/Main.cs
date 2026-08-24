@@ -233,6 +233,8 @@ RadioInstaller.Instantiate(radio, viewport);
                     radio.AddComponent<StationMapOverlay>();
                 if (radio.GetComponent<LighthouseMapMarker>().IsNull())
                     radio.AddComponent<LighthouseMapMarker>();
+                if (radio.GetComponent<StationMapMarker>().IsNull())
+                    radio.AddComponent<StationMapMarker>();
 
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +

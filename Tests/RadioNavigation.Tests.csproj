@@ -24,6 +24,7 @@
     <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />
     <Compile Include="Stubs\UnityEngineTransform.cs" />
     <Compile Include="Stubs\GameStubs.cs" />
+    <Compile Include="Stubs\SceneStubs.cs" />
     <Compile Include="StoryDecisionGatewayTests.cs" />
     <Compile Include="SkipTestException.cs" />
     <Compile Include="GameContractTests.cs" />
@@ -58,6 +59,8 @@
     <Compile Include="LighthouseMarkerSizingTests.cs" />
     <Compile Include="RadioNavDiagnosticsTests.cs" />
     <Compile Include="TransformHelpersTests.cs" />
+    <Compile Include="StationTooltipTextTests.cs" />
+    <Compile Include="NavMarkerGateTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -93,6 +96,8 @@
     <Compile Include="..\Source\Logic\LighthouseMarkerSizing.cs" Link="Source\Logic\LighthouseMarkerSizing.cs" />
     <Compile Include="..\Source\Logic\RadioNavDiagnostics.cs" Link="Source\Logic\RadioNavDiagnostics.cs" />
     <Compile Include="..\Source\Logic\TransformHelpers.cs" Link="Source\Logic\TransformHelpers.cs" />
+    <Compile Include="..\Source\Logic\StationTooltipText.cs" Link="Source\Logic\StationTooltipText.cs" />
+    <Compile Include="..\Source\Logic\NavMarkerGate.cs" Link="Source\Logic\NavMarkerGate.cs" />
   </ItemGroup>
 
 </Project>

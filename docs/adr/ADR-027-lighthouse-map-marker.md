@@ -36,3 +36,8 @@
 ```json
 {"id":"ADR-027","decision":"Собственный world-space маркер маяка под EntityMarkersManager","reason":"Игровой EntityMarkerUI/IconOverride не адресует спрайты мод-бандла","fallback":"Пустой Image при отсутствии спрайта в бандле (лог-предупреждение)"}
 ```
+## Аддендум (2026-08-25): общий базовый класс маркеров
+
+- Скелет маркера (world-space canvas, backdrop/icon/hitbox/tooltip, зум-сайзинг через LighthouseMarkerSizing, гейтинг через новый чистый NavMarkerGate.IsMapOpen) вынесен из LighthouseMapMarker в общий абстрактный `NavMapMarkerBase` (Source/UI/NavMapMarkerBase.cs).
+- LighthouseMapMarker и StationMapMarker — тонкие наследники: контент (entity/станции), тексты тултипов, иконка, maintenance-хуки.
+- Поведение 1:1 (проверено в игре 2026-08-25); тесты 279 PASS (+6 NavMarkerGateTests по стаб-энумам CameraMode/MapDisplayMode из Tests/Stubs/SceneStubs.cs).
