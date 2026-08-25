@@ -452,3 +452,10 @@ L☾ = 218.3165 + 481267.8813·T       (средняя долгота Луны)
   - `src/core/modules/ZoneArray.cpp`, `src/core/modules/Star.hpp` — формат .cat
 - Мод: `Source/Logic/LighthouseBeamGlow.cs` (инжект Weather + ResolveCamera), `Source/Logic/PlayerPositionProvider.cs` (лат/лон), `Source/Data/BeaconData.cs` (конвенция статик-данных)
 - Математика: J. Meeus, «Astronomical Algorithms», 2nd ed. — гл. 7 (JD), 12 (GMST), 21 (прецессия), 22 (нутация), 31 (планеты, кеплеровы), 32 (VSOP87), 47 (Луна ELP2000)
+
+---
+
+## 15. Верификация тумблера созвездий (2026-08-25)
+
+- 11.2 п.6 подтверждён в игре: клавиша Z (перебор F9 -> F10 -> F11 — все заняты игрой: Quick Load / Capture Screenshot / bug report), кнопка CONST ON/OFF на панели радио, DevConsole RadioNavConstellations [on|off]. Состояние в PlayerPrefs RadioNav.ConstellationsEnabled (default ON).
+- Полная таблица хоткеев игры: knowledge/inventory/game-hotkeys.md (дамп 80/83 осей временным InputDumpMod, метод внутри).
