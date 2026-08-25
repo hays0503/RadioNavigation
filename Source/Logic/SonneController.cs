@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -425,7 +426,10 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 if (!positionProviderSuccessLogged)
                 {
-                    Debug.Log("[RadioNav][POSITION] provider returned " + posLat.ToString("F5") + "," + posLon.ToString("F5"));
+                    DateTime utcNow = GameTimeResolver.GetUtcNow();
+                    Debug.Log("[RadioNav][POSITION] provider returned " + posLat.ToString("F5") + "," + posLon.ToString("F5")
+                        + " | " + posLat.ToString("F4") + "," + posLon.ToString("F4")
+                        + " | " + utcNow.ToString("yyyy-MM-dd HH-mm-ss", CultureInfo.InvariantCulture));
                     positionProviderSuccessLogged = true;
                 }
                 if (!positionAvailable
