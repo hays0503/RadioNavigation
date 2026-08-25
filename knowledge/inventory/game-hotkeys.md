@@ -29,6 +29,8 @@ Source: InputDumpMod dump of 80/83 game InputAxis assets (effective bindings —
 | F8 | Quick Save |
 | F9 | Quick Load |
 | F10 | Capture Screenshot |
+| F11 | Bug report dialog (errorReporting, NOT an InputAxis — hardcoded report hotkey) |
+| Z | RadioNavigation mod: constellation lines toggle (free at dump time) |
 | Space | Pause |
 | Tab | Switch Character |
 | Escape | Exit / Stop Interaction / Cancel |
@@ -49,9 +51,9 @@ Source: InputDumpMod dump of 80/83 game InputAxis assets (effective bindings —
 
 ## Verified free
 
-- **F11** — free (chosen for the constellation toggle)
 - F12 — free in game, but reserved by Steam screenshot overlay — avoid
-- Alpha0, I, O, P, T, X, Y, Z — not present in the dump (letters may still collide with unlisted contexts)
+- I, O, P, T, X, Y — not present in the dump, not hardcoded in game source (verify per-context before use)
+- Alpha0 — not present in the dump
 
 ## Method
 
