@@ -30,8 +30,8 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<int> triangles = new List<int>();
         private readonly List<Color> colors = new List<Color>();
 
-        /// <summary>Hotkey for the constellation lines toggle (F7 is taken by the chronometer).</summary>
-        private const KeyCode ToggleKey = KeyCode.F9;
+        /// <summary>Hotkey for the constellation lines toggle. F9 = game Quick Load, F10 = Capture Screenshot — F11 is free (verified by InputDumpMod dump of all 80 game axes).</summary>
+        private const KeyCode ToggleKey = KeyCode.F11;
 
         /// <summary>Current layer state, persisted via ConstellationTogglePrefs. Default ON.</summary>
         public static bool Enabled { get; private set; } = ConstellationTogglePrefs.Load();
