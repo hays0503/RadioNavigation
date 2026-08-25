@@ -32,7 +32,6 @@ namespace UBOAT.Mods.RadioNavigation
         private float playerLongitude;
         private bool positionAvailable;
         private bool positionProviderFailureLogged;
-        private bool positionProviderSuccessLogged;
         private bool bearingDiagnosticsLogged;
         private float lastBearingLogLatitude;
         private float lastBearingLogLongitude;
@@ -57,6 +56,8 @@ namespace UBOAT.Mods.RadioNavigation
         private float tuningUpdateTimer;
         private const float NavUpdateInterval = 0.2f;
         private const float TuningUpdateInterval = 0.016f;
+        private const float PositionLogInterval = 10f;
+        private float positionLogTimer;
 
         private void Awake()
         {
@@ -424,14 +425,16 @@ namespace UBOAT.Mods.RadioNavigation
             float posLat, posLon;
             if (positionProvider.IsNotNull() && positionProvider.TryGetPosition(out posLat, out posLon))
             {
-                if (!positionProviderSuccessLogged)
+                positionLogTimer += Time.deltaTime;
+                if (positionLogTimer >= PositionLogInterval)
                 {
+                    positionLogTimer = 0f;
                     DateTime utcNow = GameTimeResolver.GetUtcNow();
                     Debug.Log("[RadioNav][POSITION] provider returned " + posLat.ToString("F5") + "," + posLon.ToString("F5")
                         + " | " + posLat.ToString("F4") + "," + posLon.ToString("F4")
                         + " | " + utcNow.ToString("yyyy-MM-dd HH-mm-ss", CultureInfo.InvariantCulture));
-                    positionProviderSuccessLogged = true;
                 }
+
                 if (!positionAvailable
                     || Math.Abs(posLat - playerLatitude) > 0.0001f
                     || Math.Abs(posLon - playerLongitude) > 0.0001f)
