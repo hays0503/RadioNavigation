@@ -30,6 +30,32 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<int> triangles = new List<int>();
         private readonly List<Color> colors = new List<Color>();
 
+        /// <summary>Hotkey for the constellation lines toggle (F7 is taken by the chronometer).</summary>
+        private const KeyCode ToggleKey = KeyCode.F9;
+
+        /// <summary>Current layer state, persisted via ConstellationTogglePrefs. Default ON.</summary>
+        public static bool Enabled { get; private set; } = ConstellationTogglePrefs.Load();
+
+        /// <summary>Raised after the layer state flips; carries the new value.</summary>
+        public static event Action<bool> EnabledChanged;
+
+        public static void SetEnabled(bool value)
+        {
+            if (Enabled == value)
+                return;
+
+            Enabled = value;
+            ConstellationTogglePrefs.Save(value);
+            Debug.Log("[RadioNav][ConstellationMesh] constellations " + (value ? "ON" : "OFF"));
+            EnabledChanged?.Invoke(value);
+        }
+
+        private void Update()
+        {
+            if (Input.GetKeyDown(ToggleKey))
+                SetEnabled(!Enabled);
+        }
+
         private void Awake()
         {
             meshFilter = GetComponent<MeshFilter>();
@@ -65,6 +91,14 @@ namespace UBOAT.Mods.RadioNavigation
             Camera cam;
             if (!CameraResolver.TryResolve(out cam))
                 return;
+
+            // User toggle (F9 / console / panel button) gates the whole layer.
+            if (!Enabled)
+            {
+                if (meshRenderer.enabled)
+                    meshRenderer.enabled = false;
+                return;
+            }
 
             // Constellation lines follow the star sky: only outside the boat.
             bool outside = SkyVisibilityResolver.IsPlayerOutside();

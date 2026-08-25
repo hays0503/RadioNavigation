@@ -323,7 +323,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        protected static TMP_FontAsset GetTooltipFont()
+        public static TMP_FontAsset GetTooltipFont()
         {
             if (tooltipFont != null)
                 return tooltipFont;

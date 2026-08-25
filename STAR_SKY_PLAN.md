@@ -432,7 +432,7 @@ L☾ = 218.3165 + 481267.8813·T       (средняя долгота Луны)
 - [x] 3. `Source/Logic/AstroMath.cs` + unit-тесты (§11.1) — JD/GMST/LST, прецессия, нутация, Alt/Az, планеты, Луна
 - [~] 4. Phase 0 лог-патч (§10) → вердикт по Луне — probe `Source/Logic/StarSkyPhase0Probe.cs` готов (PlayerPrefs `RadioNav.Phase0Probe=1`, лог Sun/Moon/farClip/shader/Lerp/pos), живые замеры в игре pending
 - [~] 5. `StarSkyRenderer` + `StarsMesh` — корень, куллинг, fade, меш звёзд, `TryGetAltitude`; нет runtime quaternion epoch turn
-- [~] 6. `ConstellationMesh` — линии и цвет Stellarium реализованы; тумблер хоткей/GUI ещё не добавлен
+- [x] 6. `ConstellationMesh` — линии и цвет Stellarium; тумблер реализован: F9 + кнопка CONST на панели + DevConsole `RadioNavConstellations [on|off]`, состояние в PlayerPrefs `RadioNav.ConstellationsEnabled` (2026-08-25)
 - [~] 7. `PlanetRenderer` — 4 планеты и low-precision Луна; Phase 0/ELP2000 точность не подтверждены
 - [x] 8. Точка входа в `Main.cs`
 - [x] 9. `powershell -File tests.ps1` зелёные; Release/Debug build без ошибок

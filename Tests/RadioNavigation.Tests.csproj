@@ -61,6 +61,7 @@
     <Compile Include="TransformHelpersTests.cs" />
     <Compile Include="StationTooltipTextTests.cs" />
     <Compile Include="NavMarkerGateTests.cs" />
+    <Compile Include="ConstellationTogglePrefsTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -98,6 +99,7 @@
     <Compile Include="..\Source\Logic\TransformHelpers.cs" Link="Source\Logic\TransformHelpers.cs" />
     <Compile Include="..\Source\Logic\StationTooltipText.cs" Link="Source\Logic\StationTooltipText.cs" />
     <Compile Include="..\Source\Logic\NavMarkerGate.cs" Link="Source\Logic\NavMarkerGate.cs" />
+    <Compile Include="..\Source\Logic\ConstellationTogglePrefs.cs" Link="Source\Logic\ConstellationTogglePrefs.cs" />
   </ItemGroup>
 
 </Project>
