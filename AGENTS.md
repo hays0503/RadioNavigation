@@ -34,6 +34,7 @@ Compiled game/modding knowledge base (built 2026-08-24 during free-token window)
 - `knowledge/classes/` — досье: Sandbox, Story, PlayerShip, Characters, DI+Resources
 - `knowledge/playbooks/` — рецепты: маркеры карты, сейв-персистентность, решения RadioStory, гейтинг UI по камере, погода/время через события
 Подключено как opencode reference `uboat-kb` + skill `uboat-game-api`. Проверяй KB до чтения исходников игры.
+- `SEXTANT_PLAN.md` — готовый план секстанта (PIP две камеры, фильтры, ID звезд): исполнять в новой сессии по чеклисту §7, факты §3-4 не перепроверять.
 
 ## Project identity
 
@@ -57,7 +58,7 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 - **Harmony patches** target: `RadioStory.ContinueStory`, `Locale.RetrieveString` (2 overloads), `RadioStory.OnDecisionSelected`, `RadioStory.OnStopped`
 - **DI framework**: UBOAT custom `DWS.Common.InjectionFramework` вЂ” needs Reflection permission in Manifest.json. Mod assembly injected explicitly via `InjectIntoAssembly` (`Mod.cs InitializeAssembly`), not framework `"uboat"` auto-injection (assembly name `radionavigation` doesn't match). `OnSceneAwake` handler injects scene objects.
 - **UI**: Unity uGUI prefabs from AssetBundle (`Bundles/testui`). Hierarchy validated against hardcoded paths at runtime (Main.cs:~200, `requiredChildren[]` из констант `PrefabNames.*`); destroyed+skipped on failure.
-- **Source layout**: `Data/` (static configs вЂ” 14 beacons, 5 radio bands), `Logic/` (core sim вЂ” morse keyer, nav patterns, bearing diagnostics), `Sound/` (DSP audio synthesis via `OnAudioFilterRead`), `UI/` (MonoBehaviour handlers)
+- **Source layout**: `Data/` (static configs вЂ” 5 beacons CAP 59, 5 radio bands), `Logic/` (core sim вЂ” morse keyer, nav patterns, bearing diagnostics), `Sound/` (DSP audio synthesis via `OnAudioFilterRead`), `UI/` (MonoBehaviour handlers)
 
 ## Gotchas
 
