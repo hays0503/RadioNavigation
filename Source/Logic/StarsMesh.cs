@@ -15,7 +15,8 @@ namespace UBOAT.Mods.RadioNavigation
         private const float WorldRadiusM = 3900f;
         private const float MinStarSizePx = 2f;
         private const float MaxStarSizePx = 20f;
-        private const float NavStarMultiplier = 1.6f;
+        private const float NavStarMultiplier = 1.9f;
+        private const float NavStarAlphaMultiplier = 1.5f;
 
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
@@ -138,6 +139,10 @@ namespace UBOAT.Mods.RadioNavigation
 
                 // Color from B-V index
                 Color color = ColorFromBV(star.Bv, star.Vmag);
+
+                // Navigation stars render brighter (alpha boosted, clamped)
+                if (star.IsNav)
+                    color.a = Mathf.Clamp01(color.a * NavStarAlphaMultiplier);
 
                 // Billboard quad (4 vertices, 2 triangles)
                 AddBillboardQuad(worldPos, dir, size, color);
