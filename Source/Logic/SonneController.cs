@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using UBOAT.Game.Sandbox;
 using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
@@ -418,6 +419,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
+            // Campaign sandbox not loaded (menu / early port load): the ship's
+            // SandboxEntity.Position is still the new-game default and GameTime
+            // is uninitialized — polling here would log garbage positions.
+            if (Sandbox.Instance == null)
+                return;
+
             suppressAudioForTimeCompression = IsTimeCompressed(Time.timeScale);
 
             // Poll the position feed; UpdatePosition is invoked on significant
