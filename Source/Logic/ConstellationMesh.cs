@@ -52,7 +52,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
-            if (Input.GetKeyDown(ToggleKey))
+            // SEXTANT_PLAN §7.4: ignore Z while Ctrl is held (Ctrl+Z = sextant)
+            // and while the sextant overlay is open (stars must not vanish mid-shot).
+            if (Input.GetKeyDown(ToggleKey)
+                && !Input.GetKey(KeyCode.LeftControl)
+                && !Input.GetKey(KeyCode.RightControl)
+                && !SextantController.IsOpen)
                 SetEnabled(!Enabled);
         }
 

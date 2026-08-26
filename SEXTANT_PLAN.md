@@ -1,6 +1,9 @@
 # SEXTANT_PLAN — Секстант для RadioNavigation (PIP-две камеры, всё программно)
 
-> Версия: 1.0 (2026-08-25). Статус: план готов к исполнению в новой сессии.
+> Версия: 1.1 (2026-08-26). Статус: план готов к исполнению в новой сессии.
+> 1.1 (2026-08-26): + §13 разметка/разрешения; §3.2 veil/RT 1024/квадратный
+> aspect; §7.4 Z-блок при открытом секстанте; §7.8 гейт камеры + layout;
+> §9 глифы; §10 пп.7–9; §12 оценка 70–100 мин. Согласовано с автором.
 > Цель документа: реализовать в новой сессии без повторного исследования.
 > Спецификация согласована с автором (2026-08-25, см. §2 — все решения зафиксированы).
 
@@ -74,11 +77,21 @@
   `cam.transform.position + dir·3900`, см. StarsMesh.cs:134) — вторая камера
   **в той же точке** видит их автоматически. Skybox в PIP = игровое небо
   (аутентично), звёзды аддитивные поверх.
-- RT: `new RenderTexture(512, 512, 24)`; `pipCamera.targetTexture = rt`;
-  включать только при открытом секстанте (экономия).
-- Оверлей: screen-space overlay Canvas (sortingOrder ~100), тёмный Image,
-  PIP `RawImage` (texture = RT) с радиальной альфа-маской (процедурная
-  текстура — паттерн `NavMapMarkerBase.GetBackdropSprite()`).
+- RT: `new RenderTexture(1024, 1024, 24)` статически (512 мылится на
+  1440p/4K: апскейл до 800–1200 px; 1024² = 4 MB VRAM, одна камера —
+  дёшево, без логики пересоздания при ресайзе); `pipCamera.targetTexture
+  = rt`; включать только при открытом секстанте (экономия).
+  **Aspect PIP не наследовать от основной камеры — квадрат**: vertical
+  FOV = main/3 даёт равномерный ×3 по обеим осям на любом аспекте
+  дисплея (16:9/21:9/4:3); наследование aspect даст эллипс-сжатие.
+- Оверлей: свой screen-space overlay Canvas, sortingOrder **1000**
+  (точки маяка LighthouseBeamGlow уже 500), **GraphicRaycaster включён**
+  (модальность: поглощать клики), CanvasScaler ScaleWithScreenSize
+  ref 1920×1080 matchWidthOrHeight=1 (детали — §13). Тёмный veil —
+  сплошной Image α0.85 БЕЗ дырки; PIP `RawImage` (texture = RT) с мягким
+  радиальным краем (паттерн `NavMapMarkerBase.GetBackdropSprite()` —
+  градиентное кольцо поверх края PIP, не маска с вырезом: растянутая
+  маска станет эллипсом на не-16:9).
 - Шрифт: `NavMapMarkerBase.GetTooltipFont()` — **public static** (открыт
   2026-08-25 для переиспользования).
 - Полноэкранный режим устройства НЕ нужен: оверлей поверх геймплея
@@ -208,7 +221,10 @@ holdTimer ≥ 5 с → identified: имя (NavStarNames.TryGetName(hip))
 - [ ] 7.3 csproj тестов: + SextantArcTests, + Link SextantArc.cs.
 - [ ] 7.4 `Source/Logic/ConstellationMesh.cs`: в Update условие
        `Input.GetKeyDown(ToggleKey) && !Input.GetKey(KeyCode.LeftControl)
-       && !Input.GetKey(KeyCode.RightControl)`.
+       && !Input.GetKey(KeyCode.RightControl) && !SextantController.IsOpen`
+       (зеркальная защита: Z при открытом секстанте не тумблит созвездия —
+       звёзды не исчезают посреди замера; `IsOpen` — static-свойство
+       контроллера, появится в 7.8).
 - [ ] 7.5 `Source/Logic/SextantGlare.cs` (чистый): Glare(angleDeg,
        sunAltitudeDeg, filters) по §6.2; константы σ-делитель, transmission.
 - [ ] 7.6 `Tests/SextantGlareTests.cs` (+5): гауссиан пик/спад, transmission
@@ -218,17 +234,21 @@ holdTimer ≥ 5 с → identified: имя (NavStarNames.TryGetName(hip))
        имён из списка STAR_SKY_PLAN §3.7 → эмиссит
        `static readonly Dictionary<int, string> Names` + `TryGetName(int hip,
        out string name)`. Формат name.fab сверить по первой строке.
-- [ ] 7.8 `Source/UI/SextantController.cs` (ядро, ~330 строк):
+- [ ] 7.8 `Source/UI/SextantController.cs` (ядро, ~370 строк):
        - поля: open, arcAngle, filterCount, holdTimer, identifiedHip,
-         pipCamera, rt, overlay-ссылки, [Inject] GameInput/Weather.
-       - Ctrl+Z toggle (Update); открытие: blockade, билд оверлея+PIP,
-         filterCount = 0, arcAngle = 0.
+         pipCamera, rt, overlay-ссылки, [Inject] GameInput/Weather;
+         `public static bool IsOpen { get; private set; }` (гейт Z в 7.4).
+       - Ctrl+Z toggle (Update); гейт камеры (§13.4): невалидный вид →
+         тихий игнор + один Debug.Log `[RadioNav]` на нажатие; открытие:
+         blockade, билд оверлея+PIP, filterCount = 0, arcAngle = 0.
        - PIP: GO "RadioNavSextantCamera", Camera (cullingMask/depth копия
          main, clearFlags Skybox, targetTexture RT 512², FOV = main/3),
          позиция/ yaw = main каждый кадр, pitch = arcAngle.
-       - Оверлей: Canvas overlay sortingOrder 100 → тёмный Image →
-         круглый RawImage(RT) c маской → горизонтальная линия-тик →
-         тексты (угол + строка имени/боли).
+       - Оверлей: Canvas overlay sortingOrder 1000 + GraphicRaycaster +
+         CanvasScaler(1920×1080, match=1) → сплошной veil α0.85 →
+         круглый RawImage(RT) 600² с мягким краем → glare-ребёнок →
+         линия-тик (ровно диаметр) → колонка текста слева от круга →
+         hint снизу (состав и якоря — §13.3).
        - Стрелки: rate 2°/с (Shift 10°/с), SextantArc.Clamp+Quantize,
          текст = SextantArc.Format.
        - ID звезды: §6.3, имя из NavStarNames; солнце: угол до SunDirection
@@ -239,7 +259,8 @@ holdTimer ≥ 5 с → identified: имя (NavStarNames.TryGetName(hip))
        - OnDestroy: RemoveBlockade + Destroy(RT/cameras/materials).
 - [ ] 7.9 `Source/Logic/Main.cs`: AddComponent<SextantController>() после
        ConstellationToggleButton.
-- [ ] 7.10 Сборка Release+Debug → 0 ошибок; tests.ps1 → 289 PASS.
+- [ ] 7.10 Сборка Release+Debug → 0 ошибок; tests.ps1 → 295 PASS
+       (283 база + 7 arc + 5 glare; факт 2026-08-26).
 - [ ] 7.11 In-game чеклист (§10).
 - [ ] 7.12 Документация: STAR_SKY_PLAN §15 аддендум + supermemory
        (архитектура секстанта) + коммит.
@@ -267,6 +288,7 @@ SextantGlareTests: пик в 0° = sunIntensity; спад 2σ → <10%; филь
 | Звёзды в PIP не видны днём | Так и задумано (день = солнце через фильтры) |
 | 5046 звёзд ID тормозит | Считать раз в 0.2 с, не каждый кадр |
 | name.fab отсутствует | Fallback: имя = "HIP " + hip (ID работает, без имени) |
+| Глифов «·»/«↑↓» нет в GetTooltipFont() | Primary hint уже без стрелок («Стрелки: угол · ...»); если «·» рисуется квадратом — заменить на запятые |
 
 ---
 
@@ -278,6 +300,12 @@ SextantGlareTests: пик в 0° = sunIntensity; спад 2σ → <10%; филь
 4. День: навести на солнце без фильтров → белое пятно + «НЕ МОГУ, ГЛАЗАМ БОЛЬНО — УСТАНОВИТЕ ФИЛЬТР»; фильтры 1→2→3 — пятно гаснет, «Солнце» + замер.
 5. Ctrl+Z закрытие — блокада снята (стрелки снова зумят игру), созвездия по Z работают (Ctrl+Z не тумблит их).
 6. Перезапуск игры — пересборка, секстант на месте.
+7. Раскладка на 1024×768 и ultrawide: круг круглый, тексты не обрезаны,
+   hint читаем (§13).
+8. Ctrl+Z на тактической карте/перископе — молча ничего; в логе один
+   `[RadioNav]`.
+9. Под секстантом HUD/радистка недоступны (veil + raycaster) — так
+   задумано.
 
 ---
 
@@ -297,5 +325,60 @@ SextantGlareTests: пик в 0° = sunIntensity; спад 2σ → <10%; филь
 
 ## 12. Оценка
 
-Исполнение: 60–90 мин (генератор имён ~15 мин, ядро ~40 мин, тесты ~10 мин,
-проводка/доки ~10 мин). In-game верификация — на авторе (ночь + день).
+Исполнение: 70–100 мин (генератор имён ~15 мин, ядро ~45 мин, layout/§13
+~10 мин, тесты ~10 мин, проводка/доки ~10 мин). In-game верификация —
+на авторе (ночь + день).
+
+---
+
+## 13. Разметка и разрешения (добавлено 2026-08-26, согласовано с автором)
+
+### 13.1 Канвас
+- Свой ScreenSpaceOverlay Canvas: sortingOrder **1000** (точки маяка
+  LighthouseBeamGlow уже занимают 500), **GraphicRaycaster включён**
+  (модальность — поглощать клики, иначе они уйдут в UI игры под
+  оверлеем).
+- CanvasScaler: ScaleWithScreenSize, reference **1920×1080**,
+  matchWidthOrHeight = **1.0** (match height). Вертикальные пропорции
+  постоянны на любом разрешении; квадратный rect остаётся кругом.
+- Игровой «масштаб интерфейса» игнорируется — сознательно
+  (полноэкранный прибор, не HUD; согласуется с §2.6).
+
+### 13.2 Инварианты вертикали (любое разрешение)
+
+| Зона | 1080-единицы |
+|---|---|
+| Окуляр PIP (центр) | 600×600 (константа `OcularSizeUnits = 600`) |
+| Тёмные полосы над/под кругом | по 240 — всегда |
+| Боковые живые зоны 16:9 | по 660 |
+| Боковые зоны 4:3 (минимум игры) | по 420 |
+| 21:9 / 32:9 | ещё шире — не проблема |
+
+- Минимум поддержки: **1024×768** (худший случай: колонка текста
+  помещается в свободные 420 ед.). Ниже 900 px высоты hint не читаем —
+  не тюним.
+- Match=1 делает боковые зоны ≥ 420 ед. на любом аспекте — всё
+  содержимое влезает всегда.
+
+### 13.3 Элементы (anchor / размер в 1080-единицах)
+
+| Элемент | Anchor | Размер/позиция |
+|---|---|---|
+| Veil | stretch full | сплошной чёрный α0.85 (константа `VeilAlpha`), БЕЗ дырки |
+| PIP RawImage (RT) | center | 600×600, мягкий радиальный край (градиентное кольцо поверх края) |
+| Glare-вспышка | child PIP | тот же rect, белый радиальный материал, α = glare·0.9 |
+| Линия-тик | center | ровно 600×3 (без вылезания за край круга) |
+| Колонка чтения | слева от круга, pivot(1,0.5) | угол f44 → имя f32 → «боль» f32 → «ФИЛЬТР n» f28; maxWidth 320 + ellipsis |
+| Подсказка | bottom-center, y=60 | f26, серый: `Стрелки: угол · Shift: быстрее · 1–3: фильтры · Ctrl+Z: выход`, постоянная |
+
+- Колонка привязана к краю круга (не к экрану): на ultrawide текст
+  жмётся к прибору, на 4:3 помещается в свободные 420 ед.
+- Мягкий край PIP — градиентное кольцо поверх края PIP-квадрата, не
+  маска с вырезом (растянутая маска = эллипс на не-16:9).
+
+### 13.4 Гейт камеры при открытии
+- Открытие только из живого вида (мостик) — playbook
+  `knowledge/playbooks/gate-ui-by-camera-mode.md`. PIP снимает main
+  camera: поверх тактической карты/перископа замер бессмыслен.
+- Невалидный вид → **тихий игнор Ctrl+Z** (без сообщения игроку);
+  один `Debug.Log("[RadioNav] ...")` на нажатие — для отладки.

@@ -459,3 +459,18 @@ L☾ = 218.3165 + 481267.8813·T       (средняя долгота Луны)
 
 - 11.2 п.6 подтверждён в игре: клавиша Z (перебор F9 -> F10 -> F11 — все заняты игрой: Quick Load / Capture Screenshot / bug report), кнопка CONST ON/OFF на панели радио, DevConsole RadioNavConstellations [on|off]. Состояние в PlayerPrefs RadioNav.ConstellationsEnabled (default ON).
 - Полная таблица хоткеев игры: knowledge/inventory/game-hotkeys.md (дамп 80/83 осей временным InputDumpMod, метод внутри).
+
+---
+
+## 16. Аддендум: секстант (2026-08-26, SEXTANT_PLAN v1.1 исполнен)
+
+- Реализация: `Source/UI/SextantController.cs` (ядро), `Source/Logic/SextantArc.cs` +
+  `SextantGlare.cs` (чистая математика, 12 офлайн-тестов), `Data/NavStarNames.cs`
+  (57 имён; генератор `Tools/gen-navstar-names.ps1`).
+- **Факт-поправка к §3.7**: `stars/hip_gaia3/name.fab` содержит только байеровские
+  обозначения. Собственные имена — `skycultures/common_star_names.fab`, формат
+  `HIP|_("Name") вес`; «Al Na'ir» в файле = «Alnair». Генератор учитывает.
+- Тесты: 295 PASS (283 база + 7 arc + 5 glare); квантование — round-half-down
+  на точных полушагах (§8 SEXTANT_PLAN пиннит 0.005° → 1/300°).
+- Разметка/разрешения: SEXTANT_PLAN §13 (канвас sortingOrder 1000,
+  CanvasScaler match=1, окуляр 600², veil без дырки, гейт камеры SectionView/FPP).

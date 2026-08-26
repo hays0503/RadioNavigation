@@ -237,6 +237,8 @@ RadioInstaller.Instantiate(radio, viewport);
                     radio.AddComponent<StationMapMarker>();
                 if (radio.GetComponent<ConstellationToggleButton>().IsNull())
                     radio.AddComponent<ConstellationToggleButton>();
+                if (radio.GetComponent<SextantController>().IsNull())
+                    radio.AddComponent<SextantController>(); // SEXTANT_PLAN §7.9
 
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +
