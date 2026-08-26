@@ -322,7 +322,10 @@ namespace UBOAT.Mods.RadioNavigation
             // The game's render pipeline renders water only for cameras
             // registered on the main camera's AdditionalCameraData
             // (periscope pattern, Periscope.cs:581).
-            go.AddComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+            UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd =
+                go.AddComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+            pipAdd.RenderScene = true;
+            SetupRenderPasses(pipAdd, pipCamera.cullingMask);
 
             // Post stack v2 (game's custom fork): without it the HDR sky/sea
             // clip to pure white (in-game finding 2026-08-26). The fork hides
@@ -871,6 +874,41 @@ namespace UBOAT.Mods.RadioNavigation
             }
             ringTexture.Apply();
             return Sprite.Create(ringTexture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        /// <summary>
+        /// The game's SRP renders a camera through the passes configured on
+        /// its AdditionalCameraData; a freshly added component has none, so
+        /// the RT stays blank (in-game finding 2026-08-26). Build a single
+        /// enabled pass with the camera's culling mask, mirroring the
+        /// periscope prefab layout.
+        /// </summary>
+        private static void SetupRenderPasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData data, int cullingMask)
+        {
+            Type type = data.GetType();
+            Type passType = type.GetNestedType("CameraPass",
+                BindingFlags.Public | BindingFlags.NonPublic);
+            if (passType == null)
+            {
+                Debug.LogWarning(LogPrefix + " CameraPass type not found - PIP may stay blank");
+                return;
+            }
+
+            try
+            {
+                object pass = Activator.CreateInstance(passType);
+                passType.GetProperty("CullingMask").SetValue(pass, cullingMask);
+                passType.GetProperty("Enabled").SetValue(pass, true);
+                passType.GetProperty("ScreenSpaceReflections").SetValue(pass, false);
+                Array passes = Array.CreateInstance(passType, 1);
+                passes.SetValue(pass, 0);
+                type.GetProperty("Passes").SetValue(data, passes);
+                Debug.Log(LogPrefix + " PIP render pass configured, mask=" + cullingMask);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning(LogPrefix + " render pass setup failed: " + e.Message);
+            }
         }
 
         /// <summary>Hard circle sprite for the ocular Mask (smooth AA at the rim).</summary>
