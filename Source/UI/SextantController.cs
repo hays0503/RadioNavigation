@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Globalization;
+using System.Reflection;
 using DWS.Common.InjectionFramework;
 using TMPro;
 using UBOAT.Game.Core.Input;
-using UBOAT.Game.Scene;
 using UBOAT.Game.Scene.Camera;
 using UBOAT.Game.Scene.Environment;
 using UnityEngine;
@@ -40,6 +41,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const float PainOnGlare = 0.6f;
         private const float PainOffGlare = 0.5f;
         private const int RtSize = 1024;
+        private const float SunDriftLogIntervalSeconds = 10f;
         private const string SunName = "\u0421\u043E\u043B\u043D\u0446\u0435";
         private const string PainMessage =
             "\u041D\u0415 \u041C\u041E\u0413\u0423, \u0413\u041B\u0410\u0417\u0410\u041C \u0411\u041E\u041B\u042C\u041D\u041E \u2014 " +
@@ -59,14 +61,21 @@ namespace UBOAT.Mods.RadioNavigation
         private string identifiedName = "";
         private bool pain;
         private double lastFormattedArc = double.MinValue;
-        private bool sunDirSignResolved;
-        private float sunDirSign = 1f;
-        private bool skyWarned;
+        private float sunDriftLogTimer;
 
         private Camera viewCamera;
         private MainCamera gameMainCamera;
         private GameInput gameInput;
+
+        // Game sun access for SUNDRIFT diagnostics only (SEXTANT_PLAN v1.3):
+        // TOD_Sky is not referenceable by the in-game mod compiler, so the
+        // game values are read via cached reflection and never named.
         private Weather weather;
+        private PropertyInfo gameSkyProperty;
+        private MemberInfo gameSunDirMember;
+        private MemberInfo gameSunAltMember;
+        private bool gameSunMembersResolved;
+        private bool gameSunUnavailableWarned;
 
         private RenderTexture rt;
         private Camera pipCamera;
@@ -95,7 +104,7 @@ namespace UBOAT.Mods.RadioNavigation
                 HandleArcInput(Time.unscaledDeltaTime);
                 HandleFilterKeys();
                 UpdatePipPose();
-                UpdateGlare();
+                UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
             }
@@ -154,7 +163,7 @@ namespace UBOAT.Mods.RadioNavigation
             identifiedName = "";
             pain = false;
             lastFormattedArc = double.MinValue;
-            sunDirSignResolved = false;
+            sunDriftLogTimer = 0f; // force the first SUNDRIFT line on open
 
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
@@ -272,20 +281,18 @@ namespace UBOAT.Mods.RadioNavigation
 
         // ---- glare -----------------------------------------------------------
 
-        private void UpdateGlare()
+        private void UpdateGlare(float dt)
         {
             float g = 0f;
-            TOD_Sky sky = ResolveSky();
-            if (sky != null && pipCamera != null)
+            Vector3 sunDir;
+            float sunAlt;
+            if (pipCamera != null && TryGetOwnSun(out sunDir, out sunAlt))
             {
-                Vector3 sunDir = sky.SunDirection;
-                float alt = sky.SunAltitude;
-                ResolveSunSign(sunDir, alt);
-                sunDir *= sunDirSign;
                 float angle = Vector3.Angle(pipCamera.transform.forward, sunDir);
-                g = (float)SextantGlare.Glare(angle, alt, filterCount, pipCamera.fieldOfView);
+                g = (float)SextantGlare.Glare(angle, sunAlt, filterCount, pipCamera.fieldOfView);
             }
             ApplyGlare(g);
+            LogSunDrift(dt);
         }
 
         private void ApplyGlare(float g)
@@ -310,27 +317,132 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private TOD_Sky ResolveSky()
+        /// <summary>
+        /// Own Meeus ephemeris: sun RA/Dec → the same ENU→world mapping the
+        /// star sky uses, so axis conventions are already game-proven.
+        /// Needs a valid sandbox position (lat/lon), like star identification.
+        /// </summary>
+        private bool TryGetOwnSun(out Vector3 dirWorld, out float altDeg)
         {
+            dirWorld = Vector3.zero;
+            altDeg = 0f;
+
+            float lat, lon;
+            if (!positionProvider.TryGetPosition(out lat, out lon))
+                return false;
+
+            DateTime utc = GameTimeResolver.GetUtcNow();
+            double jd = AstroMath.ToJulianDay(utc);
+            double lstDeg = AstroMath.LstDeg(jd, lon);
+
+            double raRad, decRad;
+            AstroMath.SunRaDec(jd, out raRad, out decRad);
+            double altRad, azRad, e, n, u;
+            AstroMath.RaDecToEnu(raRad, decRad, lstDeg, lat, out altRad, out azRad, out e, out n, out u);
+
+            double len = Math.Sqrt(e * e + n * n + u * u);
+            if (len < 1e-9)
+                return false;
+
+            dirWorld = new Vector3((float)(e / len), (float)(u / len), (float)(n / len));
+            altDeg = (float)(altRad * Mathf.Rad2Deg);
+            return true;
+        }
+
+        /// <summary>
+        /// SUNDRIFT telemetry (SEXTANT_PLAN v1.3): every 10 s while the sextant
+        /// is open, log the angular separation between our Meeus sun vector and
+        /// the game's TOD_Sky sun vector (read via cached reflection). A steady
+        /// sep above ~0.5° means an ephemeris or axis-convention drift.
+        /// </summary>
+        private void LogSunDrift(float dt)
+        {
+            sunDriftLogTimer -= dt;
+            if (sunDriftLogTimer > 0f)
+                return;
+            sunDriftLogTimer = SunDriftLogIntervalSeconds;
+
+            Vector3 ownDir;
+            float ownAlt;
+            if (!TryGetOwnSun(out ownDir, out ownAlt))
+                return; // no sandbox position - nothing to compare against
+
+            Vector3 gameDir;
+            float gameAlt;
+            if (!TryGetGameSun(out gameDir, out gameAlt))
+            {
+                if (!gameSunUnavailableWarned)
+                {
+                    gameSunUnavailableWarned = true;
+                    Debug.LogWarning(LogPrefix + " SUNDRIFT game sun unavailable via reflection - drift unmonitored");
+                }
+                return;
+            }
+
+            float sepDeg = Vector3.Angle(ownDir, gameDir);
+            float dAlt = ownAlt - gameAlt;
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} SUNDRIFT sep={1:F3} dalt={2:F3} meeus(alt={3:F2}) game(alt={4:F2})",
+                LogPrefix, sepDeg, dAlt, ownAlt, gameAlt));
+        }
+
+        private bool TryGetGameSun(out Vector3 dir, out float alt)
+        {
+            dir = Vector3.zero;
+            alt = 0f;
             if (weather == null && InjectionFramework.Instance.IsNotNull())
                 weather = InjectionFramework.Instance.GetInstance<Weather>();
             if (weather == null)
+                return false;
+
+            try
             {
-                WarnSkyOnce();
-                return null;
+                if (gameSkyProperty == null)
+                    gameSkyProperty = weather.GetType().GetProperty("Sky");
+                if (gameSkyProperty == null)
+                    return false;
+
+                object sky = gameSkyProperty.GetValue(weather, null);
+                if (sky == null)
+                    return false;
+
+                if (!gameSunMembersResolved)
+                {
+                    gameSunMembersResolved = true;
+                    gameSunDirMember = FindSunMember(sky.GetType(), "SunDirection");
+                    gameSunAltMember = FindSunMember(sky.GetType(), "SunAltitude");
+                }
+                if (gameSunDirMember == null || gameSunAltMember == null)
+                    return false;
+
+                object dirBoxed = ReadMember(sky, gameSunDirMember);
+                if (!(dirBoxed is Vector3))
+                    return false;
+                dir = (Vector3)dirBoxed;
+                alt = Convert.ToSingle(ReadMember(sky, gameSunAltMember));
+                return true;
             }
-            TOD_Sky sky = weather.Sky;
-            if (sky == null)
-                WarnSkyOnce();
-            return sky;
+            catch (Exception e)
+            {
+                Debug.LogWarning(LogPrefix + " SUNDRIFT reflection failed: " + e.Message);
+                return false;
+            }
         }
 
-        private void WarnSkyOnce()
+        private static MemberInfo FindSunMember(Type type, string name)
         {
-            if (skyWarned)
-                return;
-            skyWarned = true;
-            Debug.LogWarning(LogPrefix + " weather.Sky unavailable - glare disabled");
+            PropertyInfo prop = type.GetProperty(name);
+            if (prop != null)
+                return prop;
+            return type.GetField(name);
+        }
+
+        private static object ReadMember(object target, MemberInfo member)
+        {
+            FieldInfo field = member as FieldInfo;
+            if (field != null)
+                return field.GetValue(target);
+            return ((PropertyInfo)member).GetValue(target, null);
         }
 
         // ---- star / sun identification ---------------------------------------
@@ -375,15 +487,11 @@ namespace UBOAT.Mods.RadioNavigation
             if (pipCamera == null)
                 return null;
 
-            var sky = ResolveSky();
-            if (sky != null)
-            {
-                Vector3 sunDir = sky.SunDirection;
-                ResolveSunSign(sunDir, sky.SunAltitude);
-                sunDir *= sunDirSign;
-                if (Vector3.Angle(pipCamera.transform.forward, sunDir) <= IdentifyConeDeg)
-                    return SunName;
-            }
+            Vector3 sunDir;
+            float sunAlt;
+            if (TryGetOwnSun(out sunDir, out sunAlt)
+                && Vector3.Angle(pipCamera.transform.forward, sunDir) <= IdentifyConeDeg)
+                return SunName;
 
             float lat, lon;
             if (!positionProvider.TryGetPosition(out lat, out lon))
@@ -423,17 +531,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             string name;
             return NavStarNames.TryGetName(bestHip, out name) ? name : ("HIP " + bestHip);
-        }
-
-        // §9 fallback: verify the sign of SunDirection once during daytime.
-        private void ResolveSunSign(Vector3 sunDir, float sunAltitude)
-        {
-            if (sunDirSignResolved || sunAltitude < 10f)
-                return;
-            sunDirSignResolved = true;
-            sunDirSign = Vector3.Dot(sunDir, Vector3.up) >= 0f ? 1f : -1f;
-            if (sunDirSign < 0f)
-                Debug.Log(LogPrefix + " SunDirection points below horizon - inverting sign");
         }
 
         // ---- readout -----------------------------------------------------------

@@ -278,6 +278,27 @@ namespace UBOAT.Mods.RadioNavigation
             return 0.5 * (1.0 - Math.Cos(2 * Math.PI * phase / synodicDays));
         }
 
+        /// <summary>
+        /// Геоцентрические RA/Dec Солнца, низкоточная формула Meeus (гл.25,
+        /// без нутации/аберрации высших порядков, точность ~0.01°). Введена
+        /// для секстанта: TOD_Sky недоступен компилятору мода in-game
+        /// (SEXTANT_PLAN v1.3).
+        /// </summary>
+        public static void SunRaDec(double jd, out double raRad, out double decRad)
+        {
+            double n = jd - 2451545.0;
+            double meanLon = NormalizeDegrees(280.460 + 0.9856474 * n);
+            double meanAnom = NormalizeDegrees(357.528 + 0.9856003 * n);
+            double gRad = meanAnom * Deg2Rad;
+            double eclLon = NormalizeDegrees(meanLon + 1.915 * Math.Sin(gRad) + 0.020 * Math.Sin(2 * gRad));
+            double eclLonRad = eclLon * Deg2Rad;
+            double obliquity = (23.439 - 0.0000004 * n) * Deg2Rad;
+
+            raRad = Math.Atan2(Math.Cos(obliquity) * Math.Sin(eclLonRad), Math.Cos(eclLonRad));
+            if (raRad < 0) raRad += 2 * Math.PI;
+            decRad = Math.Asin(Math.Sin(obliquity) * Math.Sin(eclLonRad));
+        }
+
         private static void SolveKepler(double e, double M_deg, out double v)
         {
             // Упрощённое решение уравнения Кеплера (итерация Ньютона)

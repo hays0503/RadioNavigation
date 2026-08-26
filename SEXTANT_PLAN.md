@@ -1,6 +1,8 @@
 # SEXTANT_PLAN — Секстант для RadioNavigation (PIP-две камеры, всё программно)
 
-> Версия: 1.2 (2026-08-26). Статус: исполнен (eee0274); рехоткей по итогам in-game.
+> Версия: 1.3 (2026-08-26). Статус: исполнен (eee0274, 43b154b); солнце — своя эфемерида.
+> 1.3 (2026-08-26): TOD_Sky недоступен in-game компилятору (CS0246/CS0012) →
+> `AstroMath.SunRaDec` (Meeus) + диагностика SUNDRIFT (reflection, 10 с); тесты 298.
 > 1.2 (2026-08-26): секстант=Z, созвездия=Shift+Z — игра ставит действие в
 > очередь на Ctrl, Ctrl выведен из биндинга полностью.
 > 1.1 (2026-08-26): + §13 разметка/разрешения; §3.2 veil/RT 1024/квадратный
@@ -106,13 +108,17 @@
   навсегда (частый баг — тестировать закрытие).
 
 ### 3.4 Небо и светила
-- `[Inject] static Weather weather;` (паттерн LighthouseBeamGlow.cs:72) →
-  `weather.Sky` = TOD_Sky: `SunDirection` (Vector3), `SunAltitude`,
-  `SunZenith`, `LerpValue`, `IsNight`; `weather.Sky.Atmosphere.Fogginess`.
-- **ВНИМАНИЕ (§7.2 исполнения): знак `SunDirection` не верифицирован** —
-  днём вектор к солнцу должен иметь +Y; проверить дотом с up, при
-  отрицательном — инвертировать. Фолбэк: `weather.Sky.SunAltitude` для
-  интенсивности + направление из SunAzimuth/SunAltitude вручную.
+- **v1.3 ФАКТ: `TOD_Sky` недоступен компилятору мода in-game** (тип живёт в
+  `com.uboat.dependencies`, которой нет в reference-сете `Mod.Compile` —
+  CS0246/CS0012, проверено 2026-08-26). Локальный `dotnet build` её видит —
+  не ориентир. Солнце считается собственной формулой Meeus
+  (`AstroMath.SunRaDec`, точность ~0.01°) через тот же `RaDecToEnu`, что и
+  звёзды; оси уже доказаны игрой. Игровые значения читаются только для
+  диагностики дрейфа — reflection-кешем (`Weather.Sky` → `SunDirection`/
+  `SunAltitude`), без именования типа в коде.
+- Диагностика `SUNDRIFT`: раз в 10 с при открытом секстанте лог
+  `sep=…° dalt=…° meeus(alt=…) game(alt=…)`; устойчивый sep > 0.5° —
+  дрейф эфемериды/конвенции.
 - Звёзды: `StarCatalog.Stars` — {Hip, RaRad, DecRad (экватор 1942), Vmag, Bv,
   IsNav}. Направление в момент t: `AstroMath.RaDecToEnu(raRad, decRad, lstDeg,
   latDeg, out alt, out az, out e, out n, out u)`; dir = (e, u, n) normalized;
@@ -200,7 +206,9 @@ glare        = clamp01(base · 0.35^filters)           // 1..3 фильтра
 pain         = glare > 0.6 (выход из ослепления < 0.5 — гистерезис в контроллере)
 ```
 - Ночь (SunAltitude < 0): sunIntensity = 0 → glare = 0 (звёзды без засвета).
-- Направление солнца: `weather.Sky.SunDirection` (знак проверить, §3.2).
+- Направление солнца (v1.3): собственная эфемерида — `AstroMath.SunRaDec(jd)`
+  → `RaDecToEnu` (та же конвенция осей, что у звёзд); высота — `altRad` того
+  же вызова. Weather/TOD_Sky в расчёте не участвуют (см. §3.4).
 
 ### 6.3 Идентификация звезды
 ```
@@ -238,7 +246,8 @@ holdTimer ≥ 5 с → identified: имя (NavStarNames.TryGetName(hip))
        out string name)`. Формат name.fab сверить по первой строке.
 - [ ] 7.8 `Source/UI/SextantController.cs` (ядро, ~370 строк):
        - поля: open, arcAngle, filterCount, holdTimer, identifiedHip,
-         pipCamera, rt, overlay-ссылки, [Inject] GameInput/Weather;
+         pipCamera, rt, overlay-ссылки, GameInput (GetInstance) +
+         Weather только для SUNDRIFT-reflection (v1.3);
          `public static bool IsOpen { get; private set; }` (гейт Z в 7.4).
        - Z toggle (Shift+Z игнорируется — там созвездия); гейт камеры
          (§13.4): невалидный вид → тихий игнор + один Debug.Log
@@ -254,10 +263,13 @@ holdTimer ≥ 5 с → identified: имя (NavStarNames.TryGetName(hip))
          hint снизу (состав и якоря — §13.3).
        - Стрелки: rate 2°/с (Shift 10°/с), SextantArc.Clamp+Quantize,
          текст = SextantArc.Format.
-       - ID звезды: §6.3, имя из NavStarNames; солнце: угол до SunDirection
-         < 0.5° → "Солнце"; ID заблокирован при glare > 0.6.
+       - ID звезды: §6.3, имя из NavStarNames; солнце: угол до собственного
+         вектора (SunRaDec→ENU, v1.3) < 0.5° → "Солнце"; ID заблокирован
+         при glare > 0.6.
        - Засвет: glare = SextantGlare.Glare(...); белая Image α = glare·0.9;
          pain-сообщение при glare > 0.6 (гистерезис 0.5).
+       - SUNDRIFT (v1.3): раз в 10 с при открытом — лог расхождения нашей
+         эфемериды с игровой (reflection-кеш, §3.4).
        - Закрытие: RemoveBlockade, PIP camera disable, оверлей off.
        - OnDestroy: RemoveBlockade + Destroy(RT/cameras/materials).
 - [ ] 7.9 `Source/Logic/Main.cs`: AddComponent<SextantController>() после
@@ -284,7 +296,7 @@ SextantGlareTests: пик в 0° = sunIntensity; спад 2σ → <10%; филь
 
 | Риск | Фолбэк |
 |------|--------|
-| Знак SunDirection инвертирован | Проверка дотом с up днём; инверсия константой |
+| Дрейф нашей эфемериды vs игровое солнце (v1.3) | Диагностика SUNDRIFT: sep в логе раз в 10 с; устойчивый sep > 0.5° — сигнал разбора конвенций |
 | Sky null (меню/погода не готова) | glare = 0 + Warning once |
 | Стрелки крутят зум игры при открытом секстанте | AddBlockade обязателен; проверить ДО первого теста |
 | Ctrl в биндинге — игра ставит действие в очередь на Ctrl | Снят в v1.2: секстант=Z, созвездия=Shift+Z, Ctrl не участвует |

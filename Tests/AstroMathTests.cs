@@ -64,6 +64,48 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void SunRaDec_J2000_MatchesMeeusReference()
+        {
+            // Meeus гл.25, JD 2451545.0: λ≈280.376° → RA≈281.27°, Dec≈−23.03°
+            AstroMath.SunRaDec(2451545.0, out var raRad, out var decRad);
+            double raDeg = raRad * 180.0 / Math.PI;
+            double decDeg = decRad * 180.0 / Math.PI;
+            Assert.InRange(raDeg, 281.17, 281.37);
+            Assert.InRange(decDeg, -23.08, -22.98);
+        }
+
+        [Fact]
+        public void SunRaDec_LateAugust2026_WithinAlmanacBounds()
+        {
+            // 2026-08-26 00:00 UT = JD 2461278.5. Кросс-чек независимой точкой:
+            // формула даёт Dec=+0.02° на равноденствие 2026-09-23 00:00 UT
+            // (реальное наступление 00:05 UT). RA≈154.75°, Dec≈+10.48°.
+            AstroMath.SunRaDec(2461278.5, out var raRad, out var decRad);
+            double raDeg = raRad * 180.0 / Math.PI;
+            double decDeg = decRad * 180.0 / Math.PI;
+            Assert.InRange(raDeg, 154.2, 155.3);
+            Assert.InRange(decDeg, 10.2, 10.7);
+        }
+
+        [Fact]
+        public void SunRaDec_DailyMotion_AboutOneDegree()
+        {
+            // Среднесуточный сдвиг RA: ~0.94°/день в конце августа,
+            // ~1.07°/день у перигелия (январь); диапазон с запасом.
+            AstroMath.SunRaDec(2451545.0, out var ra0, out _);
+            AstroMath.SunRaDec(2451546.0, out var ra1, out _);
+            double delta = (ra1 - ra0) * 180.0 / Math.PI;
+            if (delta < 0) delta += 360.0;
+            Assert.InRange(delta, 0.90, 1.15);
+
+            AstroMath.SunRaDec(2461278.5, out var ra2, out _);
+            AstroMath.SunRaDec(2461279.5, out var ra3, out _);
+            double delta2 = (ra3 - ra2) * 180.0 / Math.PI;
+            if (delta2 < 0) delta2 += 360.0;
+            Assert.InRange(delta2, 0.90, 1.15);
+        }
+
+        [Fact]
         public void PlanetRaDec_AllSupportedPlanets_ReturnFiniteCoordinates()
         {
             double jd = AstroMath.ToJulianDay(new DateTime(1942, 6, 15, 0, 0, 0, DateTimeKind.Utc));
