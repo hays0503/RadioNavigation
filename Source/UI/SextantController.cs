@@ -2,7 +2,6 @@
 using System.Globalization;
 using System.Reflection;
 using DWS.Common.InjectionFramework;
-using TMPro;
 using UBOAT.Game.Core.Input;
 using UBOAT.Game.Scene.Camera;
 using UBOAT.Game.Scene.Environment;
@@ -81,14 +80,15 @@ namespace UBOAT.Mods.RadioNavigation
         private Camera pipCamera;
         private GameObject canvasRoot;
         private RectTransform pipRect;
+        private Image filterDimImage;
         private Image glareImage;
-        private TextMeshProUGUI angleText;
-        private TextMeshProUGUI nameText;
-        private TextMeshProUGUI painText;
-        private TextMeshProUGUI filterText;
+        private Text angleText;
+        private Text nameText;
+        private Text painText;
+        private Text filterText;
         private Texture2D ringTexture;
         private Texture2D circleMaskTexture;
-        private static TMP_FontAsset sextantFont;
+        private static Font sextantOsFont;
 
         private readonly IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
 
@@ -175,6 +175,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             UpdatePipPose();
             UpdateFilterLabel();
+            UpdateFilterDim();
             if (painText != null) painText.enabled = false;
             UpdateReadout(true);
             Debug.Log(LogPrefix + " opened");
@@ -245,6 +246,16 @@ namespace UBOAT.Mods.RadioNavigation
         {
             filterCount = count;
             UpdateFilterLabel();
+            UpdateFilterDim();
+        }
+
+        private void UpdateFilterDim()
+        {
+            if (filterDimImage == null)
+                return;
+            Color c = filterDimImage.color;
+            c.a = 0.15f * filterCount;
+            filterDimImage.color = c;
         }
 
         // ---- PIP camera ------------------------------------------------------
@@ -616,6 +627,16 @@ namespace UBOAT.Mods.RadioNavigation
             pipImage.texture = rt;
             Stretch(pipImage.rectTransform);
 
+            // Shade filters dim the whole scope view (v1.5): the PIP camera
+            // renders without the game's post stack, so the daytime sky clips
+            // to white; filters are the authentic way to cut that down.
+            GameObject dimGo = new GameObject("FilterDim", typeof(Image));
+            dimGo.transform.SetParent(pipGo.transform, false);
+            filterDimImage = dimGo.GetComponent<Image>();
+            filterDimImage.color = new Color(0f, 0f, 0f, 0f);
+            filterDimImage.raycastTarget = false;
+            Stretch(filterDimImage.rectTransform);
+
             // Glare flash inside the ocular only.
             GameObject glareGo = new GameObject("Glare", typeof(Image));
             glareGo.transform.SetParent(pipGo.transform, false);
@@ -650,19 +671,19 @@ namespace UBOAT.Mods.RadioNavigation
             column.sizeDelta = new Vector2(ColumnWidthUnits, 180f);
             column.anchoredPosition = new Vector2(-OcularSizeUnits * 0.5f - ColumnGapUnits, 0f);
 
-            angleText = MakeLabel("AngleText", 44, TextAlignmentOptions.Right, Color.white);
+            angleText = MakeLabel("AngleText", 44, TextAnchor.MiddleRight, Color.white);
             SetChild(column, angleText, 160f);
-            nameText = MakeLabel("NameText", 32, TextAlignmentOptions.Right, new Color(0.75f, 0.9f, 1f));
+            nameText = MakeLabel("NameText", 32, TextAnchor.MiddleRight, new Color(0.75f, 0.9f, 1f));
             SetChild(column, nameText, 116f);
-            painText = MakeLabel("PainText", 32, TextAlignmentOptions.Right, new Color(1f, 0.45f, 0.35f));
+            painText = MakeLabel("PainText", 32, TextAnchor.MiddleRight, new Color(1f, 0.45f, 0.35f));
             painText.text = PainMessage;
             painText.enabled = false;
             SetChild(column, painText, 72f);
-            filterText = MakeLabel("FilterText", 28, TextAlignmentOptions.Right, new Color(0.85f, 0.85f, 0.85f));
+            filterText = MakeLabel("FilterText", 28, TextAnchor.MiddleRight, new Color(0.85f, 0.85f, 0.85f));
             SetChild(column, filterText, 36f);
 
             // Bottom hint line.
-            TextMeshProUGUI hint = MakeLabel("HintText", 26, TextAlignmentOptions.Center,
+            Text hint = MakeLabel("HintText", 26, TextAnchor.MiddleCenter,
                 new Color(0.75f, 0.75f, 0.75f));
             hint.text = HintText;
             hint.transform.SetParent(canvasRoot.transform, false);
@@ -677,42 +698,39 @@ namespace UBOAT.Mods.RadioNavigation
             Debug.Log(LogPrefix + " overlay built");
         }
 
-        private TextMeshProUGUI MakeLabel(string labelName, int fontSize, TextAlignmentOptions align, Color color)
+        private Text MakeLabel(string labelName, int fontSize, TextAnchor anchor, Color color)
         {
-            GameObject go = new GameObject(labelName, typeof(TextMeshProUGUI));
+            GameObject go = new GameObject(labelName, typeof(Text));
             go.transform.SetParent(canvasRoot.transform, false);
-            TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
-            t.font = GetSextantFont();
+            Text t = go.GetComponent<Text>();
+            t.font = GetSextantOsFont();
             t.fontSize = fontSize;
             t.color = color;
-            t.alignment = align;
+            t.alignment = anchor;
             t.raycastTarget = false;
-            t.overflowMode = TextOverflowModes.Ellipsis;
+            t.horizontalOverflow = HorizontalWrapMode.Overflow;
+            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.supportRichText = false;
             return t;
         }
 
         /// <summary>
-        /// Dynamic TMP font built from the OS Arial: the game's default font
-        /// asset has no Cyrillic glyphs (in-game finding 2026-08-26 - hint and
-        /// filter labels rendered as boxes). Static cache, shared by labels.
+        /// OS Arial for legacy UI.Text: TMP dynamic font assets did not pull
+        /// Cyrillic glyphs from the OS font (in-game 2026-08-26, labels stayed
+        /// boxes), while legacy Text renders them reliably. Static cache.
         /// </summary>
-        private static TMP_FontAsset GetSextantFont()
+        private static Font GetSextantOsFont()
         {
-            if (sextantFont != null)
-                return sextantFont;
-
-            Font osFont = Font.CreateDynamicFontFromOSFont("Arial", 48);
-            if (osFont != null)
+            if (sextantOsFont == null)
             {
-                sextantFont = TMP_FontAsset.CreateFontAsset(osFont);
-                if (sextantFont != null)
-                    return sextantFont;
+                sextantOsFont = Font.CreateDynamicFontFromOSFont("Arial", 48);
+                if (sextantOsFont == null)
+                    Debug.LogWarning(LogPrefix + " OS Arial unavailable - labels will be blank");
             }
-            Debug.LogWarning(LogPrefix + " OS Arial unavailable - falling back to default font (no Cyrillic)");
-            return NavMapMarkerBase.GetTooltipFont();
+            return sextantOsFont;
         }
 
-        private static void SetChild(RectTransform column, TextMeshProUGUI label, float y)
+        private static void SetChild(RectTransform column, Text label, float y)
         {
             RectTransform r = label.rectTransform;
             r.SetParent(column, false);
@@ -721,6 +739,7 @@ namespace UBOAT.Mods.RadioNavigation
             r.pivot = new Vector2(1f, 0.5f);
             r.offsetMin = new Vector2(0f, r.offsetMin.y);
             r.offsetMax = new Vector2(0f, r.offsetMax.y);
+            r.sizeDelta = new Vector2(0f, label.fontSize * 1.8f);
             r.anchoredPosition = new Vector2(0f, y);
         }
 
@@ -743,7 +762,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private Sprite CreateRingSprite()
         {
-            const int size = 64;
+            const int size = 256;
             ringTexture = new Texture2D(size, size, TextureFormat.RGBA32, false);
             ringTexture.name = "RadioNavSextantRing";
             ringTexture.hideFlags = HideFlags.DontSave;
@@ -770,10 +789,10 @@ namespace UBOAT.Mods.RadioNavigation
             return Sprite.Create(ringTexture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
         }
 
-        /// <summary>Hard circle sprite for the ocular Mask (1 px AA at the rim).</summary>
+        /// <summary>Hard circle sprite for the ocular Mask (smooth AA at the rim).</summary>
         private Sprite CreateCircleMaskSprite()
         {
-            const int size = 64;
+            const int size = 256;
             Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             tex.name = "RadioNavSextantCircleMask";
             tex.hideFlags = HideFlags.DontSave;
