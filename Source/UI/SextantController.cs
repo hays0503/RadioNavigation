@@ -896,8 +896,8 @@ namespace UBOAT.Mods.RadioNavigation
 
             try
             {
-                object pass = Activator.CreateInstance(passType);
-                passType.GetProperty("CullingMask").SetValue(pass, cullingMask);
+                // Public ctor: CameraPass(int cullingMask).
+                object pass = Activator.CreateInstance(passType, cullingMask);
                 passType.GetProperty("Enabled").SetValue(pass, true);
                 passType.GetProperty("ScreenSpaceReflections").SetValue(pass, false);
                 Array passes = Array.CreateInstance(passType, 1);
