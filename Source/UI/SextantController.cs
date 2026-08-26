@@ -6,6 +6,7 @@ using UBOAT.Game.Core.Input;
 using UBOAT.Game.Scene.Camera;
 using UBOAT.Game.Scene.Environment;
 using UnityEngine;
+using UnityEngine.Rendering.PostProcessing;
 using UnityEngine.UI;
 
 namespace UBOAT.Mods.RadioNavigation
@@ -76,6 +77,14 @@ namespace UBOAT.Mods.RadioNavigation
         private bool gameSunMembersResolved;
         private bool gameSunUnavailableWarned;
 
+        // Water + post stack wiring for the PIP camera (SEXTANT_PLAN v1.6):
+        // the game's render pipeline renders water only for cameras listed on
+        // the main camera's UBOAT.Game.Scene.Rendering.AdditionalCameraData
+        // (periscope pattern), and without a PostProcessLayer the HDR sky/sea
+        // clip to pure white.
+        private UBOAT.Game.Scene.Rendering.AdditionalCameraData registeredWaterData;
+        private bool waterAttachWarned;
+
         private RenderTexture rt;
         private Camera pipCamera;
         private GameObject canvasRoot;
@@ -120,6 +129,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (IsOpen && gameInput != null)
                 gameInput.RemoveBlockade(this);
+            DetachWaterCamera();
             IsOpen = false;
 
             if (canvasRoot != null) Destroy(canvasRoot);
@@ -171,6 +181,7 @@ namespace UBOAT.Mods.RadioNavigation
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
             pipCamera.enabled = true;
+            AttachWaterCamera();
             IsOpen = true;
 
             UpdatePipPose();
@@ -189,11 +200,43 @@ namespace UBOAT.Mods.RadioNavigation
             IsOpen = false;
             if (gameInput != null)
                 gameInput.RemoveBlockade(this);
+            DetachWaterCamera();
             if (pipCamera != null)
                 pipCamera.enabled = false;
             if (canvasRoot != null)
                 canvasRoot.SetActive(false);
             Debug.Log(LogPrefix + " closed");
+        }
+
+        // Water renders itself only for cameras listed on the main camera's
+        // AdditionalCameraData (periscope pattern, Periscope.cs:581).
+        private void AttachWaterCamera()
+        {
+            if (viewCamera == null || pipCamera == null)
+                return;
+
+            UBOAT.Game.Scene.Rendering.AdditionalCameraData data =
+                viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+            if (data == null)
+            {
+                if (!waterAttachWarned)
+                {
+                    waterAttachWarned = true;
+                    Debug.LogWarning(LogPrefix + " main camera lacks AdditionalCameraData - no water in PIP");
+                }
+                return;
+            }
+
+            registeredWaterData = data;
+            data.AttachedCameras.Remove(pipCamera);
+            data.AttachedCameras.Add(pipCamera);
+        }
+
+        private void DetachWaterCamera()
+        {
+            if (registeredWaterData != null && pipCamera != null)
+                registeredWaterData.AttachedCameras.Remove(pipCamera);
+            registeredWaterData = null;
         }
 
         // §13.4 camera gate: sextant exists only in live deck views.
@@ -275,6 +318,47 @@ namespace UBOAT.Mods.RadioNavigation
             pipCamera.targetTexture = rt;
             pipCamera.fieldOfView = viewCamera.fieldOfView / FovDivisor;
             pipCamera.enabled = false;
+
+            // The game's render pipeline renders water only for cameras
+            // registered on the main camera's AdditionalCameraData
+            // (periscope pattern, Periscope.cs:581).
+            go.AddComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+
+            // Post stack v2 (game's custom fork): without it the HDR sky/sea
+            // clip to pure white (in-game finding 2026-08-26). The fork hides
+            // volumeLayer/m_Resources, so both are copied from the main
+            // camera's layer via reflection.
+            PostProcessLayer mainLayer = viewCamera.GetComponent<PostProcessLayer>();
+            if (mainLayer != null)
+            {
+                PostProcessLayer pipLayer = go.AddComponent<PostProcessLayer>();
+                pipLayer.antialiasingMode = PostProcessLayer.Antialiasing.None;
+
+                FieldInfo volumeField = typeof(PostProcessLayer).GetField("volumeLayer",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
+                FieldInfo resourcesField = typeof(PostProcessLayer).GetField("m_Resources",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
+                if (volumeField != null)
+                    volumeField.SetValue(pipLayer, volumeField.GetValue(mainLayer));
+
+                PostProcessResources resources = resourcesField != null
+                    ? resourcesField.GetValue(mainLayer) as PostProcessResources
+                    : null;
+                if (resources == null)
+                {
+                    PostProcessResources[] allResources = Resources.FindObjectsOfTypeAll<PostProcessResources>();
+                    resources = allResources != null && allResources.Length > 0 ? allResources[0] : null;
+                }
+                if (resources != null)
+                    pipLayer.Init(resources);
+                else
+                    Debug.LogWarning(LogPrefix + " PostProcessResources not found - PIP stays untonemapped");
+            }
+            else
+            {
+                Debug.LogWarning(LogPrefix + " main camera has no PostProcessLayer - PIP stays untonemapped");
+            }
+
             Debug.Log(LogPrefix + " PIP camera created, RT=" + RtSize + "^2");
         }
 

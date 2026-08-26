@@ -82,5 +82,13 @@
       <HintPath>$(GameManaged)\Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="com.uboat.rendering">
+      <HintPath>$(GameManaged)\com.uboat.rendering.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.unity.postprocessing.Runtime">
+      <HintPath>$(GameManaged)\com.unity.postprocessing.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 </Project>

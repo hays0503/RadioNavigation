@@ -1,6 +1,11 @@
 # SEXTANT_PLAN — Секстант для RadioNavigation (PIP-две камеры, всё программно)
 
-> Версия: 1.5 (2026-08-26). Статус: исполнен (eee0274…4803f8b); лейблы legacy Text.
+> Версия: 1.6 (2026-08-26). Статус: исполнен (eee0274…9aa7506); PIP вода+пост.
+> 1.6 (2026-08-26): белый окуляр = PIP без воды и без тонмапа. Фикс: PIP-камера
+> регистрируется в `AdditionalCameraData.AttachedCameras` главной (вода,
+> тип из com.uboat.rendering — сборка в референсах мод-компилятора, Mod.cs:330)
+> + `PostProcessLayer.Init` с копией `volumeLayer`/`m_Resources` через
+> reflection (форк стека прячет поля). Локальные csproj/build.ps1 +2 DLL.
 > 1.5 (2026-08-26): SUNDRIFT-вывод — систематика = временной сдвиг ~6.5 мин
 > (daz/dalt отношение совпало с суточными rates); решение — БЕЗ компенсации
 > (аутентичная астрономия), вопрос компенсации открыт. Кириллица: TMP dynamic
@@ -109,6 +114,14 @@
   маска станет эллипсом на не-16:9).
 - Шрифт: `NavMapMarkerBase.GetTooltipFont()` — **public static** (открыт
   2026-08-25 для переиспользования).
+- **v1.6 ФАКТ: сторонняя RT-камера без регистрации даёт белый круг** —
+  вода рендерится только для камер из `AdditionalCameraData.AttachedCameras`
+  главной камеры (тип `UBOAT.Game.Scene.Rendering.AdditionalCameraData`,
+  com.uboat.rendering; перископ-паттерн Periscope.cs:581), а без
+  `PostProcessLayer` HDR-небо/море клипаются в белый. Обе сборки в
+  референсах мод-компилятора (Mod.cs:330 IImageEffect → rendering,
+  Mod.cs:349 PostProcessLayer). Форк пост-стека прячет `volumeLayer`/
+  `m_Resources` — копировать reflection'ом с главной камеры.
 - Полноэкранный режим устройства НЕ нужен: оверлей поверх геймплея
   (IExternalController/DeviceManualMode — не наш путь).
 
@@ -288,6 +301,10 @@ holdTimer ≥ 5 с → identified: имя (NavStarNames.TryGetName(hip))
          pain-сообщение при glare > 0.6 (гистерезис 0.5).
        - SUNDRIFT (v1.3): раз в 10 с при открытом — лог расхождения нашей
          эфемериды с игровой (reflection-кеш, §3.4).
+       - PIP вода+пост (v1.6): `AdditionalCameraData` на PIP + регистрация в
+         `AttachedCameras` главной при открытии / снятие при закрытии и
+         OnDestroy; `PostProcessLayer` с копией `volumeLayer`/`m_Resources`
+         (reflection) и `Init(resources)`, AA None.
        - Закрытие: RemoveBlockade, PIP camera disable, оверлей off.
        - OnDestroy: RemoveBlockade + Destroy(RT/cameras/materials).
 - [ ] 7.9 `Source/Logic/Main.cs`: AddComponent<SextantController>() после
