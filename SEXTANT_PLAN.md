@@ -122,6 +122,9 @@
   референсах мод-компилятора (Mod.cs:330 IImageEffect → rendering,
   Mod.cs:349 PostProcessLayer). Форк пост-стека прячет `volumeLayer`/
   `m_Resources` — копировать reflection'ом с главной камеры.
+  Пасс-лист: `CameraPass` — ctor(int cullingMask), `Enabled` rw,
+  `ScreenSpaceReflections` get-only (v1.6.1: сеттер бросал исключение —
+  пасс-лист копируется глубокой копией с главной камеры).
 - Полноэкранный режим устройства НЕ нужен: оверлей поверх геймплея
   (IExternalController/DeviceManualMode — не наш путь).
 

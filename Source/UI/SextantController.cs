@@ -325,7 +325,9 @@ namespace UBOAT.Mods.RadioNavigation
             UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd =
                 go.AddComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
             pipAdd.RenderScene = true;
-            SetupRenderPasses(pipAdd, pipCamera.cullingMask);
+            SetupRenderPasses(pipAdd,
+                viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>(),
+                pipCamera.cullingMask);
 
             // Post stack v2 (game's custom fork): without it the HDR sky/sea
             // clip to pure white (in-game finding 2026-08-26). The fork hides
@@ -879,11 +881,13 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>
         /// The game's SRP renders a camera through the passes configured on
         /// its AdditionalCameraData; a freshly added component has none, so
-        /// the RT stays blank (in-game finding 2026-08-26). Build a single
-        /// enabled pass with the camera's culling mask, mirroring the
-        /// periscope prefab layout.
+        /// the RT stays blank (in-game finding 2026-08-26). Deep-copy the
+        /// main camera's pass list when available - those are the exact
+        /// culling groups the game renders the scene with; otherwise build
+        /// a single enabled pass with the camera's culling mask.
         /// </summary>
-        private static void SetupRenderPasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData data, int cullingMask)
+        private static void SetupRenderPasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData data,
+            UBOAT.Game.Scene.Rendering.AdditionalCameraData mainData, int cullingMask)
         {
             Type type = data.GetType();
             Type passType = type.GetNestedType("CameraPass",
@@ -896,14 +900,52 @@ namespace UBOAT.Mods.RadioNavigation
 
             try
             {
-                // Public ctor: CameraPass(int cullingMask).
-                object pass = Activator.CreateInstance(passType, cullingMask);
-                passType.GetProperty("Enabled").SetValue(pass, true);
-                passType.GetProperty("ScreenSpaceReflections").SetValue(pass, false);
-                Array passes = Array.CreateInstance(passType, 1);
-                passes.SetValue(pass, 0);
+                Array source = null;
+                if (mainData != null)
+                {
+                    PropertyInfo passesProp = type.GetProperty("Passes");
+                    if (passesProp != null)
+                        source = passesProp.GetValue(mainData) as Array;
+                }
+
+                int count = source != null && source.Length > 0 ? source.Length : 1;
+                Array passes = Array.CreateInstance(passType, count);
+                if (source != null && source.Length > 0)
+                {
+                    // CameraPass(int cullingMask) is the only public ctor;
+                    // Enabled is read-write, ScreenSpaceReflections is
+                    // get-only (in-game failure) and stays at its default.
+                    PropertyInfo cullingProp = passType.GetProperty("CullingMask");
+                    PropertyInfo enabledProp = passType.GetProperty("Enabled");
+                    for (int i = 0; i < source.Length; i++)
+                    {
+                        object src = source.GetValue(i);
+                        int mask = cullingMask;
+                        if (cullingProp != null)
+                        {
+                            object maskBoxed = cullingProp.GetValue(src);
+                            if (maskBoxed is int)
+                                mask = (int)maskBoxed;
+                        }
+                        object copy = Activator.CreateInstance(passType, mask);
+                        if (enabledProp != null)
+                        {
+                            object enabled = enabledProp.GetValue(src);
+                            if (enabled is bool)
+                                enabledProp.SetValue(copy, (bool)enabled);
+                        }
+                        passes.SetValue(copy, i);
+                    }
+                }
+                else
+                {
+                    object pass = Activator.CreateInstance(passType, cullingMask);
+                    passType.GetProperty("Enabled").SetValue(pass, true);
+                    passes.SetValue(pass, 0);
+                }
+
                 type.GetProperty("Passes").SetValue(data, passes);
-                Debug.Log(LogPrefix + " PIP render pass configured, mask=" + cullingMask);
+                Debug.Log(LogPrefix + " PIP render passes configured: " + count + " pass(es), mask=" + cullingMask);
             }
             catch (Exception e)
             {
