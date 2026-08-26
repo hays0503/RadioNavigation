@@ -11,10 +11,11 @@ using UnityEngine.UI;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Sextant device (SEXTANT_PLAN v1.1). Ctrl+Z toggles a modal overlay:
-    /// dark veil over the live view, central PIP camera pitched to the arc
-    /// angle (world pitch, 0 = horizon), shade filters 1/2/3, gaussian glare
-    /// with pain hysteresis, star/sun identification after a 5 s hold.
+    /// Sextant device (SEXTANT_PLAN v1.2). Z toggles a modal overlay (Shift+Z
+    /// belongs to the constellation toggle): dark veil over the live view,
+    /// central PIP camera pitched to the arc angle (world pitch, 0 = horizon),
+    /// shade filters 1/2/3, gaussian glare with pain hysteresis, star/sun
+    /// identification after a 5 s hold.
     /// Layout is resolution-independent: own overlay canvas + CanvasScaler
     /// (1920x1080 reference, match height), SEXTANT_PLAN §13.
     /// </summary>
@@ -45,7 +46,7 @@ namespace UBOAT.Mods.RadioNavigation
             "\u0423\u0421\u0422\u0410\u041D\u041E\u0412\u0418\u0422\u0415 \u0424\u0418\u041B\u042C\u0422\u0420";
         private const string HintText =
             "\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0443\u0433\u043E\u043B \u00B7 Shift: \u0431\u044B\u0441\u0442\u0440\u0435\u0435 \u00B7 " +
-            "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440\u044B \u00B7 Ctrl+Z: \u0432\u044B\u0445\u043E\u0434";
+            "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440\u044B \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
 
         /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
         public static bool IsOpen { get; private set; }
@@ -84,7 +85,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (IsOpen)
             {
-                if (Input.GetKeyDown(KeyCode.Z))
+                // Shift+Z while open does nothing: constellations are gated by
+                // IsOpen, and the device must not close on their combo.
+                if (Input.GetKeyDown(KeyCode.Z) && !ShiftHeld())
                 {
                     Close();
                     return;
@@ -96,7 +99,7 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
             }
-            else if (Input.GetKeyDown(KeyCode.Z) && ControlHeld())
+            else if (Input.GetKeyDown(KeyCode.Z) && !ShiftHeld())
             {
                 TryOpen();
             }
@@ -124,12 +127,12 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (!IsLiveViewMode())
             {
-                Debug.Log(LogPrefix + " Ctrl+Z ignored outside live view (mode=" + CurrentModeName() + ")");
+                Debug.Log(LogPrefix + " Z ignored outside live view (mode=" + CurrentModeName() + ")");
                 return;
             }
             if (!CameraResolver.TryResolve(out viewCamera) || viewCamera == null)
             {
-                Debug.Log(LogPrefix + " Ctrl+Z ignored - no rendering camera");
+                Debug.Log(LogPrefix + " Z ignored - no rendering camera");
                 return;
             }
             if (gameInput == null && InjectionFramework.Instance.IsNotNull())
@@ -198,9 +201,9 @@ namespace UBOAT.Mods.RadioNavigation
             return gameMainCamera != null ? gameMainCamera.CurrentMode.ToString() : "no-camera";
         }
 
-        private static bool ControlHeld()
+        private static bool ShiftHeld()
         {
-            return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
         }
 
         // ---- input ---------------------------------------------------------
@@ -213,7 +216,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (dir == 0f)
                 return;
 
-            bool fast = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            bool fast = ShiftHeld();
             float rate = RateDegPerSec * (fast ? ShiftMultiplier : 1f);
             arcAngle = SextantArc.Quantize(arcAngle + dir * rate * dt);
         }

@@ -30,7 +30,7 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<int> triangles = new List<int>();
         private readonly List<Color> colors = new List<Color>();
 
-        /// <summary>Hotkey for the constellation lines toggle. Occupied by the game: F4-F10 (devices/saves/screenshot), F11 (bug report dialog). Z verified free (source grep + 80-axis dump).</summary>
+        /// <summary>Base key of the constellation toggle combo; effective binding is Shift+Z (SEXTANT_PLAN v1.2 — plain Z opens the sextant). Game occupies F4-F10/F11; Z verified free (source grep + 80-axis dump).</summary>
         private const KeyCode ToggleKey = KeyCode.Z;
 
         /// <summary>Current layer state, persisted via ConstellationTogglePrefs. Default ON.</summary>
@@ -52,11 +52,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
-            // SEXTANT_PLAN §7.4: ignore Z while Ctrl is held (Ctrl+Z = sextant)
-            // and while the sextant overlay is open (stars must not vanish mid-shot).
+            // SEXTANT_PLAN v1.2: constellations moved to Shift+Z (the game queues
+            // an action on bare Ctrl), plain Z belongs to the sextant; while the
+            // sextant overlay is open stars must not toggle mid-shot.
             if (Input.GetKeyDown(ToggleKey)
-                && !Input.GetKey(KeyCode.LeftControl)
-                && !Input.GetKey(KeyCode.RightControl)
+                && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
                 && !SextantController.IsOpen)
                 SetEnabled(!Enabled);
         }
