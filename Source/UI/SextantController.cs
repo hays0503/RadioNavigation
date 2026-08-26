@@ -87,6 +87,8 @@ namespace UBOAT.Mods.RadioNavigation
         private TextMeshProUGUI painText;
         private TextMeshProUGUI filterText;
         private Texture2D ringTexture;
+        private Texture2D circleMaskTexture;
+        private static TMP_FontAsset sextantFont;
 
         private readonly IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
 
@@ -128,6 +130,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Destroy(rt);
             }
             if (ringTexture != null) Destroy(ringTexture);
+            if (circleMaskTexture != null) Destroy(circleMaskTexture);
         }
 
         // ---- open / close -------------------------------------------------
@@ -286,7 +289,8 @@ namespace UBOAT.Mods.RadioNavigation
             float g = 0f;
             Vector3 sunDir;
             float sunAlt;
-            if (pipCamera != null && TryGetOwnSun(out sunDir, out sunAlt))
+            float sunAz;
+            if (pipCamera != null && TryGetOwnSun(out sunDir, out sunAlt, out sunAz))
             {
                 float angle = Vector3.Angle(pipCamera.transform.forward, sunDir);
                 g = (float)SextantGlare.Glare(angle, sunAlt, filterCount, pipCamera.fieldOfView);
@@ -322,10 +326,11 @@ namespace UBOAT.Mods.RadioNavigation
         /// star sky uses, so axis conventions are already game-proven.
         /// Needs a valid sandbox position (lat/lon), like star identification.
         /// </summary>
-        private bool TryGetOwnSun(out Vector3 dirWorld, out float altDeg)
+        private bool TryGetOwnSun(out Vector3 dirWorld, out float altDeg, out float azDeg)
         {
             dirWorld = Vector3.zero;
             altDeg = 0f;
+            azDeg = 0f;
 
             float lat, lon;
             if (!positionProvider.TryGetPosition(out lat, out lon))
@@ -346,6 +351,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             dirWorld = new Vector3((float)(e / len), (float)(u / len), (float)(n / len));
             altDeg = (float)(altRad * Mathf.Rad2Deg);
+            azDeg = (float)(azRad * Mathf.Rad2Deg);
             return true;
         }
 
@@ -364,7 +370,8 @@ namespace UBOAT.Mods.RadioNavigation
 
             Vector3 ownDir;
             float ownAlt;
-            if (!TryGetOwnSun(out ownDir, out ownAlt))
+            float ownAz;
+            if (!TryGetOwnSun(out ownDir, out ownAlt, out ownAz))
                 return; // no sandbox position - nothing to compare against
 
             Vector3 gameDir;
@@ -381,9 +388,16 @@ namespace UBOAT.Mods.RadioNavigation
 
             float sepDeg = Vector3.Angle(ownDir, gameDir);
             float dAlt = ownAlt - gameAlt;
+            // Azimuths 0=N +east; game azimuth derived from the world vector
+            // with the same (e→x, n→z) mapping the star sky proved in-game.
+            float gameAz = Mathf.Atan2(gameDir.x, gameDir.z) * Mathf.Rad2Deg;
+            if (gameAz < 0f) gameAz += 360f;
+            float dAz = ownAz - gameAz;
+            if (dAz > 180f) dAz -= 360f;
+            if (dAz < -180f) dAz += 360f;
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} SUNDRIFT sep={1:F3} dalt={2:F3} meeus(alt={3:F2}) game(alt={4:F2})",
-                LogPrefix, sepDeg, dAlt, ownAlt, gameAlt));
+                "{0} SUNDRIFT sep={1:F3} dalt={2:F3} daz={3:F3} meeus(alt={4:F2} az={5:F1}) game(alt={6:F2} az={7:F1})",
+                LogPrefix, sepDeg, dAlt, dAz, ownAlt, ownAz, gameAlt, gameAz));
         }
 
         private bool TryGetGameSun(out Vector3 dir, out float alt)
@@ -489,7 +503,8 @@ namespace UBOAT.Mods.RadioNavigation
 
             Vector3 sunDir;
             float sunAlt;
-            if (TryGetOwnSun(out sunDir, out sunAlt)
+            float sunAz;
+            if (TryGetOwnSun(out sunDir, out sunAlt, out sunAz)
                 && Vector3.Angle(pipCamera.transform.forward, sunDir) <= IdentifyConeDeg)
                 return SunName;
 
@@ -580,14 +595,26 @@ namespace UBOAT.Mods.RadioNavigation
             veil.color = new Color(0f, 0f, 0f, VeilAlpha);
             Stretch(veil.rectTransform);
 
-            // Ocular: square PIP showing the RT.
-            GameObject pipGo = new GameObject("Ocular", typeof(RawImage));
+            // Ocular: square container clipped to a circle (in-game finding
+            // 2026-08-26: unclipped corners painted opaque black over the live
+            // horizon). Mask clips RT view, glare, ring and tick to the circle;
+            // outside it the veil shows through.
+            GameObject pipGo = new GameObject("Ocular", typeof(Image), typeof(Mask));
             pipGo.transform.SetParent(canvasRoot.transform, false);
             pipRect = pipGo.GetComponent<RectTransform>();
             AnchorCenter(pipRect, OcularSizeUnits, OcularSizeUnits);
-            RawImage pipImage = pipGo.GetComponent<RawImage>();
+            Image maskGraphic = pipGo.GetComponent<Image>();
+            maskGraphic.sprite = CreateCircleMaskSprite();
+            maskGraphic.raycastTarget = false;
+            Mask ocularMask = pipGo.GetComponent<Mask>();
+            ocularMask.showMaskGraphic = false;
+
+            GameObject pipImageGo = new GameObject("View", typeof(RawImage));
+            pipImageGo.transform.SetParent(pipGo.transform, false);
+            RawImage pipImage = pipImageGo.GetComponent<RawImage>();
             pipImage.raycastTarget = false;
             pipImage.texture = rt;
+            Stretch(pipImage.rectTransform);
 
             // Glare flash inside the ocular only.
             GameObject glareGo = new GameObject("Glare", typeof(Image));
@@ -655,13 +682,34 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject go = new GameObject(labelName, typeof(TextMeshProUGUI));
             go.transform.SetParent(canvasRoot.transform, false);
             TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
-            t.font = NavMapMarkerBase.GetTooltipFont();
+            t.font = GetSextantFont();
             t.fontSize = fontSize;
             t.color = color;
             t.alignment = align;
             t.raycastTarget = false;
             t.overflowMode = TextOverflowModes.Ellipsis;
             return t;
+        }
+
+        /// <summary>
+        /// Dynamic TMP font built from the OS Arial: the game's default font
+        /// asset has no Cyrillic glyphs (in-game finding 2026-08-26 - hint and
+        /// filter labels rendered as boxes). Static cache, shared by labels.
+        /// </summary>
+        private static TMP_FontAsset GetSextantFont()
+        {
+            if (sextantFont != null)
+                return sextantFont;
+
+            Font osFont = Font.CreateDynamicFontFromOSFont("Arial", 48);
+            if (osFont != null)
+            {
+                sextantFont = TMP_FontAsset.CreateFontAsset(osFont);
+                if (sextantFont != null)
+                    return sextantFont;
+            }
+            Debug.LogWarning(LogPrefix + " OS Arial unavailable - falling back to default font (no Cyrillic)");
+            return NavMapMarkerBase.GetTooltipFont();
         }
 
         private static void SetChild(RectTransform column, TextMeshProUGUI label, float y)
@@ -720,6 +768,33 @@ namespace UBOAT.Mods.RadioNavigation
             }
             ringTexture.Apply();
             return Sprite.Create(ringTexture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        /// <summary>Hard circle sprite for the ocular Mask (1 px AA at the rim).</summary>
+        private Sprite CreateCircleMaskSprite()
+        {
+            const int size = 64;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.name = "RadioNavSextantCircleMask";
+            tex.hideFlags = HideFlags.DontSave;
+            float half = size * 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + 0.5f - half) / half;
+                    float dy = (y + 0.5f - half) / half;
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a;
+                    if (r <= 0.96f) a = 1f;
+                    else if (r >= 1f) a = 0f;
+                    else a = 1f - (r - 0.96f) / 0.04f;
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+            }
+            tex.Apply();
+            circleMaskTexture = tex;
+            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
         }
     }
 }
