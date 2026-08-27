@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using DWS.Common.InjectionFramework;
+using PlayWay.Water;
 using UBOAT.Game.Core.Input;
 using UBOAT.Game.Scene.Camera;
 using UBOAT.Game.Scene.Environment;
@@ -629,6 +630,20 @@ namespace UBOAT.Mods.RadioNavigation
             // + SSMS, copied in the exact component order of the FPP camera,
             // so the SRP renders the PIP views with the same fog/post look.
             AddMirroredEffectComponents(go);
+
+            // PlayWay renders the sea only for cameras carrying a WaterCamera
+            // (waterCamerasCache registry; HullEffectsRenderer.GetWaterCamera
+            // null-check skips water otherwise). Pattern: EntitySelectionCamera
+            // (disabled camera, manual Render(), WaterCamera in prefab).
+            try
+            {
+                WaterCamera waterCam = go.AddComponent<WaterCamera>();
+                Debug.Log(LogPrefix + " WATERCAM added to " + name + ": " + (waterCam != null));
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning(LogPrefix + " WATERCAM add failed: " + e.Message);
+            }
 
             cam.depthTextureMode = viewCamera.depthTextureMode;
 

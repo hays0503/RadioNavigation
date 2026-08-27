@@ -90,6 +90,10 @@
       <HintPath>$(GameManaged)\com.unity.postprocessing.Runtime.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="com.playway.water.Runtime">
+      <HintPath>$(GameManaged)\com.playway.water.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.ImageConversionModule">
       <HintPath>$(GameManaged)\UnityEngine.ImageConversionModule.dll</HintPath>
       <Private>false</Private>
