@@ -222,9 +222,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         // Water renders itself only for cameras listed on the main camera's
         // AdditionalCameraData (periscope pattern, Periscope.cs:581).
-        // Must be MainCamera, not the transient viewCamera (device probe).
+        // Viewport3D path: water attach disabled for minimal PIP test.
         private void AttachWaterCamera()
         {
+            return;
             if (pipCamera == null)
                 return;
             MainCamera main = MainCamera.Instance;
@@ -328,8 +329,13 @@ namespace UBOAT.Mods.RadioNavigation
             if (pipCamera != null)
                 return;
 
-            rt = new RenderTexture(RtSize, RtSize, 24);
+            // Viewport3D path: plain camera with targetTexture. The game's
+            // custom AdditionalCameraData + Passes path kept RT white (passes
+            // misconfigured, volumeLayer private). Viewport3D.cs:86 does the
+            // same with one line and works for UI previews without water.
+            rt = new RenderTexture(RtSize, RtSize, 32, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
             rt.name = "RadioNavSextantRT";
+            rt.filterMode = FilterMode.Bilinear;
 
             GameObject go = new GameObject("RadioNavSextantCamera");
             pipCamera = go.AddComponent<Camera>();
@@ -338,53 +344,14 @@ namespace UBOAT.Mods.RadioNavigation
             pipCamera.targetTexture = rt;
             pipCamera.fieldOfView = viewCamera.fieldOfView / FovDivisor;
             pipCamera.enabled = false;
+            pipCamera.allowHDR = true;
+            pipCamera.allowMSAA = false;
+            // Keep the game's custom pipeline from culling this camera: no
+            // AdditionalCameraData is added in Viewport3D mode. Water will be
+            // missing but the horizon/sky will be visible - that is enough to
+            // verify the PIP itself. If this works, water can be re-added.
 
-            // The game's render pipeline renders water only for cameras
-            // registered on the main camera's AdditionalCameraData
-            // (periscope pattern, Periscope.cs:581).
-            UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd =
-                go.AddComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
-            pipAdd.RenderScene = true;
-            SetupRenderPasses(pipAdd,
-                viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>(),
-                pipCamera.cullingMask);
-
-            // Post stack v2 (game's custom fork): without it the HDR sky/sea
-            // clip to pure white (in-game finding 2026-08-26). The fork hides
-            // volumeLayer/m_Resources, so both are copied from the main
-            // camera's layer via reflection.
-            PostProcessLayer mainLayer = viewCamera.GetComponent<PostProcessLayer>();
-            if (mainLayer != null)
-            {
-                PostProcessLayer pipLayer = go.AddComponent<PostProcessLayer>();
-                pipLayer.antialiasingMode = PostProcessLayer.Antialiasing.None;
-
-                FieldInfo volumeField = typeof(PostProcessLayer).GetField("volumeLayer",
-                    BindingFlags.NonPublic | BindingFlags.Instance);
-                FieldInfo resourcesField = typeof(PostProcessLayer).GetField("m_Resources",
-                    BindingFlags.NonPublic | BindingFlags.Instance);
-                if (volumeField != null)
-                    volumeField.SetValue(pipLayer, volumeField.GetValue(mainLayer));
-
-                PostProcessResources resources = resourcesField != null
-                    ? resourcesField.GetValue(mainLayer) as PostProcessResources
-                    : null;
-                if (resources == null)
-                {
-                    PostProcessResources[] allResources = Resources.FindObjectsOfTypeAll<PostProcessResources>();
-                    resources = allResources != null && allResources.Length > 0 ? allResources[0] : null;
-                }
-                if (resources != null)
-                    pipLayer.Init(resources);
-                else
-                    Debug.LogWarning(LogPrefix + " PostProcessResources not found - PIP stays untonemapped");
-            }
-            else
-            {
-                Debug.LogWarning(LogPrefix + " main camera has no PostProcessLayer - PIP stays untonemapped");
-            }
-
-            Debug.Log(LogPrefix + " PIP camera created, RT=" + RtSize + "^2");
+            Debug.Log(LogPrefix + " PIP camera created (Viewport3D path), RT=" + RtSize + "^2 HDR Linear");
         }
 
         private void UpdatePipPose()
