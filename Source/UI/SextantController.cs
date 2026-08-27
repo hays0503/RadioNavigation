@@ -73,6 +73,9 @@ namespace UBOAT.Mods.RadioNavigation
         private float vectorLogHoldTimer;
         private float vectorRotateLogTimer;
         private float lastVectorLogYaw;
+        private float renderCheckTimer;
+        private bool renderCheckDone;
+        private Texture2D renderCheckTex;
 
         private Camera viewCamera;
         private MainCamera gameMainCamera;
@@ -131,6 +134,7 @@ namespace UBOAT.Mods.RadioNavigation
                 HandleFilterKeys();
                 UpdatePipPose();
                 UpdateVectorRotateLog();
+                RenderCheck(Time.unscaledDeltaTime);
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
@@ -163,6 +167,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             if (ringTexture != null) Destroy(ringTexture);
             if (circleMaskTexture != null) Destroy(circleMaskTexture);
+            if (renderCheckTex != null) Destroy(renderCheckTex);
         }
 
         // ---- open / close -------------------------------------------------
@@ -199,6 +204,8 @@ namespace UBOAT.Mods.RadioNavigation
             pain = false;
             lastFormattedArc = double.MinValue;
             sunDriftLogTimer = 0f; // force the first SUNDRIFT line on open
+            renderCheckDone = false;
+            renderCheckTimer = 1.0f;
 
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
@@ -210,6 +217,18 @@ namespace UBOAT.Mods.RadioNavigation
                 pipLeftCamera.enabled = registeredWaterData == null;
             if (pipRightCamera != null)
                 pipRightCamera.enabled = registeredWaterData == null;
+            int attachedCount = 0;
+            if (registeredWaterData != null)
+            {
+                try { attachedCount = registeredWaterData.AttachedCameras.Count; } catch { }
+            }
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} ATTACH water={1} attached={2} leftEn={3} rightEn={4} fov={5:F1} pipFov={6:F1}",
+                LogPrefix, registeredWaterData != null, attachedCount,
+                pipLeftCamera != null && pipLeftCamera.enabled,
+                pipRightCamera != null && pipRightCamera.enabled,
+                viewCamera != null ? viewCamera.fieldOfView : 0f,
+                viewCamera != null ? viewCamera.fieldOfView / FovDivisor : 0f));
             UpdatePipPose();
             LogVectorState("open");
             IsOpen = true;
@@ -357,6 +376,45 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
+        /// One-shot RT pixel probe ~1 s after open: proves both PIP cameras
+        /// actually render into their targets (regression guard for blank RT).
+        /// </summary>
+        private void RenderCheck(float dt)
+        {
+            if (renderCheckDone)
+                return;
+            renderCheckTimer -= dt;
+            if (renderCheckTimer > 0f)
+                return;
+            renderCheckDone = true;
+            if (leftRt == null || rightRt == null || !leftRt.IsCreated() || !rightRt.IsCreated())
+            {
+                Debug.LogWarning(LogPrefix + " RENDERCHECK rt missing");
+                return;
+            }
+            if (renderCheckTex == null)
+                renderCheckTex = new Texture2D(1, 1, TextureFormat.RGB24, false);
+            try
+            {
+                RenderTexture prev = RenderTexture.active;
+                RenderTexture.active = leftRt;
+                renderCheckTex.ReadPixels(new Rect(leftRt.width / 2, leftRt.height / 2, 1, 1), 0, 0);
+                Color lc = renderCheckTex.GetPixel(0, 0);
+                RenderTexture.active = rightRt;
+                renderCheckTex.ReadPixels(new Rect(rightRt.width / 2, rightRt.height / 2, 1, 1), 0, 0);
+                Color rc = renderCheckTex.GetPixel(0, 0);
+                RenderTexture.active = prev;
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "{0} RENDERCHECK left=#{1} right=#{2}",
+                    LogPrefix, ColorUtility.ToHtmlStringRGB(lc), ColorUtility.ToHtmlStringRGB(rc)));
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning(LogPrefix + " RENDERCHECK failed: " + e.Message);
+            }
+        }
+
+        /// <summary>
         /// Vector telemetry on alidade input: left camera (player eyes, pitch
         /// 0), right camera (eyes + alidade angle), the player view camera,
         /// derived angles and the sun vectors (own Meeus vs game TOD_Sky).
@@ -413,6 +471,22 @@ namespace UBOAT.Mods.RadioNavigation
                     "{0} VECSUN {1} own{2} alt={3:F2} az={4:F1} game{5} galt={6:F2} angSunR={7:F3} sep={8:F3}",
                     LogPrefix, trigger, own ? V3(sunDir) : " n/a", sunAlt, sunAz,
                     game ? V3(gameDir) : " n/a", gameAlt, angSun, sep));
+            }
+            if (own && pipRightCamera != null)
+            {
+                // Sun projected into the right camera's viewport: proves the
+                // rendered picture matches the astro math (center = 0.5,0.5).
+                Vector3 sunNdc = pipRightCamera.WorldToViewportPoint(pipRightCamera.transform.position + sunDir * 1000f);
+                float nx = (sunNdc.x - 0.5f) * 2f;
+                float ny = (sunNdc.y - 0.5f) * 2f;
+                float tanHalf = Mathf.Tan(pipRightCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+                if (tanHalf < 0.001f) tanHalf = 0.176f;
+                float dxDeg = Mathf.Atan2(nx * tanHalf, 1f) * Mathf.Rad2Deg;
+                float dyDeg = Mathf.Atan2(ny * tanHalf, 1f) * Mathf.Rad2Deg;
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "{0} VECSP {1} ndc=({2:F3},{3:F3}) offDeg=({4:F2},{5:F2}) fov={6:F1}",
+                    LogPrefix, trigger, sunNdc.x, sunNdc.y, dxDeg, dyDeg,
+                    pipRightCamera.fieldOfView));
             }
         }
 
@@ -801,12 +875,21 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (tick)
             {
-                lastFoundName = FindNearestBodyName();
+                float bodyAlt;
+                lastFoundName = FindNearestBodyName(out bodyAlt);
                 if (lastFoundName != null)
                 {
                     holdTimer += StarIdIntervalSeconds;
                     if (holdTimer >= IdentifyHoldSeconds)
+                    {
+                        bool justIdentified = identifiedName != lastFoundName;
                         identifiedName = lastFoundName;
+                        if (justIdentified)
+                            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                                "{0} IDHIT name={1} alt={2:F2} arc={3:F2} |d|={4:F2}",
+                                LogPrefix, lastFoundName, bodyAlt, arcAngle,
+                                Math.Abs(bodyAlt - (float)arcAngle)));
+                    }
                 }
                 else
                 {
@@ -819,18 +902,25 @@ namespace UBOAT.Mods.RadioNavigation
                 nameText.text = identifiedName;
         }
 
-        private string FindNearestBodyName()
+        private string FindNearestBodyName(out float bodyAltDeg)
         {
             Vector3 sunDir;
             float sunAlt;
             float sunAz;
             Vector3 pipFwd = GetPipForward();
             if (pipFwd.sqrMagnitude < 0.01f)
+            {
+                bodyAltDeg = -1f;
                 return null;
+            }
             if (TryGetOwnSun(out sunDir, out sunAlt, out sunAz)
                 && Vector3.Angle(pipFwd, sunDir) <= IdentifyConeDeg)
+            {
+                bodyAltDeg = sunAlt;
                 return SunName;
+            }
 
+            bodyAltDeg = -1f;
             float lat, lon;
             if (!positionProvider.TryGetPosition(out lat, out lon))
                 return null;
@@ -861,6 +951,7 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     bestCos = cos;
                     bestHip = stars[i].Hip;
+                    bodyAltDeg = (float)(altRad * Mathf.Rad2Deg);
                 }
             }
 
