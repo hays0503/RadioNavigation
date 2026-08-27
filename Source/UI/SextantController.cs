@@ -222,10 +222,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         // Water renders itself only for cameras listed on the main camera's
         // AdditionalCameraData (periscope pattern, Periscope.cs:581).
-        // Viewport3D path: water attach disabled for minimal PIP test.
         private void AttachWaterCamera()
         {
-            return;
             if (pipCamera == null)
                 return;
             MainCamera main = MainCamera.Instance;
@@ -329,10 +327,10 @@ namespace UBOAT.Mods.RadioNavigation
             if (pipCamera != null)
                 return;
 
-            // Viewport3D path: plain camera with targetTexture. The game's
-            // custom AdditionalCameraData + Passes path kept RT white (passes
-            // misconfigured, volumeLayer private). Viewport3D.cs:86 does the
-            // same with one line and works for UI previews without water.
+            // Clone the MainCamera's rendering setup (periscope pattern).
+            // Viewport3D's plain targetTexture path kept the RT white in this
+            // custom SRP - the pipeline needs AdditionalCameraData with valid
+            // passes, PostProcessLayer with Init, and Water registration.
             rt = new RenderTexture(RtSize, RtSize, 32, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
             rt.name = "RadioNavSextantRT";
             rt.filterMode = FilterMode.Bilinear;
@@ -346,12 +344,116 @@ namespace UBOAT.Mods.RadioNavigation
             pipCamera.enabled = false;
             pipCamera.allowHDR = true;
             pipCamera.allowMSAA = false;
-            // Keep the game's custom pipeline from culling this camera: no
-            // AdditionalCameraData is added in Viewport3D mode. Water will be
-            // missing but the horizon/sky will be visible - that is enough to
-            // verify the PIP itself. If this works, water can be re-added.
 
-            Debug.Log(LogPrefix + " PIP camera created (Viewport3D path), RT=" + RtSize + "^2 HDR Linear");
+            GameObject mainGo = viewCamera != null ? viewCamera.gameObject : null;
+            if (mainGo == null && MainCamera.Instance != null)
+                mainGo = MainCamera.Instance.gameObject;
+            if (mainGo != null)
+            {
+                // AdditionalCameraData - deep copy from main, then fix flags
+                var mainAdd = mainGo.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                if (mainAdd != null)
+                {
+                    var pipAdd = go.AddComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                    CopyComponent(mainAdd, pipAdd);
+                    pipAdd.RenderScene = true;
+                    // Ensure passes are a deep copy (shared array would mutate main)
+                    try
+                    {
+                        Type t = pipAdd.GetType();
+                        Type passType = t.GetNestedType("CameraPass", BindingFlags.Public | BindingFlags.NonPublic);
+                        FieldInfo passesField = null;
+                        FieldInfo useCustomField = null;
+                        foreach (FieldInfo f in t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
+                        {
+                            if (f.FieldType.IsArray && f.FieldType.GetElementType() == passType)
+                                passesField = f;
+                            else if (f.FieldType == typeof(bool) && f.Name.IndexOf("useCustom", StringComparison.OrdinalIgnoreCase) >= 0)
+                                useCustomField = f;
+                        }
+                        if (passesField != null)
+                        {
+                            Array src = mainAdd.Passes as Array;
+                            if (src != null && src.Length > 0)
+                            {
+                                Array copy = Array.CreateInstance(passType, src.Length);
+                                PropertyInfo cullingProp = passType.GetProperty("CullingMask");
+                                PropertyInfo enabledProp = passType.GetProperty("Enabled");
+                                for (int i = 0; i < src.Length; i++)
+                                {
+                                    object s = src.GetValue(i);
+                                    int mask = cullingProp != null && cullingProp.GetValue(s) is int mm ? mm : pipCamera.cullingMask;
+                                    object c = Activator.CreateInstance(passType, mask);
+                                    if (enabledProp != null && enabledProp.GetValue(s) is bool en)
+                                        enabledProp.SetValue(c, en);
+                                    copy.SetValue(c, i);
+                                }
+                                passesField.SetValue(pipAdd, copy);
+                            }
+                        }
+                        if (useCustomField != null)
+                            useCustomField.SetValue(pipAdd, true);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning(LogPrefix + " AdditionalCameraData copy failed: " + e.Message);
+                    }
+                }
+
+                // PostProcessLayer - copy volumeLayer/m_Resources and Init
+                var mainPPL = mainGo.GetComponent<PostProcessLayer>();
+                if (mainPPL != null)
+                {
+                    var pipPPL = go.AddComponent<PostProcessLayer>();
+                    CopyComponent(mainPPL, pipPPL);
+                    pipPPL.antialiasingMode = PostProcessLayer.Antialiasing.None;
+                    try
+                    {
+                        FieldInfo volField = typeof(PostProcessLayer).GetField("volumeLayer", BindingFlags.NonPublic | BindingFlags.Instance);
+                        FieldInfo resField = typeof(PostProcessLayer).GetField("m_Resources", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (volField != null)
+                            volField.SetValue(pipPPL, volField.GetValue(mainPPL));
+                        PostProcessResources res = resField != null ? resField.GetValue(pipPPL) as PostProcessResources : null;
+                        if (res == null)
+                        {
+                            PostProcessResources[] all = Resources.FindObjectsOfTypeAll<PostProcessResources>();
+                            res = all != null && all.Length > 0 ? all[0] : null;
+                            if (res != null && resField != null)
+                                resField.SetValue(pipPPL, res);
+                        }
+                        if (res != null)
+                            pipPPL.Init(res);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning(LogPrefix + " PostProcessLayer copy failed: " + e.Message);
+                    }
+                }
+
+                // Copy remaining rendering components (Water, fog, etc.) generically.
+                // Viewport3D works without them, but for horizon fidelity we
+                // mirror whatever MainCamera has.
+                foreach (Component comp in mainGo.GetComponents<Component>())
+                {
+                    if (comp is Camera || comp is Transform) continue;
+                    if (comp is MainCamera) continue;
+                    if (comp is AudioListener) continue;
+                    if (comp is UBOAT.Game.Scene.Rendering.AdditionalCameraData) continue;
+                    if (comp is PostProcessLayer) continue;
+                    if (comp.GetType().Name == "PostProcessingBehaviour") continue;
+                    Type t = comp.GetType();
+                    // Only copy rendering-related behaviours to keep the clone light
+                    string n = t.Name;
+                    if (!(n.Contains("Water") || n.Contains("Fog") || n.Contains("SSMS") || n.Contains("Flare") || n.Contains("Blur") || n.Contains("Drops") || n.Contains("Underwater")))
+                        continue;
+                    Component copy = go.GetComponent(t);
+                    if (copy != null) continue;
+                    copy = go.AddComponent(t);
+                    CopyComponent(comp, copy);
+                }
+            }
+
+            Debug.Log(LogPrefix + " PIP camera created (cloned from MainCamera), RT=" + RtSize + "^2 HDR Linear");
         }
 
         private void UpdatePipPose()
@@ -966,6 +1068,25 @@ namespace UBOAT.Mods.RadioNavigation
             r.pivot = new Vector2(0.5f, 0.5f);
             r.sizeDelta = new Vector2(w, h);
             r.anchoredPosition = Vector2.zero;
+        }
+
+        private static void CopyComponent(Component src, Component dst)
+        {
+            Type t = src.GetType();
+            foreach (FieldInfo f in t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (f.IsNotSerialized)
+                    continue;
+                try { f.SetValue(dst, f.GetValue(src)); } catch { }
+            }
+            foreach (PropertyInfo p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!p.CanRead || !p.CanWrite) continue;
+                if (p.GetIndexParameters().Length > 0) continue;
+                // Skip Unity object references that would duplicate singleton links
+                if (typeof(Component).IsAssignableFrom(p.PropertyType) || typeof(GameObject).IsAssignableFrom(p.PropertyType)) continue;
+                try { p.SetValue(dst, p.GetValue(src)); } catch { }
+            }
         }
 
         private Sprite CreateRingSprite()
