@@ -523,18 +523,18 @@ namespace UBOAT.Mods.RadioNavigation
             if (tanHalf < 0.001f) tanHalf = 0.176f; // ~10deg
             Quaternion invRot = Quaternion.Inverse(Quaternion.Euler((float)arcAngle, viewCamera.transform.eulerAngles.y, 0f));
 
-            // Sun
+            // Sun - only in right (mirror) half
             Vector3 sunDir;
             float sunAlt, sunAz;
             bool sunVisible = TryGetOwnSun(out sunDir, out sunAlt, out sunAz);
             if (sunVisible)
             {
                 Vector3 local = invRot * sunDir;
-                if (local.z > 0.05f)
+                if (local.z > 0.05f && local.x > 0.02f)
                 {
                     float nx = (local.x / local.z) / tanHalf;
                     float ny = (local.y / local.z) / tanHalf;
-                    if (Mathf.Abs(nx) < 1.05f && Mathf.Abs(ny) < 1.05f)
+                    if (Mathf.Abs(nx) < 1.05f && Mathf.Abs(ny) < 1.05f && nx > 0.02f)
                     {
                         sunDot.enabled = true;
                         sunDot.rectTransform.anchoredPosition = new Vector2(nx * 300f, ny * 300f);
@@ -574,6 +574,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Vector3 dir = new Vector3((float)(e / len), (float)(u / len), (float)(n / len));
                 Vector3 local2 = invRot * dir;
                 if (local2.z <= 0.1f) continue;
+                if (local2.x <= 0.02f) continue; // only right (mirror) half
                 float nx2 = (local2.x / local2.z) / tanHalf;
                 float ny2 = (local2.y / local2.z) / tanHalf;
                 if (Mathf.Abs(nx2) > 1f || Mathf.Abs(ny2) > 1f) continue;

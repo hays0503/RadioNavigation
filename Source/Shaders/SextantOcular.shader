@@ -93,15 +93,19 @@ Shader "UI/SextantOcular"
             fixed4 frag(v2f IN) : SV_Target
             {
                 float2 uv = IN.texcoord;
-                // horizon in UV space: 0.5 + offset, offset = -arcAngle / (FOV/2) * 0.5
-                float horizonY = 0.5 + _HorizonOffset;
+                // Left ocular: direct horizon fixed at 0.5, Right ocular: mirror horizon moves with _HorizonOffset
+                float isRight = step(0.5, uv.x);
+                float horizonY = lerp(0.5, 0.5 + _HorizonOffset, isRight);
                 // sky gradient above horizon, sea below
                 float skyT = saturate((uv.y - horizonY) / max(0.001, 1.0 - horizonY));
-                float seaT = saturate((horizonY - uv.y) / max(0.001, horizonY));
                 fixed4 skyCol = lerp(_SkyHorizon, _SkyTop, skyT);
                 fixed4 seaCol = _Sea;
                 fixed4 col = uv.y > horizonY ? skyCol : seaCol;
-                // natural horizon - no white line (user request)
+                // Right mirror is slightly darker (half-silvered)
+                col.rgb *= lerp(1.0, 0.88, isRight * 0.6);
+                // Vertical seam between direct (left) and mirror (right)
+                float seam = 1.0 - smoothstep(0.0, 0.003, abs(uv.x - 0.5));
+                col = lerp(col, fixed4(1,1,1,0.7), seam * 0.55);
                 // subtle vignette inside shader (outer ring already does, keep light)
                 float2 d = uv * 2.0 - 1.0;
                 float r = dot(d, d) * 0.5;
