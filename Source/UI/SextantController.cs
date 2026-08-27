@@ -138,6 +138,14 @@ namespace UBOAT.Mods.RadioNavigation
         private Texture2D circleMaskTexture;
         private static Font sextantOsFont;
 
+        // PPv2 bloom-cut volume: a dedicated global volume on a layer present
+        // ONLY in the PIP cameras' volumeLayer masks, so while a shade filter
+        // is installed the game's sun glow/bloom is disabled in the lenses
+        // (the main camera never consumes that layer - real filter look).
+        private GameObject bloomCutGo;
+        private int bloomCutLayer;
+        private const int BloomCutLayerCandidate = 7;
+
         private readonly IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
 
         private void Update()
@@ -177,6 +185,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (canvasRoot != null) Destroy(canvasRoot);
             if (pipLeftCamera != null) Destroy(pipLeftCamera.gameObject);
             if (pipRightCamera != null) Destroy(pipRightCamera.gameObject);
+            if (bloomCutGo != null) Destroy(bloomCutGo);
             if (leftRt != null)
             {
                 leftRt.Release();
@@ -276,6 +285,8 @@ namespace UBOAT.Mods.RadioNavigation
                 gameInput.RemoveBlockade(this);
             DetachWaterCameras();
             SunDiscRenderer.Active = false;
+            if (bloomCutGo != null)
+                bloomCutGo.SetActive(false);
             if (pipLeftCamera != null)
                 pipLeftCamera.enabled = false;
             if (pipRightCamera != null)
@@ -609,6 +620,12 @@ namespace UBOAT.Mods.RadioNavigation
             UpdateFilterLabel();
             UpdateFilterDim();
             SunDiscRenderer.Active = IsOpen && filterCount > 0;
+            if (bloomCutGo != null)
+            {
+                bool on = IsOpen && filterCount > 0;
+                bloomCutGo.SetActive(on);
+                Debug.Log(LogPrefix + " BLOOMCUT " + (on ? "on" : "off") + " (filters=" + filterCount + ")");
+            }
         }
 
         private void UpdateFilterDim()
@@ -714,6 +731,12 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             cam.depthTextureMode = viewCamera.depthTextureMode;
+
+            // Bloom-cut: PPv2 volume on a PIP-only layer. While a filter is
+            // installed the sun's glow is disabled inside the lenses; the
+            // main camera's PostProcessLayer never consumes this layer, so
+            // the FPP view keeps its normal bloom.
+            EnsureBloomCutVolume(go);
 
             SextantCameraProbe probe = go.AddComponent<SextantCameraProbe>();
             probe.tracked = cam;
@@ -857,6 +880,42 @@ namespace UBOAT.Mods.RadioNavigation
                 sb.Append(comps[i] != null ? comps[i].GetType().Name : "null");
             }
             Debug.Log(LogPrefix + " PIPSTACK [" + go.name + "] " + sb.ToString());
+        }
+
+        private void EnsureBloomCutVolume(GameObject pipGo)
+        {
+            try
+            {
+                PostProcessLayer pipLayer = pipGo.GetComponent<PostProcessLayer>();
+                if (pipLayer == null)
+                    return;
+
+                // Layer 7 (unused by the game) must be added to the PIP
+                // PostProcessLayer's volumeLayer mask so the volume is
+                // consumed; the main camera's mask never contains it.
+                pipLayer.volumeLayer |= (1 << BloomCutLayerCandidate);
+
+                if (bloomCutGo != null)
+                    return;
+
+                bloomCutLayer = BloomCutLayerCandidate;
+                bloomCutGo = new GameObject("RadioNavSextantBloomCut");
+                bloomCutGo.layer = bloomCutLayer;
+                PostProcessVolume volume = bloomCutGo.AddComponent<PostProcessVolume>();
+                volume.isGlobal = true;
+                volume.priority = 1000f;
+                PostProcessProfile profile = ScriptableObject.CreateInstance<PostProcessProfile>();
+                profile.name = "RadioNavSextantBloomCut";
+                Bloom bloom = profile.AddSettings<Bloom>();
+                bloom.enabled.value = false;
+                volume.sharedProfile = profile;
+                bloomCutGo.SetActive(false); // active only while filter>0
+                Debug.Log(LogPrefix + " BLOOMCUT volume on layer " + bloomCutLayer + " created (hidden)");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning(LogPrefix + " BLOOMCUT failed: " + e.Message);
+            }
         }
 
         private void RefreshMirroredState()
