@@ -294,6 +294,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void UpdateFilterDim()
         {
+            if (!GlareEnabled)
+                return;
             if (filterDimImage == null)
                 return;
             Color c = filterDimImage.color;
@@ -383,9 +385,25 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         // ---- glare -----------------------------------------------------------
+        // v1.7: glare mechanic temporarily disabled for the white-ocular
+        // diagnosis. Flip to true to restore filters + pain + white flash.
+        private const bool GlareEnabled = false;
 
         private void UpdateGlare(float dt)
         {
+            if (!GlareEnabled)
+            {
+                ApplyGlare(0f);
+                if (filterDimImage != null)
+                {
+                    Color c = filterDimImage.color;
+                    c.a = 0f;
+                    filterDimImage.color = c;
+                }
+                LogSunDrift(dt);
+                return;
+            }
+
             float g = 0f;
             Vector3 sunDir;
             float sunAlt;
