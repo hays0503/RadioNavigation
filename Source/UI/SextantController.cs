@@ -1231,6 +1231,17 @@ namespace UBOAT.Mods.RadioNavigation
             Mask ocularMask = pipGo.GetComponent<Mask>();
             ocularMask.showMaskGraphic = false;
 
+            // Opaque black plate under the PIP views: hides the world behind
+            // the lenses regardless of the RT alpha left by the game's post
+            // stack. Clipped to the circle by the Mask; the veil outside
+            // stays unchanged (vignette).
+            GameObject backingGo = new GameObject("LensBacking", typeof(Image));
+            backingGo.transform.SetParent(pipGo.transform, false);
+            Image backing = backingGo.GetComponent<Image>();
+            backing.color = new Color(0f, 0f, 0f, 1f);
+            backing.raycastTarget = false;
+            Stretch(backing.rectTransform);
+
             // Left half: fixed-horizon camera view (pitch 0). Shows only the
             // left half of its RT so the optical axis sits at the split line
             // (screen center); the right half of the frame is not drawn.
