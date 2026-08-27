@@ -75,7 +75,10 @@ namespace UBOAT.Mods.RadioNavigation
         private float lastVectorLogYaw;
         private float renderCheckTimer;
         private bool renderCheckDone;
+        private bool renderCheckSecondPending;
+        private bool renderCheckSecondDone;
         private Texture2D renderCheckTex;
+        private float manualRenderLogTimer;
 
         private Camera viewCamera;
         private MainCamera gameMainCamera;
@@ -378,17 +381,43 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// One-shot RT pixel probe ~1 s after open: proves both PIP cameras
-        /// actually render into their targets (regression guard for blank RT).
+        /// RT pixel probe: once ~1 s after open, and once more ~1 s after the
+        /// alidade first passes 20 deg - proves the PIP cameras render and
+        /// that the right RT content follows the pose (frozen = same colors).
         /// </summary>
         private void RenderCheck(float dt)
         {
-            if (renderCheckDone)
+            if (renderCheckDone && !renderCheckSecondPending)
                 return;
-            renderCheckTimer -= dt;
-            if (renderCheckTimer > 0f)
+
+            if (!renderCheckDone)
+            {
+                renderCheckTimer -= dt;
+                if (renderCheckTimer > 0f)
+                    return;
+                renderCheckDone = true;
+                DoRenderCheck("open");
                 return;
-            renderCheckDone = true;
+            }
+
+            if (arcAngle > 20.0 && !renderCheckSecondPending && !renderCheckSecondDone)
+            {
+                renderCheckSecondPending = true;
+                renderCheckTimer = 1.0f;
+            }
+            if (renderCheckSecondPending)
+            {
+                renderCheckTimer -= dt;
+                if (renderCheckTimer > 0f)
+                    return;
+                renderCheckSecondPending = false;
+                renderCheckSecondDone = true;
+                DoRenderCheck("arc20");
+            }
+        }
+
+        private void DoRenderCheck(string tag)
+        {
             if (leftRt == null || rightRt == null || !leftRt.IsCreated() || !rightRt.IsCreated())
             {
                 Debug.LogWarning(LogPrefix + " RENDERCHECK rt missing");
@@ -407,8 +436,8 @@ namespace UBOAT.Mods.RadioNavigation
                 Color rb = SampleRt(rightRt, 0.1f);
                 RenderTexture.active = prev;
                 Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} RENDERCHECK left(t/m/b)=#{1}/#{2}/#{3} right(t/m/b)=#{4}/#{5}/#{6}",
-                    LogPrefix,
+                    "{0} RENDERCHECK {1} left(t/m/b)=#{2}/#{3}/#{4} right(t/m/b)=#{5}/#{6}/#{7}",
+                    LogPrefix, tag,
                     ColorUtility.ToHtmlStringRGB(lt), ColorUtility.ToHtmlStringRGB(lm),
                     ColorUtility.ToHtmlStringRGB(lb), ColorUtility.ToHtmlStringRGB(rtTop),
                     ColorUtility.ToHtmlStringRGB(rm), ColorUtility.ToHtmlStringRGB(rb)));
@@ -634,6 +663,29 @@ namespace UBOAT.Mods.RadioNavigation
 
             SyncCameraState(pipLeftCamera, viewCamera);
             SyncCameraState(pipRightCamera, viewCamera);
+
+            // The game's SRP renders attached cameras once and never
+            // refreshes them with the updated pose; force the render so the
+            // right RT follows the alidade.
+            if (VectorLogEnabled)
+            {
+                manualRenderLogTimer -= Time.unscaledDeltaTime;
+                if (manualRenderLogTimer <= 0f)
+                {
+                    manualRenderLogTimer = 1f;
+                    Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                        "{0} MANUALRENDER frame={1} arc={2:F2}",
+                        LogPrefix, Time.frameCount, arcAngle));
+                }
+            }
+            try
+            {
+                pipRightCamera.Render();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning(LogPrefix + " MANUALRENDER failed: " + e.Message);
+            }
         }
 
         private void SyncCameraState(Camera cam, Camera source)
