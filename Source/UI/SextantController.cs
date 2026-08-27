@@ -61,7 +61,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
         public static bool IsOpen { get; private set; }
 
-        private double arcAngle;
+        internal double arcAngle;
         private int filterCount;
         private float holdTimer;
         private float starIdTimer;
@@ -215,8 +215,10 @@ namespace UBOAT.Mods.RadioNavigation
             // cameras (not attached) need enabled=true.
             if (pipLeftCamera != null)
                 pipLeftCamera.enabled = registeredWaterData == null;
+            // The right camera must re-render with the updated pose: the
+            // attached pass list does not refresh it, so keep it enabled.
             if (pipRightCamera != null)
-                pipRightCamera.enabled = registeredWaterData == null;
+                pipRightCamera.enabled = true;
             int attachedCount = 0;
             if (registeredWaterData != null)
             {
@@ -397,21 +399,31 @@ namespace UBOAT.Mods.RadioNavigation
             try
             {
                 RenderTexture prev = RenderTexture.active;
-                RenderTexture.active = leftRt;
-                renderCheckTex.ReadPixels(new Rect(leftRt.width / 2, leftRt.height / 2, 1, 1), 0, 0);
-                Color lc = renderCheckTex.GetPixel(0, 0);
-                RenderTexture.active = rightRt;
-                renderCheckTex.ReadPixels(new Rect(rightRt.width / 2, rightRt.height / 2, 1, 1), 0, 0);
-                Color rc = renderCheckTex.GetPixel(0, 0);
+                Color lt = SampleRt(leftRt, 0.9f);
+                Color lm = SampleRt(leftRt, 0.5f);
+                Color lb = SampleRt(leftRt, 0.1f);
+                Color rtTop = SampleRt(rightRt, 0.9f);
+                Color rm = SampleRt(rightRt, 0.5f);
+                Color rb = SampleRt(rightRt, 0.1f);
                 RenderTexture.active = prev;
                 Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} RENDERCHECK left=#{1} right=#{2}",
-                    LogPrefix, ColorUtility.ToHtmlStringRGB(lc), ColorUtility.ToHtmlStringRGB(rc)));
+                    "{0} RENDERCHECK left(t/m/b)=#{1}/#{2}/#{3} right(t/m/b)=#{4}/#{5}/#{6}",
+                    LogPrefix,
+                    ColorUtility.ToHtmlStringRGB(lt), ColorUtility.ToHtmlStringRGB(lm),
+                    ColorUtility.ToHtmlStringRGB(lb), ColorUtility.ToHtmlStringRGB(rtTop),
+                    ColorUtility.ToHtmlStringRGB(rm), ColorUtility.ToHtmlStringRGB(rb)));
             }
             catch (Exception e)
             {
                 Debug.LogWarning(LogPrefix + " RENDERCHECK failed: " + e.Message);
             }
+        }
+
+        private Color SampleRt(RenderTexture target, float v)
+        {
+            RenderTexture.active = target;
+            renderCheckTex.ReadPixels(new Rect(target.width / 2, (int)(target.height * v), 1, 1), 0, 0);
+            return renderCheckTex.GetPixel(0, 0);
         }
 
         /// <summary>
@@ -597,6 +609,10 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Debug.LogWarning(LogPrefix + " main camera has no PostProcessLayer - PIP stays untonemapped");
             }
+
+            SextantCameraProbe probe = go.AddComponent<SextantCameraProbe>();
+            probe.tracked = cam;
+            probe.owner = this;
 
             return cam;
         }
@@ -1339,6 +1355,30 @@ namespace UBOAT.Mods.RadioNavigation
             tex.Apply();
             circleMaskTexture = tex;
             return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+        }
+    }
+
+    /// <summary>
+    /// Render probe: OnPreRender fires only when the camera actually renders,
+    /// so these logs prove whether the SRP re-renders the PIP cameras every
+    /// frame and with which pose (frozen forward = cached matrices).
+    /// </summary>
+    internal sealed class SextantCameraProbe : MonoBehaviour
+    {
+        public Camera tracked;
+        public SextantController owner;
+
+        private void OnPreRender()
+        {
+            if (tracked == null || owner == null)
+                return;
+            if (Time.frameCount < 10 || Time.frameCount % 60 == 0)
+            {
+                Vector3 f = tracked.transform.forward;
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "[RadioNav][Sextant] PRERENDER {0} frame={1} fwd=({2:F2},{3:F2},{4:F2}) arc={5:F2}",
+                    tracked.name, Time.frameCount, f.x, f.y, f.z, owner.arcAngle));
+            }
         }
     }
 }
