@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using System.Reflection;
+using System.Text;
 using DWS.Common.InjectionFramework;
 using UBOAT.Game.Core.Input;
 using UBOAT.Game.Scene.Camera;
@@ -107,6 +108,18 @@ namespace UBOAT.Mods.RadioNavigation
         private RawImage rightViewImage;
         private UBOAT.Game.Scene.Rendering.AdditionalCameraData registeredWaterData;
         private bool waterAttachWarned;
+
+        // 1:1 mirror of the main camera's rendering stack (periscope camera
+        // pattern): effect components are copied from the FPP camera onto the
+        // PIP cameras so the SRP renders them with the same fog/post look.
+        private Component pipSsmsFog;
+        private Component pipSsms;
+        private Component pipPpBehaviour;
+        private Component sourceSsmsFog;
+        private Component sourceSsms;
+        private Component sourcePpBehaviour;
+        private readonly System.Collections.Generic.Dictionary<Type, MemberInfo[]> mirrorMemberCache =
+            new System.Collections.Generic.Dictionary<Type, MemberInfo[]>();
 
         private GameObject canvasRoot;
         private RectTransform pipRect;
@@ -569,9 +582,9 @@ namespace UBOAT.Mods.RadioNavigation
             if (pipLeftCamera != null && pipRightCamera != null)
                 return;
 
-            leftRt = new RenderTexture(RtWidth, RtHeight, 24);
+            leftRt = new RenderTexture(RtWidth, RtHeight, 32, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
             leftRt.name = "RadioNavSextantLeftRT";
-            rightRt = new RenderTexture(RtWidth, RtHeight, 24);
+            rightRt = new RenderTexture(RtWidth, RtHeight, 32, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
             rightRt.name = "RadioNavSextantRightRT";
 
             pipLeftCamera = ConfigurePipCamera("RadioNavSextantLeftCamera", leftRt);
@@ -603,47 +616,172 @@ namespace UBOAT.Mods.RadioNavigation
             SetupRenderPasses(pipAdd,
                 viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>(),
                 cam.cullingMask);
-
-            // Post stack v2 (game's custom fork): without it the HDR sky/sea
-            // clip to pure white (in-game finding 2026-08-26). The fork hides
-            // volumeLayer/m_Resources, so both are copied from the main
-            // camera's layer via reflection.
-            PostProcessLayer mainLayer = viewCamera.GetComponent<PostProcessLayer>();
-            if (mainLayer != null)
+            try
             {
-                PostProcessLayer pipLayer = go.AddComponent<PostProcessLayer>();
-                pipLayer.antialiasingMode = PostProcessLayer.Antialiasing.None;
-
-                FieldInfo volumeField = typeof(PostProcessLayer).GetField("volumeLayer",
-                    BindingFlags.NonPublic | BindingFlags.Instance);
-                FieldInfo resourcesField = typeof(PostProcessLayer).GetField("m_Resources",
-                    BindingFlags.NonPublic | BindingFlags.Instance);
-                if (volumeField != null)
-                    volumeField.SetValue(pipLayer, volumeField.GetValue(mainLayer));
-
-                PostProcessResources resources = resourcesField != null
-                    ? resourcesField.GetValue(mainLayer) as PostProcessResources
-                    : null;
-                if (resources == null)
-                {
-                    PostProcessResources[] allResources = Resources.FindObjectsOfTypeAll<PostProcessResources>();
-                    resources = allResources != null && allResources.Length > 0 ? allResources[0] : null;
-                }
-                if (resources != null)
-                    pipLayer.Init(resources);
-                else
-                    Debug.LogWarning(LogPrefix + " PostProcessResources not found - PIP stays untonemapped");
+                var mainAdd = viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                if (mainAdd != null)
+                    pipAdd.ShadowDistance = mainAdd.ShadowDistance;
             }
-            else
-            {
-                Debug.LogWarning(LogPrefix + " main camera has no PostProcessLayer - PIP stays untonemapped");
-            }
+            catch { }
+
+            // 1:1 mirror of the main camera's rendering stack: PPv2
+            // PostProcessLayer + legacy PostProcessingBehaviour + SSMSGlobalFog
+            // + SSMS, copied in the exact component order of the FPP camera,
+            // so the SRP renders the PIP views with the same fog/post look.
+            AddMirroredEffectComponents(go);
+
+            cam.depthTextureMode = viewCamera.depthTextureMode;
 
             SextantCameraProbe probe = go.AddComponent<SextantCameraProbe>();
             probe.tracked = cam;
             probe.owner = this;
 
             return cam;
+        }
+
+        private void ResolveMirrorSources()
+        {
+            if (sourceSsmsFog != null || viewCamera == null)
+                return;
+            sourceSsmsFog = FindComponent(viewCamera, "SSMSGlobalFog");
+            sourceSsms = FindComponent(viewCamera, "SSMS");
+            sourcePpBehaviour = FindComponent(viewCamera, "PostProcessingBehaviour");
+        }
+
+        private static Component FindComponent(Camera cam, string typeName)
+        {
+            MonoBehaviour[] comps = cam.GetComponents<MonoBehaviour>();
+            for (int i = 0; i < comps.Length; i++)
+            {
+                if (comps[i] != null && comps[i].GetType().Name == typeName)
+                    return comps[i];
+            }
+            return null;
+        }
+
+        private void AddMirroredEffectComponents(GameObject go)
+        {
+            ResolveMirrorSources();
+            if (viewCamera == null)
+                return;
+
+            // Preserve the exact component order of the source camera so the
+            // SRP/effect chain matches the reference render 1:1.
+            MonoBehaviour[] comps = viewCamera.GetComponents<MonoBehaviour>();
+            for (int i = 0; i < comps.Length; i++)
+            {
+                if (comps[i] == null)
+                    continue;
+                Type t = comps[i].GetType();
+                string name = t.Name;
+                if (name != "PostProcessLayer" && name != "PostProcessingBehaviour" &&
+                    name != "SSMSGlobalFog" && name != "SSMS")
+                    continue;
+
+                Component source = comps[i];
+                Component dst = go.AddComponent(t);
+                MemberInfo[] members = GetMirrorMembers(t);
+                CopyMembers(source, dst, members);
+                if (name == "PostProcessLayer")
+                    CopyPrivatePostLayerFields(source, dst);
+                else if (name == "SSMSGlobalFog")
+                    pipSsmsFog = dst;
+                else if (name == "SSMS")
+                    pipSsms = dst;
+                else if (name == "PostProcessingBehaviour")
+                    pipPpBehaviour = dst;
+            }
+
+            LogPipStack(go);
+        }
+
+        private static MemberInfo[] GetMirrorMembers(Type t)
+        {
+            var list = new System.Collections.Generic.List<MemberInfo>();
+            foreach (FieldInfo f in t.GetFields(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (f.IsInitOnly || f.IsStatic)
+                    continue;
+                list.Add(f);
+            }
+            foreach (PropertyInfo p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!p.CanRead || !p.CanWrite || p.GetIndexParameters().Length > 0)
+                    continue;
+                list.Add(p);
+            }
+            return list.ToArray();
+        }
+
+        private MemberInfo[] GetMirrorMembersCached(Type t)
+        {
+            MemberInfo[] cached;
+            if (!mirrorMemberCache.TryGetValue(t, out cached))
+            {
+                cached = GetMirrorMembers(t);
+                mirrorMemberCache[t] = cached;
+            }
+            return cached;
+        }
+
+        private static void CopyMembers(Component from, Component to, MemberInfo[] members)
+        {
+            if (members == null)
+                return;
+            for (int i = 0; i < members.Length; i++)
+            {
+                try
+                {
+                    FieldInfo f = members[i] as FieldInfo;
+                    if (f != null)
+                        f.SetValue(to, f.GetValue(from));
+                    else
+                        ((PropertyInfo)members[i]).SetValue(to,
+                            ((PropertyInfo)members[i]).GetValue(from, null), null);
+                }
+                catch { }
+            }
+        }
+
+        private static void CopyPrivatePostLayerFields(Component from, Component to)
+        {
+            Type t = from.GetType();
+            foreach (FieldInfo f in t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (f.Name == "volumeLayer" || f.Name == "m_Resources")
+                {
+                    try { f.SetValue(to, f.GetValue(from)); } catch { }
+                }
+            }
+            try
+            {
+                PostProcessResources[] allResources = Resources.FindObjectsOfTypeAll<PostProcessResources>();
+                PostProcessLayer layer = to as PostProcessLayer;
+                if (allResources != null && allResources.Length > 0 && layer != null)
+                    layer.Init(allResources[0]);
+            }
+            catch { }
+        }
+
+        private void LogPipStack(GameObject go)
+        {
+            UnityEngine.Object[] comps = go.GetComponents(typeof(UnityEngine.Component));
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < comps.Length; i++)
+            {
+                if (i > 0)
+                    sb.Append(",");
+                sb.Append(comps[i] != null ? comps[i].GetType().Name : "null");
+            }
+            Debug.Log(LogPrefix + " PIPSTACK [" + go.name + "] " + sb.ToString());
+        }
+
+        private void RefreshMirroredState()
+        {
+            if (pipSsmsFog != null && sourceSsmsFog != null)
+                CopyMembers(sourceSsmsFog, pipSsmsFog, GetMirrorMembersCached(sourceSsmsFog.GetType()));
+            if (pipSsms != null && sourceSsms != null)
+                CopyMembers(sourceSsms, pipSsms, GetMirrorMembersCached(sourceSsms.GetType()));
         }
 
         private void UpdatePipPose()
@@ -663,6 +801,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             SyncCameraState(pipLeftCamera, viewCamera);
             SyncCameraState(pipRightCamera, viewCamera);
+            RefreshMirroredState();
 
             // The game's SRP renders attached cameras once and never
             // refreshes them with the updated pose; force the render so the
