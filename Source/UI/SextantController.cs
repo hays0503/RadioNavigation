@@ -575,7 +575,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (doPng)
                 debugRtPngTimer = 5f;
 
-            if (rt == null || pipCamera == null || !pipCamera.isActiveAndEnabled || !rt.IsCreated())
+            if (rt == null || pipCamera == null || !rt.IsCreated())
             {
                 if (doLog)
                 {
