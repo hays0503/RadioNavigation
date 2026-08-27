@@ -947,9 +947,10 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         // ---- glare -----------------------------------------------------------
-        // v1.7: glare mechanic temporarily disabled for the white-ocular
-        // diagnosis. Flip to true to restore filters + pain + white flash.
-        private const bool GlareEnabled = false;
+        // v1.7 the glare mechanic was disabled for the white-ocular diagnosis;
+        // the diagnosis is closed (PIP cameras mirror the FPP post stack), so
+        // the full mechanic is back: shade filters, white flash, pain.
+        private const bool GlareEnabled = true;
 
         private void UpdateGlare(float dt)
         {
