@@ -419,13 +419,22 @@ SextantGlareTests: пик в 0° = sunIntensity; спад 2σ → <10%; филь
 | Элемент | Anchor | Размер/позиция |
 |---|---|---|
 | Veil | stretch full | сплошной чёрный α0.85 (константа `VeilAlpha`), БЕЗ дырки |
-| PIP RawImage (RT) | center | 600×600, **круглая маска** (Mask + circle-спрайт 256², углы = veil), мягкий радиальный край (кольцо 256²) |
-| FilterDim (v1.5) | child PIP | чёрный α=0.15×filterCount поверх RT — фильтры затемняют всю трубу (PIP без пост-стека игры: дневное небо клипается в белый) |
+| LeftView RawImage (RT левой камеры) | child PIP, левая половина `[0,0.5]×[0,1]` | **круглая маска** (Mask + circle-спрайт 256², углы = veil), мягкий радиальный край (кольцо 256²) |
+| RightView RawImage (RT правой камеры) | child PIP, правая половина `[0.5,1]×[0,1]` | та же маска |
+| VerticalSplit | center | 2×600, белый α0.35 — стык половин |
+| FilterDim (v1.5) | child PIP | чёрный α=0.15×filterCount поверх RT — фильтры затемняют всю трубу |
 | Glare-вспышка | child PIP | тот же rect, белый радиальный материал, α = glare·0.9 |
-| Линия-тик | center | ровно 600×3 (без вылезания за край круга) |
 | Колонка чтения | слева от круга, pivot(1,0.5) | угол f44 → имя f32 → «боль» f32 → «ФИЛЬТР n» f28; maxWidth 320 + ellipsis |
 | Подсказка | bottom-center, y=60 | f26, серый: `Стрелки: угол · Shift: быстрее · 1–3: фильтры · Z: выход`, постоянная |
 
+- Окуляр (v1.8, 2026-08-27): **две игровые PIP-камеры** по periscope-паттерну
+  (`AdditionalCameraData.AttachedCameras` + SRP-passes + `PostProcessLayer`-клон) —
+  левая смотрит pitch 0 (неподвижный горизонт), правая pitch = `arcAngle`
+  (0–130°, стрелки). Контент рисуют **шейдеры самой игры** (небо/море/звёзды/солнце),
+  мод меняет только угол. Кастомный шейдер окуляра, фолбэк-картинки и
+  UI-точки звёзд удалены.
+- Камеры: FOV = main/3 (`FovDivisor`), RT 512×1024 на каждую, `enabled=false`
+  (рендер через pass-лист MainCamera), солид-чёрный клир.
 - Шрифт (v1.5): **legacy `UnityEngine.UI.Text` + OS Arial**
   (`CreateDynamicFontFromOSFont`) — TMP dynamic font asset не подтянул
   кириллические глифы из OS-шрифта (in-game v1.4: боксы остались);

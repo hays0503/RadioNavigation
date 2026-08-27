@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Globalization;
-using System.IO;
 using System.Reflection;
 using DWS.Common.InjectionFramework;
 using UBOAT.Game.Core.Input;
@@ -15,8 +14,12 @@ namespace UBOAT.Mods.RadioNavigation
     /// <summary>
     /// Sextant device (SEXTANT_PLAN v1.2). Z toggles a modal overlay (Shift+Z
     /// belongs to the constellation toggle): dark veil over the live view,
-    /// central PIP camera pitched to the arc angle (world pitch, 0 = horizon),
-    /// shade filters 1/2/3, gaussian glare with pain hysteresis, star/sun
+    /// circular ocular split in two halves. The left half is a fixed-horizon
+    /// PIP camera (pitch 0), the right half is a second PIP camera pitched to
+    /// the arc angle (0-130). Both cameras use the game's own periscope render
+    /// pattern (AttachedCameras + SRP passes), so sky/sea/stars are drawn by
+    /// the game's shaders and the mod only changes the angle.
+    /// Shade filters 1/2/3, gaussian glare with pain hysteresis, star/sun
     /// identification after a 5 s hold.
     /// Layout is resolution-independent: own overlay canvas + CanvasScaler
     /// (1920x1080 reference, match height), SEXTANT_PLAN §13.
@@ -25,11 +28,10 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
 
-        // Shader ocular path (user request): no second camera, pure UI + shader
-        private const bool UseShaderOcular = true;
-
         // §13.3 layout constants (1080-space units).
         private const float OcularSizeUnits = 600f;
+        private const int RtWidth = 512;
+        private const int RtHeight = 1024;
         private const float VeilAlpha = 0.85f;
         private const float ColumnGapUnits = 40f;
         private const float ColumnWidthUnits = 320f;
@@ -44,7 +46,6 @@ namespace UBOAT.Mods.RadioNavigation
         private const float StarIdIntervalSeconds = 0.2f;
         private const float PainOnGlare = 0.6f;
         private const float PainOffGlare = 0.5f;
-        private const int RtSize = 1024;
         private const float SunDriftLogIntervalSeconds = 10f;
         private const string SunName = "\u0421\u043E\u043B\u043D\u0446\u0435";
         private const string PainMessage =
@@ -81,22 +82,20 @@ namespace UBOAT.Mods.RadioNavigation
         private bool gameSunMembersResolved;
         private bool gameSunUnavailableWarned;
 
-        // Water + post stack wiring for the PIP camera (SEXTANT_PLAN v1.6):
+        // Water + post stack wiring for the PIP cameras (SEXTANT_PLAN v1.6):
         // the game's render pipeline renders water only for cameras listed on
         // the main camera's UBOAT.Game.Scene.Rendering.AdditionalCameraData
-        // (periscope pattern), and without a PostProcessLayer the HDR sky/sea
-        // clip to pure white.
+        // (periscope pattern, Periscope.cs:581), and without a
+        // PostProcessLayer the HDR sky/sea clip to pure white.
+        private Camera pipLeftCamera;
+        private Camera pipRightCamera;
+        private RenderTexture leftRt;
+        private RenderTexture rightRt;
+        private RawImage leftViewImage;
+        private RawImage rightViewImage;
         private UBOAT.Game.Scene.Rendering.AdditionalCameraData registeredWaterData;
         private bool waterAttachWarned;
 
-        // RT debug (user request: pixel groups + screenshot of ocular)
-        private const bool DebugRtEnabled = true;
-        private float debugRtLogTimer;
-        private float debugRtPngTimer;
-        private Texture2D debugRtTex;
-
-        private RenderTexture rt;
-        private Camera pipCamera;
         private GameObject canvasRoot;
         private RectTransform pipRect;
         private Image filterDimImage;
@@ -108,19 +107,6 @@ namespace UBOAT.Mods.RadioNavigation
         private Texture2D ringTexture;
         private Texture2D circleMaskTexture;
         private static Font sextantOsFont;
-
-        // Shader ocular (UseShaderOcular=true): no RT/camera, pure UI
-        private Material ocularMaterial;
-        private Image ocularBackground;
-        private Image skyImage;
-        private Image seaImage;
-        private Image vertSplitImage;
-        private Image tickImage;
-        private RectTransform starsContainer;
-        private readonly System.Collections.Generic.List<Image> starPool = new System.Collections.Generic.List<Image>();
-        private Image sunDot;
-        private Sprite starSprite;
-        private Sprite sunSprite;
 
         private readonly IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
 
@@ -137,14 +123,10 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 HandleArcInput(Time.unscaledDeltaTime);
                 HandleFilterKeys();
-                if (UseShaderOcular)
-                    UpdateShaderOcular(false);
-                else
-                    UpdatePipPose();
+                UpdatePipPose();
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
-                DebugRt(Time.unscaledDeltaTime);
             }
             else if (Input.GetKeyDown(KeyCode.Z) && !ShiftHeld())
             {
@@ -156,19 +138,24 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (IsOpen && gameInput != null)
                 gameInput.RemoveBlockade(this);
-            DetachWaterCamera();
+            DetachWaterCameras();
             IsOpen = false;
 
             if (canvasRoot != null) Destroy(canvasRoot);
-            if (pipCamera != null) Destroy(pipCamera.gameObject);
-            if (rt != null)
+            if (pipLeftCamera != null) Destroy(pipLeftCamera.gameObject);
+            if (pipRightCamera != null) Destroy(pipRightCamera.gameObject);
+            if (leftRt != null)
             {
-                rt.Release();
-                Destroy(rt);
+                leftRt.Release();
+                Destroy(leftRt);
+            }
+            if (rightRt != null)
+            {
+                rightRt.Release();
+                Destroy(rightRt);
             }
             if (ringTexture != null) Destroy(ringTexture);
             if (circleMaskTexture != null) Destroy(circleMaskTexture);
-            if (debugRtTex != null) Destroy(debugRtTex);
         }
 
         // ---- open / close -------------------------------------------------
@@ -194,7 +181,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             EnsureOverlay();
-            EnsurePipCamera();
+            EnsurePipCameras();
 
             arcAngle = 0.0;
             filterCount = 0;
@@ -208,27 +195,22 @@ namespace UBOAT.Mods.RadioNavigation
 
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
-            if (!UseShaderOcular)
-            {
-                AttachWaterCamera();
-                // Attached cameras are rendered via MainCamera's pass list;
-                // keep enabled=false like periscope's small view. Standalone
-                // cameras (not attached) need enabled=true.
-                if (pipCamera != null)
-                    pipCamera.enabled = registeredWaterData == null;
-                UpdatePipPose();
-            }
-            else
-            {
-                UpdateShaderOcular(true);
-            }
+            AttachWaterCameras();
+            // Attached cameras are rendered via MainCamera's pass list;
+            // keep enabled=false like periscope's small view. Standalone
+            // cameras (not attached) need enabled=true.
+            if (pipLeftCamera != null)
+                pipLeftCamera.enabled = registeredWaterData == null;
+            if (pipRightCamera != null)
+                pipRightCamera.enabled = registeredWaterData == null;
+            UpdatePipPose();
             IsOpen = true;
 
             UpdateFilterLabel();
             UpdateFilterDim();
             if (painText != null) painText.enabled = false;
             UpdateReadout(true);
-            Debug.Log(LogPrefix + " opened" + (UseShaderOcular ? " (shader ocular)" : ""));
+            Debug.Log(LogPrefix + " opened (two-camera split ocular)");
         }
 
         private void Close()
@@ -239,12 +221,11 @@ namespace UBOAT.Mods.RadioNavigation
             IsOpen = false;
             if (gameInput != null)
                 gameInput.RemoveBlockade(this);
-            if (!UseShaderOcular)
-            {
-                DetachWaterCamera();
-                if (pipCamera != null)
-                    pipCamera.enabled = false;
-            }
+            DetachWaterCameras();
+            if (pipLeftCamera != null)
+                pipLeftCamera.enabled = false;
+            if (pipRightCamera != null)
+                pipRightCamera.enabled = false;
             if (canvasRoot != null)
                 canvasRoot.SetActive(false);
             Debug.Log(LogPrefix + " closed");
@@ -253,9 +234,9 @@ namespace UBOAT.Mods.RadioNavigation
         // Water renders itself only for cameras listed on the main camera's
         // AdditionalCameraData (periscope pattern, Periscope.cs:581).
         // Must be MainCamera, not the transient viewCamera (device probe).
-        private void AttachWaterCamera()
+        private void AttachWaterCameras()
         {
-            if (pipCamera == null)
+            if (pipLeftCamera == null && pipRightCamera == null)
                 return;
             MainCamera main = MainCamera.Instance;
             if (main == null)
@@ -276,14 +257,26 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             registeredWaterData = data;
-            data.AttachedCameras.Remove(pipCamera);
-            data.AttachedCameras.Add(pipCamera);
+            if (pipLeftCamera != null)
+            {
+                data.AttachedCameras.Remove(pipLeftCamera);
+                data.AttachedCameras.Add(pipLeftCamera);
+            }
+            if (pipRightCamera != null)
+            {
+                data.AttachedCameras.Remove(pipRightCamera);
+                data.AttachedCameras.Add(pipRightCamera);
+            }
         }
 
-        private void DetachWaterCamera()
+        private void DetachWaterCameras()
         {
-            if (registeredWaterData != null && pipCamera != null)
-                registeredWaterData.AttachedCameras.Remove(pipCamera);
+            if (registeredWaterData == null)
+                return;
+            if (pipLeftCamera != null)
+                registeredWaterData.AttachedCameras.Remove(pipLeftCamera);
+            if (pipRightCamera != null)
+                registeredWaterData.AttachedCameras.Remove(pipRightCamera);
             registeredWaterData = null;
         }
 
@@ -351,27 +344,37 @@ namespace UBOAT.Mods.RadioNavigation
             filterDimImage.color = c;
         }
 
-        // ---- PIP camera ------------------------------------------------------
+        // ---- PIP cameras ------------------------------------------------------
 
-        private void EnsurePipCamera()
+        private void EnsurePipCameras()
         {
-            if (UseShaderOcular)
-                return;
-            if (pipCamera != null)
+            if (pipLeftCamera != null && pipRightCamera != null)
                 return;
 
-            rt = new RenderTexture(RtSize, RtSize, 24);
-            rt.name = "RadioNavSextantRT";
+            leftRt = new RenderTexture(RtWidth, RtHeight, 24);
+            leftRt.name = "RadioNavSextantLeftRT";
+            rightRt = new RenderTexture(RtWidth, RtHeight, 24);
+            rightRt.name = "RadioNavSextantRightRT";
 
-            GameObject go = new GameObject("RadioNavSextantCamera");
-            pipCamera = go.AddComponent<Camera>();
-            pipCamera.CopyFrom(viewCamera);
-            // DIAG: solid red clear to prove the camera actually renders to RT
-            pipCamera.clearFlags = CameraClearFlags.SolidColor;
-            pipCamera.backgroundColor = Color.red;
-            pipCamera.targetTexture = rt;
-            pipCamera.fieldOfView = viewCamera.fieldOfView / FovDivisor;
-            pipCamera.enabled = false;
+            pipLeftCamera = ConfigurePipCamera("RadioNavSextantLeftCamera", leftRt);
+            pipRightCamera = ConfigurePipCamera("RadioNavSextantRightCamera", rightRt);
+
+            if (leftViewImage != null) leftViewImage.texture = leftRt;
+            if (rightViewImage != null) rightViewImage.texture = rightRt;
+
+            Debug.Log(LogPrefix + " PIP cameras created, RT=" + RtWidth + "x" + RtHeight);
+        }
+
+        private Camera ConfigurePipCamera(string name, RenderTexture target)
+        {
+            GameObject go = new GameObject(name);
+            Camera cam = go.AddComponent<Camera>();
+            cam.CopyFrom(viewCamera);
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = Color.black;
+            cam.targetTexture = target;
+            cam.fieldOfView = viewCamera.fieldOfView / FovDivisor;
+            cam.enabled = false;
 
             // The game's render pipeline renders water only for cameras
             // registered on the main camera's AdditionalCameraData
@@ -381,7 +384,7 @@ namespace UBOAT.Mods.RadioNavigation
             pipAdd.RenderScene = true;
             SetupRenderPasses(pipAdd,
                 viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>(),
-                pipCamera.cullingMask);
+                cam.cullingMask);
 
             // Post stack v2 (game's custom fork): without it the HDR sky/sea
             // clip to pure white (in-game finding 2026-08-26). The fork hides
@@ -418,26 +421,35 @@ namespace UBOAT.Mods.RadioNavigation
                 Debug.LogWarning(LogPrefix + " main camera has no PostProcessLayer - PIP stays untonemapped");
             }
 
-            Debug.Log(LogPrefix + " PIP camera created, RT=" + RtSize + "^2");
+            return cam;
         }
 
         private void UpdatePipPose()
         {
-            if (pipCamera == null)
+            if (pipLeftCamera == null || pipRightCamera == null)
                 return;
             if (!CameraResolver.TryResolve(out viewCamera) || viewCamera == null)
                 return;
 
             Transform mt = viewCamera.transform;
-            pipCamera.transform.position = mt.position;
             Vector3 mainEuler = mt.eulerAngles;
-            pipCamera.transform.rotation = Quaternion.Euler((float)arcAngle, mainEuler.y, 0f);
-            pipCamera.fieldOfView = viewCamera.fieldOfView / FovDivisor;
-            pipCamera.cullingMask = viewCamera.cullingMask;
+            pipLeftCamera.transform.position = mt.position;
+            pipLeftCamera.transform.rotation = Quaternion.Euler(0f, mainEuler.y, 0f);
+            pipRightCamera.transform.position = mt.position;
+            pipRightCamera.transform.rotation = Quaternion.Euler((float)arcAngle, mainEuler.y, 0f);
+
+            SyncCameraState(pipLeftCamera, viewCamera);
+            SyncCameraState(pipRightCamera, viewCamera);
+        }
+
+        private void SyncCameraState(Camera cam, Camera source)
+        {
+            cam.fieldOfView = source.fieldOfView / FovDivisor;
+            cam.cullingMask = source.cullingMask;
             // Keep the SRP pass mask in sync with the live cullingMask
             try
             {
-                var pipAdd = pipCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                var pipAdd = cam.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
                 if (pipAdd != null)
                 {
                     Array passes = pipAdd.Passes as Array;
@@ -447,11 +459,11 @@ namespace UBOAT.Mods.RadioNavigation
                         {
                             var prop = p.GetType().GetProperty("CullingMask");
                             if (prop != null && prop.CanWrite)
-                                prop.SetValue(p, pipCamera.cullingMask);
+                                prop.SetValue(p, cam.cullingMask);
                             else
                             {
                                 FieldInfo f = p.GetType().GetField("cullingMask", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-                                if (f != null) f.SetValue(p, pipCamera.cullingMask);
+                                if (f != null) f.SetValue(p, cam.cullingMask);
                             }
                         }
                     }
@@ -462,8 +474,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private Vector3 GetPipForward()
         {
-            if (!UseShaderOcular && pipCamera != null)
-                return pipCamera.transform.forward;
+            if (pipRightCamera != null)
+                return pipRightCamera.transform.forward;
             float yaw = 0f;
             if (viewCamera != null)
                 yaw = viewCamera.transform.eulerAngles.y;
@@ -471,177 +483,6 @@ namespace UBOAT.Mods.RadioNavigation
                 yaw = gameMainCamera.transform.eulerAngles.y;
             Quaternion rot = Quaternion.Euler((float)arcAngle, yaw, 0f);
             return rot * Vector3.forward;
-        }
-
-        private void UpdateShaderOcular(bool force)
-        {
-            if (ocularBackground == null)
-                return;
-            if (viewCamera == null && !CameraResolver.TryResolve(out viewCamera))
-                return;
-            float pipFov = 20f;
-            try { pipFov = viewCamera.fieldOfView / FovDivisor; } catch { }
-            if (pipFov < 1f) pipFov = 20f;
-            float offset = -(float)arcAngle / pipFov;
-            if (ocularMaterial != null && ocularMaterial.HasProperty("_HorizonOffset"))
-            {
-                ocularMaterial.SetFloat("_HorizonOffset", offset);
-                // Natural horizon - hide the white tick line
-                if (tickImage != null)
-                    tickImage.enabled = false;
-            }
-            else
-            {
-                // Natural horizon - hide the white tick line
-                if (tickImage != null)
-                    tickImage.enabled = false;
-                // Fallback sky/sea split when custom shader not in bundle
-                if (skyImage != null && seaImage != null)
-                {
-                    float horizonY = Mathf.Clamp01(0.5f + offset);
-                    skyImage.rectTransform.anchorMin = new Vector2(0.5f, horizonY);
-                    skyImage.rectTransform.anchorMax = new Vector2(1f, 1f);
-                    skyImage.rectTransform.offsetMin = Vector2.zero;
-                    skyImage.rectTransform.offsetMax = Vector2.zero;
-                    seaImage.rectTransform.anchorMin = new Vector2(0.5f, 0f);
-                    seaImage.rectTransform.anchorMax = new Vector2(1f, horizonY);
-                    seaImage.rectTransform.offsetMin = Vector2.zero;
-                    seaImage.rectTransform.offsetMax = Vector2.zero;
-                }
-            }
-
-            // Stars / sun projection
-            if (starsContainer == null)
-                return;
-            if (starSprite == null)
-                starSprite = GetStarSprite();
-            if (sunSprite == null)
-                sunSprite = starSprite;
-
-            Vector3 pipFwd = GetPipForward();
-            float tanHalf = Mathf.Tan(pipFov * 0.5f * Mathf.Deg2Rad);
-            if (tanHalf < 0.001f) tanHalf = 0.176f; // ~10deg
-            Quaternion invRot = Quaternion.Inverse(Quaternion.Euler((float)arcAngle, viewCamera.transform.eulerAngles.y, 0f));
-
-            // Sun - only in right (mirror) half
-            Vector3 sunDir;
-            float sunAlt, sunAz;
-            bool sunVisible = TryGetOwnSun(out sunDir, out sunAlt, out sunAz);
-            if (sunVisible)
-            {
-                Vector3 local = invRot * sunDir;
-                if (local.z > 0.05f && local.x > 0.02f)
-                {
-                    float nx = (local.x / local.z) / tanHalf;
-                    float ny = (local.y / local.z) / tanHalf;
-                    if (Mathf.Abs(nx) < 1.05f && Mathf.Abs(ny) < 1.05f && nx > 0.02f)
-                    {
-                        sunDot.enabled = true;
-                        sunDot.rectTransform.anchoredPosition = new Vector2(nx * 300f, ny * 300f);
-                    }
-                    else
-                        sunDot.enabled = false;
-                }
-                else
-                    sunDot.enabled = false;
-            }
-            else
-                sunDot.enabled = false;
-
-            // Stars: project brightest visible ones
-            float lat, lon;
-            if (!positionProvider.TryGetPosition(out lat, out lon))
-            {
-                foreach (var img in starPool) img.enabled = false;
-                return;
-            }
-            DateTime utc = GameTimeResolver.GetUtcNow();
-            double jd = AstroMath.ToJulianDay(utc);
-            double lstDeg = AstroMath.LstDeg(jd, lon);
-
-            // Ensure pool
-            int needed = 0;
-            // First pass: collect candidates
-            System.Collections.Generic.List<int> candidates = new System.Collections.Generic.List<int>(80);
-            for (int i = 0; i < StarCatalog.Stars.Length; i++)
-            {
-                var s = StarCatalog.Stars[i];
-                if (s.Vmag > 4.2f) continue;
-                AstroMath.RaDecToEnu(s.RaDeg * Mathf.Deg2Rad, s.DecDeg * Mathf.Deg2Rad, lstDeg, lat, out double altRad, out _, out double e, out double n, out double u);
-                if (altRad <= 0) continue;
-                double len = Math.Sqrt(e * e + n * n + u * u);
-                if (len < 1e-9) continue;
-                Vector3 dir = new Vector3((float)(e / len), (float)(u / len), (float)(n / len));
-                Vector3 local2 = invRot * dir;
-                if (local2.z <= 0.1f) continue;
-                if (local2.x <= 0.02f) continue; // only right (mirror) half
-                float nx2 = (local2.x / local2.z) / tanHalf;
-                float ny2 = (local2.y / local2.z) / tanHalf;
-                if (Mathf.Abs(nx2) > 1f || Mathf.Abs(ny2) > 1f) continue;
-                candidates.Add(i);
-                if (candidates.Count >= 70) break;
-            }
-            // Ensure pool size
-            while (starPool.Count < candidates.Count)
-            {
-                GameObject go = new GameObject("StarDot", typeof(Image));
-                go.transform.SetParent(starsContainer, false);
-                Image img = go.GetComponent<Image>();
-                img.sprite = starSprite;
-                img.raycastTarget = false;
-                img.color = new Color(1f, 1f, 1f, 0.95f);
-                RectTransform r = img.rectTransform;
-                r.anchorMin = new Vector2(0.5f, 0.5f);
-                r.anchorMax = new Vector2(0.5f, 0.5f);
-                r.sizeDelta = new Vector2(6, 6);
-                starPool.Add(img);
-            }
-            for (int i = 0; i < starPool.Count; i++)
-            {
-                if (i >= candidates.Count)
-                {
-                    starPool[i].enabled = false;
-                    continue;
-                }
-                int idx = candidates[i];
-                var s = StarCatalog.Stars[idx];
-                AstroMath.RaDecToEnu(s.RaDeg * Mathf.Deg2Rad, s.DecDeg * Mathf.Deg2Rad, lstDeg, lat, out double altRad2, out _, out double e2, out double n2, out double u2);
-                double len2 = Math.Sqrt(e2 * e2 + n2 * n2 + u2 * u2);
-                Vector3 dir2 = new Vector3((float)(e2 / len2), (float)(u2 / len2), (float)(n2 / len2));
-                Vector3 local3 = invRot * dir2;
-                float nx3 = (local3.x / local3.z) / tanHalf;
-                float ny3 = (local3.y / local3.z) / tanHalf;
-                Image img = starPool[i];
-                img.enabled = true;
-                img.rectTransform.anchoredPosition = new Vector2(nx3 * 300f, ny3 * 300f);
-                // Brightness by Vmag: brighter = larger/whiter
-                float b = Mathf.Clamp01((4.2f - s.Vmag) / 4.2f);
-                img.color = new Color(1f, 1f, 1f, 0.7f + b * 0.3f);
-                float sz = 4f + b * 4f;
-                img.rectTransform.sizeDelta = new Vector2(sz, sz);
-            }
-        }
-
-        private Sprite GetStarSprite()
-        {
-            if (starSprite != null) return starSprite;
-            Texture2D tex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
-            tex.hideFlags = HideFlags.DontSave;
-            tex.name = "RadioNavStarDot";
-            for (int y = 0; y < 16; y++)
-                for (int x = 0; x < 16; x++)
-                {
-                    float dx = (x + 0.5f - 8f) / 8f;
-                    float dy = (y + 0.5f - 8f) / 8f;
-                    float r = Mathf.Sqrt(dx * dx + dy * dy);
-                    float a = r <= 0.5f ? 1f : (r >= 0.9f ? 0f : 1f - (r - 0.5f) / 0.4f);
-                    // soft outer
-                    a *= a;
-                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
-                }
-            tex.Apply();
-            starSprite = Sprite.Create(tex, new Rect(0, 0, 16, 16), new Vector2(0.5f, 0.5f));
-            return starSprite;
         }
 
         // ---- glare -----------------------------------------------------------
@@ -668,10 +509,10 @@ namespace UBOAT.Mods.RadioNavigation
             Vector3 sunDir;
             float sunAlt;
             float sunAz;
-            if (pipCamera != null && TryGetOwnSun(out sunDir, out sunAlt, out sunAz))
+            if (pipRightCamera != null && TryGetOwnSun(out sunDir, out sunAlt, out sunAz))
             {
-                float angle = Vector3.Angle(pipCamera.transform.forward, sunDir);
-                g = (float)SextantGlare.Glare(angle, sunAlt, filterCount, pipCamera.fieldOfView);
+                float angle = Vector3.Angle(pipRightCamera.transform.forward, sunDir);
+                g = (float)SextantGlare.Glare(angle, sunAlt, filterCount, pipRightCamera.fieldOfView);
             }
             ApplyGlare(g);
             LogSunDrift(dt);
@@ -776,98 +617,6 @@ namespace UBOAT.Mods.RadioNavigation
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} SUNDRIFT sep={1:F3} dalt={2:F3} daz={3:F3} meeus(alt={4:F2} az={5:F1}) game(alt={6:F2} az={7:F1})",
                 LogPrefix, sepDeg, dAlt, dAz, ownAlt, ownAz, gameAlt, gameAz));
-        }
-
-        private void DebugRt(float dt)
-        {
-            if (!DebugRtEnabled)
-                return;
-            debugRtLogTimer -= dt;
-            debugRtPngTimer -= dt;
-            bool doLog = debugRtLogTimer <= 0f;
-            bool doPng = debugRtPngTimer <= 0f;
-            if (!doLog && !doPng)
-                return;
-            if (doLog)
-                debugRtLogTimer = 2f;
-            if (doPng)
-                debugRtPngTimer = 5f;
-
-            if (rt == null || pipCamera == null || !pipCamera.isActiveAndEnabled || !rt.IsCreated())
-            {
-                if (doLog)
-                {
-                    string rtState = rt == null ? "null" : (!rt.IsCreated() ? "notCreated" : "ok");
-                    string camState = pipCamera == null ? "null" : (!pipCamera.isActiveAndEnabled ? "disabled" : "enabled");
-                    UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd = pipCamera != null ? pipCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>() : null;
-                    int passes = 0;
-                    if (pipAdd != null)
-                    {
-                        try { Array a = pipAdd.Passes as Array; if (a != null) passes = a.Length; } catch { }
-                    }
-                    Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                        "{0} RTDBG rt={1} cam={2} passes={3} cullingMask={4} near={5:F3} far={6:F0} pos=({7:F1},{8:F1},{9:F1})",
-                        LogPrefix, rtState, camState, passes,
-                        pipCamera != null ? pipCamera.cullingMask.ToString() : "n/a",
-                        pipCamera != null ? pipCamera.nearClipPlane : 0f,
-                        pipCamera != null ? pipCamera.farClipPlane : 0f,
-                        pipCamera != null ? pipCamera.transform.position.x : 0f,
-                        pipCamera != null ? pipCamera.transform.position.y : 0f,
-                        pipCamera != null ? pipCamera.transform.position.z : 0f));
-                }
-                return;
-            }
-
-            // Read RT on main thread after render (previous frame is fine for diagnosis)
-            if (debugRtTex == null)
-                debugRtTex = new Texture2D(256, 256, TextureFormat.RGB24, false);
-            RenderTexture prev = RenderTexture.active;
-            RenderTexture.active = rt;
-            debugRtTex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-            debugRtTex.Apply();
-            RenderTexture.active = prev;
-
-            if (doLog)
-            {
-                Color c = debugRtTex.GetPixel(128, 128);
-                Color t = debugRtTex.GetPixel(128, 220);
-                Color b = debugRtTex.GetPixel(128, 35);
-                Color l = debugRtTex.GetPixel(35, 128);
-                Color rr = debugRtTex.GetPixel(220, 128);
-                // average of center 3x3
-                Color avg = Color.black;
-                for (int x = 126; x <= 130; x++) for (int y = 126; y <= 130; y++) avg += debugRtTex.GetPixel(x, y);
-                avg /= 25f;
-                UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd = pipCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
-                int passes = 0;
-                try { Array a = pipAdd.Passes as Array; if (a != null) passes = a.Length; } catch { }
-                Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} RTPIXEL c=#{1} t=#{2} b=#{3} l=#{4} r=#{5} avg=#{6} rt={7}x{8} passes={9} mask={10}",
-                    LogPrefix,
-                    ColorUtility.ToHtmlStringRGB(c), ColorUtility.ToHtmlStringRGB(t),
-                    ColorUtility.ToHtmlStringRGB(b), ColorUtility.ToHtmlStringRGB(l),
-                    ColorUtility.ToHtmlStringRGB(rr), ColorUtility.ToHtmlStringRGB(avg),
-                    rt.width, rt.height, passes, pipCamera.cullingMask));
-            }
-
-            if (doPng)
-            {
-                try
-                {
-                    byte[] png = UnityEngine.ImageConversion.EncodeToPNG(debugRtTex);
-                    string dir = Path.Combine(Application.persistentDataPath, "RadioNavigation");
-                    Directory.CreateDirectory(dir);
-                    string path = Path.Combine(dir, string.Format("sextant_{0:D06}.png", Time.frameCount));
-                    File.WriteAllBytes(path, png);
-                    // also latest
-                    File.WriteAllBytes(Path.Combine(dir, "sextant_last.png"), png);
-                    Debug.Log(string.Format(CultureInfo.InvariantCulture, "{0} RTPNG saved {1} ({2} bytes)", LogPrefix, path, png.Length));
-                }
-                catch (Exception e)
-                {
-                    Debug.LogWarning(LogPrefix + " RTPNG failed: " + e.Message);
-                }
-            }
         }
 
         private bool TryGetGameSun(out Vector3 dir, out float alt)
@@ -1067,7 +816,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             // Ocular: square container clipped to a circle (in-game finding
             // 2026-08-26: unclipped corners painted opaque black over the live
-            // horizon). Mask clips RT view, glare, ring and tick to the circle;
+            // horizon). Mask clips both RT views, glare and ring to the circle;
             // outside it the veil shows through.
             GameObject pipGo = new GameObject("Ocular", typeof(Image), typeof(Mask));
             pipGo.transform.SetParent(canvasRoot.transform, false);
@@ -1079,85 +828,35 @@ namespace UBOAT.Mods.RadioNavigation
             Mask ocularMask = pipGo.GetComponent<Mask>();
             ocularMask.showMaskGraphic = false;
 
-            if (UseShaderOcular)
-            {
-                GameObject bgGo = new GameObject("SkySea", typeof(Image));
-                bgGo.transform.SetParent(pipGo.transform, false);
-                ocularBackground = bgGo.GetComponent<Image>();
-                ocularBackground.raycastTarget = false;
-                Shader s = Shader.Find("UI/SextantOcular");
-                if (s != null)
-                {
-                    ocularMaterial = new Material(s);
-                    ocularBackground.material = ocularMaterial;
-                    ocularBackground.color = Color.white;
-                }
-                else
-                {
-                    ocularMaterial = null;
-                    ocularBackground.enabled = false;
-                    GameObject skyLeftGo = new GameObject("SkyLeftFallback", typeof(Image));
-                    skyLeftGo.transform.SetParent(pipGo.transform, false);
-                    Image skyLeft = skyLeftGo.GetComponent<Image>();
-                    skyLeft.color = new Color(0.55f, 0.72f, 0.92f, 1f);
-                    skyLeft.raycastTarget = false;
-                    skyLeft.rectTransform.anchorMin = new Vector2(0f, 0.5f);
-                    skyLeft.rectTransform.anchorMax = new Vector2(0.5f, 1f);
-                    skyLeft.rectTransform.offsetMin = Vector2.zero;
-                    skyLeft.rectTransform.offsetMax = Vector2.zero;
-                    GameObject seaLeftGo = new GameObject("SeaLeftFallback", typeof(Image));
-                    seaLeftGo.transform.SetParent(pipGo.transform, false);
-                    Image seaLeft = seaLeftGo.GetComponent<Image>();
-                    seaLeft.color = new Color(0.06f, 0.14f, 0.27f, 1f);
-                    seaLeft.raycastTarget = false;
-                    seaLeft.rectTransform.anchorMin = new Vector2(0f, 0f);
-                    seaLeft.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-                    seaLeft.rectTransform.offsetMin = Vector2.zero;
-                    seaLeft.rectTransform.offsetMax = Vector2.zero;
-                    GameObject skyGo2 = new GameObject("SkyFallback", typeof(Image));
-                    skyGo2.transform.SetParent(pipGo.transform, false);
-                    skyImage = skyGo2.GetComponent<Image>();
-                    skyImage.color = new Color(0.484f, 0.634f, 0.81f, 1f);
-                    skyImage.raycastTarget = false;
-                    GameObject seaGo = new GameObject("SeaFallback", typeof(Image));
-                    seaGo.transform.SetParent(pipGo.transform, false);
-                    seaImage = seaGo.GetComponent<Image>();
-                    seaImage.color = new Color(0.053f, 0.123f, 0.238f, 1f);
-                    seaImage.raycastTarget = false;
-                    GameObject vertGo = new GameObject("VerticalSplit", typeof(Image));
-                    vertGo.transform.SetParent(pipGo.transform, false);
-                    vertSplitImage = vertGo.GetComponent<Image>();
-                    vertSplitImage.color = new Color(1f, 1f, 1f, 0.35f);
-                    vertSplitImage.raycastTarget = false;
-                    // Vertical line full height, 2px wide at center
-                    AnchorCenter(vertSplitImage.rectTransform, 2f, OcularSizeUnits);
-                }
-                Stretch(ocularBackground.rectTransform);
+            // Left half: fixed-horizon camera view (pitch 0).
+            GameObject leftGo = new GameObject("LeftView", typeof(RawImage));
+            leftGo.transform.SetParent(pipGo.transform, false);
+            leftViewImage = leftGo.GetComponent<RawImage>();
+            leftViewImage.raycastTarget = false;
+            leftViewImage.texture = leftRt;
+            leftViewImage.rectTransform.anchorMin = new Vector2(0f, 0f);
+            leftViewImage.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+            leftViewImage.rectTransform.offsetMin = Vector2.zero;
+            leftViewImage.rectTransform.offsetMax = Vector2.zero;
 
-                GameObject starsGo = new GameObject("Stars", typeof(RectTransform));
-                starsGo.transform.SetParent(pipGo.transform, false);
-                starsContainer = starsGo.GetComponent<RectTransform>();
-                Stretch(starsContainer);
+            // Right half: mirror camera pitched to the arc angle (0-130).
+            GameObject rightGo = new GameObject("RightView", typeof(RawImage));
+            rightGo.transform.SetParent(pipGo.transform, false);
+            rightViewImage = rightGo.GetComponent<RawImage>();
+            rightViewImage.raycastTarget = false;
+            rightViewImage.texture = rightRt;
+            rightViewImage.rectTransform.anchorMin = new Vector2(0.5f, 0f);
+            rightViewImage.rectTransform.anchorMax = new Vector2(1f, 1f);
+            rightViewImage.rectTransform.offsetMin = Vector2.zero;
+            rightViewImage.rectTransform.offsetMax = Vector2.zero;
 
-                GameObject sunGo = new GameObject("Sun", typeof(Image));
-                sunGo.transform.SetParent(starsContainer, false);
-                sunDot = sunGo.GetComponent<Image>();
-                sunDot.sprite = GetStarSprite();
-                sunDot.color = new Color(1f, 0.95f, 0.65f, 1f);
-                sunDot.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-                sunDot.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-                sunDot.rectTransform.sizeDelta = new Vector2(22, 22);
-                sunDot.enabled = false;
-            }
-            else
-            {
-                GameObject pipImageGo = new GameObject("View", typeof(RawImage));
-                pipImageGo.transform.SetParent(pipGo.transform, false);
-                RawImage pipImage = pipImageGo.GetComponent<RawImage>();
-                pipImage.raycastTarget = false;
-                pipImage.texture = rt;
-                Stretch(pipImage.rectTransform);
-            }
+            // Vertical split line between the halves.
+            GameObject splitGo = new GameObject("VerticalSplit", typeof(Image));
+            splitGo.transform.SetParent(pipGo.transform, false);
+            Image splitImage = splitGo.GetComponent<Image>();
+            splitImage.color = new Color(1f, 1f, 1f, 0.35f);
+            splitImage.raycastTarget = false;
+            AnchorCenter(splitImage.rectTransform, 2f, OcularSizeUnits);
 
             // Shade filters dim the whole scope view (v1.5): the PIP camera
             // renders without the game's post stack, so the daytime sky clips
@@ -1184,14 +883,6 @@ namespace UBOAT.Mods.RadioNavigation
             ring.sprite = CreateRingSprite();
             ring.raycastTarget = false;
             Stretch(ring.rectTransform);
-
-            // Horizon tick line across the exact diameter.
-            GameObject tickGo = new GameObject("TickLine", typeof(Image));
-            tickGo.transform.SetParent(pipGo.transform, false);
-            tickImage = tickGo.GetComponent<Image>();
-            tickImage.color = new Color(1f, 1f, 1f, 0.8f);
-            tickImage.raycastTarget = false;
-            AnchorCenter(tickImage.rectTransform, OcularSizeUnits, 3f);
 
             // Reading column hugging the circle's left edge (§13.3).
             GameObject columnGo = new GameObject("ReadingColumn");
