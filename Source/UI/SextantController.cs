@@ -25,6 +25,9 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
 
+        // Shader ocular path (user request): no second camera, pure UI + shader
+        private const bool UseShaderOcular = true;
+
         // §13.3 layout constants (1080-space units).
         private const float OcularSizeUnits = 600f;
         private const float VeilAlpha = 0.85f;
@@ -106,6 +109,16 @@ namespace UBOAT.Mods.RadioNavigation
         private Texture2D circleMaskTexture;
         private static Font sextantOsFont;
 
+        // Shader ocular (UseShaderOcular=true): no RT/camera, pure UI
+        private Material ocularMaterial;
+        private Image ocularBackground;
+        private Image tickImage;
+        private RectTransform starsContainer;
+        private readonly System.Collections.Generic.List<Image> starPool = new System.Collections.Generic.List<Image>();
+        private Image sunDot;
+        private Sprite starSprite;
+        private Sprite sunSprite;
+
         private readonly IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
 
         private void Update()
@@ -121,7 +134,10 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 HandleArcInput(Time.unscaledDeltaTime);
                 HandleFilterKeys();
-                UpdatePipPose();
+                if (UseShaderOcular)
+                    UpdateShaderOcular(false);
+                else
+                    UpdatePipPose();
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
@@ -189,19 +205,27 @@ namespace UBOAT.Mods.RadioNavigation
 
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
-            AttachWaterCamera();
-            // Attached cameras are rendered via MainCamera's pass list;
-            // keep enabled=false like periscope's small view. Standalone
-            // cameras (not attached) need enabled=true.
-            pipCamera.enabled = registeredWaterData == null;
+            if (!UseShaderOcular)
+            {
+                AttachWaterCamera();
+                // Attached cameras are rendered via MainCamera's pass list;
+                // keep enabled=false like periscope's small view. Standalone
+                // cameras (not attached) need enabled=true.
+                if (pipCamera != null)
+                    pipCamera.enabled = registeredWaterData == null;
+                UpdatePipPose();
+            }
+            else
+            {
+                UpdateShaderOcular(true);
+            }
             IsOpen = true;
 
-            UpdatePipPose();
             UpdateFilterLabel();
             UpdateFilterDim();
             if (painText != null) painText.enabled = false;
             UpdateReadout(true);
-            Debug.Log(LogPrefix + " opened");
+            Debug.Log(LogPrefix + " opened" + (UseShaderOcular ? " (shader ocular)" : ""));
         }
 
         private void Close()
@@ -212,9 +236,12 @@ namespace UBOAT.Mods.RadioNavigation
             IsOpen = false;
             if (gameInput != null)
                 gameInput.RemoveBlockade(this);
-            DetachWaterCamera();
-            if (pipCamera != null)
-                pipCamera.enabled = false;
+            if (!UseShaderOcular)
+            {
+                DetachWaterCamera();
+                if (pipCamera != null)
+                    pipCamera.enabled = false;
+            }
             if (canvasRoot != null)
                 canvasRoot.SetActive(false);
             Debug.Log(LogPrefix + " closed");
@@ -325,6 +352,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void EnsurePipCamera()
         {
+            if (UseShaderOcular)
+                return;
             if (pipCamera != null)
                 return;
 
@@ -426,6 +455,175 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
             catch { }
+        }
+
+        private Vector3 GetPipForward()
+        {
+            if (!UseShaderOcular && pipCamera != null)
+                return pipCamera.transform.forward;
+            float yaw = 0f;
+            if (viewCamera != null)
+                yaw = viewCamera.transform.eulerAngles.y;
+            else if (gameMainCamera != null)
+                yaw = gameMainCamera.transform.eulerAngles.y;
+            Quaternion rot = Quaternion.Euler((float)arcAngle, yaw, 0f);
+            return rot * Vector3.forward;
+        }
+
+        private void UpdateShaderOcular(bool force)
+        {
+            if (ocularBackground == null)
+                return;
+            if (viewCamera == null && !CameraResolver.TryResolve(out viewCamera))
+                return;
+            float pipFov = 20f;
+            try { pipFov = viewCamera.fieldOfView / FovDivisor; } catch { }
+            if (pipFov < 1f) pipFov = 20f;
+            float offset = -(float)arcAngle / pipFov;
+            if (ocularMaterial != null && ocularMaterial.HasProperty("_HorizonOffset"))
+            {
+                ocularMaterial.SetFloat("_HorizonOffset", offset);
+                if (tickImage != null)
+                    tickImage.rectTransform.anchoredPosition = Vector2.zero;
+            }
+            else
+            {
+                // Fallback without custom shader: move the tick line to horizon position
+                if (tickImage != null)
+                    tickImage.rectTransform.anchoredPosition = new Vector2(0f, offset * 300f);
+            }
+
+            // Stars / sun projection
+            if (starsContainer == null)
+                return;
+            if (starSprite == null)
+                starSprite = GetStarSprite();
+            if (sunSprite == null)
+                sunSprite = starSprite;
+
+            Vector3 pipFwd = GetPipForward();
+            float tanHalf = Mathf.Tan(pipFov * 0.5f * Mathf.Deg2Rad);
+            if (tanHalf < 0.001f) tanHalf = 0.176f; // ~10deg
+            Quaternion invRot = Quaternion.Inverse(Quaternion.Euler((float)arcAngle, viewCamera.transform.eulerAngles.y, 0f));
+
+            // Sun
+            Vector3 sunDir;
+            float sunAlt, sunAz;
+            bool sunVisible = TryGetOwnSun(out sunDir, out sunAlt, out sunAz);
+            if (sunVisible)
+            {
+                Vector3 local = invRot * sunDir;
+                if (local.z > 0.05f)
+                {
+                    float nx = (local.x / local.z) / tanHalf;
+                    float ny = (local.y / local.z) / tanHalf;
+                    if (Mathf.Abs(nx) < 1.05f && Mathf.Abs(ny) < 1.05f)
+                    {
+                        sunDot.enabled = true;
+                        sunDot.rectTransform.anchoredPosition = new Vector2(nx * 300f, ny * 300f);
+                    }
+                    else
+                        sunDot.enabled = false;
+                }
+                else
+                    sunDot.enabled = false;
+            }
+            else
+                sunDot.enabled = false;
+
+            // Stars: project brightest visible ones
+            float lat, lon;
+            if (!positionProvider.TryGetPosition(out lat, out lon))
+            {
+                foreach (var img in starPool) img.enabled = false;
+                return;
+            }
+            DateTime utc = GameTimeResolver.GetUtcNow();
+            double jd = AstroMath.ToJulianDay(utc);
+            double lstDeg = AstroMath.LstDeg(jd, lon);
+
+            // Ensure pool
+            int needed = 0;
+            // First pass: collect candidates
+            System.Collections.Generic.List<int> candidates = new System.Collections.Generic.List<int>(80);
+            for (int i = 0; i < StarCatalog.Stars.Length; i++)
+            {
+                var s = StarCatalog.Stars[i];
+                if (s.Vmag > 4.2f) continue;
+                AstroMath.RaDecToEnu(s.RaDeg * Mathf.Deg2Rad, s.DecDeg * Mathf.Deg2Rad, lstDeg, lat, out double altRad, out _, out double e, out double n, out double u);
+                if (altRad <= 0) continue;
+                double len = Math.Sqrt(e * e + n * n + u * u);
+                if (len < 1e-9) continue;
+                Vector3 dir = new Vector3((float)(e / len), (float)(u / len), (float)(n / len));
+                Vector3 local2 = invRot * dir;
+                if (local2.z <= 0.1f) continue;
+                float nx2 = (local2.x / local2.z) / tanHalf;
+                float ny2 = (local2.y / local2.z) / tanHalf;
+                if (Mathf.Abs(nx2) > 1f || Mathf.Abs(ny2) > 1f) continue;
+                candidates.Add(i);
+                if (candidates.Count >= 70) break;
+            }
+            // Ensure pool size
+            while (starPool.Count < candidates.Count)
+            {
+                GameObject go = new GameObject("StarDot", typeof(Image));
+                go.transform.SetParent(starsContainer, false);
+                Image img = go.GetComponent<Image>();
+                img.sprite = starSprite;
+                img.raycastTarget = false;
+                img.color = new Color(1f, 1f, 1f, 0.95f);
+                RectTransform r = img.rectTransform;
+                r.anchorMin = new Vector2(0.5f, 0.5f);
+                r.anchorMax = new Vector2(0.5f, 0.5f);
+                r.sizeDelta = new Vector2(6, 6);
+                starPool.Add(img);
+            }
+            for (int i = 0; i < starPool.Count; i++)
+            {
+                if (i >= candidates.Count)
+                {
+                    starPool[i].enabled = false;
+                    continue;
+                }
+                int idx = candidates[i];
+                var s = StarCatalog.Stars[idx];
+                AstroMath.RaDecToEnu(s.RaDeg * Mathf.Deg2Rad, s.DecDeg * Mathf.Deg2Rad, lstDeg, lat, out double altRad2, out _, out double e2, out double n2, out double u2);
+                double len2 = Math.Sqrt(e2 * e2 + n2 * n2 + u2 * u2);
+                Vector3 dir2 = new Vector3((float)(e2 / len2), (float)(u2 / len2), (float)(n2 / len2));
+                Vector3 local3 = invRot * dir2;
+                float nx3 = (local3.x / local3.z) / tanHalf;
+                float ny3 = (local3.y / local3.z) / tanHalf;
+                Image img = starPool[i];
+                img.enabled = true;
+                img.rectTransform.anchoredPosition = new Vector2(nx3 * 300f, ny3 * 300f);
+                // Brightness by Vmag: brighter = larger/whiter
+                float b = Mathf.Clamp01((4.2f - s.Vmag) / 4.2f);
+                img.color = new Color(1f, 1f, 1f, 0.7f + b * 0.3f);
+                float sz = 4f + b * 4f;
+                img.rectTransform.sizeDelta = new Vector2(sz, sz);
+            }
+        }
+
+        private Sprite GetStarSprite()
+        {
+            if (starSprite != null) return starSprite;
+            Texture2D tex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
+            tex.hideFlags = HideFlags.DontSave;
+            tex.name = "RadioNavStarDot";
+            for (int y = 0; y < 16; y++)
+                for (int x = 0; x < 16; x++)
+                {
+                    float dx = (x + 0.5f - 8f) / 8f;
+                    float dy = (y + 0.5f - 8f) / 8f;
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a = r <= 0.5f ? 1f : (r >= 0.9f ? 0f : 1f - (r - 0.5f) / 0.4f);
+                    // soft outer
+                    a *= a;
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+            tex.Apply();
+            starSprite = Sprite.Create(tex, new Rect(0, 0, 16, 16), new Vector2(0.5f, 0.5f));
+            return starSprite;
         }
 
         // ---- glare -----------------------------------------------------------
@@ -758,8 +956,11 @@ namespace UBOAT.Mods.RadioNavigation
             Vector3 sunDir;
             float sunAlt;
             float sunAz;
+            Vector3 pipFwd = GetPipForward();
+            if (pipFwd.sqrMagnitude < 0.01f)
+                return null;
             if (TryGetOwnSun(out sunDir, out sunAlt, out sunAz)
-                && Vector3.Angle(pipCamera.transform.forward, sunDir) <= IdentifyConeDeg)
+                && Vector3.Angle(pipFwd, sunDir) <= IdentifyConeDeg)
                 return SunName;
 
             float lat, lon;
@@ -770,7 +971,7 @@ namespace UBOAT.Mods.RadioNavigation
             double jd = AstroMath.ToJulianDay(utc);
             double lstDeg = AstroMath.LstDeg(jd, lon);
 
-            Vector3 fwd = pipCamera.transform.forward;
+            Vector3 fwd = pipFwd;
             double bestCos = Math.Cos(IdentifyConeDeg * Mathf.Deg2Rad);
             int bestHip = -1;
 
@@ -863,12 +1064,51 @@ namespace UBOAT.Mods.RadioNavigation
             Mask ocularMask = pipGo.GetComponent<Mask>();
             ocularMask.showMaskGraphic = false;
 
-            GameObject pipImageGo = new GameObject("View", typeof(RawImage));
-            pipImageGo.transform.SetParent(pipGo.transform, false);
-            RawImage pipImage = pipImageGo.GetComponent<RawImage>();
-            pipImage.raycastTarget = false;
-            pipImage.texture = rt;
-            Stretch(pipImage.rectTransform);
+            if (UseShaderOcular)
+            {
+                GameObject bgGo = new GameObject("SkySea", typeof(Image));
+                bgGo.transform.SetParent(pipGo.transform, false);
+                ocularBackground = bgGo.GetComponent<Image>();
+                ocularBackground.raycastTarget = false;
+                Shader s = Shader.Find("UI/SextantOcular");
+                if (s != null)
+                {
+                    ocularMaterial = new Material(s);
+                    ocularBackground.material = ocularMaterial;
+                    ocularBackground.color = Color.white;
+                }
+                else
+                {
+                    ocularMaterial = null;
+                    ocularBackground.material = null;
+                    ocularBackground.color = new Color(0.18f, 0.45f, 0.85f, 1f);
+                }
+                Stretch(ocularBackground.rectTransform);
+
+                GameObject starsGo = new GameObject("Stars", typeof(RectTransform));
+                starsGo.transform.SetParent(pipGo.transform, false);
+                starsContainer = starsGo.GetComponent<RectTransform>();
+                Stretch(starsContainer);
+
+                GameObject sunGo = new GameObject("Sun", typeof(Image));
+                sunGo.transform.SetParent(starsContainer, false);
+                sunDot = sunGo.GetComponent<Image>();
+                sunDot.sprite = GetStarSprite();
+                sunDot.color = new Color(1f, 0.95f, 0.65f, 1f);
+                sunDot.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+                sunDot.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                sunDot.rectTransform.sizeDelta = new Vector2(22, 22);
+                sunDot.enabled = false;
+            }
+            else
+            {
+                GameObject pipImageGo = new GameObject("View", typeof(RawImage));
+                pipImageGo.transform.SetParent(pipGo.transform, false);
+                RawImage pipImage = pipImageGo.GetComponent<RawImage>();
+                pipImage.raycastTarget = false;
+                pipImage.texture = rt;
+                Stretch(pipImage.rectTransform);
+            }
 
             // Shade filters dim the whole scope view (v1.5): the PIP camera
             // renders without the game's post stack, so the daytime sky clips
@@ -899,10 +1139,10 @@ namespace UBOAT.Mods.RadioNavigation
             // Horizon tick line across the exact diameter.
             GameObject tickGo = new GameObject("TickLine", typeof(Image));
             tickGo.transform.SetParent(pipGo.transform, false);
-            Image tick = tickGo.GetComponent<Image>();
-            tick.color = new Color(1f, 1f, 1f, 0.8f);
-            tick.raycastTarget = false;
-            AnchorCenter(tick.rectTransform, OcularSizeUnits, 3f);
+            tickImage = tickGo.GetComponent<Image>();
+            tickImage.color = new Color(1f, 1f, 1f, 0.8f);
+            tickImage.raycastTarget = false;
+            AnchorCenter(tickImage.rectTransform, OcularSizeUnits, 3f);
 
             // Reading column hugging the circle's left edge (§13.3).
             GameObject columnGo = new GameObject("ReadingColumn");
