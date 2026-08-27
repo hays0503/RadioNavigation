@@ -189,8 +189,11 @@ namespace UBOAT.Mods.RadioNavigation
 
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
-            pipCamera.enabled = true;
             AttachWaterCamera();
+            // Attached cameras are rendered via MainCamera's pass list;
+            // keep enabled=false like periscope's small view. Standalone
+            // cameras (not attached) need enabled=true.
+            pipCamera.enabled = registeredWaterData == null;
             IsOpen = true;
 
             UpdatePipPose();
@@ -219,13 +222,19 @@ namespace UBOAT.Mods.RadioNavigation
 
         // Water renders itself only for cameras listed on the main camera's
         // AdditionalCameraData (periscope pattern, Periscope.cs:581).
+        // Must be MainCamera, not the transient viewCamera (device probe).
         private void AttachWaterCamera()
         {
-            if (viewCamera == null || pipCamera == null)
+            if (pipCamera == null)
+                return;
+            MainCamera main = MainCamera.Instance;
+            if (main == null)
+                main = FindObjectOfType<MainCamera>();
+            if (main == null)
                 return;
 
             UBOAT.Game.Scene.Rendering.AdditionalCameraData data =
-                viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                main.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
             if (data == null)
             {
                 if (!waterAttachWarned)
@@ -391,6 +400,30 @@ namespace UBOAT.Mods.RadioNavigation
             pipCamera.transform.rotation = Quaternion.Euler((float)arcAngle, mainEuler.y, 0f);
             pipCamera.fieldOfView = viewCamera.fieldOfView / FovDivisor;
             pipCamera.cullingMask = viewCamera.cullingMask;
+            // Keep the SRP pass mask in sync with the live cullingMask
+            try
+            {
+                var pipAdd = pipCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                if (pipAdd != null)
+                {
+                    Array passes = pipAdd.Passes as Array;
+                    if (passes != null)
+                    {
+                        foreach (object p in passes)
+                        {
+                            var prop = p.GetType().GetProperty("CullingMask");
+                            if (prop != null && prop.CanWrite)
+                                prop.SetValue(p, pipCamera.cullingMask);
+                            else
+                            {
+                                FieldInfo f = p.GetType().GetField("cullingMask", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+                                if (f != null) f.SetValue(p, pipCamera.cullingMask);
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
         }
 
         // ---- glare -----------------------------------------------------------
@@ -1004,6 +1037,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// main camera's pass list when available - those are the exact
         /// culling groups the game renders the scene with; otherwise build
         /// a single enabled pass with the camera's culling mask.
+        /// Backing fields are private: "passes" (CameraPass[]) and
+        /// "useCustomPasses" (bool) - the Passes property is get-only.
         /// </summary>
         private static void SetupRenderPasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData data,
             UBOAT.Game.Scene.Rendering.AdditionalCameraData mainData, int cullingMask)
@@ -1019,12 +1054,30 @@ namespace UBOAT.Mods.RadioNavigation
 
             try
             {
+                // Passes is get-only (CanWrite=false) - find backing field by type
+                FieldInfo passesField = null;
+                FieldInfo useCustomField = null;
+                foreach (FieldInfo f in type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
+                {
+                    if (f.FieldType.IsArray && f.FieldType.GetElementType() == passType)
+                        passesField = f;
+                    else if (f.FieldType == typeof(bool) && f.Name.IndexOf("useCustom", StringComparison.OrdinalIgnoreCase) >= 0)
+                        useCustomField = f;
+                }
+                if (passesField == null)
+                    passesField = type.GetField("passes", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (useCustomField == null)
+                    useCustomField = type.GetField("useCustomPasses", BindingFlags.NonPublic | BindingFlags.Instance);
+
                 Array source = null;
                 if (mainData != null)
                 {
                     PropertyInfo passesProp = type.GetProperty("Passes");
                     if (passesProp != null)
                         source = passesProp.GetValue(mainData) as Array;
+                    // fallback: read backing field directly if property missing
+                    if (source == null && passesField != null)
+                        source = passesField.GetValue(mainData) as Array;
                 }
 
                 int count = source != null && source.Length > 0 ? source.Length : 1;
@@ -1033,7 +1086,7 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     // CameraPass(int cullingMask) is the only public ctor;
                     // Enabled is read-write, ScreenSpaceReflections is
-                    // get-only (in-game failure) and stays at its default.
+                    // get-only and stays at its default.
                     PropertyInfo cullingProp = passType.GetProperty("CullingMask");
                     PropertyInfo enabledProp = passType.GetProperty("Enabled");
                     for (int i = 0; i < source.Length; i++)
@@ -1063,12 +1116,24 @@ namespace UBOAT.Mods.RadioNavigation
                     passes.SetValue(pass, 0);
                 }
 
-                type.GetProperty("Passes").SetValue(data, passes);
+                if (passesField != null)
+                    passesField.SetValue(data, passes);
+                else
+                    type.GetProperty("Passes").SetValue(data, passes);
+                if (useCustomField != null)
+                    useCustomField.SetValue(data, true);
+                else
+                {
+                    PropertyInfo useCustomProp = type.GetProperty("UseCustomPasses");
+                    if (useCustomProp != null && useCustomProp.CanWrite)
+                        useCustomProp.SetValue(data, true);
+                }
+                data.RenderScene = true;
                 Debug.Log(LogPrefix + " PIP render passes configured: " + count + " pass(es), mask=" + cullingMask);
             }
             catch (Exception e)
             {
-                Debug.LogWarning(LogPrefix + " render pass setup failed: " + e.Message);
+                Debug.LogWarning(LogPrefix + " render pass setup failed: " + e.Message + " " + e.StackTrace);
             }
         }
 
