@@ -40,6 +40,8 @@ namespace UBOAT.Mods.RadioNavigation
         // §2 behaviour constants.
         private const float RateDegPerSec = 2f;
         private const float ShiftMultiplier = 5f;
+        private const bool VectorLogEnabled = true;
+        private const float VectorLogHoldIntervalSeconds = 0.5f;
         private const float FovDivisor = 3f;
         private const float IdentifyConeDeg = 0.5f;
         private const float IdentifyHoldSeconds = 5f;
@@ -67,6 +69,7 @@ namespace UBOAT.Mods.RadioNavigation
         private bool pain;
         private double lastFormattedArc = double.MinValue;
         private float sunDriftLogTimer;
+        private float vectorLogHoldTimer;
 
         private Camera viewCamera;
         private MainCamera gameMainCamera;
@@ -204,6 +207,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (pipRightCamera != null)
                 pipRightCamera.enabled = registeredWaterData == null;
             UpdatePipPose();
+            LogVectorState("open");
             IsOpen = true;
 
             UpdateFilterLabel();
@@ -313,9 +317,83 @@ namespace UBOAT.Mods.RadioNavigation
             if (dir == 0f)
                 return;
 
+            bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
+            if (VectorLogEnabled)
+            {
+                vectorLogHoldTimer -= dt;
+                if (pressed || vectorLogHoldTimer <= 0f)
+                {
+                    vectorLogHoldTimer = VectorLogHoldIntervalSeconds;
+                    LogVectorState(pressed ? "press" : "hold");
+                }
+            }
+
             bool fast = ShiftHeld();
             float rate = RateDegPerSec * (fast ? ShiftMultiplier : 1f);
             arcAngle = SextantArc.Quantize(arcAngle + dir * rate * dt);
+        }
+
+        /// <summary>
+        /// Vector telemetry on alidade input: left camera (player eyes, pitch
+        /// 0), right camera (eyes + alidade angle), the player view camera,
+        /// derived angles and the sun vectors (own Meeus vs game TOD_Sky).
+        /// </summary>
+        private void LogVectorState(string trigger)
+        {
+            if (viewCamera == null && !CameraResolver.TryResolve(out viewCamera))
+                viewCamera = FindObjectOfType<Camera>();
+
+            Vector3 lfwd = pipLeftCamera != null ? pipLeftCamera.transform.forward : Vector3.zero;
+            Vector3 lup = pipLeftCamera != null ? pipLeftCamera.transform.up : Vector3.zero;
+            Vector3 lrgt = pipLeftCamera != null ? pipLeftCamera.transform.right : Vector3.zero;
+            Vector3 lpos = pipLeftCamera != null ? pipLeftCamera.transform.position : Vector3.zero;
+            Vector3 leul = pipLeftCamera != null ? pipLeftCamera.transform.eulerAngles : Vector3.zero;
+            Vector3 rfwd = pipRightCamera != null ? pipRightCamera.transform.forward : Vector3.zero;
+            Vector3 rup = pipRightCamera != null ? pipRightCamera.transform.up : Vector3.zero;
+            Vector3 rrgt = pipRightCamera != null ? pipRightCamera.transform.right : Vector3.zero;
+            Vector3 rpos = pipRightCamera != null ? pipRightCamera.transform.position : Vector3.zero;
+            Vector3 reul = pipRightCamera != null ? pipRightCamera.transform.eulerAngles : Vector3.zero;
+            Vector3 vfwd = viewCamera != null ? viewCamera.transform.forward : Vector3.zero;
+            Vector3 veul = viewCamera != null ? viewCamera.transform.eulerAngles : Vector3.zero;
+            Vector3 vpos = viewCamera != null ? viewCamera.transform.position : Vector3.zero;
+            Vector3 sunDir = Vector3.zero;
+            float sunAlt = 0f, sunAz = 0f;
+            bool own = TryGetOwnSun(out sunDir, out sunAlt, out sunAz);
+            Vector3 gameDir = Vector3.zero;
+            float gameAlt = 0f;
+            bool game = TryGetGameSun(out gameDir, out gameAlt);
+            double q = SextantArc.Quantize(arcAngle);
+            float angLR = pipLeftCamera != null && pipRightCamera != null
+                ? Vector3.Angle(lfwd, rfwd) : 0f;
+            float dotLR = pipLeftCamera != null && pipRightCamera != null
+                ? Vector3.Dot(lfwd, rfwd) : 0f;
+
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} VECL {1} pos={2} eul={3} fwd={4} up={5} rgt={6}",
+                LogPrefix, trigger, V3(lpos), V3(leul), V3(lfwd), V3(lup), V3(lrgt)));
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} VECR {1} pos={2} eul={3} fwd={4} up={5} rgt={6}",
+                LogPrefix, trigger, V3(rpos), V3(reul), V3(rfwd), V3(rup), V3(rrgt)));
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} VECV {1} pos={2} eul={3} fwd={4}",
+                LogPrefix, trigger, V3(vpos), V3(veul), V3(vfwd)));
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} VECD {1} arc={2:F6} quant={3:F6} fmt={4} angLR={5:F3} dotLR={6:F6}",
+                LogPrefix, trigger, arcAngle, q, SextantArc.Format(q), angLR, dotLR));
+            if (own || game)
+            {
+                float angSun = own ? Vector3.Angle(rfwd, sunDir) : -1f;
+                float sep = own && game ? Vector3.Angle(sunDir, gameDir) : -1f;
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "{0} VECSUN {1} own{2} alt={3:F2} az={4:F1} game{5} galt={6:F2} angSunR={7:F3} sep={8:F3}",
+                    LogPrefix, trigger, own ? V3(sunDir) : " n/a", sunAlt, sunAz,
+                    game ? V3(gameDir) : " n/a", gameAlt, angSun, sep));
+            }
+        }
+
+        private static string V3(Vector3 v)
+        {
+            return string.Format(CultureInfo.InvariantCulture, "({0:F3},{1:F3},{2:F3})", v.x, v.y, v.z);
         }
 
         private void HandleFilterKeys()
