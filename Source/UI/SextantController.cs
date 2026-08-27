@@ -638,6 +638,11 @@ namespace UBOAT.Mods.RadioNavigation
                 rightFilterCount = count;
             UpdateFilterLabel();
             UpdateFilterDim();
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} FILTERSIDE side={1} count={2} left={3} right={4} dimA=(L={5:F2},R={6:F2})",
+                LogPrefix, leftSide ? "L" : "R", count, leftFilterCount, rightFilterCount,
+                filterDimLeftImage != null ? filterDimLeftImage.color.a : -1f,
+                filterDimRightImage != null ? filterDimRightImage.color.a : -1f));
 
             // The sun disc lives in the right (sun) half: gated by the right
             // filter only. The left filter dims the horizon view.
@@ -1543,6 +1548,26 @@ namespace UBOAT.Mods.RadioNavigation
             dimRightRt.offsetMin = Vector2.zero;
             dimRightRt.offsetMax = Vector2.zero;
 
+            // One-shot placement proof: screen-space corners of both dim
+            // halves (matches the FILTERSIDE logs when a side is pressed).
+            try
+            {
+                Vector3[] corners = new Vector3[4];
+                filterDimLeftImage.rectTransform.GetWorldCorners(corners);
+                Vector2[] tl = new Vector2[4];
+                for (int i = 0; i < 4; i++)
+                    tl[i] = corners[i];
+                filterDimRightImage.rectTransform.GetWorldCorners(corners);
+                Vector2[] tr = new Vector2[4];
+                for (int i = 0; i < 4; i++)
+                    tr[i] = corners[i];
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "{0} DIMRECT left=({1:F0},{2:F0})-({3:F0},{4:F0}) right=({5:F0},{6:F0})-({7:F0},{8:F0}) screen={9}x{10}",
+                    LogPrefix, tl[0].x, tl[0].y, tl[2].x, tl[2].y,
+                    tr[0].x, tr[0].y, tr[2].x, tr[2].y, Screen.width, Screen.height));
+            }
+            catch { }
+
             // Glare flash inside the ocular only.
             GameObject glareGo = new GameObject("Glare", typeof(Image));
             glareGo.transform.SetParent(pipGo.transform, false);
@@ -1578,14 +1603,15 @@ namespace UBOAT.Mods.RadioNavigation
             painText.enabled = false;
             // Pain warning is long; a wide centered line above the hint
             // fits it fully (the narrow left column used to clip the left
-            // edge off-screen with Overflow).
+            // edge off-screen with Overflow). Must sit ABOVE the button row
+            // (button tops end at y=193 from the bottom edge), so y=215.
             {
                 RectTransform pr = painText.rectTransform;
                 pr.anchorMin = new Vector2(0.5f, 0f);
                 pr.anchorMax = new Vector2(0.5f, 0f);
                 pr.pivot = new Vector2(0.5f, 0f);
                 pr.sizeDelta = new Vector2(1500f, 40f);
-                pr.anchoredPosition = new Vector2(0f, HintYUnits + 70f);
+                pr.anchoredPosition = new Vector2(0f, HintYUnits + 155f);
             }
             filterText = MakeLabel("FilterText", 28, TextAnchor.MiddleRight, new Color(0.85f, 0.85f, 0.85f));
             SetChild(column, filterText, 36f);
