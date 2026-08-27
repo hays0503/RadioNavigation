@@ -35,7 +35,8 @@ $refs = @(
     "$GamePath\UBOAT_Data\Managed\com.uboat.modapi.dll",
     "$GamePath\UBOAT_Data\Managed\Unity.TextMeshPro.dll",
     "$GamePath\UBOAT_Data\Managed\com.uboat.rendering.dll",
-    "$GamePath\UBOAT_Data\Managed\com.unity.postprocessing.Runtime.dll"
+    "$GamePath\UBOAT_Data\Managed\com.unity.postprocessing.Runtime.dll",
+    "$GamePath\UBOAT_Data\Managed\UnityEngine.ImageConversionModule.dll"
 )
 
 # csc is not on PATH in every shell; locate a compiler before invoking.

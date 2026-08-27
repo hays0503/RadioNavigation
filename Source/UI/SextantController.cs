@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 using DWS.Common.InjectionFramework;
 using UBOAT.Game.Core.Input;
@@ -85,6 +86,12 @@ namespace UBOAT.Mods.RadioNavigation
         private UBOAT.Game.Scene.Rendering.AdditionalCameraData registeredWaterData;
         private bool waterAttachWarned;
 
+        // RT debug (user request: pixel groups + screenshot of ocular)
+        private const bool DebugRtEnabled = true;
+        private float debugRtLogTimer;
+        private float debugRtPngTimer;
+        private Texture2D debugRtTex;
+
         private RenderTexture rt;
         private Camera pipCamera;
         private GameObject canvasRoot;
@@ -118,6 +125,7 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
+                DebugRt(Time.unscaledDeltaTime);
             }
             else if (Input.GetKeyDown(KeyCode.Z) && !ShiftHeld())
             {
@@ -141,6 +149,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             if (ringTexture != null) Destroy(ringTexture);
             if (circleMaskTexture != null) Destroy(circleMaskTexture);
+            if (debugRtTex != null) Destroy(debugRtTex);
         }
 
         // ---- open / close -------------------------------------------------
@@ -516,6 +525,98 @@ namespace UBOAT.Mods.RadioNavigation
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} SUNDRIFT sep={1:F3} dalt={2:F3} daz={3:F3} meeus(alt={4:F2} az={5:F1}) game(alt={6:F2} az={7:F1})",
                 LogPrefix, sepDeg, dAlt, dAz, ownAlt, ownAz, gameAlt, gameAz));
+        }
+
+        private void DebugRt(float dt)
+        {
+            if (!DebugRtEnabled)
+                return;
+            debugRtLogTimer -= dt;
+            debugRtPngTimer -= dt;
+            bool doLog = debugRtLogTimer <= 0f;
+            bool doPng = debugRtPngTimer <= 0f;
+            if (!doLog && !doPng)
+                return;
+            if (doLog)
+                debugRtLogTimer = 2f;
+            if (doPng)
+                debugRtPngTimer = 5f;
+
+            if (rt == null || pipCamera == null || !pipCamera.isActiveAndEnabled || !rt.IsCreated())
+            {
+                if (doLog)
+                {
+                    string rtState = rt == null ? "null" : (!rt.IsCreated() ? "notCreated" : "ok");
+                    string camState = pipCamera == null ? "null" : (!pipCamera.isActiveAndEnabled ? "disabled" : "enabled");
+                    UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd = pipCamera != null ? pipCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>() : null;
+                    int passes = 0;
+                    if (pipAdd != null)
+                    {
+                        try { Array a = pipAdd.Passes as Array; if (a != null) passes = a.Length; } catch { }
+                    }
+                    Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                        "{0} RTDBG rt={1} cam={2} passes={3} cullingMask={4} near={5:F3} far={6:F0} pos=({7:F1},{8:F1},{9:F1})",
+                        LogPrefix, rtState, camState, passes,
+                        pipCamera != null ? pipCamera.cullingMask.ToString() : "n/a",
+                        pipCamera != null ? pipCamera.nearClipPlane : 0f,
+                        pipCamera != null ? pipCamera.farClipPlane : 0f,
+                        pipCamera != null ? pipCamera.transform.position.x : 0f,
+                        pipCamera != null ? pipCamera.transform.position.y : 0f,
+                        pipCamera != null ? pipCamera.transform.position.z : 0f));
+                }
+                return;
+            }
+
+            // Read RT on main thread after render (previous frame is fine for diagnosis)
+            if (debugRtTex == null)
+                debugRtTex = new Texture2D(256, 256, TextureFormat.RGB24, false);
+            RenderTexture prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            debugRtTex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            debugRtTex.Apply();
+            RenderTexture.active = prev;
+
+            if (doLog)
+            {
+                Color c = debugRtTex.GetPixel(128, 128);
+                Color t = debugRtTex.GetPixel(128, 220);
+                Color b = debugRtTex.GetPixel(128, 35);
+                Color l = debugRtTex.GetPixel(35, 128);
+                Color rr = debugRtTex.GetPixel(220, 128);
+                // average of center 3x3
+                Color avg = Color.black;
+                for (int x = 126; x <= 130; x++) for (int y = 126; y <= 130; y++) avg += debugRtTex.GetPixel(x, y);
+                avg /= 25f;
+                UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd = pipCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                int passes = 0;
+                try { Array a = pipAdd.Passes as Array; if (a != null) passes = a.Length; } catch { }
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "{0} RTPIXEL c=#{1} t=#{2} b=#{3} l=#{4} r=#{5} avg=#{6} rt={7}x{8} passes={9} mask={10}",
+                    LogPrefix,
+                    ColorUtility.ToHtmlStringRGB(c), ColorUtility.ToHtmlStringRGB(t),
+                    ColorUtility.ToHtmlStringRGB(b), ColorUtility.ToHtmlStringRGB(l),
+                    ColorUtility.ToHtmlStringRGB(rr), ColorUtility.ToHtmlStringRGB(avg),
+                    rt.width, rt.height, passes, pipCamera.cullingMask));
+            }
+
+            if (doPng)
+            {
+                try
+                {
+                    byte[] png = UnityEngine.ImageConversion.EncodeToPNG(debugRtTex);
+                    string dir = Path.Combine(Application.persistentDataPath, "RadioNavigation");
+                    Directory.CreateDirectory(dir);
+                    string path = Path.Combine(dir, string.Format("sextant_{0:D06}.png", Time.frameCount));
+                    File.WriteAllBytes(path, png);
+                    // also latest
+                    File.WriteAllBytes(Path.Combine(dir, "sextant_last.png"), png);
+                    Debug.Log(string.Format(CultureInfo.InvariantCulture, "{0} RTPNG saved {1} ({2} bytes)", LogPrefix, path, png.Length));
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning(LogPrefix + " RTPNG failed: " + e.Message);
+                }
+            }
         }
 
         private bool TryGetGameSun(out Vector3 dir, out float alt)
