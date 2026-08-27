@@ -45,7 +45,11 @@ namespace UBOAT.Mods.RadioNavigation
         private const bool VectorLogEnabled = true;
         private const float VectorLogHoldIntervalSeconds = 0.5f;
         private const float VectorRotateMinDeltaDeg = 0.5f;
-        private const float FovDivisor = 3f;
+        // Zoom steps (divisor on the main camera's FOV): index 2 = default 3x.
+        // Smaller divisor = closer view. Buttons/keys shift the index.
+        private static readonly float[] ZoomSteps = { 6f, 4.5f, 3f, 2f, 1.5f, 1f };
+        private int zoomIndex = 2;
+        private float PipFovDivisor { get { return ZoomSteps[zoomIndex]; } }
         private const float IdentifyConeDeg = 0.5f;
         private const float IdentifyHoldSeconds = 5f;
         private const float StarIdIntervalSeconds = 0.2f;
@@ -58,7 +62,7 @@ namespace UBOAT.Mods.RadioNavigation
             "\u0423\u0421\u0422\u0410\u041D\u041E\u0412\u0418\u0422\u0415 \u0424\u0418\u041B\u042C\u0422\u0420";
         private const string HintText =
             "\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0443\u0433\u043E\u043B \u00B7 Shift: \u0431\u044B\u0441\u0442\u0440\u0435\u0435 \u00B7 " +
-            "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440\u044B \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
+            "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440\u044B \u00B7 R: 0\u00B0 \u00B7 +/\u2212: \u0437\u0443\u043C \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
 
         /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
         public static bool IsOpen { get; private set; }
@@ -149,6 +153,7 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 HandleArcInput(Time.unscaledDeltaTime);
                 HandleFilterKeys();
+                HandleZoomKeys();
                 UpdatePipPose();
                 UpdateVectorRotateLog();
                 RenderCheck(Time.unscaledDeltaTime);
@@ -247,7 +252,7 @@ namespace UBOAT.Mods.RadioNavigation
                 pipLeftCamera != null && pipLeftCamera.enabled,
                 pipRightCamera != null && pipRightCamera.enabled,
                 viewCamera != null ? viewCamera.fieldOfView : 0f,
-                viewCamera != null ? viewCamera.fieldOfView / FovDivisor : 0f));
+                viewCamera != null ? viewCamera.fieldOfView / PipFovDivisor : 0f));
             UpdatePipPose();
             LogVectorState("open");
             IsOpen = true;
@@ -558,6 +563,43 @@ namespace UBOAT.Mods.RadioNavigation
             else if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0)) SetFilters(0);
         }
 
+        private void HandleZoomKeys()
+        {
+            if (Input.GetKeyDown(KeyCode.Equals) || Input.GetKeyDown(KeyCode.KeypadPlus)) ZoomIn();
+            else if (Input.GetKeyDown(KeyCode.Minus) || Input.GetKeyDown(KeyCode.KeypadMinus)) ZoomOut();
+            if (Input.GetKeyDown(KeyCode.R)) ResetArc();
+        }
+
+        private void ResetArc()
+        {
+            arcAngle = 0.0;
+            Debug.Log(LogPrefix + " ARC reset to 0");
+        }
+
+        private void ZoomIn()
+        {
+            if (zoomIndex >= ZoomSteps.Length - 1)
+                return;
+            zoomIndex++;
+            LogZoom();
+        }
+
+        private void ZoomOut()
+        {
+            if (zoomIndex <= 0)
+                return;
+            zoomIndex--;
+            LogZoom();
+        }
+
+        private void LogZoom()
+        {
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} ZOOM div={1:F1} fov={2:F1}",
+                LogPrefix, PipFovDivisor,
+                viewCamera != null ? viewCamera.fieldOfView / PipFovDivisor : 0f));
+        }
+
         private void SetFilters(int count)
         {
             filterCount = count;
@@ -605,7 +647,7 @@ namespace UBOAT.Mods.RadioNavigation
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Color.black;
             cam.targetTexture = target;
-            cam.fieldOfView = viewCamera.fieldOfView / FovDivisor;
+            cam.fieldOfView = viewCamera.fieldOfView / PipFovDivisor;
             cam.enabled = false;
 
             // The game's render pipeline renders water only for cameras
@@ -863,7 +905,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void SyncCameraState(Camera cam, Camera source)
         {
-            cam.fieldOfView = source.fieldOfView / FovDivisor;
+            cam.fieldOfView = source.fieldOfView / PipFovDivisor;
             cam.cullingMask = source.cullingMask;
             // Keep the SRP pass mask in sync with the live cullingMask
             try
@@ -1370,8 +1412,52 @@ namespace UBOAT.Mods.RadioNavigation
             hr.sizeDelta = new Vector2(1100f, 40f);
             hr.anchoredPosition = new Vector2(0f, HintYUnits);
 
+            // Control buttons under the ocular: zoom out, reset to 0, zoom in.
+            MakeSextantButton("ZoomOutBtn", "\u2212", new Vector2(-110f, -OcularSizeUnits * 0.5f - 70f), ZoomOut);
+            MakeSextantButton("ResetArcBtn", "0\u00B0", new Vector2(0f, -OcularSizeUnits * 0.5f - 70f), ResetArc);
+            MakeSextantButton("ZoomInBtn", "+", new Vector2(110f, -OcularSizeUnits * 0.5f - 70f), ZoomIn);
+
             canvasRoot.SetActive(false);
             Debug.Log(LogPrefix + " overlay built");
+        }
+
+        private Button MakeSextantButton(string btnName, string labelText, Vector2 anchoredPos, UnityEngine.Events.UnityAction onClick)
+        {
+            GameObject go = new GameObject(btnName, typeof(RectTransform));
+            go.transform.SetParent(canvasRoot.transform, false);
+            RectTransform r = go.GetComponent<RectTransform>();
+            r.anchorMin = new Vector2(0.5f, 0.5f);
+            r.anchorMax = new Vector2(0.5f, 0.5f);
+            r.pivot = new Vector2(0.5f, 0.5f);
+            r.sizeDelta = new Vector2(90f, 46f);
+            r.anchoredPosition = anchoredPos;
+
+            Image img = go.AddComponent<Image>();
+            img.color = new Color(0.03f, 0.04f, 0.05f, 0.85f);
+            img.raycastTarget = true;
+
+            Button btn = go.AddComponent<Button>();
+            btn.targetGraphic = img;
+            ColorBlock cb = btn.colors;
+            cb.highlightedColor = new Color(0.25f, 0.3f, 0.35f, 1f);
+            cb.pressedColor = new Color(0.1f, 0.12f, 0.15f, 1f);
+            btn.colors = cb;
+            btn.onClick.AddListener(onClick);
+
+            GameObject labelGo = new GameObject("Label", typeof(Text));
+            labelGo.transform.SetParent(go.transform, false);
+            Text label = labelGo.GetComponent<Text>();
+            label.font = GetSextantOsFont();
+            label.fontSize = 30;
+            label.alignment = TextAnchor.MiddleCenter;
+            label.color = Color.white;
+            label.raycastTarget = false;
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            label.verticalOverflow = VerticalWrapMode.Overflow;
+            label.text = labelText;
+            Stretch(label.rectTransform);
+
+            return btn;
         }
 
         private Text MakeLabel(string labelName, int fontSize, TextAnchor anchor, Color color)
