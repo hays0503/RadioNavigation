@@ -42,6 +42,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const float ShiftMultiplier = 5f;
         private const bool VectorLogEnabled = true;
         private const float VectorLogHoldIntervalSeconds = 0.5f;
+        private const float VectorRotateMinDeltaDeg = 0.5f;
         private const float FovDivisor = 3f;
         private const float IdentifyConeDeg = 0.5f;
         private const float IdentifyHoldSeconds = 5f;
@@ -70,6 +71,8 @@ namespace UBOAT.Mods.RadioNavigation
         private double lastFormattedArc = double.MinValue;
         private float sunDriftLogTimer;
         private float vectorLogHoldTimer;
+        private float vectorRotateLogTimer;
+        private float lastVectorLogYaw;
 
         private Camera viewCamera;
         private MainCamera gameMainCamera;
@@ -127,6 +130,7 @@ namespace UBOAT.Mods.RadioNavigation
                 HandleArcInput(Time.unscaledDeltaTime);
                 HandleFilterKeys();
                 UpdatePipPose();
+                UpdateVectorRotateLog();
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
@@ -334,6 +338,25 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
+        /// Logs the player's eye vector when the view camera rotates
+        /// (mouse look / boat turn) while the sextant is open.
+        /// </summary>
+        private void UpdateVectorRotateLog()
+        {
+            if (!VectorLogEnabled || viewCamera == null)
+                return;
+            vectorRotateLogTimer -= Time.unscaledDeltaTime;
+            if (vectorRotateLogTimer > 0f)
+                return;
+            float yaw = viewCamera.transform.eulerAngles.y;
+            if (Mathf.Abs(Mathf.DeltaAngle(lastVectorLogYaw, yaw)) >= VectorRotateMinDeltaDeg)
+            {
+                vectorRotateLogTimer = VectorLogHoldIntervalSeconds;
+                LogVectorState("rotate");
+            }
+        }
+
+        /// <summary>
         /// Vector telemetry on alidade input: left camera (player eyes, pitch
         /// 0), right camera (eyes + alidade angle), the player view camera,
         /// derived angles and the sun vectors (own Meeus vs game TOD_Sky).
@@ -342,6 +365,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (viewCamera == null && !CameraResolver.TryResolve(out viewCamera))
                 viewCamera = FindObjectOfType<Camera>();
+            if (viewCamera != null)
+                lastVectorLogYaw = viewCamera.transform.eulerAngles.y;
 
             Vector3 lfwd = pipLeftCamera != null ? pipLeftCamera.transform.forward : Vector3.zero;
             Vector3 lup = pipLeftCamera != null ? pipLeftCamera.transform.up : Vector3.zero;
