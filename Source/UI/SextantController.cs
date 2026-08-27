@@ -145,6 +145,8 @@ namespace UBOAT.Mods.RadioNavigation
         private GameObject bloomCutGo;
         private int bloomCutLayer;
         private const int BloomCutLayerCandidate = 7;
+        private bool bloomCutLogged;
+        private bool sunDiscSourceLogged;
 
         private readonly IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
 
@@ -285,6 +287,7 @@ namespace UBOAT.Mods.RadioNavigation
                 gameInput.RemoveBlockade(this);
             DetachWaterCameras();
             SunDiscRenderer.Active = false;
+            SunDiscRenderer.ResetDirection();
             if (bloomCutGo != null)
                 bloomCutGo.SetActive(false);
             if (pipLeftCamera != null)
@@ -625,6 +628,22 @@ namespace UBOAT.Mods.RadioNavigation
                 bool on = IsOpen && filterCount > 0;
                 bloomCutGo.SetActive(on);
                 Debug.Log(LogPrefix + " BLOOMCUT " + (on ? "on" : "off") + " (filters=" + filterCount + ")");
+                if (!bloomCutLogged && on)
+                {
+                    bloomCutLogged = true;
+                    try
+                    {
+                        PostProcessLayer pipLayer = pipLeftCamera != null
+                            ? pipLeftCamera.GetComponent<PostProcessLayer>() : null;
+                        PostProcessLayer mainLayer = viewCamera != null
+                            ? viewCamera.GetComponent<PostProcessLayer>() : null;
+                        Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                            "{0} BLOOMCUT applied pipLayer={1} mainLayer={2} volumeActive={3}",
+                            LogPrefix, pipLayer != null,
+                            mainLayer != null, bloomCutGo.activeSelf));
+                    }
+                    catch { }
+                }
             }
         }
 
@@ -635,7 +654,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (filterDimImage == null)
                 return;
             Color c = filterDimImage.color;
-            c.a = 0.15f * filterCount;
+            c.a = 0.30f * filterCount;
             filterDimImage.color = c;
         }
 
@@ -1046,10 +1065,17 @@ namespace UBOAT.Mods.RadioNavigation
                 // so position it on the game direction when available.
                 Vector3 gameDir;
                 float gameAlt;
-                if (TryGetGameSun(out gameDir, out gameAlt))
-                    SunDiscRenderer.SunDirection = gameDir;
-                else
-                    SunDiscRenderer.SunDirection = sunDir;
+                bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
+                SunDiscRenderer.SunDirection = gameOk ? gameDir : sunDir;
+                if (!sunDiscSourceLogged && SunDiscRenderer.Active)
+                {
+                    sunDiscSourceLogged = true;
+                    float sep = gameOk ? Vector3.Angle(gameDir, sunDir) : -1f;
+                    Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                        "{0} SUNDISC src={1} sep={2:F3} own(alt={3:F2} az={4:F1}) game={5}",
+                        LogPrefix, gameOk ? "game" : "own", sep, sunAlt, sunAz,
+                        gameOk ? V3(gameDir) : " n/a"));
+                }
             }
             ApplyGlare(g);
             LogSunDrift(dt);

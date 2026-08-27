@@ -18,7 +18,12 @@ namespace UBOAT.Mods.RadioNavigation
         public const int SunDiscLayer = 7;
         public const int SunDiscLayerMask = 1 << SunDiscLayer;
 
-        private const float AngularDiameterDeg = 0.53f;
+        /// <summary>
+        /// Readable solar disc: the real 0.53° scaled by the player-measured
+        /// 4.0625× (GIMP overlay 48px→195px) so the filtered view shows the
+        /// disc big enough to read sunspots. Angular size - scales with zoom.
+        /// </summary>
+        private const float AngularDiameterDeg = 0.53f * 4.0625f;
         private const float AngularRadiusRad = AngularDiameterDeg * 0.5f * Mathf.Deg2Rad;
         private const int TextureSize = 256;
         private const string LogPrefix = "[RadioNav][SunDisc]";
@@ -51,6 +56,12 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (instance != null)
                 instance.RebuildTexture();
+        }
+
+        /// <summary>Clears the last sun direction (called on sextant close).</summary>
+        public static void ResetDirection()
+        {
+            SunDirection = Vector3.zero;
         }
 
         private void Awake()
@@ -181,7 +192,13 @@ namespace UBOAT.Mods.RadioNavigation
                         }
                     }
 
+                    // Premultiplied alpha: the material blends
+                    // One/OneMinusSrcAlpha, so rgb must fade with alpha or
+                    // the disc edge shows a bright orange ring.
                     c.a = alpha;
+                    c.r *= alpha;
+                    c.g *= alpha;
+                    c.b *= alpha;
                     discTexture.SetPixel(x, y, c);
                 }
             }
@@ -196,6 +213,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (!Active || material == null)
             {
                 meshRenderer.enabled = false;
+                if (!Active && SunDirection.sqrMagnitude > 0.01f)
+                    SunDirection = Vector3.zero;
                 return;
             }
 
