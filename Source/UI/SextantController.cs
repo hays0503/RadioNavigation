@@ -1495,10 +1495,20 @@ namespace UBOAT.Mods.RadioNavigation
             SetChild(column, angleText, 160f);
             nameText = MakeLabel("NameText", 32, TextAnchor.MiddleRight, new Color(0.75f, 0.9f, 1f));
             SetChild(column, nameText, 116f);
-            painText = MakeLabel("PainText", 32, TextAnchor.MiddleRight, new Color(1f, 0.45f, 0.35f));
+            painText = MakeLabel("PainText", 28, TextAnchor.MiddleCenter, new Color(1f, 0.45f, 0.35f));
             painText.text = PainMessage;
             painText.enabled = false;
-            SetChild(column, painText, 72f);
+            // Pain warning is long; a wide centered line above the hint
+            // fits it fully (the narrow left column used to clip the left
+            // edge off-screen with Overflow).
+            {
+                RectTransform pr = painText.rectTransform;
+                pr.anchorMin = new Vector2(0.5f, 0f);
+                pr.anchorMax = new Vector2(0.5f, 0f);
+                pr.pivot = new Vector2(0.5f, 0f);
+                pr.sizeDelta = new Vector2(1500f, 40f);
+                pr.anchoredPosition = new Vector2(0f, HintYUnits + 70f);
+            }
             filterText = MakeLabel("FilterText", 28, TextAnchor.MiddleRight, new Color(0.85f, 0.85f, 0.85f));
             SetChild(column, filterText, 36f);
 
