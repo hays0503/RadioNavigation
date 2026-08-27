@@ -32,7 +32,7 @@ namespace UBOAT.Mods.RadioNavigation
         // §13.3 layout constants (1080-space units).
         private const float OcularSizeUnits = 600f;
         private const int RtWidth = 512;
-        private const int RtHeight = 1024;
+        private const int RtHeight = 512;
         private const float VeilAlpha = 0.85f;
         private const float ColumnGapUnits = 40f;
         private const float ColumnWidthUnits = 320f;
@@ -819,6 +819,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             try
             {
+                pipLeftCamera.Render();
                 pipRightCamera.Render();
             }
             catch (Exception e)
@@ -1230,7 +1231,9 @@ namespace UBOAT.Mods.RadioNavigation
             Mask ocularMask = pipGo.GetComponent<Mask>();
             ocularMask.showMaskGraphic = false;
 
-            // Left half: fixed-horizon camera view (pitch 0).
+            // Left half: fixed-horizon camera view (pitch 0). Shows only the
+            // left half of its RT so the optical axis sits at the split line
+            // (screen center); the right half of the frame is not drawn.
             GameObject leftGo = new GameObject("LeftView", typeof(RawImage));
             leftGo.transform.SetParent(pipGo.transform, false);
             leftViewImage = leftGo.GetComponent<RawImage>();
@@ -1240,8 +1243,11 @@ namespace UBOAT.Mods.RadioNavigation
             leftViewImage.rectTransform.anchorMax = new Vector2(0.5f, 1f);
             leftViewImage.rectTransform.offsetMin = Vector2.zero;
             leftViewImage.rectTransform.offsetMax = Vector2.zero;
+            leftViewImage.uvRect = new Rect(0f, 0f, 0.5f, 1f);
 
             // Right half: mirror camera pitched to the arc angle (0-130).
+            // Right half of its RT only; at arc=0 the halves form one
+            // continuous circling picture.
             GameObject rightGo = new GameObject("RightView", typeof(RawImage));
             rightGo.transform.SetParent(pipGo.transform, false);
             rightViewImage = rightGo.GetComponent<RawImage>();
@@ -1251,6 +1257,7 @@ namespace UBOAT.Mods.RadioNavigation
             rightViewImage.rectTransform.anchorMax = new Vector2(1f, 1f);
             rightViewImage.rectTransform.offsetMin = Vector2.zero;
             rightViewImage.rectTransform.offsetMax = Vector2.zero;
+            rightViewImage.uvRect = new Rect(0.5f, 0f, 0.5f, 1f);
 
             // Vertical split line between the halves.
             GameObject splitGo = new GameObject("VerticalSplit", typeof(Image));
