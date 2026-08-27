@@ -639,6 +639,24 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 WaterCamera waterCam = go.AddComponent<WaterCamera>();
                 Debug.Log(LogPrefix + " WATERCAM added to " + name + ": " + (waterCam != null));
+
+                // A raw WaterCamera is empty: PlayWay needs the config the
+                // main camera's component carries (Water reference, custom
+                // water render list, enable flags). Mirror it 1:1 so the sea
+                // is drawn for the PIP camera as well.
+                if (waterCam != null)
+                {
+                    WaterCamera mainWater = viewCamera.GetComponent<WaterCamera>();
+                    if (mainWater != null)
+                    {
+                        CopyMembers(mainWater, waterCam, GetMirrorMembers(mainWater.GetType()));
+                        Debug.Log(LogPrefix + " WATERCAM copied to " + name + " from main camera");
+                    }
+                    else
+                    {
+                        Debug.LogWarning(LogPrefix + " WATERCAM mirror source missing, raw component on " + name);
+                    }
+                }
             }
             catch (Exception e)
             {
