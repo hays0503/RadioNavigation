@@ -112,6 +112,9 @@ namespace UBOAT.Mods.RadioNavigation
         // Shader ocular (UseShaderOcular=true): no RT/camera, pure UI
         private Material ocularMaterial;
         private Image ocularBackground;
+        private Image skyImage;
+        private Image seaImage;
+        private Image vertSplitImage;
         private Image tickImage;
         private RectTransform starsContainer;
         private readonly System.Collections.Generic.List<Image> starPool = new System.Collections.Generic.List<Image>();
@@ -483,14 +486,28 @@ namespace UBOAT.Mods.RadioNavigation
             if (ocularMaterial != null && ocularMaterial.HasProperty("_HorizonOffset"))
             {
                 ocularMaterial.SetFloat("_HorizonOffset", offset);
+                // Natural horizon - hide the white tick line
                 if (tickImage != null)
-                    tickImage.rectTransform.anchoredPosition = Vector2.zero;
+                    tickImage.enabled = false;
             }
             else
             {
-                // Fallback without custom shader: move the tick line to horizon position
+                // Natural horizon - hide the white tick line
                 if (tickImage != null)
-                    tickImage.rectTransform.anchoredPosition = new Vector2(0f, offset * 300f);
+                    tickImage.enabled = false;
+                // Fallback sky/sea split when custom shader not in bundle
+                if (skyImage != null && seaImage != null)
+                {
+                    float horizonY = Mathf.Clamp01(0.5f + offset);
+                    skyImage.rectTransform.anchorMin = new Vector2(0f, horizonY);
+                    skyImage.rectTransform.anchorMax = new Vector2(1f, 1f);
+                    skyImage.rectTransform.offsetMin = Vector2.zero;
+                    skyImage.rectTransform.offsetMax = Vector2.zero;
+                    seaImage.rectTransform.anchorMin = new Vector2(0f, 0f);
+                    seaImage.rectTransform.anchorMax = new Vector2(1f, horizonY);
+                    seaImage.rectTransform.offsetMin = Vector2.zero;
+                    seaImage.rectTransform.offsetMax = Vector2.zero;
+                }
             }
 
             // Stars / sun projection
@@ -1080,8 +1097,24 @@ namespace UBOAT.Mods.RadioNavigation
                 else
                 {
                     ocularMaterial = null;
-                    ocularBackground.material = null;
-                    ocularBackground.color = new Color(0.18f, 0.45f, 0.85f, 1f);
+                    ocularBackground.enabled = false;
+                    GameObject skyGo2 = new GameObject("SkyFallback", typeof(Image));
+                    skyGo2.transform.SetParent(pipGo.transform, false);
+                    skyImage = skyGo2.GetComponent<Image>();
+                    skyImage.color = new Color(0.55f, 0.72f, 0.92f, 1f);
+                    skyImage.raycastTarget = false;
+                    GameObject seaGo = new GameObject("SeaFallback", typeof(Image));
+                    seaGo.transform.SetParent(pipGo.transform, false);
+                    seaImage = seaGo.GetComponent<Image>();
+                    seaImage.color = new Color(0.06f, 0.14f, 0.27f, 1f);
+                    seaImage.raycastTarget = false;
+                    GameObject vertGo = new GameObject("VerticalSplit", typeof(Image));
+                    vertGo.transform.SetParent(pipGo.transform, false);
+                    vertSplitImage = vertGo.GetComponent<Image>();
+                    vertSplitImage.color = new Color(1f, 1f, 1f, 0.35f);
+                    vertSplitImage.raycastTarget = false;
+                    // Vertical line full height, 2px wide at center
+                    AnchorCenter(vertSplitImage.rectTransform, 2f, OcularSizeUnits);
                 }
                 Stretch(ocularBackground.rectTransform);
 
