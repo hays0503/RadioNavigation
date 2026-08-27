@@ -499,11 +499,11 @@ namespace UBOAT.Mods.RadioNavigation
                 if (skyImage != null && seaImage != null)
                 {
                     float horizonY = Mathf.Clamp01(0.5f + offset);
-                    skyImage.rectTransform.anchorMin = new Vector2(0f, horizonY);
+                    skyImage.rectTransform.anchorMin = new Vector2(0.5f, horizonY);
                     skyImage.rectTransform.anchorMax = new Vector2(1f, 1f);
                     skyImage.rectTransform.offsetMin = Vector2.zero;
                     skyImage.rectTransform.offsetMax = Vector2.zero;
-                    seaImage.rectTransform.anchorMin = new Vector2(0f, 0f);
+                    seaImage.rectTransform.anchorMin = new Vector2(0.5f, 0f);
                     seaImage.rectTransform.anchorMax = new Vector2(1f, horizonY);
                     seaImage.rectTransform.offsetMin = Vector2.zero;
                     seaImage.rectTransform.offsetMax = Vector2.zero;
@@ -968,9 +968,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         private string FindNearestBodyName()
         {
-            if (pipCamera == null)
-                return null;
-
             Vector3 sunDir;
             float sunAlt;
             float sunAz;
@@ -1099,15 +1096,33 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     ocularMaterial = null;
                     ocularBackground.enabled = false;
+                    GameObject skyLeftGo = new GameObject("SkyLeftFallback", typeof(Image));
+                    skyLeftGo.transform.SetParent(pipGo.transform, false);
+                    Image skyLeft = skyLeftGo.GetComponent<Image>();
+                    skyLeft.color = new Color(0.55f, 0.72f, 0.92f, 1f);
+                    skyLeft.raycastTarget = false;
+                    skyLeft.rectTransform.anchorMin = new Vector2(0f, 0.5f);
+                    skyLeft.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+                    skyLeft.rectTransform.offsetMin = Vector2.zero;
+                    skyLeft.rectTransform.offsetMax = Vector2.zero;
+                    GameObject seaLeftGo = new GameObject("SeaLeftFallback", typeof(Image));
+                    seaLeftGo.transform.SetParent(pipGo.transform, false);
+                    Image seaLeft = seaLeftGo.GetComponent<Image>();
+                    seaLeft.color = new Color(0.06f, 0.14f, 0.27f, 1f);
+                    seaLeft.raycastTarget = false;
+                    seaLeft.rectTransform.anchorMin = new Vector2(0f, 0f);
+                    seaLeft.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                    seaLeft.rectTransform.offsetMin = Vector2.zero;
+                    seaLeft.rectTransform.offsetMax = Vector2.zero;
                     GameObject skyGo2 = new GameObject("SkyFallback", typeof(Image));
                     skyGo2.transform.SetParent(pipGo.transform, false);
                     skyImage = skyGo2.GetComponent<Image>();
-                    skyImage.color = new Color(0.55f, 0.72f, 0.92f, 1f);
+                    skyImage.color = new Color(0.484f, 0.634f, 0.81f, 1f);
                     skyImage.raycastTarget = false;
                     GameObject seaGo = new GameObject("SeaFallback", typeof(Image));
                     seaGo.transform.SetParent(pipGo.transform, false);
                     seaImage = seaGo.GetComponent<Image>();
-                    seaImage.color = new Color(0.06f, 0.14f, 0.27f, 1f);
+                    seaImage.color = new Color(0.053f, 0.123f, 0.238f, 1f);
                     seaImage.raycastTarget = false;
                     GameObject vertGo = new GameObject("VerticalSplit", typeof(Image));
                     vertGo.transform.SetParent(pipGo.transform, false);
