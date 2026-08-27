@@ -62,13 +62,15 @@ namespace UBOAT.Mods.RadioNavigation
             "\u0423\u0421\u0422\u0410\u041D\u041E\u0412\u0418\u0422\u0415 \u0424\u0418\u041B\u042C\u0422\u0420";
         private const string HintText =
             "\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0443\u0433\u043E\u043B \u00B7 Shift: \u0431\u044B\u0441\u0442\u0440\u0435\u0435 \u00B7 " +
-            "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440\u044B \u00B7 R: 0\u00B0 \u00B7 +/\u2212: \u0437\u0443\u043C \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
+            "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440 \u043F\u0440\u0430\u0432\u044B\u0439 \u00B7 Ctrl+1\u20133: \u043B\u0435\u0432\u044B\u0439 \u00B7 " +
+            "0: \u0441\u043D\u044F\u0442\u044C \u00B7 R: 0\u00B0 \u00B7 +/\u2212: \u0437\u0443\u043C \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
 
         /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
         public static bool IsOpen { get; private set; }
 
         internal double arcAngle;
-        private int filterCount;
+        private int leftFilterCount;
+        private int rightFilterCount;
         private float holdTimer;
         private float starIdTimer;
         private string lastFoundName;
@@ -128,7 +130,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private GameObject canvasRoot;
         private RectTransform pipRect;
-        private Image filterDimImage;
+        private Image filterDimLeftImage;
+        private Image filterDimRightImage;
         private Image glareImage;
         private Text angleText;
         private Text nameText;
@@ -138,13 +141,16 @@ namespace UBOAT.Mods.RadioNavigation
         private Texture2D circleMaskTexture;
         private static Font sextantOsFont;
 
-        // PPv2 bloom-cut volume: a dedicated global volume on a layer present
-        // ONLY in the PIP cameras' volumeLayer masks, so while a shade filter
-        // is installed the game's sun glow/bloom is disabled in the lenses
-        // (the main camera never consumes that layer - real filter look).
-        private GameObject bloomCutGo;
-        private int bloomCutLayer;
-        private const int BloomCutLayerCandidate = 7;
+        // PPv2 bloom-cut volumes: one per PIP camera on dedicated layers
+        // present ONLY in that camera's volumeLayer mask, so each shade
+        // filter disables its own half's sun glow independently (the main
+        // camera never consumes those layers - real filter look).
+        private GameObject bloomCutLeftGo;
+        private GameObject bloomCutRightGo;
+        private int bloomCutLeftLayer;
+        private int bloomCutRightLayer;
+        private const int BloomCutLayerCandidateLeft = 7;
+        private const int BloomCutLayerCandidateRight = 6;
         private bool bloomCutLogged;
         private bool sunDiscSourceLogged;
 
@@ -187,7 +193,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (canvasRoot != null) Destroy(canvasRoot);
             if (pipLeftCamera != null) Destroy(pipLeftCamera.gameObject);
             if (pipRightCamera != null) Destroy(pipRightCamera.gameObject);
-            if (bloomCutGo != null) Destroy(bloomCutGo);
+            if (bloomCutLeftGo != null) Destroy(bloomCutLeftGo);
+            if (bloomCutRightGo != null) Destroy(bloomCutRightGo);
             if (leftRt != null)
             {
                 leftRt.Release();
@@ -229,7 +236,8 @@ namespace UBOAT.Mods.RadioNavigation
             EnsurePipCameras();
 
             arcAngle = 0.0;
-            filterCount = 0;
+            leftFilterCount = 0;
+            rightFilterCount = 0;
             holdTimer = 0f;
             starIdTimer = 0f;
             lastFoundName = null;
@@ -288,8 +296,10 @@ namespace UBOAT.Mods.RadioNavigation
             DetachWaterCameras();
             SunDiscRenderer.Active = false;
             SunDiscRenderer.ResetDirection();
-            if (bloomCutGo != null)
-                bloomCutGo.SetActive(false);
+            if (bloomCutLeftGo != null)
+                bloomCutLeftGo.SetActive(false);
+            if (bloomCutRightGo != null)
+                bloomCutRightGo.SetActive(false);
             if (pipLeftCamera != null)
                 pipLeftCamera.enabled = false;
             if (pipRightCamera != null)
@@ -574,10 +584,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void HandleFilterKeys()
         {
-            if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1)) SetFilters(1);
-            else if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2)) SetFilters(2);
-            else if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3)) SetFilters(3);
-            else if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0)) SetFilters(0);
+            // Ctrl toggles the LEFT (horizon) filter; plain keys the RIGHT
+            // (sun) filter - like the separate shade glasses of a sextant.
+            bool left = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1)) SetFilters(1, left);
+            else if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2)) SetFilters(2, left);
+            else if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3)) SetFilters(3, left);
+            else if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0)) SetFilters(0, left);
         }
 
         private void HandleZoomKeys()
@@ -617,33 +630,51 @@ namespace UBOAT.Mods.RadioNavigation
                 viewCamera != null ? viewCamera.fieldOfView / PipFovDivisor : 0f));
         }
 
-        private void SetFilters(int count)
+        private void SetFilters(int count, bool leftSide)
         {
-            filterCount = count;
+            if (leftSide)
+                leftFilterCount = count;
+            else
+                rightFilterCount = count;
             UpdateFilterLabel();
             UpdateFilterDim();
-            SunDiscRenderer.Active = IsOpen && filterCount > 0;
-            if (bloomCutGo != null)
+
+            // The sun disc lives in the right (sun) half: gated by the right
+            // filter only. The left filter dims the horizon view.
+            SunDiscRenderer.Active = IsOpen && rightFilterCount > 0;
+
+            // Bloom-cut per half: each PIP camera has its own volume.
+            if (bloomCutRightGo != null)
             {
-                bool on = IsOpen && filterCount > 0;
-                bloomCutGo.SetActive(on);
-                Debug.Log(LogPrefix + " BLOOMCUT " + (on ? "on" : "off") + " (filters=" + filterCount + ")");
-                if (!bloomCutLogged && on)
+                bool rightOn = IsOpen && rightFilterCount > 0;
+                bloomCutRightGo.SetActive(rightOn);
+                Debug.Log(LogPrefix + " BLOOMCUT right " + (rightOn ? "on" : "off") + " (filters=" + rightFilterCount + ")");
+            }
+            if (bloomCutLeftGo != null)
+            {
+                bool leftOn = IsOpen && leftFilterCount > 0;
+                bloomCutLeftGo.SetActive(leftOn);
+                Debug.Log(LogPrefix + " BLOOMCUT left " + (leftOn ? "on" : "off") + " (filters=" + leftFilterCount + ")");
+            }
+            if (!bloomCutLogged && (leftFilterCount > 0 || rightFilterCount > 0))
+            {
+                bloomCutLogged = true;
+                try
                 {
-                    bloomCutLogged = true;
-                    try
-                    {
-                        PostProcessLayer pipLayer = pipLeftCamera != null
-                            ? pipLeftCamera.GetComponent<PostProcessLayer>() : null;
-                        PostProcessLayer mainLayer = viewCamera != null
-                            ? viewCamera.GetComponent<PostProcessLayer>() : null;
-                        Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                            "{0} BLOOMCUT applied pipLayer={1} mainLayer={2} volumeActive={3}",
-                            LogPrefix, pipLayer != null,
-                            mainLayer != null, bloomCutGo.activeSelf));
-                    }
-                    catch { }
+                    PostProcessLayer pipLeftLayer = pipLeftCamera != null
+                        ? pipLeftCamera.GetComponent<PostProcessLayer>() : null;
+                    PostProcessLayer pipRightLayer = pipRightCamera != null
+                        ? pipRightCamera.GetComponent<PostProcessLayer>() : null;
+                    PostProcessLayer mainLayer = viewCamera != null
+                        ? viewCamera.GetComponent<PostProcessLayer>() : null;
+                    Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                        "{0} BLOOMCUT applied pipL={1} pipR={2} main={3} leftVol={4} rightVol={5}",
+                        LogPrefix, pipLeftLayer != null, pipRightLayer != null,
+                        mainLayer != null,
+                        bloomCutLeftGo != null && bloomCutLeftGo.activeSelf,
+                        bloomCutRightGo != null && bloomCutRightGo.activeSelf));
                 }
+                catch { }
             }
         }
 
@@ -651,11 +682,18 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (!GlareEnabled)
                 return;
-            if (filterDimImage == null)
-                return;
-            Color c = filterDimImage.color;
-            c.a = 0.30f * filterCount;
-            filterDimImage.color = c;
+            if (filterDimLeftImage != null)
+            {
+                Color c = filterDimLeftImage.color;
+                c.a = 0.30f * leftFilterCount;
+                filterDimLeftImage.color = c;
+            }
+            if (filterDimRightImage != null)
+            {
+                Color c = filterDimRightImage.color;
+                c.a = 0.30f * rightFilterCount;
+                filterDimRightImage.color = c;
+            }
         }
 
         // ---- PIP cameras ------------------------------------------------------
@@ -670,8 +708,8 @@ namespace UBOAT.Mods.RadioNavigation
             rightRt = new RenderTexture(RtWidth, RtHeight, 32, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
             rightRt.name = "RadioNavSextantRightRT";
 
-            pipLeftCamera = ConfigurePipCamera("RadioNavSextantLeftCamera", leftRt);
-            pipRightCamera = ConfigurePipCamera("RadioNavSextantRightCamera", rightRt);
+            pipLeftCamera = ConfigurePipCamera("RadioNavSextantLeftCamera", leftRt, false);
+            pipRightCamera = ConfigurePipCamera("RadioNavSextantRightCamera", rightRt, true);
 
             if (leftViewImage != null) leftViewImage.texture = leftRt;
             if (rightViewImage != null) rightViewImage.texture = rightRt;
@@ -679,7 +717,7 @@ namespace UBOAT.Mods.RadioNavigation
             Debug.Log(LogPrefix + " PIP cameras created, RT=" + RtWidth + "x" + RtHeight);
         }
 
-        private Camera ConfigurePipCamera(string name, RenderTexture target)
+        private Camera ConfigurePipCamera(string name, RenderTexture target, bool rightSide)
         {
             GameObject go = new GameObject(name);
             Camera cam = go.AddComponent<Camera>();
@@ -752,10 +790,10 @@ namespace UBOAT.Mods.RadioNavigation
             cam.depthTextureMode = viewCamera.depthTextureMode;
 
             // Bloom-cut: PPv2 volume on a PIP-only layer. While a filter is
-            // installed the sun's glow is disabled inside the lenses; the
-            // main camera's PostProcessLayer never consumes this layer, so
-            // the FPP view keeps its normal bloom.
-            EnsureBloomCutVolume(go);
+            // installed the sun's glow is disabled inside that half's lens;
+            // the main camera's PostProcessLayer never consumes this layer,
+            // so the FPP view keeps its normal bloom.
+            EnsureBloomCutVolume(go, rightSide);
 
             SextantCameraProbe probe = go.AddComponent<SextantCameraProbe>();
             probe.tracked = cam;
@@ -901,7 +939,7 @@ namespace UBOAT.Mods.RadioNavigation
             Debug.Log(LogPrefix + " PIPSTACK [" + go.name + "] " + sb.ToString());
         }
 
-        private void EnsureBloomCutVolume(GameObject pipGo)
+        private void EnsureBloomCutVolume(GameObject pipGo, bool rightSide)
         {
             try
             {
@@ -909,27 +947,38 @@ namespace UBOAT.Mods.RadioNavigation
                 if (pipLayer == null)
                     return;
 
-                // Layer 7 (unused by the game) must be added to the PIP
-                // PostProcessLayer's volumeLayer mask so the volume is
-                // consumed; the main camera's mask never contains it.
-                pipLayer.volumeLayer |= (1 << BloomCutLayerCandidate);
+                GameObject volumeGo = rightSide ? bloomCutRightGo : bloomCutLeftGo;
+                if (volumeGo == null)
+                {
+                    int layer = rightSide ? BloomCutLayerCandidateRight : BloomCutLayerCandidateLeft;
+                    volumeGo = new GameObject(rightSide ? "RadioNavSextantBloomCutRight" : "RadioNavSextantBloomCutLeft");
+                    volumeGo.layer = layer;
+                    PostProcessVolume volume = volumeGo.AddComponent<PostProcessVolume>();
+                    volume.isGlobal = true;
+                    volume.priority = 1000f;
+                    PostProcessProfile profile = ScriptableObject.CreateInstance<PostProcessProfile>();
+                    profile.name = "RadioNavSextantBloomCut";
+                    Bloom bloom = profile.AddSettings<Bloom>();
+                    bloom.enabled.value = false;
+                    volume.sharedProfile = profile;
+                    volumeGo.SetActive(false); // active only while filter>0
+                    if (rightSide)
+                    {
+                        bloomCutRightGo = volumeGo;
+                        bloomCutRightLayer = layer;
+                    }
+                    else
+                    {
+                        bloomCutLeftGo = volumeGo;
+                        bloomCutLeftLayer = layer;
+                    }
+                    Debug.Log(LogPrefix + " BLOOMCUT volume " + (rightSide ? "right" : "left")
+                        + " on layer " + layer + " created (hidden)");
+                }
 
-                if (bloomCutGo != null)
-                    return;
-
-                bloomCutLayer = BloomCutLayerCandidate;
-                bloomCutGo = new GameObject("RadioNavSextantBloomCut");
-                bloomCutGo.layer = bloomCutLayer;
-                PostProcessVolume volume = bloomCutGo.AddComponent<PostProcessVolume>();
-                volume.isGlobal = true;
-                volume.priority = 1000f;
-                PostProcessProfile profile = ScriptableObject.CreateInstance<PostProcessProfile>();
-                profile.name = "RadioNavSextantBloomCut";
-                Bloom bloom = profile.AddSettings<Bloom>();
-                bloom.enabled.value = false;
-                volume.sharedProfile = profile;
-                bloomCutGo.SetActive(false); // active only while filter>0
-                Debug.Log(LogPrefix + " BLOOMCUT volume on layer " + bloomCutLayer + " created (hidden)");
+                // Layer must be in THIS PIP camera's volumeLayer mask only;
+                // the main camera's mask never contains it.
+                pipLayer.volumeLayer |= (1 << volumeGo.layer);
             }
             catch (Exception e)
             {
@@ -1043,11 +1092,17 @@ namespace UBOAT.Mods.RadioNavigation
             if (!GlareEnabled)
             {
                 ApplyGlare(0f);
-                if (filterDimImage != null)
+                if (filterDimLeftImage != null)
                 {
-                    Color c = filterDimImage.color;
+                    Color c = filterDimLeftImage.color;
                     c.a = 0f;
-                    filterDimImage.color = c;
+                    filterDimLeftImage.color = c;
+                }
+                if (filterDimRightImage != null)
+                {
+                    Color c = filterDimRightImage.color;
+                    c.a = 0f;
+                    filterDimRightImage.color = c;
                 }
                 LogSunDrift(dt);
                 return;
@@ -1060,7 +1115,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (pipRightCamera != null && TryGetOwnSun(out sunDir, out sunAlt, out sunAz))
             {
                 float angle = Vector3.Angle(pipRightCamera.transform.forward, sunDir);
-                g = (float)SextantGlare.Glare(angle, sunAlt, filterCount, pipRightCamera.fieldOfView);
+                g = (float)SextantGlare.Glare(angle, sunAlt, rightFilterCount, pipRightCamera.fieldOfView);
                 // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6°),
                 // so position it on the game direction when available.
                 Vector3 gameDir;
@@ -1365,9 +1420,17 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (filterText == null)
                 return;
-            filterText.text = filterCount > 0
-                ? "\u0424\u0418\u041B\u042C\u0422\u0420 " + filterCount
-                : "";
+            if (leftFilterCount <= 0 && rightFilterCount <= 0)
+            {
+                filterText.text = "";
+                return;
+            }
+            System.Text.StringBuilder sb = new System.Text.StringBuilder("\u0424\u0418\u041B\u042C\u0422\u0420 ");
+            if (leftFilterCount > 0)
+                sb.Append("\u041B").Append(leftFilterCount).Append(" ");
+            if (rightFilterCount > 0)
+                sb.Append("\u041F").Append(rightFilterCount);
+            filterText.text = sb.ToString().TrimEnd();
         }
 
         // ---- overlay construction (§13.3) --------------------------------------
@@ -1455,15 +1518,30 @@ namespace UBOAT.Mods.RadioNavigation
             splitImage.raycastTarget = false;
             AnchorCenter(splitImage.rectTransform, 2f, OcularSizeUnits);
 
-            // Shade filters dim the whole scope view (v1.5): the PIP camera
-            // renders without the game's post stack, so the daytime sky clips
-            // to white; filters are the authentic way to cut that down.
-            GameObject dimGo = new GameObject("FilterDim", typeof(Image));
-            dimGo.transform.SetParent(pipGo.transform, false);
-            filterDimImage = dimGo.GetComponent<Image>();
-            filterDimImage.color = new Color(0f, 0f, 0f, 0f);
-            filterDimImage.raycastTarget = false;
-            Stretch(filterDimImage.rectTransform);
+            // Shade filters dim the scope view (v1.5): separate left (horizon)
+            // and right (sun) half dimmers - like the separate shade glasses
+            // of a real sextant.
+            GameObject dimLeftGo = new GameObject("FilterDimLeft", typeof(Image));
+            dimLeftGo.transform.SetParent(pipGo.transform, false);
+            filterDimLeftImage = dimLeftGo.GetComponent<Image>();
+            filterDimLeftImage.color = new Color(0f, 0f, 0f, 0f);
+            filterDimLeftImage.raycastTarget = false;
+            RectTransform dimLeftRt = filterDimLeftImage.rectTransform;
+            dimLeftRt.anchorMin = new Vector2(0f, 0f);
+            dimLeftRt.anchorMax = new Vector2(0.5f, 1f);
+            dimLeftRt.offsetMin = Vector2.zero;
+            dimLeftRt.offsetMax = Vector2.zero;
+
+            GameObject dimRightGo = new GameObject("FilterDimRight", typeof(Image));
+            dimRightGo.transform.SetParent(pipGo.transform, false);
+            filterDimRightImage = dimRightGo.GetComponent<Image>();
+            filterDimRightImage.color = new Color(0f, 0f, 0f, 0f);
+            filterDimRightImage.raycastTarget = false;
+            RectTransform dimRightRt = filterDimRightImage.rectTransform;
+            dimRightRt.anchorMin = new Vector2(0.5f, 0f);
+            dimRightRt.anchorMax = new Vector2(1f, 1f);
+            dimRightRt.offsetMin = Vector2.zero;
+            dimRightRt.offsetMax = Vector2.zero;
 
             // Glare flash inside the ocular only.
             GameObject glareGo = new GameObject("Glare", typeof(Image));
