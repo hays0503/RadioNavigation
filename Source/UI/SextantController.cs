@@ -514,7 +514,8 @@ namespace UBOAT.Mods.RadioNavigation
             pipLeftCamera.transform.position = mt.position;
             pipLeftCamera.transform.rotation = Quaternion.Euler(0f, mainEuler.y, 0f);
             pipRightCamera.transform.position = mt.position;
-            pipRightCamera.transform.rotation = Quaternion.Euler((float)arcAngle, mainEuler.y, 0f);
+            // Positive Euler X pitches DOWN in Unity; the alidade looks UP.
+            pipRightCamera.transform.rotation = Quaternion.Euler(-(float)arcAngle, mainEuler.y, 0f);
 
             SyncCameraState(pipLeftCamera, viewCamera);
             SyncCameraState(pipRightCamera, viewCamera);
@@ -559,7 +560,7 @@ namespace UBOAT.Mods.RadioNavigation
                 yaw = viewCamera.transform.eulerAngles.y;
             else if (gameMainCamera != null)
                 yaw = gameMainCamera.transform.eulerAngles.y;
-            Quaternion rot = Quaternion.Euler((float)arcAngle, yaw, 0f);
+            Quaternion rot = Quaternion.Euler(-(float)arcAngle, yaw, 0f);
             return rot * Vector3.forward;
         }
 
