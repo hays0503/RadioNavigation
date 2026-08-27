@@ -270,6 +270,15 @@ RadioInstaller.Instantiate(radio, viewport);
                     Debug.Log("[RadioNav][Main] PlanetRoot created with PlanetRenderer component");
                 }
 
+                // SEXTANT: real-size filtered sun disc (layer 7, PIP cameras only)
+                if (GameObject.Find("SunDiscRoot").IsNull())
+                {
+                    GameObject sunDiscRoot = new GameObject("SunDiscRoot");
+                    sunDiscRoot.AddComponent<SunDiscRenderer>();
+                    Object.DontDestroyOnLoad(sunDiscRoot);
+                    Debug.Log("[RadioNav][Main] SunDiscRoot created with SunDiscRenderer component");
+                }
+
                 LighthousePlacer.EnsureRunning();
 
                 // Phase0 probe (STAR_SKY_PLAN:10, ADR-020) — only when PlayerPrefs RadioNav.Phase0Probe=1

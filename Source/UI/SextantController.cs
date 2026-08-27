@@ -228,6 +228,8 @@ namespace UBOAT.Mods.RadioNavigation
             sunDriftLogTimer = 0f; // force the first SUNDRIFT line on open
             renderCheckDone = false;
             renderCheckTimer = 1.0f;
+            SunDiscRenderer.RandomizeDisc(); // fresh sunspot pattern per open
+            SunDiscRenderer.Active = false;
 
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
@@ -273,6 +275,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (gameInput != null)
                 gameInput.RemoveBlockade(this);
             DetachWaterCameras();
+            SunDiscRenderer.Active = false;
             if (pipLeftCamera != null)
                 pipLeftCamera.enabled = false;
             if (pipRightCamera != null)
@@ -578,17 +581,17 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void ZoomIn()
         {
-            if (zoomIndex >= ZoomSteps.Length - 1)
+            if (zoomIndex <= 0)
                 return;
-            zoomIndex++;
+            zoomIndex--;
             LogZoom();
         }
 
         private void ZoomOut()
         {
-            if (zoomIndex <= 0)
+            if (zoomIndex >= ZoomSteps.Length - 1)
                 return;
-            zoomIndex--;
+            zoomIndex++;
             LogZoom();
         }
 
@@ -605,6 +608,7 @@ namespace UBOAT.Mods.RadioNavigation
             filterCount = count;
             UpdateFilterLabel();
             UpdateFilterDim();
+            SunDiscRenderer.Active = IsOpen && filterCount > 0;
         }
 
         private void UpdateFilterDim()
@@ -649,6 +653,10 @@ namespace UBOAT.Mods.RadioNavigation
             cam.targetTexture = target;
             cam.fieldOfView = viewCamera.fieldOfView / PipFovDivisor;
             cam.enabled = false;
+            // Sun disc layer (7): rendered only by the PIP cameras; the bit
+            // is absent from every stock camera mask, so the main view
+            // never sees the disc.
+            cam.cullingMask |= SunDiscRenderer.SunDiscLayerMask;
 
             // The game's render pipeline renders water only for cameras
             // registered on the main camera's AdditionalCameraData
@@ -906,7 +914,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void SyncCameraState(Camera cam, Camera source)
         {
             cam.fieldOfView = source.fieldOfView / PipFovDivisor;
-            cam.cullingMask = source.cullingMask;
+            cam.cullingMask = source.cullingMask | SunDiscRenderer.SunDiscLayerMask;
             // Keep the SRP pass mask in sync with the live cullingMask
             try
             {
@@ -975,6 +983,14 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 float angle = Vector3.Angle(pipRightCamera.transform.forward, sunDir);
                 g = (float)SextantGlare.Glare(angle, sunAlt, filterCount, pipRightCamera.fieldOfView);
+                // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6°),
+                // so position it on the game direction when available.
+                Vector3 gameDir;
+                float gameAlt;
+                if (TryGetGameSun(out gameDir, out gameAlt))
+                    SunDiscRenderer.SunDirection = gameDir;
+                else
+                    SunDiscRenderer.SunDirection = sunDir;
             }
             ApplyGlare(g);
             LogSunDrift(dt);
