@@ -38,6 +38,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const float ColumnGapUnits = 40f;
         private const float ColumnWidthUnits = 320f;
         private const float HintYUnits = 60f;
+        private const float SunColumnWidthUnits = 440f;
 
         // §2 behaviour constants.
         private const float RateDegPerSec = 2f;
@@ -64,6 +65,10 @@ namespace UBOAT.Mods.RadioNavigation
             "\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0443\u0433\u043E\u043B \u00B7 Shift: \u0431\u044B\u0441\u0442\u0440\u0435\u0435 \u00B7 " +
             "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440 \u043F\u0440\u0430\u0432\u044B\u0439 \u00B7 Ctrl+1\u20133: \u043B\u0435\u0432\u044B\u0439 \u00B7 " +
             "0: \u0441\u043D\u044F\u0442\u044C \u00B7 R: 0\u00B0 \u00B7 +/\u2212: \u0437\u0443\u043C \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
+        private const string SunAnglePrefix =
+            "\u0423\u0433\u043E\u043B \u043E\u0442 \u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442\u0430 \u043D\u0430 \u0421\u043E\u043B\u043D\u0446\u0435: ";
+        private const string SunAltPrefix =
+            "\u0412\u044B\u0441\u043E\u0442\u0430 \u0441\u043E\u043B\u043D\u0446\u0430 \u043D\u0430\u0434 \u0443\u0440\u043E\u0432\u043D\u0435\u043C \u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442\u0430: ";
 
         /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
         public static bool IsOpen { get; private set; }
@@ -137,6 +142,10 @@ namespace UBOAT.Mods.RadioNavigation
         private Text nameText;
         private Text painText;
         private Text filterText;
+        private Text sunAngleText;
+        private Text sunAltText;
+        private string lastSunAngleLine;
+        private string lastSunAltLine;
         private Texture2D ringTexture;
         private Texture2D circleMaskTexture;
         private static Font sextantOsFont;
@@ -244,6 +253,8 @@ namespace UBOAT.Mods.RadioNavigation
             identifiedName = "";
             pain = false;
             lastFormattedArc = double.MinValue;
+            lastSunAngleLine = null;
+            lastSunAltLine = null;
             sunDriftLogTimer = 0f; // force the first SUNDRIFT line on open
             renderCheckDone = false;
             renderCheckTimer = 1.0f;
@@ -1127,6 +1138,7 @@ namespace UBOAT.Mods.RadioNavigation
                 float gameAlt;
                 bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
                 SunDiscRenderer.SunDirection = gameOk ? gameDir : sunDir;
+                UpdateSunReadout(true, sunAlt, SunDiscRenderer.SunDirection);
                 if (!sunDiscSourceLogged && SunDiscRenderer.Active)
                 {
                     sunDiscSourceLogged = true;
@@ -1137,8 +1149,46 @@ namespace UBOAT.Mods.RadioNavigation
                         gameOk ? V3(gameDir) : " n/a"));
                 }
             }
+            else
+            {
+                UpdateSunReadout(false, 0f, Vector3.zero);
+            }
             ApplyGlare(g);
             LogSunDrift(dt);
+        }
+
+        /// <summary>
+        /// Right-side verification readout: angle from the true horizon (left
+        /// PIP camera, pitch 0) to the displayed sun direction, plus the own
+        /// Meeus altitude as reference. At alignment both should match the arc.
+        /// </summary>
+        private void UpdateSunReadout(bool available, float sunAltDeg, Vector3 displayDir)
+        {
+            if (sunAngleText == null || sunAltText == null)
+                return;
+            string line1;
+            string line2;
+            if (!available || pipLeftCamera == null || displayDir.sqrMagnitude < 0.01f)
+            {
+                line1 = SunAnglePrefix + "\u2014";
+                line2 = SunAltPrefix + "\u2014";
+            }
+            else
+            {
+                float angleFromHorizon = Vector3.Angle(pipLeftCamera.transform.forward, displayDir);
+                line1 = SunAnglePrefix + angleFromHorizon.ToString("F1", CultureInfo.InvariantCulture) + "\u00B0";
+                line2 = SunAltPrefix + sunAltDeg.ToString("F1", CultureInfo.InvariantCulture) + "\u00B0";
+            }
+            if (line1 != lastSunAngleLine)
+            {
+                sunAngleText.text = line1;
+                lastSunAngleLine = line1;
+            }
+            if (line2 != lastSunAltLine)
+            {
+                sunAltText.text = line2;
+                lastSunAltLine = line2;
+            }
         }
 
         private void ApplyGlare(float g)
@@ -1615,6 +1665,22 @@ namespace UBOAT.Mods.RadioNavigation
             }
             filterText = MakeLabel("FilterText", 14, TextAnchor.MiddleRight, new Color(0.85f, 0.85f, 0.85f));
             SetChild(column, filterText, 36f);
+
+            // Sun verification readout hugging the circle's right edge:
+            // horizon->sun angle (scene) + own-ephemeris altitude (reference).
+            GameObject sunColumnGo = new GameObject("SunInfoColumn");
+            sunColumnGo.transform.SetParent(canvasRoot.transform, false);
+            RectTransform sunColumn = sunColumnGo.AddComponent<RectTransform>();
+            sunColumn.anchorMin = new Vector2(0.5f, 0.5f);
+            sunColumn.anchorMax = new Vector2(0.5f, 0.5f);
+            sunColumn.pivot = new Vector2(0f, 0.5f);
+            sunColumn.sizeDelta = new Vector2(SunColumnWidthUnits, 180f);
+            sunColumn.anchoredPosition = new Vector2(OcularSizeUnits * 0.5f + ColumnGapUnits, 0f);
+
+            sunAngleText = MakeLabel("SunAngleText", 14, TextAnchor.MiddleLeft, Color.white);
+            SetChild(sunColumn, sunAngleText, 160f);
+            sunAltText = MakeLabel("SunAltText", 14, TextAnchor.MiddleLeft, new Color(0.75f, 0.9f, 1f));
+            SetChild(sunColumn, sunAltText, 116f);
 
             // Bottom hint line.
             Text hint = MakeLabel("HintText", 13, TextAnchor.MiddleCenter,
