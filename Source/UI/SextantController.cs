@@ -1594,11 +1594,11 @@ namespace UBOAT.Mods.RadioNavigation
             column.sizeDelta = new Vector2(ColumnWidthUnits, 180f);
             column.anchoredPosition = new Vector2(-OcularSizeUnits * 0.5f - ColumnGapUnits, 0f);
 
-            angleText = MakeLabel("AngleText", 44, TextAnchor.MiddleRight, Color.white);
+            angleText = MakeLabel("AngleText", 22, TextAnchor.MiddleRight, Color.white);
             SetChild(column, angleText, 160f);
-            nameText = MakeLabel("NameText", 32, TextAnchor.MiddleRight, new Color(0.75f, 0.9f, 1f));
+            nameText = MakeLabel("NameText", 16, TextAnchor.MiddleRight, new Color(0.75f, 0.9f, 1f));
             SetChild(column, nameText, 116f);
-            painText = MakeLabel("PainText", 28, TextAnchor.MiddleCenter, new Color(1f, 0.45f, 0.35f));
+            painText = MakeLabel("PainText", 14, TextAnchor.MiddleCenter, new Color(1f, 0.45f, 0.35f));
             painText.text = PainMessage;
             painText.enabled = false;
             // Pain warning is long; a wide centered line above the hint
@@ -1613,11 +1613,11 @@ namespace UBOAT.Mods.RadioNavigation
                 pr.sizeDelta = new Vector2(1500f, 40f);
                 pr.anchoredPosition = new Vector2(0f, HintYUnits + 155f);
             }
-            filterText = MakeLabel("FilterText", 28, TextAnchor.MiddleRight, new Color(0.85f, 0.85f, 0.85f));
+            filterText = MakeLabel("FilterText", 14, TextAnchor.MiddleRight, new Color(0.85f, 0.85f, 0.85f));
             SetChild(column, filterText, 36f);
 
             // Bottom hint line.
-            Text hint = MakeLabel("HintText", 26, TextAnchor.MiddleCenter,
+            Text hint = MakeLabel("HintText", 13, TextAnchor.MiddleCenter,
                 new Color(0.75f, 0.75f, 0.75f));
             hint.text = HintText;
             hint.transform.SetParent(canvasRoot.transform, false);
@@ -1664,7 +1664,7 @@ namespace UBOAT.Mods.RadioNavigation
             labelGo.transform.SetParent(go.transform, false);
             Text label = labelGo.GetComponent<Text>();
             label.font = GetSextantOsFont();
-            label.fontSize = 30;
+            label.fontSize = 15;
             label.alignment = TextAnchor.MiddleCenter;
             label.color = Color.white;
             label.raycastTarget = false;
