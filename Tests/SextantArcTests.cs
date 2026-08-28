@@ -48,5 +48,33 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             string s = SextantArc.Format(45.0 + 23.4 / 60.0);
             Assert.Equal("45\u00B023.4\u2032", s);
         }
+
+        // Fine adjustment (Ctrl+arrows): one drum tick = 0.2' = 1/300° —
+        // exactly one display quantum, so steps never drift off-grid.
+        [Fact]
+        public void FineStep_OneTick_IsOneQuantum()
+        {
+            double tick = 1.0 / SextantArc.StepsPerDeg;
+            Assert.Equal(1.0 / 300.0, tick, 12);
+        }
+
+        [Fact]
+        public void FineStep_ThreeTicks_FromZero_ShowsPointSixMinutes()
+        {
+            double q = 0.0;
+            for (int i = 0; i < 3; i++)
+                q = SextantArc.Quantize(q + 1.0 / SextantArc.StepsPerDeg);
+            Assert.Equal(0.6 / 60.0, q, 12);
+            Assert.Equal("0\u00B000.6\u2032", SextantArc.Format(q));
+        }
+
+        [Fact]
+        public void FineStep_TickFromReading_StaysOnGrid()
+        {
+            double q = SextantArc.Quantize(45.0 + 23.4 / 60.0);
+            q = SextantArc.Quantize(q + 1.0 / SextantArc.StepsPerDeg);
+            Assert.Equal(45.0 + 23.6 / 60.0, q, 12);
+            Assert.Equal("45\u00B023.6\u2032", SextantArc.Format(q));
+        }
     }
 }

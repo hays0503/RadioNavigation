@@ -43,6 +43,11 @@ namespace UBOAT.Mods.RadioNavigation
         // §2 behaviour constants.
         private const float RateDegPerSec = 2f;
         private const float ShiftMultiplier = 5f;
+        // Fine adjustment (Ctrl+arrows): one micrometer-drum tick per step,
+        // 0.2' = 12" = exactly one display quantum (SextantArc.StepsPerDeg).
+        private const int FineStepQuant = 1;
+        private const float FineRepeatDelay = 0.3f;
+        private const float FineRepeatInterval = 0.15f;
         private const bool VectorLogEnabled = true;
         private const float VectorLogHoldIntervalSeconds = 0.5f;
         private const float VectorRotateMinDeltaDeg = 0.5f;
@@ -63,6 +68,7 @@ namespace UBOAT.Mods.RadioNavigation
             "\u0423\u0421\u0422\u0410\u041D\u041E\u0412\u0418\u0422\u0415 \u0424\u0418\u041B\u042C\u0422\u0420";
         private const string HintText =
             "\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0443\u0433\u043E\u043B \u00B7 Shift: \u0431\u044B\u0441\u0442\u0440\u0435\u0435 \u00B7 " +
+            "Ctrl+\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0442\u043E\u0447\u043D\u043E (0,2\u2032) \u00B7 " +
             "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440 \u043F\u0440\u0430\u0432\u044B\u0439 \u00B7 Ctrl+1\u20133: \u043B\u0435\u0432\u044B\u0439 \u00B7 " +
             "0: \u0441\u043D\u044F\u0442\u044C \u00B7 R: 0\u00B0 \u00B7 +/\u2212: \u0437\u0443\u043C \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
         private const string SunAltPrefix =
@@ -75,6 +81,7 @@ namespace UBOAT.Mods.RadioNavigation
         private int leftFilterCount;
         private int rightFilterCount;
         private float holdTimer;
+        private float fineRepeatTimer;
         private float starIdTimer;
         private string lastFoundName;
         private string identifiedName = "";
@@ -395,12 +402,36 @@ namespace UBOAT.Mods.RadioNavigation
             if (Input.GetKey(KeyCode.UpArrow)) dir += 1f;
             if (Input.GetKey(KeyCode.DownArrow)) dir -= 1f;
             if (dir == 0f)
+            {
+                fineRepeatTimer = 0f;
                 return;
+            }
 
-            bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
+            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            if (ctrl)
+            {
+                // Fine adjustment: one drum tick (0.2' = 1 quantum) per press,
+                // hold repeats after a short delay - like turning the drum.
+                bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
+                if (pressed)
+                {
+                    fineRepeatTimer = FineRepeatDelay;
+                    StepArcFine(dir);
+                    return;
+                }
+                fineRepeatTimer -= dt;
+                if (fineRepeatTimer <= 0f)
+                {
+                    fineRepeatTimer = FineRepeatInterval;
+                    StepArcFine(dir);
+                }
+                return;
+            }
+
             if (VectorLogEnabled)
             {
                 vectorLogHoldTimer -= dt;
+                bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
                 if (pressed || vectorLogHoldTimer <= 0f)
                 {
                     vectorLogHoldTimer = VectorLogHoldIntervalSeconds;
@@ -411,6 +442,12 @@ namespace UBOAT.Mods.RadioNavigation
             bool fast = ShiftHeld();
             float rate = RateDegPerSec * (fast ? ShiftMultiplier : 1f);
             arcAngle = SextantArc.Quantize(arcAngle + dir * rate * dt);
+        }
+
+        /// <summary>One fine-adjustment step (0.2' drum tick), always on-grid.</summary>
+        private void StepArcFine(float dir)
+        {
+            arcAngle = SextantArc.Quantize(arcAngle + dir * FineStepQuant / SextantArc.StepsPerDeg);
         }
 
         /// <summary>
