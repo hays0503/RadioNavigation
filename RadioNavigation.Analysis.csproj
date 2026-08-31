@@ -1,0 +1,146 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Analysis-only project for Roslynator static analysis of the mod source.
+
+    Uses net48 + the REAL UnityEngine.* and game DLLs from UBOAT_Data\Managed.
+    This is the correct environment: Roslyn resolves the actual Unity API surface
+    the game is built against (no stubs, no OpenMod.Redist).
+
+    Why net48 and not netstandard2.0:
+      - netstandard2.0 conflicts with Unity's mscorlib-2.0-based assemblies ->
+        CS0012 flood -> analyzers never run.
+      - .NET Framework TFMs unify mscorlib so the real Unity DLLs resolve cleanly.
+      - net48 gives 0 compile errors; net45 has 4 (Array.Empty), net40 has 16.
+
+    Never used by build.ps1 (which is the real csc-based compiler).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.0</LangVersion>
+    <OutputType>Library</OutputType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>CS8032;CS0162;CS0219;CS0414;CS0649</NoWarn>
+
+    <!--
+      Isolate this project's build state from radionavigation.csproj.
+      BaseIntermediateOutputPath moves compile outputs under obj/analysis so the
+      two projects' generated files don't collide.
+
+      NOTE: do NOT also override MSBuildProjectExtensionsPath here. Roslynator CLI
+      does not honor a custom extensions path - it reads project.assets.json /
+      *.nuget.g.* from the default obj\ root, so overriding it makes analysis
+      resolve stale/wrong references (verified: 2058 RCS / 67020 CS vs clean
+      3084 / 0). The real protection against cross-project assets corruption is
+      analyze.ps1 always restoring the analysis project first.
+    -->
+    <BaseIntermediateOutputPath>obj\analysis\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\analysis\</BaseOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GamePath Condition="'$(GamePath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\UBOAT</GamePath>
+    <GameManaged>$(GamePath)\UBOAT_Data\Managed</GameManaged>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.12.10" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!--
+    Custom Harmony-patch analyzer (RN0001-RN0005). Validates the mod's imperative
+    reflection patching in Main.cs: target resolution + Prefix/Postfix handler
+    signature checks that Roslynator cannot express. Built from
+    RadioNavigation.Analyzers (netstandard2.0, Microsoft.CodeAnalysis.CSharp 4.11.0).
+    Build it with `dotnet build RadioNavigation.Analyzers -c Release` before analyze.
+  -->
+  <ItemGroup>
+    <Analyzer Include="RadioNavigation.Analyzers\bin\Release\netstandard2.0\RadioNavigation.Analyzers.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Source\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameManaged)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.uboat.game">
+      <HintPath>$(GameManaged)\com.uboat.game.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.uboat.modapi">
+      <HintPath>$(GameManaged)\com.uboat.modapi.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.uboat.dependencies">
+      <HintPath>$(GameManaged)\com.uboat.dependencies.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.uboat.rendering">
+      <HintPath>$(GameManaged)\com.uboat.rendering.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameManaged)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GameManaged)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.playway.water.Runtime">
+      <HintPath>$(GameManaged)\com.playway.water.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.unity.postprocessing.Runtime">
+      <HintPath>$(GameManaged)\com.unity.postprocessing.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(GameManaged)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameManaged)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(GameManaged)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GameManaged)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(GameManaged)\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(GameManaged)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(GameManaged)\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(GameManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(GameManaged)\UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(GameManaged)\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

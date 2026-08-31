@@ -1,0 +1,2 @@
+is_global = true
+roslynator_analyzers.enabled_by_default = true

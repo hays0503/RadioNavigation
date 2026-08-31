@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>RadioNavigation.Analyzers.Tests</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="HarmonyPatchAnalyzerTests.cs" />
+    <Compile Include="GameMetadataIndexTests.cs" />
+    <Compile Include="UnityLifecycleAnalyzerTests.cs" />
+    <Compile Include="ReflectionHazardAnalyzerTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.11.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RadioNavigation.Analyzers\RadioNavigation.Analyzers.csproj" />
+  </ItemGroup>
+
+</Project>
