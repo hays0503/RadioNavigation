@@ -1,0 +1,148 @@
+Assets:
+- Assets/Packages/testui/Astronomical observations logbook.pdf
+- Assets/Packages/testui/Brick Red.mat
+- Assets/Packages/testui/ciferblat.png
+- Assets/Packages/testui/closebtn.png
+- Assets/Packages/testui/cursor.png
+- Assets/Packages/testui/Dark Metal.mat
+- Assets/Packages/testui/DefaultMaterial.mat
+- Assets/Packages/testui/Documents.prefab
+- Assets/Packages/testui/expendedicon.png
+- Assets/Packages/testui/ground.png
+- Assets/Packages/testui/IconLighthouse.prefab
+- Assets/Packages/testui/IconSextan.prefab
+- Assets/Packages/testui/IconSonne.prefab
+- Assets/Temp/Models/36c7cb62e558f5940b6b1116cee13bb4/Цилиндр.asset
+- Assets/Packages/testui/lamp.fbx
+- Assets/Packages/testui/lantern-materail.mat
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/Finial.asset
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/FinialBase.asset
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/LanternLowerRail.asset
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/LanternRoof.asset
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/LanternUpperRail.asset
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/Light.asset
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/LowerPlinth.asset
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/RoofRim.asset
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/TowerBody.asset
+- Assets/Temp/Models/990ce9d8734a59743a6a52c27cebd348/UpperGallery.asset
+- Assets/Packages/testui/lighthouse.fbx
+- Assets/Packages/testui/lighthouse.prefab
+- Assets/Packages/testui/LighthouseFlare.shader
+- Assets/Packages/testui/LighthouseFlareGlow.mat
+- Assets/Packages/testui/LighthouseFlareGlowTex.png
+- Assets/Packages/testui/LighthouseFlareStar.mat
+- Assets/Packages/testui/LighthouseFlareStarTex.png
+- Assets/Packages/testui/LighthouseFlareStreak.mat
+- Assets/Packages/testui/LighthouseFlareStreakTex.png
+- Assets/Packages/testui/main.mp4
+- Assets/Packages/testui/MainVideo.prefab
+- Assets/Packages/testui/Manifest.asset
+- Assets/Packages/testui/Painted White.mat
+- Assets/Packages/testui/panel.png
+- Assets/Packages/testui/panel.xcf
+- Assets/Packages/testui/Radio.prefab
+- Assets/Packages/testui/RadioNavOpaqueView.mat
+- Assets/Packages/testui/RadioNavUIOpaque.shader
+- Assets/Packages/testui/RadioZone1.png
+- Assets/Packages/testui/RadioZone2.png
+- Assets/Packages/testui/RadioZone3.png
+- Assets/Packages/testui/RadioZone4.png
+- Assets/Packages/testui/RadioZone5.png
+- Assets/Packages/testui/Roof.mat
+- Assets/Packages/testui/sextan.png
+- Assets/Packages/testui/sone.png
+- Assets/Packages/testui/spinner.png
+- Assets/Packages/testui/tumbler.png
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/Finial.asset
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/FinialBase.asset
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/LanternLowerRail.asset
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/LanternRoof.asset
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/LanternUpperRail.asset
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/Light.asset
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/LowerPlinth.asset
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/RoofRim.asset
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/TowerBody.asset
+- Assets/Temp/Models/5345910f637b787478d78c1f31fce7f7/UpperGallery.asset
+- Assets/Packages/testui/Маяк.fbx
+- Assets/Packages/testui/Прозрачный материал.mat
+- Assets/Packages/testui/кирпич.mat
+- Assets/Packages/testui/кирпич.png
+- Assets/Packages/testui/маяк.png
+- Assets/Packages/testui/текстуракирпича_albedo.png
+- Assets/Packages/testui/текстуракирпича_albedo.xcf
+- Assets/Packages/testui/текстуракирпича_normal.png
+Dependencies:
+- uboat.core
+Paths:
+- d2490d08af6401a4f910baaea186b4f0: Astronomical observations logbook
+- 4a3f369a689bac0429e6fb80f66515b8: Brick Red
+- d4997e10c8ae38e4d817ba2577a7dfdf: ciferblat
+- 1e7ebeca0998666459fa7d963ba9e0fe: closebtn
+- ed1da96152e34324a93c14df617a0f69: cursor
+- b57c5bb18c780ad47beb5804f135b6db: Dark Metal
+- 4b6cc3984bff05d459064ca0d96f0180: DefaultMaterial
+- 584e51af9503e8b4c8be823e0e1b12d9: Documents
+- 23f06033c05bd0e48bb26ee468d238d1: expendedicon
+- 4e7be80be03e10b45949ad0152ac574a: ground
+- 7cb55b8bc6f1dce4aba861053f881e31: IconLighthouse
+- de0636b5252663547a1ff5bf884f792a: IconSextan
+- 62f8ca4220b93254aa7e190f27b4d36a: IconSonne
+- 36c7cb62e558f5940b6b1116cee13bb4: lamp
+- : lamp.model
+- 9f701addf31d8954397280aac3cf871a: lantern-materail
+- 9265bde2892321c4d81ca3c8e1ec016a: lighthouse/Finial
+- 87cc2ebbbcc361040ae6b9a4873d42fd: lighthouse/FinialBase
+- e4e9a441e395d8a4f8c384bbefb5a199: lighthouse/LanternLowerRail
+- b6538c90ea1d180449594bc8c7719491: lighthouse/LanternRoof
+- 0a621ad09c26dc54ca44404fe18f51f0: lighthouse/LanternUpperRail
+- a65893e272d235442bb01365c4dde268: lighthouse/Light
+- cfd4d9f9ea7c8284f8b3468e008cf8ab: lighthouse/LowerPlinth
+- 6e74096935abf314f9fe17e4f151254a: lighthouse/RoofRim
+- 98c59647fd019d142b5cfcd2a49cec31: lighthouse/TowerBody
+- 1b115d9b9c2e59848bcc3070e7da81be: lighthouse/UpperGallery
+- 990ce9d8734a59743a6a52c27cebd348: lighthouse
+- fe7004e07c483914bb1a8cce33c91d56: lighthouse
+- f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6: LighthouseFlare
+- 4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f99: LighthouseFlareGlow
+- 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d: LighthouseFlareGlowTex
+- 6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c: LighthouseFlareStar
+- 3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e88: LighthouseFlareStarTex
+- 5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b: LighthouseFlareStreak
+- 2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e: LighthouseFlareStreakTex
+- f8dc0340f041f2f4984dd3f648bc338b: main
+- 54da935b8b1de0847b3af761320f6417: MainVideo
+- 47cd0800d5f0dd34facfe170bc5a894d: Manifest
+- f1eeba19354c9d747b646edfe8db5e86: Painted White
+- 32b66ba888ad03f4da595632b5585666: panel
+- e0be14242aa54e149b76a6025c0644b2: panel
+- fa4d736a56f28634a986975e622591e8: Radio
+- 07318ecbe86155047b2b9693e431ec2e: RadioNavOpaqueView
+- fb7155d248063394bbfca472f7cf3cd6: RadioNavUIOpaque
+- c0d820b7cdf9f7b43b12c14eec996f54: RadioZone1
+- baff9eab6d2f4834fabf40890e76b8a0: RadioZone2
+- dd17a9453538f384fb6c632e1d53cf27: RadioZone3
+- 2ce4fdbb091527a4fb25c9274ed9c461: RadioZone4
+- 7638521c7f4d95944950eb17c53a3d6c: RadioZone5
+- 8e888cd8287a5ef4dbf3efeaf6c1d5b2: Roof
+- 00709c967ff6e094a9aa5c42383691a4: sextan
+- fe63a8edc87e1134594db7f9d0d6945c: sone
+- 639f069eda9b1af44a85f5f101d8bf56: spinner
+- 2fb8dfc55cabafc4195995ca7c318e48: tumbler
+- 77f5389dd2c983c41a8fc0454993a0d1: Маяк/Finial
+- af604b89ed089694693f12eb37f0b059: Маяк/FinialBase
+- 3d11938b8866e4445ba56791cef1e9d8: Маяк/LanternLowerRail
+- c2e0fdc67e67b454e9dea53b8aa037a4: Маяк/LanternRoof
+- 32674162d9890914fa2c08e410157569: Маяк/LanternUpperRail
+- 878ab6e8e7b41a74fa5533f8debf84e7: Маяк/Light
+- 394ed84d08c306649b4b9e188ee9a8df: Маяк/LowerPlinth
+- 1fe841c0ce71b8f44bc1af6dbdcb2e9b: Маяк/RoofRim
+- ec60fd05c5a59964892b23fb2128edf0: Маяк/TowerBody
+- 329eed412596680468effef4514646d6: Маяк/UpperGallery
+- 5345910f637b787478d78c1f31fce7f7: Маяк
+- 8180285f09630bd4f97a9039921371f6: Прозрачный материал
+- a3b64fadf01812f4eaa77453825951fb: кирпич
+- a04ad4ac1ac187444a4999eba372769b: кирпич
+- 13d24340091089640a7f2d92ea8ea978: маяк
+- a825d48b9941ab749b269dfe42a45c0e: текстуракирпича_albedo
+- 988858a00e12b7644898c0319f332a9a: текстуракирпича_albedo
+- 545d5abff09bfa44f8899d19b7b40d52: текстуракирпича_normal
