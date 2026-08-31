@@ -5,20 +5,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
     public class NavigationPatternTests
     {
         [Fact]
-        public void FormatPattern_SingleGroup_Alternating()
-        {
-            var p = new NavigationPattern(new[] { new Group(0b10101010UL) }, 8);
-            Assert.Equal("[.-.-.-.-]", NavigationPattern.FormatPattern(p));
-        }
-
-        [Fact]
-        public void FormatPattern_TransitionGroup_UsesEquals()
-        {
-            var p = new NavigationPattern(new[] { new Group(0b11110000UL), new Group(0b00001111UL) }, 8, 1);
-            Assert.Equal("[....----] [========]", NavigationPattern.FormatPattern(p));
-        }
-
-        [Fact]
         public void GetElement_TransitionGroup_AlwaysFalse()
         {
             var p = new NavigationPattern(new[] { new Group(0b11111111UL), new Group(0b11111111UL) }, 8, 1);
@@ -67,21 +53,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void FormatCompact_WithTransition_ContainsEqualsAndDoesNotThrow()
-        {
-            var p = new NavigationPattern(new[] { new Group(0b11110000UL), new Group(0b00001111UL) }, 8, 1);
-            string s = NavigationPattern.FormatCompact(p);
-            Assert.NotEmpty(s);
-            Assert.Contains("=", s);
-        }
-
-        [Fact]
-        public void FormatCompact_EmptyPattern_Dashes()
-        {
-            Assert.Equal("---", NavigationPattern.FormatCompact(new NavigationPattern(new Group[0], 8)));
-        }
-
-        [Fact]
         public void CallsignPattern_BuildsFromMorse()
         {
             var c = new CallsignPattern("B");
@@ -117,12 +88,5 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             _ = p.GetElement(100);
         }
 
-        [Fact]
-        public void ZeroElementsPerGroup_FormattersDoNotThrow()
-        {
-            var p = new NavigationPattern(new[] { new Group(0b11110000UL), new Group(0b00001111UL) }, 0, 1);
-            Assert.NotEmpty(NavigationPattern.FormatPattern(p));
-            Assert.NotEmpty(NavigationPattern.FormatCompact(p));
-        }
     }
 }

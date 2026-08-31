@@ -17,23 +17,6 @@ namespace UBOAT.Mods.RadioNavigation
         public int WednesdayMaintenanceStartMinutesUtc;
         public int WednesdayMaintenanceEndMinutesUtc;
 
-        public bool IsOperationalAt(DateTime utc)
-        {
-            int minutes = utc.Hour * 60 + utc.Minute;
-            if (minutes < DailyStartMinutesUtc || minutes >= DailyEndMinutesUtc)
-                return false;
-
-            if (IsInside(minutes, DailyMaintenanceStartMinutesUtc, DailyMaintenanceEndMinutesUtc))
-                return false;
-            if (utc.DayOfWeek == DayOfWeek.Wednesday
-                && IsInside(minutes, WednesdayMaintenanceStartMinutesUtc, WednesdayMaintenanceEndMinutesUtc))
-                return false;
-
-            return true;
-        }
-
-        private static bool IsInside(int value, int start, int end) =>
-            start >= 0 && end > start && value >= start && value < end;
     }
 
     public struct BeaconHistoryEntry

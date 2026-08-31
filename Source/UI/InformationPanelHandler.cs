@@ -28,8 +28,6 @@ namespace UBOAT.Mods.RadioNavigation
         private RadioHandler radioHandler;
         private SonneController sonneController;
 
-        private float currentFreqKHz;
-        private int currentZoneIndex;
         private string stationBaseText = "";
         private string lastLoggedDecoded = "";
         private float patternUpdateTimer;
@@ -296,8 +294,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnFrequencyChanged(float freqKHz, int zoneIndex)
         {
-            currentFreqKHz = freqKHz;
-            currentZoneIndex = zoneIndex;
             lastLoggedDecoded = "";
 
             string formatted = DialConfig.FormatFrequency(freqKHz, zoneIndex);

@@ -27,13 +27,11 @@ namespace UBOAT.Mods.RadioNavigation
         private static readonly Color ColorBackground = new Color(0.02f, 0.03f, 0.04f, 0.85f);
 
         private TextMeshProUGUI label;
-        private bool wired;
 
         private void Start()
         {
             BuildButton();
             DevConsole.AddListener(ConsoleCommand, HandleConsoleCommand);
-            wired = true;
             RefreshLabel();
             Debug.Log(LogPrefix + " toggle button built; console command '" + ConsoleCommand + "' registered");
         }

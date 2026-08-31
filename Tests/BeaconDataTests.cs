@@ -80,24 +80,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void Stations_Cap59Schedules_RespectPublishedWindows()
-        {
-            var bushmills = BeaconData.Stations[0].Schedule;
-            Assert.True(bushmills.IsOperationalAt(new DateTime(2026, 8, 3, 15, 59, 0)));
-            Assert.False(bushmills.IsOperationalAt(new DateTime(2026, 8, 3, 16, 0, 0)));
-            Assert.False(bushmills.IsOperationalAt(new DateTime(2026, 8, 5, 11, 30, 0)));
-
-            var ploneis = BeaconData.Stations[1].Schedule;
-            Assert.False(ploneis.IsOperationalAt(new DateTime(2026, 8, 4, 7, 30, 0)));
-            Assert.True(ploneis.IsOperationalAt(new DateTime(2026, 8, 4, 7, 45, 0)));
-
-            var seville = BeaconData.Stations[4].Schedule;
-            Assert.False(seville.IsOperationalAt(new DateTime(2026, 8, 4, 5, 59, 0)));
-            Assert.True(seville.IsOperationalAt(new DateTime(2026, 8, 4, 6, 0, 0)));
-            Assert.False(seville.IsOperationalAt(new DateTime(2026, 8, 4, 20, 0, 0)));
-        }
-
-        [Fact]
         public void Stations_AllHistoryCallsigns_TwoOrThreeLettersWhenNonNull()
         {
             foreach (var s in BeaconData.Stations)

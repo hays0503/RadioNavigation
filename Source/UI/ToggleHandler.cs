@@ -41,25 +41,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static readonly Color DialActiveColor = new Color32(0xFF, 0xEC, 0xB6, 0xFF);
 
-        private string DebugImg(GameObject go)
-        {
-            if (go.IsNull()) return "null";
-            Image img = go.GetComponent<Image>();
-            string spriteName = (img.IsNotNull() && img.sprite.IsNotNull()) ? img.sprite.name : "no-sprite";
-            float alpha = (img.IsNotNull()) ? img.color.a : -1f;
-            bool imgEnabled = img.IsNotNull() && img.enabled;
-            RectTransform rt = go.GetComponent<RectTransform>();
-            Vector2 size = rt.IsNotNull() ? rt.sizeDelta : Vector2.zero;
-            Vector2 anchoredPos = rt.IsNotNull() ? rt.anchoredPosition : Vector2.zero;
-            return go.name
-                + " active=" + go.activeSelf
-                + " imgEnabled=" + imgEnabled
-                + " sprite=" + spriteName
-                + " alpha=" + alpha.ToString("F2")
-                + " size=" + size
-                + " anchoredPos=" + anchoredPos;
-        }
-
         private void Start()
         {
             toggleComp = GetComponent<Toggle>();
@@ -103,8 +84,6 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             Debug.Log("[RadioNav][Toggle] Start"
-                + " on=" + DebugImg(onImage)
-                + " off=" + DebugImg(offImage)
                 + " toggle.graphic=" + (toggleComp.graphic.IsNotNull() ? toggleComp.graphic.name : "null")
                 + " toggle.isOn=" + toggleComp.isOn
                 + " dialColor=" + (dialImage.IsNotNull() ? dialImage.color.ToString() : "no-dial"));
@@ -116,17 +95,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnPointerClick(PointerEventData eventData)
         {
-#if DEBUG
-            Vector3[] corners = new Vector3[4];
-            toggleRect.GetWorldCorners(corners);
-
-            Debug.Log("[RadioNav][Toggle] OnPointerClick"
-                + " screenPos=" + eventData.position
-                + " isOn=" + toggleComp.isOn
-                + " corners=" + corners[0] + " " + corners[1] + " " + corners[2] + " " + corners[3]
-                + " on=" + DebugImg(onImage)
-                + " off=" + DebugImg(offImage));
-#endif
         }
 
         private void OnToggleChanged(bool isOn)
@@ -152,14 +120,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (OnValueChanged.IsNotNull())
                 OnValueChanged(isOn);
-
-#if DEBUG
-            Debug.Log("[RadioNav][Toggle] OnToggleChanged"
-                + " isOn=" + isOn
-                + " on=" + DebugImg(onImage)
-                + " off=" + DebugImg(offImage)
-                + " dialColor=" + (dialImage.IsNotNull() ? dialImage.color.ToString() : "no-dial"));
-#endif
         }
 
         private void OnDestroy()

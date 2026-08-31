@@ -6,39 +6,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
     {
         private const float Tol = 0.01f;
 
-        [Fact]
-        public void CalculateSector_OnBaseAngle_ZeroDotsDotSector()
-        {
-            var result = SonneSignalGenerator.CalculateSector(310.2f, 310.2f);
-
-            Assert.Equal(0, result.DotCount);
-            Assert.False(result.IsDashSector);
-            Assert.Equal(0, result.SectorNumber);
-            Assert.Equal(0f, result.LocalAngle, Tol);
-        }
-
-        [Fact]
-        public void CalculateSector_MidSector_HalfDots()
-        {
-            var result = SonneSignalGenerator.CalculateSector(312.7f, 310.2f);
-
-            Assert.Equal(30, result.DotCount);
-            Assert.False(result.IsDashSector);
-            Assert.Equal(0, result.SectorNumber);
-            Assert.Equal(2.5f, result.LocalAngle, Tol);
-        }
-
-        [Fact]
-        public void CalculateSector_MidSector_DashZone()
-        {
-            var result = SonneSignalGenerator.CalculateSector(317.5f, 310f);
-
-            Assert.Equal(30, result.DotCount);
-            Assert.True(result.IsDashSector);
-            Assert.Equal(1, result.SectorNumber);
-            Assert.Equal(2.5f, result.LocalAngle, Tol);
-        }
-
         [Theory]
         [InlineData(310f, 310f, true)]
         [InlineData(312.4f, 310f, true)]
@@ -79,7 +46,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(60, elements.Length);
             Assert.Equal(64, pattern.ElementCount);
             Assert.Equal(4, pattern.TransitionIndex);
-            Assert.Contains("=", NavigationPattern.FormatPattern(pattern));
         }
 
         [Fact]
@@ -89,37 +55,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             Assert.Empty(pattern.Groups);
             Assert.Equal(0, pattern.ElementCount);
-        }
-
-        [Fact]
-        public void CalculateSector_FullRotation_WrapsToZero()
-        {
-            var result = SonneSignalGenerator.CalculateSector(670.2f, 310.2f);
-
-            Assert.Equal(0, result.DotCount);
-            Assert.False(result.IsDashSector);
-        }
-
-        [Fact]
-        public void RestoreBearingFromDotCount_DotSector()
-        {
-            Assert.Equal(312.7f,
-                SonneSignalGenerator.RestoreBearingFromDotCount(30, false, 310.2f),
-                Tol);
-        }
-
-        [Fact]
-        public void RestoreBearingFromDotCount_DashSector()
-        {
-            Assert.Equal(317.7f,
-                SonneSignalGenerator.RestoreBearingFromDotCount(30, true, 315.2f),
-                Tol);
-        }
-
-        [Fact]
-        public void DegPerSign_IsFiveSixtiethsOfDegree()
-        {
-            Assert.Equal(5f / 60f, SonneSignalGenerator.DegPerSign, 1e-6f);
         }
 
         [Fact]

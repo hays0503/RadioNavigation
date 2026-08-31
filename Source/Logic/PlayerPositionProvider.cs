@@ -17,9 +17,6 @@ namespace UBOAT.Mods.RadioNavigation
 
     public class GamePlayerPositionProvider : IPlayerPositionProvider
     {
-        private const string EntityName = "UBOAT.Game.Scene.Entities.Entity";
-        private const string PlayerShipName = "UBOAT.Game.Scene.Entities.PlayerShip";
-
         private static FieldInfo playerShipField;
         private static PropertyInfo sandboxShipProperty;
         private static PropertyInfo positionProperty;

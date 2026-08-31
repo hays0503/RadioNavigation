@@ -55,63 +55,6 @@ namespace UBOAT.Mods.RadioNavigation
             return Groups[g].GetElement(e);
         }
 
-        public static string FormatPattern(NavigationPattern pattern)
-        {
-            if (pattern.Groups.IsNull() || pattern.Groups.Length.IsZero())
-                return "---";
-
-            // F19: string concatenation in loops allocates per group and per
-            // element; these run ~5x/second from InformationPanelHandler.
-            var sb = new System.Text.StringBuilder(pattern.Groups.Length * (pattern.ElementsPerGroup + 3));
-            for (int g = 0; g < pattern.Groups.Length; g++)
-            {
-                if (g > 0) sb.Append(' ');
-                sb.Append('[');
-                for (int e = 0; e < pattern.ElementsPerGroup; e++)
-                {
-                    if (g == pattern.TransitionIndex)
-                        sb.Append('=');
-                    else if (pattern.Groups[g].GetElement(e))
-                        sb.Append('-');
-                    else
-                        sb.Append('.');
-                }
-                sb.Append(']');
-            }
-            return sb.ToString();
-        }
-
-        public static string FormatCompact(NavigationPattern pattern)
-        {
-            if (pattern.Groups.IsNull() || pattern.Groups.Length.IsZero())
-                return "---";
-
-            var sb = new System.Text.StringBuilder(pattern.Groups.Length * (pattern.ElementsPerGroup + 3));
-            bool inDashes = false;
-
-            for (int g = 0; g < pattern.Groups.Length; g++)
-            {
-                if (g == pattern.TransitionIndex)
-                {
-                    for (int e = 0; e < pattern.ElementsPerGroup; e++)
-                        sb.Append('.');
-                    sb.Append(" = ");
-                    inDashes = true;
-                }
-                else if (!inDashes)
-                {
-                    for (int e = 0; e < pattern.ElementsPerGroup; e++)
-                        sb.Append('.');
-                }
-                else
-                {
-                    for (int e = 0; e < pattern.ElementsPerGroup; e++)
-                        sb.Append('-');
-                }
-            }
-
-            return sb.ToString();
-        }
     }
 
     public struct CallsignPattern : IKeySequence

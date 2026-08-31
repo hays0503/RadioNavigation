@@ -16,41 +16,6 @@ namespace UBOAT.Mods.RadioNavigation
         private const float MaxAlpha = 1f;
         internal const float ActiveAlphaThreshold = 0.5f;
 
-        private string StateLog()
-        {
-            RectTransform bgRt = bgImage.IsNotNull() ? bgImage.rectTransform : null;
-            RectTransform grRt = GetComponent<RectTransform>();
-            GameObject bgGo = bgImage.IsNotNull() ? bgImage.gameObject : null;
-
-            return "[Ground] active=" + gameObject.activeSelf
-                + " grPos=" + (grRt.IsNotNull() ? grRt.anchoredPosition.ToString() : "no-rt")
-                + " grSize=" + (grRt.IsNotNull() ? grRt.sizeDelta.ToString() : "no-rt")
-
-                + " [Background] active=" + (bgGo.IsNotNull() ? bgGo.activeSelf.ToString() : "no-bg")
-                + " imgEnabled=" + (bgImage.IsNotNull() ? bgImage.enabled.ToString() : "no-img")
-                + " imgAlpha=" + (bgImage.IsNotNull() ? bgImage.color.a.ToString("F2") : "-")
-                + " imgR=" + (bgImage.IsNotNull() ? bgImage.color.r.ToString("F2") : "-")
-                + " imgG=" + (bgImage.IsNotNull() ? bgImage.color.g.ToString("F2") : "-")
-                + " imgB=" + (bgImage.IsNotNull() ? bgImage.color.b.ToString("F2") : "-")
-                + " raycast=" + (bgImage.IsNotNull() ? bgImage.raycastTarget.ToString() : "-")
-                + " pos=" + (bgRt.IsNotNull() ? bgRt.anchoredPosition.ToString() : "no-rt")
-                + " size=" + (bgRt.IsNotNull() ? bgRt.sizeDelta.ToString() : "no-rt")
-
-                + " [GroundCheckmark] active=" + (groundCheckmark.IsNotNull() ? groundCheckmark.gameObject.activeSelf.ToString() : "null")
-                + " imgEnabled=" + (groundCheckmark.IsNotNull() ? groundCheckmark.enabled.ToString() : "-")
-                + " sprite=" + (groundCheckmark.IsNotNull() && groundCheckmark.sprite.IsNotNull() ? groundCheckmark.sprite.name : "no-sprite")
-                + " alpha=" + (groundCheckmark.IsNotNull() ? groundCheckmark.color.a.ToString("F2") : "-")
-                + " r=" + (groundCheckmark.IsNotNull() ? groundCheckmark.color.r.ToString("F2") : "-")
-                + " g=" + (groundCheckmark.IsNotNull() ? groundCheckmark.color.g.ToString("F2") : "-")
-                + " b=" + (groundCheckmark.IsNotNull() ? groundCheckmark.color.b.ToString("F2") : "-")
-                + " raycast=" + (groundCheckmark.IsNotNull() ? groundCheckmark.raycastTarget.ToString() : "-")
-                + " pos=" + (groundCheckmark.IsNotNull() ? groundCheckmark.rectTransform.anchoredPosition.ToString() : "-")
-
-                + " [Toggle] found=" + (radioToggle.IsNotNull())
-                + " interactable=" + (radioToggle?.interactable ?? false)
-                + " isOn=" + (radioToggle?.isOn ?? false);
-        }
-
         private void Start()
         {
             Transform bgT = transform.Find(PrefabNames.Background);
@@ -94,10 +59,6 @@ namespace UBOAT.Mods.RadioNavigation
                 radioToggle.interactable = false;
             }
             ToggleHandler.SetGroundActive(false);
-
-#if DEBUG
-            Debug.Log("[RadioNav][Ground] Start " + StateLog());
-#endif
         }
 
         // F160: exposed so InformationPanelHandler reads the handler state
@@ -140,10 +101,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (OnValueChanged.IsNotNull())
                 OnValueChanged(!isActive);
-
-#if DEBUG
-            Debug.Log("[RadioNav][Ground] onClick screenPos=" + eventData.position + " " + StateLog());
-#endif
         }
     }
 }

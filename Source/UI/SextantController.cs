@@ -131,10 +131,8 @@ namespace UBOAT.Mods.RadioNavigation
         // PIP cameras so the SRP renders them with the same fog/post look.
         private Component pipSsmsFog;
         private Component pipSsms;
-        private Component pipPpBehaviour;
         private Component sourceSsmsFog;
         private Component sourceSsms;
-        private Component sourcePpBehaviour;
         private readonly System.Collections.Generic.Dictionary<Type, MemberInfo[]> mirrorMemberCache =
             new System.Collections.Generic.Dictionary<Type, MemberInfo[]>();
 
@@ -856,7 +854,6 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             sourceSsmsFog = FindComponent(viewCamera, "SSMSGlobalFog");
             sourceSsms = FindComponent(viewCamera, "SSMS");
-            sourcePpBehaviour = FindComponent(viewCamera, "PostProcessingBehaviour");
         }
 
         private static Component FindComponent(Camera cam, string typeName)
@@ -899,8 +896,6 @@ namespace UBOAT.Mods.RadioNavigation
                     pipSsmsFog = dst;
                 else if (name == "SSMS")
                     pipSsms = dst;
-                else if (name == "PostProcessingBehaviour")
-                    pipPpBehaviour = dst;
             }
 
             LogPipStack(go);

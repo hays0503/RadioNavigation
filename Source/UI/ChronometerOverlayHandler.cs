@@ -34,7 +34,6 @@ namespace UBOAT.Mods.RadioNavigation
         private GraphicRaycaster chronometerRaycaster;
         private ChronometerDragShield chronometerDragShield;
         private ChronometerScaleControl chronometerScaleControl;
-        private RectTransform chronometerScaleControlRect;
         private PanelDragHandler panelDragHandler;
         private Texture2D expandCursor;
         private Texture2D reduceCursor;
@@ -337,7 +336,6 @@ namespace UBOAT.Mods.RadioNavigation
             controlImage.raycastTarget = true;
 
             chronometerScaleControl = control.GetComponent<ChronometerScaleControl>();
-            chronometerScaleControlRect = controlRect;
             chronometerScaleControl.SetOwner(this);
         }
 
@@ -463,7 +461,6 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         internal bool IsChronometerExpanded => chronometerExpanded;
-        internal bool IsChronometerRaised => chronometerRaised;
 
         private bool mapDragActive;
 
@@ -736,7 +733,6 @@ namespace UBOAT.Mods.RadioNavigation
             ToggleChronometerScale();
         }
 
-        internal bool IsLocalDragActive => localDragActive;
 
         private void CaptureDefaultPosition()
         {

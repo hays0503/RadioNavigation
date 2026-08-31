@@ -34,7 +34,6 @@ namespace UBOAT.Mods.RadioNavigation
         internal static PropertyInfo DecisionsProp => decisionsProp;
         internal static MethodInfo InsertMethod => insertMethod;
         internal static MethodInfo OnUpdatedMethod => onUpdatedMethod;
-        internal static bool IsInitialized => initialized;
 
         internal static void Reset()
         {

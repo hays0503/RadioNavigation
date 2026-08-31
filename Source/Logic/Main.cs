@@ -119,15 +119,6 @@ namespace UBOAT.Mods.RadioNavigation
                 " resourceManager=" + (resourceManager.IsNotNull() ? "ok" : "null"));
         }
 
-#if DEBUG
-        private static void DumpHierarchy(Transform t, string indent)
-        {
-            Debug.Log(indent + t.name);
-            foreach (Transform child in t)
-                DumpHierarchy(child, indent + "  ");
-        }
-#endif
-
         private void SceneEventsListener_OnSceneAwake(Scene scene)
         {
             if (InjectionFramework.Instance.IsNull())
@@ -244,10 +235,6 @@ RadioInstaller.Instantiate(radio, viewport);
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +
                     " radio=created handlers=" + hCount +
                     " visible=" + (RadioHandler.Instance.IsNotNull() ? RadioHandler.Instance.IsVisible.ToString() : "no-instance"));
-
-#if DEBUG
-                DumpHierarchy(radio.transform, "[RadioNav][Main] Prefab hierarchy: ");
-#endif
 
                 // STAR_SKY: create star sky renderer (ADR-021)
                 GameObject starSkyRoot = new GameObject("StarSkyRoot");

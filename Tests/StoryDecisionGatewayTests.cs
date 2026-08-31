@@ -154,7 +154,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             // Ensure Reset leaves gateway uninitialized
             StoryDecisionGateway.Reset();
-            Assert.False(StoryDecisionGateway.IsInitialized);
             Assert.Null(StoryDecisionGateway.DecisionType);
             Assert.Null(StoryDecisionGateway.StageField);
         }

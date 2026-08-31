@@ -5,53 +5,6 @@ namespace UBOAT.Mods.RadioNavigation
     public static class SonneSignalGenerator
     {
         public const float SectorWidthDeg = 5f;
-        public const int TotalSignals = 60;
-        public const float DegPerSign = SectorWidthDeg / TotalSignals;
-
-        public struct SectorResult
-        {
-            public int DotCount;
-            public bool IsDashSector;
-            public int SectorNumber;
-            public float LocalAngle;
-            public float SectorBase;
-        }
-
-        public static SectorResult CalculateSector(float bearing, float baseAngle)
-        {
-            float delta = ((bearing - baseAngle) % 360f + 360f) % 360f;
-            float localAngle = delta % SectorWidthDeg;
-            int sectorNumber = CalculateSectorNumber(bearing, baseAngle);
-            bool isDashSector = (sectorNumber % 2 == 1);
-
-            int dotCount;
-            if (isDashSector)
-                dotCount = (int)(((SectorWidthDeg - localAngle) / SectorWidthDeg) * TotalSignals);
-            else
-                dotCount = (int)((localAngle / SectorWidthDeg) * TotalSignals);
-
-            dotCount = Math.Max(0, Math.Min(TotalSignals, dotCount));
-
-            return new SectorResult
-            {
-                DotCount = dotCount,
-                IsDashSector = isDashSector,
-                SectorNumber = sectorNumber,
-                LocalAngle = localAngle,
-                SectorBase = bearing - localAngle
-            };
-        }
-
-        public static float RestoreBearingFromDotCount(int dotCount, bool isDashSector, float sectorBase)
-        {
-            int correctedDots;
-            if (isDashSector)
-                correctedDots = TotalSignals - dotCount;
-            else
-                correctedDots = dotCount;
-
-            return sectorBase + correctedDots * DegPerSign;
-        }
 
         public static int CalculateSectorNumber(float bearing, float baseAngle)
         {

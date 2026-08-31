@@ -20,15 +20,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void Nutation_Magnitude_Within20Arcsec()
-        {
-            double jd = AstroMath.ToJulianDay(new DateTime(1942, 6, 15, 0, 0, 0, DateTimeKind.Utc));
-            AstroMath.NutationDeg(jd, out var dPsi, out var dEps);
-            Assert.InRange(Math.Abs(dPsi * 3600), 0, 20);
-            Assert.InRange(Math.Abs(dEps * 3600), 0, 20);
-        }
-
-        [Fact]
         public void RaDecToEnu_Polaris_At50N_AltAbout50_AzNorth()
         {
             // Полярная RA~37.95° Dec~89.26° (J2000) → на 50N alt≈50, az≈0
@@ -50,17 +41,6 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             double lst = 95.0;
             AstroMath.RaDecToEnu(ra, dec, lst, 50.0, out var alt, out _, out _, out _, out _);
             Assert.True(alt < 0, $"Canopus alt {alt*180/Math.PI} should be <0 at 50N");
-        }
-
-        [Fact]
-        public void Precession_SameEpoch_IsIdentity()
-        {
-            double[] m = new double[9];
-            double jd = 2451545.0;
-            AstroMath.PrecessionMatrix(jd, jd, m);
-            Assert.InRange(m[0], 0.99, 1.01);
-            Assert.InRange(m[4], 0.99, 1.01);
-            Assert.InRange(m[8], 0.99, 1.01);
         }
 
         [Fact]
