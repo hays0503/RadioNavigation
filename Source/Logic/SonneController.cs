@@ -86,7 +86,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i < beaconStations.Length; i++)
             {
-                TryGetCallsignFromHistory(beaconStations[i], out string callsign);
+                StationCallsignResolver.TryGet(beaconStations[i], out string callsign);
 
                 var config = ConsolCycleConfig.GetForCycleDuration(beaconStations[i].CycleDurationSeconds);
                 var initialPattern = SonneBeam.BuildPattern(0, false);
@@ -233,7 +233,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             string callsign = null;
             var station = BeaconData.Stations[stationIndex];
-            TryGetCallsignFromHistory(station, out callsign);
+            StationCallsignResolver.TryGet(station, out callsign);
 
             if (string.IsNullOrEmpty(callsign))
             {
@@ -241,11 +241,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            int expectedLen = 0;
-            foreach (char ch in callsign.ToUpperInvariant())
-                expectedLen += MorseAlphabet.GetMorse(ch).Length;
-
-            if (morseDecoderBuffer.Length != expectedLen)
+            if (morseDecoderBuffer.Length != MorseDecoder.ExpectedLength(callsign))
             {
                 morseDecoderBuffer.Clear();
                 return;
@@ -254,17 +250,7 @@ namespace UBOAT.Mods.RadioNavigation
             // Keep only the latest completed callsign. Appending every cycle
             // made the panel grow into "FRQ MWN SL ..." until trimming.
             decodedText.Clear();
-            int pos = 0;
-            foreach (char ch in callsign.ToUpperInvariant())
-            {
-                string mc = MorseAlphabet.GetMorse(ch);
-                if (mc.Length.IsZero() || pos + mc.Length > morseDecoderBuffer.Length)
-                    break;
-
-                string segment = morseDecoderBuffer.ToString(pos, mc.Length);
-                decodedText.Append(segment == mc ? ch : '?');
-                pos += mc.Length;
-            }
+            decodedText.Append(MorseDecoder.Decode(callsign, morseDecoderBuffer));
 
             SignalRichTextFormatter.TrimDecodedText(decodedText);
             morseDecoderBuffer.Clear();
@@ -354,7 +340,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             var s = stations[index];
             var station = BeaconData.Stations[index];
-            TryGetCallsignFromHistory(station, out string callsign);
+            StationCallsignResolver.TryGet(station, out string callsign);
 
             float elapsed = 0f;
             if (IsStationNavigating(index))
@@ -706,24 +692,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static bool IsFinite(float value) =>
             !float.IsNaN(value) && !float.IsInfinity(value);
-
-        private static bool TryGetCallsignFromHistory(BeaconStation station, out string callsign)
-        {
-            if (station.History.IsNotNull()
-                && station.History.Length.IsPositive()
-                && !string.IsNullOrEmpty(station.History[0].Callsign))
-            {
-                callsign = station.History[0].Callsign;
-                return true;
-            }
-
-            // F87: no history callsign -> report absence instead of fabricating
-            // a fake one (e.g. "PL" from "Plougourvest"); the scheduler skips
-            // the callsign phase and the decoder clears the buffer. F66:
-            // station.Name may be null and is not used here.
-            callsign = null;
-            return false;
-        }
 
         public static float CalculateBearing(float lat1, float lon1, float lat2, float lon2)
         {

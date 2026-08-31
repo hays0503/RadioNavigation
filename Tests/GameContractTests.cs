@@ -246,5 +246,37 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.NotNull(position);
             Assert.Equal("UnityEngine.Vector2", position.PropertyType.FullName);
         }
+
+        [Fact]
+        public void ShipControlUI_ChronometerBridge_Targets_Exist()
+        {
+            RequireGame();
+
+            // CH-2: ShipControlUIBridge reflects these string names against the
+            // native ShipControlUI/CursorManager surfaces. Pin them so a game
+            // update cannot silently break the F7 chronometer overlay (RN0010).
+            var ui = Game().GetType("UBOAT.Game.UI.ShipControlUI", false);
+            Assert.NotNull(ui);
+
+            Assert.NotNull(ui.GetField("chronometerToolDragContainer",
+                BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.NotNull(ui.GetField("chronometerButton",
+                BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.NotNull(ui.GetField("chronometerToolDefaultPos",
+                BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.NotNull(ui.GetField("chronometerToolDragState",
+                BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.NotNull(ui.GetField("uiDialsDataHolder",
+                BindingFlags.Static | BindingFlags.NonPublic));
+            Assert.NotNull(ui.GetMethod("ApplyToolPositionLimits",
+                BindingFlags.Static | BindingFlags.NonPublic));
+
+            var cursorManager = Game().GetType("UBOAT.Game.Core.Input.CursorManager", false);
+            if (cursorManager != null)
+            {
+                Assert.NotNull(cursorManager.GetField("normalCursorTex",
+                    BindingFlags.Instance | BindingFlags.NonPublic));
+            }
+        }
     }
 }

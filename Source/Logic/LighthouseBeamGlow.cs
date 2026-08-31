@@ -49,22 +49,9 @@ namespace UBOAT.Mods.RadioNavigation
         private const float DaySunIntensityThreshold = 0.6f;
 
         // Unified perceptual model lives in LighthouseVisualModel (pure math,
-        // unit-tested). Layer constants below scale the shared I_visual per
-        // render layer; pixel sizes come from the model's size channel.
-        private const float CoreDotAlpha = 0.95f;
-        // Perceptual dot size multiplier (+10%): scales core, halo and
-        // streak together; the model's pixel caps still apply via DotSizePx.
-        private const float DotSizeScale = 1.1f;
-        // Halo is atmospheric scattering (Mie): physically zero in clear air,
-        // peaks in fog (Narasimhan/Nayar CVPR'03; IALA "loom"). Alpha scales
-        // with Weather Fogginess — hence the low max value.
-        private const float HaloMaxAlpha = 0.12f;
-        private const float StreakAlpha = 0.5f;
-        private const float StreakLengthMultiplier = 6.5f;
-        private const float StreakThicknessMultiplier = 0.25f;
+        // unit-tested). Dot/streak layer constants and layout math live in
+        // LighthouseDotLayout (P5.4 LBG-2); pixel sizes come from the model.
         private const float BeamVisibleAngleDeg = 60f;
-        private const float StreakFadeNearM = 70f;
-        private const float StreakFadeFarM = 200f;
         // Native flare is replaced by the screen-space dot beyond this range:
         // the dot path obeys the model's exact pixel caps (≤10px / ≤13px).
         private const float FlareMaxDistanceM = 1200f;
@@ -321,29 +308,27 @@ namespace UBOAT.Mods.RadioNavigation
                   " screen=" + screen.x.ToString("F0") + "," + screen.y.ToString("F0") +
                   " onScreen=" + (screen.x >= 0f && screen.x <= Screen.width && screen.y >= 0f && screen.y <= Screen.height)
                 : null);
-            float size = (float)LighthouseVisualModel.DotSizePx(distance) * DotSizeScale;
-            lastDotSize = size;
-            float sx = screen.x - Screen.width * 0.5f;
-            float sy = screen.y - Screen.height * 0.5f;
+            var metrics = LighthouseDotLayout.Compute(
+                distance,
+                screen.x, screen.y,
+                Screen.width, Screen.height,
+                iVisual,
+                GetHorizonAngleDeg(renderingCamera, worldPosition));
+            lastDotSize = metrics.Size;
 
-            dotRect.anchoredPosition = new Vector2(sx, sy);
-            dotRect.sizeDelta = new Vector2(size, size);
-            dotHaloRect.anchoredPosition = new Vector2(sx, sy);
-            dotHaloRect.sizeDelta = new Vector2(size * 3f, size * 3f);
+            dotRect.anchoredPosition = metrics.CenterOffset;
+            dotRect.sizeDelta = new Vector2(metrics.Size, metrics.Size);
+            dotHaloRect.anchoredPosition = metrics.CenterOffset;
+            dotHaloRect.sizeDelta = new Vector2(metrics.Size * 3f, metrics.Size * 3f);
             if (dotStreakRect.IsNotNull())
             {
-                float f = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(StreakFadeNearM, StreakFadeFarM, distance));
-                float streakLength = Mathf.Min(
-                    size * StreakLengthMultiplier * Mathf.Lerp(0.2f, 1f, f),
-                    (float)LighthouseVisualModel.StreakLengthCapPx(distance));
-                float streakThickness = Mathf.Max(2f, size * StreakThicknessMultiplier * Mathf.Lerp(0.2f, 1f, f));
-                dotStreakRect.anchoredPosition = new Vector2(sx, sy);
-                dotStreakRect.sizeDelta = new Vector2(streakLength, streakThickness);
-                dotStreakRect.localRotation = Quaternion.Euler(0f, 0f, GetHorizonAngleDeg(renderingCamera, worldPosition));
-                SetImageColor(dotStreakImage, StreakAlpha * iVisual * f);
+                dotStreakRect.anchoredPosition = metrics.CenterOffset;
+                dotStreakRect.sizeDelta = new Vector2(metrics.StreakLength, metrics.StreakThickness);
+                dotStreakRect.localRotation = Quaternion.Euler(0f, 0f, metrics.HorizonAngleDeg);
+                SetImageColor(dotStreakImage, metrics.StreakAlphaFinal);
             }
-            SetImageColor(dotImage, CoreDotAlpha * iVisual);
-            SetImageColor(dotHaloImage, HaloMaxAlpha * iVisual);
+            SetImageColor(dotImage, metrics.CoreAlpha);
+            SetImageColor(dotHaloImage, metrics.HaloAlpha);
         }
 
         /// <summary>
@@ -533,29 +518,6 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// InteriorCamera lives in com.uboat.rendering (not referenced by the
-        /// mod), so its enabled state is read via reflection as a Behaviour.
-        /// </summary>
-        private static string GetInteriorCameraEnabled(MainCamera mc)
-        {
-            try
-            {
-                PropertyInfo prop = typeof(MainCamera).GetProperty("InteriorCamera",
-                    BindingFlags.Public | BindingFlags.Instance);
-                object interior = prop != null ? prop.GetValue(mc, null) : null;
-                if (interior == null)
-                {
-                    return "null";
-                }
-                return ((Behaviour)interior).enabled.ToString();
-            }
-            catch (Exception e)
-            {
-                return "err:" + e.Message;
-            }
-        }
-
-        /// <summary>
         /// Screen-space position of the light for the overlay dot, using the
         /// game's own MainCamera.WorldToScreenPointNonJitteredExternalView:
         /// it handles every periscope mode — FullScreenView (periscope/UZO)
@@ -649,7 +611,7 @@ namespace UBOAT.Mods.RadioNavigation
                     devEn = devCam != null ? devCam.enabled.ToString() : "null";
                     devRT = devCam != null && devCam.targetTexture != null ? "yes" : "no";
                 }
-                intEn = GetInteriorCameraEnabled(mc);
+                intEn = LighthouseDiagnostics.GetInteriorCameraEnabled(mc);
                 Debug.Log("[RadioNav][Lighthouse] screenPt: src=maincam" +
                     " mode=" + mc.CurrentMode +
                     " dev=" + devCtl +
@@ -778,129 +740,25 @@ namespace UBOAT.Mods.RadioNavigation
             }
             nextDiagnosticTime = Time.unscaledTime + DiagnosticIntervalSeconds;
 
-            bool flareActive = lensFlare.IsNotNull() && lensFlare.gameObject.activeInHierarchy;
-            bool rendererEnabled = false;
-            bool rendererVisible = false;
-            MeshRenderer flareRenderer = lensFlare.IsNotNull() ? lensFlare.GetComponent<MeshRenderer>() : null;
-            if (flareRenderer.IsNotNull())
+            var snap = new LighthouseDiagnostics.GlowSnapshot
             {
-                rendererEnabled = flareRenderer.enabled;
-                rendererVisible = flareRenderer.isVisible;
-            }
-
-            string flareIntensity = "?";
-            if (lensFlare.IsNotNull() && flareIntensityProperty.IsNotNull())
-            {
-                try
-                {
-                    flareIntensity = ((float)flareIntensityProperty.GetValue(lensFlare, null)).ToString("F3");
-                }
-                catch
-                {
-                    flareIntensity = "read-failed";
-                }
-            }
-
-            string camName = "null";
-            float distance = -1f;
-            float farClip = -1f;
-            if (renderingCamera.IsNotNull())
-            {
-                camName = renderingCamera.name;
-                distance = (renderingCamera.transform.position - worldPosition).magnitude;
-                farClip = renderingCamera.farClipPlane;
-            }
-
-            float beamAngle = 0f;
-            if (rotator.IsNotNull() && renderingCamera.IsNotNull())
-            {
-                Vector3 dir = (renderingCamera.transform.position - worldPosition).normalized;
-                Vector3 flat = new Vector3(dir.x, 0f, dir.z);
-                if (flat.sqrMagnitude > 0.0001f)
-                {
-                    beamAngle = Vector3.Angle(rotator.forward, flat.normalized);
-                }
-            }
-
-            // --- Heights requested: beacon / light / object / spot / distant light ---
-            float hBeacon = container.IsNotNull() ? container.position.y : float.NaN;
-            float hLamp = rotator.IsNotNull() ? rotator.position.y : float.NaN;
-            float hObj = transform.position.y;
-            float hSpotLight = spotLight.IsNotNull() ? spotLight.transform.position.y : float.NaN;
-            float hFarLight = worldPosition.y;
-            float hCam = renderingCamera.IsNotNull() ? renderingCamera.transform.position.y : float.NaN;
-            // Model breakdown for verbose diagnostics
-            float fog = SkyVisibilityResolver.GetFogginess();
-            double atten = LighthouseVisualModel.DistanceAttenuation(distance);
-            double trans = LighthouseVisualModel.Transmittance(distance, fog);
-            double hotDbg = 0;
-            try
-            {
-                if (rotator.IsNotNull() && renderingCamera.IsNotNull())
-                {
-                    Vector3 toCamDbg = (renderingCamera.transform.position - worldPosition).normalized;
-                    float hotAlignDbg = Mathf.Abs(Vector3.Dot(toCamDbg, rotator.forward));
-                    hotDbg = LighthouseVisualModel.BeamIntensityFactor(hotAlignDbg);
-                }
-            }
-            catch { }
-            float spotI = spotLight.IsNotNull() ? spotLight.intensity : float.NaN;
-            Vector3 rotEuler = rotator.IsNotNull() ? rotator.eulerAngles : Vector3.zero;
-            float dotA = CoreDotAlpha * lastIVisual;
-            float haloA = HaloMaxAlpha * lastIVisual;
-            float streakA = StreakAlpha * lastIVisual;
-
-            // Device view diagnostics: mode, external controller, periscope
-            // fullscreen/windowed state and camera enabled flags.
-            string devInfo = "mode=?";
-            try
-            {
-                MainCamera mc = gameMainCamera;
-                if (mc.IsNull())
-                {
-                    mc = Object.FindObjectOfType<MainCamera>();
-                }
-                if (mc.IsNotNull())
-                {
-                    devInfo = "mode=" + mc.CurrentMode;
-                    if (mc.CurrentMode.ToString() == "Generic" &&
-                        mc.GenericController.IsNotNull() &&
-                        mc.GenericController.ExternalController is PeriscopeController pc &&
-                        pc.IsNotNull() && pc.Periscope.IsNotNull())
-                    {
-                        devInfo += " dev=Periscope fullScreen=" + pc.Periscope.FullScreenView;
-                        Camera devCam = pc.Periscope.PeriscopeCamera;
-                        devInfo += " devEn=" + (devCam != null ? devCam.enabled.ToString() : "null") +
-                            " devRT=" + (devCam != null && devCam.targetTexture != null ? "yes" : "no");
-                    }
-                    devInfo += " mainEn=" + (mc.Camera != null ? mc.Camera.enabled.ToString() : "?") +
-                        " intEn=" + GetInteriorCameraEnabled(mc);
-                }
-            }
-            catch (Exception e)
-            {
-                devInfo = "mode=err:" + e.Message;
-            }
-
-            Debug.Log("[RadioNav][Lighthouse] glow diag: cam='" + camName + "' night=" + isNight +
-                " dist=" + distance.ToString("F0") + " camFar=" + farClip.ToString("F0") +
-                " beam=" + beamAngle.ToString("F0") + " fog=" + fog.ToString("F2") +
-                " A=" + atten.ToString("F3") + " T=" + trans.ToString("F3") + " beam=" + hotDbg.ToString("F2") +
-                " Ivis=" + lastIVisual.ToString("F3") + " sizePx=" + lastDotSize.ToString("F1") +
-                " flareActive=" + flareActive +
-                " flareI=" + flareIntensity +
-                " renderer=" + rendererEnabled + "/" + rendererVisible +
-                " dot=" + (dotCanvas.IsNotNull() && dotCanvas.enabled) +
-                " spotI=" + spotI.ToString("F2") +
-                " alphas core=" + dotA.ToString("F2") + " halo=" + haloA.ToString("F2") + " streak=" + streakA.ToString("F2") +
-                " rotY=" + rotEuler.y.ToString("F1") +
-                " " + devInfo +
-                " heights: beaconY=" + hBeacon.ToString("F1") +
-                " lampY=" + hLamp.ToString("F1") +
-                " objY=" + hObj.ToString("F1") +
-                " spotY=" + hSpotLight.ToString("F1") +
-                " farY=" + hFarLight.ToString("F1") +
-                " camY=" + hCam.ToString("F1"));
+                LensFlare = lensFlare,
+                FlareIntensityProperty = flareIntensityProperty,
+                RenderingCamera = renderingCamera,
+                Rotator = rotator,
+                Container = container,
+                SpotLight = spotLight,
+                GameMainCamera = gameMainCamera,
+                DotCanvas = dotCanvas,
+                IsNight = isNight,
+                LastIVisual = lastIVisual,
+                LastDotSize = lastDotSize,
+                ObjectY = transform.position.y,
+                CoreAlpha = LighthouseDotLayout.CoreDotAlpha * lastIVisual,
+                HaloAlpha = LighthouseDotLayout.HaloMaxAlpha * lastIVisual,
+                StreakAlpha = LighthouseDotLayout.StreakAlpha * lastIVisual,
+            };
+            LighthouseDiagnostics.Log(snap, worldPosition);
         }
 
         private void FindSpotLight(Transform rotator)

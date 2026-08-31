@@ -46,32 +46,32 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            EnsureLayout(content);
+            UIElementFactory.EnsureLayout(content);
 
-            toggleText = CreateLabel(content, "ToggleStatus", "Toggle: OFF");
-            groundText = CreateLabel(content, "GroundStatus", "Ground: Dimmed");
-            zoneText = CreateLabel(content, "ZoneStatus", "Zone: 1");
-            volumeText = CreateLabel(content, "VolumeStatus", "Volume: 0%");
-            feedbackText = CreateLabel(content, "FeedbackStatus", "Feedback: 0%");
-            frequencyText = CreateLabel(content, "FrequencyStatus", "Freq: ---");
-            stationText = CreateLabel(content, "StationStatus", "");
+            toggleText = UIElementFactory.CreateLabel(content, "ToggleStatus", "Toggle: OFF");
+            groundText = UIElementFactory.CreateLabel(content, "GroundStatus", "Ground: Dimmed");
+            zoneText = UIElementFactory.CreateLabel(content, "ZoneStatus", "Zone: 1");
+            volumeText = UIElementFactory.CreateLabel(content, "VolumeStatus", "Volume: 0%");
+            feedbackText = UIElementFactory.CreateLabel(content, "FeedbackStatus", "Feedback: 0%");
+            frequencyText = UIElementFactory.CreateLabel(content, "FrequencyStatus", "Freq: ---");
+            stationText = UIElementFactory.CreateLabel(content, "StationStatus", "");
 
-            CreateSeparator(content, "Sep1");
-            signalText = CreateLabel(content, "SignalStatus", "--- Signal: ");
+            UIElementFactory.CreateSeparator(content, "Sep1");
+            signalText = UIElementFactory.CreateLabel(content, "SignalStatus", "--- Signal: ");
             signalText.supportRichText = true;
             signalText.color = Color.cyan;
 
-            decodedText = CreateLabel(content, "DecodedStatus", "Decoded: ");
+            decodedText = UIElementFactory.CreateLabel(content, "DecodedStatus", "Decoded: ");
             decodedText.color = new Color(0.8f, 0.8f, 0.5f);
 
-            CreateSeparator(content, "Sep2");
-            CreateLabel(content, "PatternsHeader", "--- Signal Patterns ---");
+            UIElementFactory.CreateSeparator(content, "Sep2");
+            UIElementFactory.CreateLabel(content, "PatternsHeader", "--- Signal Patterns ---");
 
             // Keep panel rows aligned with the active historical station set.
             patternTexts = new Text[BeaconData.Stations.Length];
             for (int i = 0; i < patternTexts.Length; i++)
             {
-                patternTexts[i] = CreateLabel(content, "Pattern" + i, "");
+                patternTexts[i] = UIElementFactory.CreateLabel(content, "Pattern" + i, "");
                 patternTexts[i].verticalOverflow = VerticalWrapMode.Overflow;
                 patternTexts[i].GetComponent<RectTransform>().sizeDelta =
                     new Vector2(200f, PatternLabelHeight);
@@ -114,75 +114,6 @@ namespace UBOAT.Mods.RadioNavigation
                 signalUpdateTimer = 0f;
                 UpdateSignalDisplay();
             }
-        }
-
-        private static void EnsureLayout(Transform content)
-        {
-            if (content.GetComponent<VerticalLayoutGroup>().IsNull())
-            {
-                var vlg = content.gameObject.AddComponent<VerticalLayoutGroup>();
-                vlg.spacing = 4f;
-                vlg.padding = new RectOffset(8, 8, 8, 8);
-                vlg.childAlignment = TextAnchor.UpperLeft;
-                vlg.childControlWidth = true;
-                vlg.childControlHeight = false;
-                vlg.childForceExpandWidth = false;
-                vlg.childForceExpandHeight = false;
-            }
-
-            if (content.GetComponent<ContentSizeFitter>().IsNull())
-            {
-                var csf = content.gameObject.AddComponent<ContentSizeFitter>();
-                csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-                csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            }
-        }
-
-        // F103: create the Arial font once and reuse it for every label
-        // instead of calling Font.CreateDynamicFontFromOSFont per label.
-        private static Font cachedArialFont;
-
-        private static Text CreateLabel(Transform parent, string name, string defaultText)
-        {
-            GameObject go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0, 1);
-            rt.anchorMax = new Vector2(0, 1);
-            rt.pivot = new Vector2(0, 1);
-            rt.sizeDelta = new Vector2(200, 20);
-
-            var text = go.AddComponent<Text>();
-            text.text = defaultText;
-            // F173: "Arial" is an OS font name and may be missing; fall back
-            // to Unity's built-in font so the panel never renders without one.
-            if (cachedArialFont.IsNull())
-            {
-                cachedArialFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
-                if (cachedArialFont.IsNull())
-                {
-                    UnityEngine.Debug.LogWarning("[RadioNav] OS font 'Arial' not found, falling back to built-in font");
-                    cachedArialFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                }
-            }
-            text.font = cachedArialFont;
-            text.fontSize = 14;
-            text.color = Color.black;
-            text.alignment = TextAnchor.MiddleLeft;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-
-            return text;
-        }
-
-        private static void CreateSeparator(Transform parent, string name)
-        {
-            GameObject go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var rt = go.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(200, 2);
-            var img = go.AddComponent<Image>();
-            img.color = new Color(1f, 1f, 1f, 0.2f);
         }
 
         private void FindHandlers()
@@ -302,7 +233,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (frequencyText.IsNotNull())
                 frequencyText.text = "Freq: " + formatted + " (Band " + bandId + ")";
 
-            string stationName = FindClosestStation(freqKHz, zoneIndex);
+            string stationName = StationMatchFormatter.Format(freqKHz, zoneIndex);
             stationBaseText = stationName;
             if (stationText.IsNotNull())
                 stationText.text = stationName;
@@ -445,43 +376,6 @@ namespace UBOAT.Mods.RadioNavigation
             int min = s / 60;
             int sec = s % 60;
             return min.ToString("D2") + ":" + sec.ToString("D2");
-        }
-
-        private string FindClosestStation(float freqKHz, int zoneIndex)
-        {
-            if (zoneIndex != 1)
-                return "";
-
-            float bestDelta = float.MaxValue;
-            float bestFreq = 0f;
-            string bestName = null;
-            string bestCallsign = null;
-
-            var stations = BeaconData.Stations;
-            for (int i = 0; i < stations.Length; i++)
-            {
-                var history = stations[i].History;
-                if (history.IsNull() || history.Length.IsZero()) continue;
-                float? stationFreq = history[0].FrequencyKHz;
-                if (stationFreq.IsNull()) continue;
-
-                float delta = Math.Abs(freqKHz - stationFreq.Value);
-                if (delta < bestDelta)
-                {
-                    bestDelta = delta;
-                    bestFreq = stationFreq.Value;
-                    bestName = stations[i].Name;
-                    string cs = history[0].Callsign;
-                    bestCallsign = string.IsNullOrEmpty(cs) ? null : cs;
-                }
-            }
-
-            if (bestName.IsNull() || bestDelta > Constants.StationMatchDeltaKHz)
-                return "";
-
-            float gain = Mathf.Exp(-(bestDelta * bestDelta) / (2f * 1.5f * 1.5f));
-            string displayName = !string.IsNullOrEmpty(bestCallsign) ? bestCallsign : bestName;
-            return displayName + " " + DialConfig.FormatFrequency(bestFreq, zoneIndex) + " " + Mathf.RoundToInt(gain * 100f) + "%";
         }
 
         private void OnDestroy()

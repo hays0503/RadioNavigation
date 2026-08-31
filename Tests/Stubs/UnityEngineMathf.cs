@@ -23,5 +23,18 @@ namespace UnityEngine
                 return 0f;
             return Clamp01((value - a) / (b - a));
         }
+
+        public static float SmoothStep(float from, float to, float t)
+        {
+            t = Clamp01(t);
+            t = t * t * (3f - 2f * t);
+            return from + (to - from) * t;
+        }
+
+        public static float Max(float a, float b) => a > b ? a : b;
+
+        public static float Min(float a, float b) => a < b ? a : b;
+
+        public static float Exp(float power) => (float)Math.Exp(power);
     }
 }

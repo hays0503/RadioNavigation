@@ -1,6 +1,4 @@
-﻿using System;
-using System.Reflection;
-using DWS.Common.InjectionFramework;
+﻿using DWS.Common.InjectionFramework;
 using UBOAT.Game.Core.Input;
 using UBOAT.Game.UI;
 using UnityEngine;
@@ -13,15 +11,6 @@ namespace UBOAT.Mods.RadioNavigation
     // on top of the shared screen-space canvas.
     public sealed class ChronometerOverlayHandler : MonoBehaviour
     {
-        private static readonly FieldInfo ChronometerDragField = typeof(ShipControlUI).GetField(
-            "chronometerToolDragContainer", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static readonly FieldInfo ChronometerButtonField = typeof(ShipControlUI).GetField(
-            "chronometerButton", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static readonly FieldInfo ChronometerDefaultPositionField = typeof(ShipControlUI).GetField(
-            "chronometerToolDefaultPos", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static readonly FieldInfo ChronometerDragStateField = typeof(ShipControlUI).GetField(
-            "chronometerToolDragState", BindingFlags.Instance | BindingFlags.NonPublic);
-
         private ShipControlUI shipControlUI;
 
         // Etalon (native radio-room UX): hovering an interactive element
@@ -148,13 +137,13 @@ namespace UBOAT.Mods.RadioNavigation
                 return true;
             }
 
-            if (ChronometerDragField.IsNull())
+            if (!ShipControlUIBridge.HasDragContainer)
             {
                 LogResolveWarning("ShipControlUI.chronometerToolDragContainer field not found");
                 return false;
             }
 
-            chronometerDragContainer = ChronometerDragField.GetValue(shipControlUI) as RectTransform;
+            chronometerDragContainer = ShipControlUIBridge.GetDragContainer(shipControlUI);
             if (chronometerDragContainer.IsNull())
             {
                 LogResolveWarning("native chronometer drag container is not ready");
@@ -193,10 +182,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void ResolveChronometerButton()
         {
-            if (chronometerButton.IsNotNull() || ChronometerButtonField.IsNull())
+            if (chronometerButton.IsNotNull() || !ShipControlUIBridge.HasButton)
                 return;
 
-            chronometerButton = ChronometerButtonField.GetValue(shipControlUI) as Toggle;
+            chronometerButton = ShipControlUIBridge.GetButton(shipControlUI);
             if (chronometerButton.IsNull())
                 LogResolveWarning("native chronometer toggle is not ready");
         }
@@ -305,6 +294,11 @@ namespace UBOAT.Mods.RadioNavigation
             originalChronometerScale = Vector3.zero;
             attachedChronometerScale = Vector3.zero;
 
+            // CH-3 leak fix: the mod-owned sensor must not survive inside the
+            // native hierarchy after restore. Destroy it so the next raise
+            // recreates a fresh, correctly-parented control.
+            ReleaseScaleControl();
+
             if (chronometerDragShield.IsNotNull())
                 chronometerDragShield.SetOwner(null);
 
@@ -337,6 +331,15 @@ namespace UBOAT.Mods.RadioNavigation
 
             chronometerScaleControl = control.GetComponent<ChronometerScaleControl>();
             chronometerScaleControl.SetOwner(this);
+        }
+
+        // Destroys the mod-owned scale sensor and clears the reference so a
+        // later raise recreates it fresh. Used on restore (leak fix) and teardown.
+        private void ReleaseScaleControl()
+        {
+            if (chronometerScaleControl.IsNotNull())
+                Destroy(chronometerScaleControl.gameObject);
+            chronometerScaleControl = null;
         }
 
         internal void SetScaleHover(bool value)
@@ -422,9 +425,6 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private static FieldInfo normalCursorTexField;
-        private static Texture2D gameDefaultCursor;
-
         // Sync the manager's mode to Default AND force the texture: foreign
         // UnsetCustomCursor calls can leave the mode at Default while our
         // custom texture is still on screen, and the guarded SetDefaultCursor
@@ -432,27 +432,9 @@ namespace UBOAT.Mods.RadioNavigation
         private void ApplyGameDefaultCursor()
         {
             cursorManager.SetDefaultCursor();
-            Texture2D normal = GetGameDefaultCursorTexture();
+            Texture2D normal = ShipControlUIBridge.GetGameDefaultCursor(cursorManager);
             if (normal.IsNotNull())
                 Cursor.SetCursor(normal, Vector2.zero, CursorMode.Auto);
-        }
-
-        private static Texture2D GetGameDefaultCursorTexture()
-        {
-            if (gameDefaultCursor.IsNotNull() || cursorManager.IsNull())
-                return gameDefaultCursor;
-            try
-            {
-                if (normalCursorTexField == null)
-                    normalCursorTexField = typeof(CursorManager).GetField(
-                        "normalCursorTex", BindingFlags.Instance | BindingFlags.NonPublic);
-                gameDefaultCursor = normalCursorTexField?.GetValue(cursorManager) as Texture2D;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[RadioNav][Chronometer] default cursor texture probe failed: " + e.Message);
-            }
-            return gameDefaultCursor;
         }
 
         internal RectTransform GetDragAreaRect()
@@ -534,66 +516,15 @@ namespace UBOAT.Mods.RadioNavigation
                 gameInput.RemoveBlockade(this);
         }
 
-        private static FieldInfo uiDialsDataHolderField;
-        private static PropertyInfo chronoPosOverrideProp;
-        private static MethodInfo applyToolPositionLimitsMethod;
-
         // Expanded drag bypasses native HandleDialDragging (its fixed-radius
         // circle cannot reach the scaled face), so the position override is
-        // written here exactly like the game does: normalized screen coords
-        // plus its own edge clamping via ApplyToolPositionLimits.
-        private bool ResolveNativePositionBridge()
-        {
-            if (chronoPosOverrideProp != null)
-                return true;
-            try
-            {
-                if (uiDialsDataHolderField == null)
-                    uiDialsDataHolderField = typeof(ShipControlUI).GetField(
-                        "uiDialsDataHolder", BindingFlags.Static | BindingFlags.NonPublic);
-                object holder = uiDialsDataHolderField?.GetValue(null);
-                if (holder.IsNull())
-                    return false;
-
-                Type iface = holder.GetType().GetInterface("IUserInterfaceDialsDataHolder");
-                if (iface != null)
-                    chronoPosOverrideProp = iface.GetProperty("ChronometerPosOverride");
-                if (applyToolPositionLimitsMethod == null)
-                    applyToolPositionLimitsMethod = typeof(ShipControlUI).GetMethod(
-                        "ApplyToolPositionLimits", BindingFlags.Static | BindingFlags.NonPublic);
-
-                if (chronoPosOverrideProp == null || applyToolPositionLimitsMethod == null)
-                {
-                    Debug.LogWarning("[RadioNav][Chronometer] expanded-drag position bridge incomplete");
-                    return false;
-                }
-                return true;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[RadioNav][Chronometer] expanded-drag position bridge failed: " + e.Message);
-                return false;
-            }
-        }
-
+        // written via ShipControlUIBridge exactly like the game does:
+        // normalized screen coords plus its own edge clamping.
         private void PersistExpandedChronometerPosition()
         {
-            if (chronometerDragContainer.IsNull() || !ResolveNativePositionBridge())
+            if (chronometerDragContainer.IsNull())
                 return;
-            try
-            {
-                object holder = uiDialsDataHolderField.GetValue(null);
-                Vector2 current = (Vector2)chronoPosOverrideProp.GetValue(holder, null);
-                Vector2 screenPos = chronometerDragContainer.position;
-                current = ChronometerMapDragMath.ToNormalizedOverride(screenPos, Screen.width, Screen.height);
-                Vector2 limited = (Vector2)applyToolPositionLimitsMethod.Invoke(
-                    null, new object[] { current, chronometerDragContainer });
-                chronoPosOverrideProp.SetValue(holder, limited, null);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[RadioNav][Chronometer] expanded-drag persist failed: " + e.Message);
-            }
+            ShipControlUIBridge.PersistExpandedPosition(chronometerDragContainer);
         }
 
         internal void ToggleChronometerScale()
@@ -624,83 +555,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (expandCursor.IsNotNull() && reduceCursor.IsNotNull())
                 return;
 
-            expandCursor = CreateScaleCursor(false);
-            reduceCursor = CreateScaleCursor(true);
-        }
-
-        private static Texture2D CreateScaleCursor(bool inward)
-        {
-            const int size = 32;
-            var pixels = new Color32[size * size];
-            for (int i = 0; i < pixels.Length; i++)
-                pixels[i] = new Color32(0, 0, 0, 0);
-
-            Color32 color = new Color32(255, 255, 255, 255);
-            DrawScaleArrow(pixels, 15, 15, 5, 5, inward, color);
-            DrawScaleArrow(pixels, 16, 15, 26, 5, inward, color);
-            DrawScaleArrow(pixels, 15, 16, 5, 26, inward, color);
-            DrawScaleArrow(pixels, 16, 16, 26, 26, inward, color);
-
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            texture.SetPixels32(pixels);
-            texture.Apply();
-            texture.filterMode = FilterMode.Point;
-            texture.wrapMode = TextureWrapMode.Clamp;
-            return texture;
-        }
-
-        private static void DrawScaleArrow(
-            Color32[] pixels,
-            int centerX,
-            int centerY,
-            int cornerX,
-            int cornerY,
-            bool inward,
-            Color32 color)
-        {
-            DrawLine(pixels, centerX, centerY, cornerX, cornerY, color);
-
-            int tipX = inward ? centerX : cornerX;
-            int tipY = inward ? centerY : cornerY;
-            int horizontal = cornerX < centerX ? -5 : 5;
-            int vertical = cornerY < centerY ? -5 : 5;
-            if (!inward)
-            {
-                horizontal = -horizontal;
-                vertical = -vertical;
-            }
-
-            DrawLine(pixels, tipX, tipY, tipX + horizontal, tipY, color);
-            DrawLine(pixels, tipX, tipY, tipX, tipY + vertical, color);
-        }
-
-        private static void DrawLine(Color32[] pixels, int x0, int y0, int x1, int y1, Color32 color)
-        {
-            int dx = Math.Abs(x1 - x0);
-            int sx = x0 < x1 ? 1 : -1;
-            int dy = -Math.Abs(y1 - y0);
-            int sy = y0 < y1 ? 1 : -1;
-            int error = dx + dy;
-
-            while (true)
-            {
-                if (x0 >= 0 && x0 < 32 && y0 >= 0 && y0 < 32)
-                    pixels[y0 * 32 + x0] = color;
-                if (x0 == x1 && y0 == y1)
-                    break;
-
-                int doubleError = 2 * error;
-                if (doubleError >= dy)
-                {
-                    error += dy;
-                    x0 += sx;
-                }
-                if (doubleError <= dx)
-                {
-                    error += dx;
-                    y0 += sy;
-                }
-            }
+            expandCursor = ChronometerCursorArt.CreateScaleCursor(false);
+            reduceCursor = ChronometerCursorArt.CreateScaleCursor(true);
         }
 
         private void CaptureChronometerScale()
@@ -736,28 +592,31 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void CaptureDefaultPosition()
         {
-            if (defaultPositionCaptured || ChronometerDefaultPositionField.IsNull())
+            if (defaultPositionCaptured || !ShipControlUIBridge.HasDefaultPosition)
                 return;
 
-            originalDefaultPosition = (Vector2)ChronometerDefaultPositionField.GetValue(shipControlUI);
+            Vector2? value = ShipControlUIBridge.GetDefaultPosition(shipControlUI);
+            if (value == null)
+                return;
+            originalDefaultPosition = value.Value;
             defaultPositionCaptured = true;
         }
 
         private void UpdateDefaultPositionForRadioParent()
         {
-            if (!defaultPositionCaptured || ChronometerDefaultPositionField.IsNull())
+            if (!defaultPositionCaptured || !ShipControlUIBridge.HasDefaultPosition)
                 return;
 
             Vector3 offset = chronometerDragContainer.position - transform.position;
-            ChronometerDefaultPositionField.SetValue(shipControlUI, new Vector2(offset.x, offset.y));
+            ShipControlUIBridge.SetDefaultPosition(shipControlUI, new Vector2(offset.x, offset.y));
         }
 
         private void RestoreDefaultPosition()
         {
-            if (!defaultPositionCaptured || ChronometerDefaultPositionField.IsNull())
+            if (!defaultPositionCaptured || !ShipControlUIBridge.HasDefaultPosition)
                 return;
 
-            ChronometerDefaultPositionField.SetValue(shipControlUI, originalDefaultPosition);
+            ShipControlUIBridge.SetDefaultPosition(shipControlUI, originalDefaultPosition);
             originalDefaultPosition = Vector2.zero;
             defaultPositionCaptured = false;
         }
@@ -830,11 +689,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void CancelNativeDrag()
         {
-            if (shipControlUI.IsNotNull() && ChronometerDragStateField.IsNotNull())
-            {
-                object none = Enum.ToObject(ChronometerDragStateField.FieldType, 0);
-                ChronometerDragStateField.SetValue(shipControlUI, none);
-            }
+            if (shipControlUI.IsNotNull())
+                ShipControlUIBridge.ResetNativeDragState(shipControlUI);
 
             if (gameInput.IsNull() && InjectionFramework.Instance.IsNotNull())
                 gameInput = InjectionFramework.Instance.GetInstance<GameInput>();
@@ -888,8 +744,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (createdDragShield && chronometerDragShield.IsNotNull())
                 Destroy(chronometerDragShield);
 
-            if (chronometerScaleControl.IsNotNull())
-                Destroy(chronometerScaleControl);
+            ReleaseScaleControl();
             if (expandCursor.IsNotNull())
                 Destroy(expandCursor);
             if (reduceCursor.IsNotNull())

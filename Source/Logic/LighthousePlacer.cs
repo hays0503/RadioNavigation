@@ -94,6 +94,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void Reset()
         {
+            // Hot-reload: destroy the holder GO too, not just null the
+            // instance. Otherwise the old Update() loop keeps polling
+            // placements while EnsureRunning spawns a second one.
+            if (instance.IsNotNull())
+                UnityEngine.Object.Destroy(instance.gameObject);
             instance = null;
         }
 
