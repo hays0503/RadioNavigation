@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
 using DWS.Common.InjectionFramework;
+using DWS.Common.Resources;
 using PlayWay.Water;
 using UBOAT.Game.Core.Input;
 using UBOAT.Game.Scene.Camera;
@@ -40,6 +42,28 @@ namespace UBOAT.Mods.RadioNavigation
         private const float HintYUnits = 60f;
         private const float SunColumnWidthUnits = 440f;
 
+        // Running-fix worksheet column (F-Tafel Beobachtungsblatt, two sun
+        // sights with Versetzung). SEXTANT_PLAN v1.9.
+        private const float FixColumnWidthUnits = 380f;
+        private const float FixCardHeightUnits = 560f;
+        private const int FixCardFontSize = 11;
+        private const float FixPanelIntervalSeconds = 1f;
+        private const float FixStatusSeconds = 3f;
+        private const float CourseSampleIntervalSeconds = 2f;
+        private const float CourseSampleWindowSeconds = 10f;
+        private const float MinTransferSpeedKn = 0.5f;
+
+        // Eyecup (наглазник): the rubber shade around the eyepiece. The cup
+        // sprite is larger than the ocular and sits between the veil and the
+        // lens, hiding the world around the field of view; the tube shadow
+        // (EdgeRing) darkens the lens periphery like light falloff in a tube.
+        private const float EyecupSizeUnits = 1000f;
+        private const float EyecupSolidTo = 0.60f;  // solid black up to the ocular rim (0.6 = 300/500)
+        private const float TubeShadowStart = 0.55f; // tube light falloff begins
+        private const float TubeShadowMid = 0.85f;   // shadow strength at mid-falloff
+        private const float TubeShadowMidAlpha = 0.45f;
+        private const float TubeShadowFull = 0.97f;  // fully black before the mask edge
+
         // §2 behaviour constants.
         private const float RateDegPerSec = 2f;
         private const float ShiftMultiplier = 5f;
@@ -57,7 +81,8 @@ namespace UBOAT.Mods.RadioNavigation
         private int zoomIndex = 2;
         private float PipFovDivisor { get { return ZoomSteps[zoomIndex]; } }
         private const float IdentifyConeDeg = 0.5f;
-        private const float IdentifyHoldSeconds = 5f;
+        // v1.12: 2.5 s (was 5 s) — author request, faster sight workflow.
+        private const float IdentifyHoldSeconds = 2.5f;
         private const float StarIdIntervalSeconds = 0.2f;
         private const float PainOnGlare = 0.6f;
         private const float PainOffGlare = 0.5f;
@@ -70,9 +95,58 @@ namespace UBOAT.Mods.RadioNavigation
             "\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0443\u0433\u043E\u043B \u00B7 Shift: \u0431\u044B\u0441\u0442\u0440\u0435\u0435 \u00B7 " +
             "Ctrl+\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0442\u043E\u0447\u043D\u043E (0,2\u2032) \u00B7 " +
             "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440 \u043F\u0440\u0430\u0432\u044B\u0439 \u00B7 Ctrl+1\u20133: \u043B\u0435\u0432\u044B\u0439 \u00B7 " +
-            "0: \u0441\u043D\u044F\u0442\u044C \u00B7 R: 0\u00B0 \u00B7 +/\u2212: \u0437\u0443\u043C \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
+            "0: \u0441\u043D\u044F\u0442\u044C \u00B7 R: 0\u00B0 \u00B7 +/\u2212: \u0437\u0443\u043C \u00B7 " +
+            "I: \u0437\u0430\u043C\u0435\u0440 \u00B7 O: \u0441\u0435\u0440\u0438\u044F \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
         private const string SunAltPrefix =
             "\u0412\u044B\u0441\u043E\u0442\u0430 \u0441\u043E\u043B\u043D\u0446\u0430 \u043D\u0430\u0434 \u0443\u0440\u043E\u0432\u043D\u0435\u043C \u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442\u0430: ";
+        private const string MoonLabel = "\u041B\u0443\u043D\u0430";
+        private const string EyeHeightLabel = "\u0413\u043B\u0430\u0437";
+        private const float BodiesReadoutIntervalSeconds = 1f;
+        private const int BodiesMaxStars = 10;
+
+        // F-Tafel worksheet card strings (v1.9).
+        private const string FixCardTitle =
+            "\u0410\u0421\u0422\u0420\u041E\u041D\u0410\u0412\u0418\u0413\u0410\u0426\u0418\u042F";
+        private const string FixCardSight =
+            "\u041D\u0410\u0411\u041B\u042E\u0414\u0415\u041D\u0418\u0415";
+        private const string FixCardNoSight =
+            "\u041D\u0415\u0422 \u041D\u0410\u0411\u041B\u042E\u0414\u0415\u041D\u0418\u042F";
+        private const string FixCardNoPosition =
+            "\u041D\u0415\u0422 \u041F\u041E\u0417\u0418\u0426\u0418\u0418";
+        private const string FixCardRecorded1 =
+            "\u041D\u0410\u0411\u041B\u042E\u0414\u0415\u041D\u0418\u0415 \u21161 \u0417\u0410\u041F\u0418\u0421\u0410\u041D\u041E";
+        private const string FixCardRecorded2 =
+            "\u041D\u0410\u0411\u041B\u042E\u0414\u0415\u041D\u0418\u0415 \u21162 \u0417\u0410\u041F\u0418\u0421\u0410\u041D\u041E";
+        private const string FixCardNewSeries =
+            "\u041D\u041E\u0412\u0410\u042F \u0421\u0415\u0420\u0418\u042F";
+        private const string FixCardAwaitSecond =
+            "\u0417\u0430\u043F\u0438\u0448\u0438\u0442\u0435 \u0432\u0442\u043E\u0440\u043E\u0435 " +
+            "\u043D\u0430\u0431\u043B\u044E\u0434\u0435\u043D\u0438\u0435 (I)";
+        private const string FixCardFirstHint =
+            "\u0421\u043E\u043B\u043D\u0446\u0435 \u0432 \u0446\u0435\u043D\u0442\u0440, 2.5 \u0441, " +
+            "\u0437\u0430\u0442\u0435\u043C I";
+        private const string FixCardVersetzung =
+            "\u0412\u0415\u0420\u0421\u0415\u0422\u0426\u0423\u041D\u0413";
+        private const string FixCardCourse = "\u041A\u0443\u0440\u0441";
+        private const string FixCardSpeed = "\u0421\u043A\u043E\u0440";
+        private const string FixCardMinutes = "\u043C\u0438\u043D";
+        private const string FixCardTransfer = "\u041F\u0435\u0440\u0435\u043D\u043E\u0441";
+        private const string FixCardError =
+            "\u041E\u0448\u0438\u0431\u043A\u0430 \u043E\u0442 \u0441\u0447\u0438\u0441\u043B\u0435\u043D\u0438\u044F";
+        private const string FixCardQuadrant = "\u043A\u0432.";
+        private const string FixCardCalibration =
+            "\u041A\u0430\u043B\u0438\u0431\u0440\u043E\u0432\u043A\u0430";
+        private const string FixCardGeometry =
+            "\u0413\u0435\u043E\u043C\u0435\u0442\u0440\u0438\u044F";
+        private const string FixCardGeomGood =
+            "\u0445\u043E\u0440\u043E\u0448\u043E";
+        private const string FixCardGeomFair =
+            "\u043F\u043E\u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0435\u043D\u043D\u043E";
+        private const string FixCardGeomPoor =
+            "\u0441\u043B\u0430\u0431\u043E";
+        private const string FixCardGeomAdvice =
+            "<15\u00B0: \u0440\u0430\u0437\u043D\u0435\u0441\u0438\u0442\u0435 " +
+            "\u0437\u0430\u043C\u0435\u0440\u044B \u043F\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0438";
 
         /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
         public static bool IsOpen { get; private set; }
@@ -147,6 +221,9 @@ namespace UBOAT.Mods.RadioNavigation
         private Text filterText;
         private Text sunAltText;
         private string lastSunAltLine;
+        private Text bodiesAltText;
+        private string lastBodiesLine;
+        private float bodiesReadoutTimer;
         private Texture2D ringTexture;
         private Texture2D circleMaskTexture;
         private static Font sextantOsFont;
@@ -165,6 +242,98 @@ namespace UBOAT.Mods.RadioNavigation
         private bool sunDiscSourceLogged;
 
         private readonly IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
+
+        // Running-fix worksheet state (v1.9): two recorded sights, the
+        // calculator, the card text and a course/speed track sampler.
+        private readonly RunningFixCalculator runningFix = new RunningFixCalculator();
+        private Text fixCardText;
+        private string lastFixCardLine;
+        private string fixStatusLine = "";
+        private float fixStatusTimer;
+        private float fixPanelTimer;
+        private float courseSampleTimer;
+        private float smoothedCourseDeg;
+        private float smoothedSpeedKn;
+        private struct TrackSample
+        {
+            public DateTime Utc;
+            public double Lat;
+            public double Lon;
+        }
+        private readonly List<TrackSample> trackSamples = new List<TrackSample>(16);
+
+        // v1.13 frozen fix: the Versetzung/geometry/FIX card section is built
+        // once at observation-2 record time and never recomputed by the 1 Hz
+        // refresh or by reopening the sextant.
+        private string fixSectionText;
+
+        // SUNDRIFT calibration (v1.10): solved against the game sun on each
+        // open, persisted in PlayerPrefs, applied to all worksheet ephemeris.
+        private const string SunCalibrationPrefsKey = "RadioNav.SunCalibrationMinutes";
+
+        private void Awake()
+        {
+            float saved = PlayerPrefs.GetFloat(SunCalibrationPrefsKey, 0f);
+            if (Math.Abs(saved) > 1e-4)
+            {
+                SunEphemerisCalibration.SetDelta(saved);
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "{0} SUNDRIFT calibration loaded: {1:F2} min",
+                    LogPrefix, saved));
+            }
+        }
+
+        /// <summary>
+        /// Solves the ephemeris time shift against the game sun direction
+        /// (cheap: ~70 ephemeris evaluations once per open) and persists it.
+        /// Keeps the previous calibration when the game sun is unavailable
+        /// or the residual is too large to trust.
+        /// </summary>
+        private void SolveSunCalibration()
+        {
+            float latF, lonF;
+            if (!positionProvider.TryGetPosition(out latF, out lonF))
+                return;
+            Vector3 gameDir;
+            float gameAlt;
+            if (!TryGetGameSun(out gameDir, out gameAlt))
+                return;
+
+            // v1.13: never re-solve mid-series — observation 1 was recorded
+            // under the stored Δt, a new Δt would put the two sights on
+            // different ephemerides and skew the LOPs. Re-solving happens
+            // only when the next open starts with an empty series.
+            if (runningFix.Observation1 != null)
+            {
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "{0} SUNDRIFT calibration kept: dt={1:F2} min (series active)",
+                    LogPrefix, SunEphemerisCalibration.DeltaMinutes));
+                return;
+            }
+
+            DateTime utc = GameTimeResolver.GetUtcNow();
+            double delta, residual;
+            if (SunEphemerisCalibration.SolveDelta(utc, latF, lonF,
+                    gameDir.x, gameDir.y, gameDir.z, out delta, out residual))
+            {
+                SunEphemerisCalibration.SetDelta(delta);
+                PlayerPrefs.SetFloat(SunCalibrationPrefsKey, (float)delta);
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "{0} SUNDRIFT calibration solved: dt={1:F2} min residual={2:F3} deg",
+                    LogPrefix, delta, residual));
+            }
+            else
+            {
+                Debug.LogWarning(string.Format(CultureInfo.InvariantCulture,
+                    "{0} SUNDRIFT calibration rejected: residual={1:F3} deg - keeping previous",
+                    LogPrefix, residual));
+            }
+            lastFixCardLine = null; // card shows the calibration line
+        }
+
+        [Inject] private static ResourceManager resourceManager = null;
+        private Material opaqueViewMaterial;
+        private bool opaqueViewWarned;
 
         private void Update()
         {
@@ -186,6 +355,10 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
+                UpdateBodiesReadout(Time.unscaledDeltaTime);
+                HandleFixKeys();
+                UpdateCourseSampler(Time.unscaledDeltaTime);
+                UpdateFixPanel(Time.unscaledDeltaTime);
             }
             else if (Input.GetKeyDown(KeyCode.Z) && !ShiftHeld())
             {
@@ -244,8 +417,10 @@ namespace UBOAT.Mods.RadioNavigation
 
             EnsureOverlay();
             EnsurePipCameras();
+            SolveSunCalibration();
 
-            arcAngle = 0.0;
+            // arcAngle is intentionally NOT reset here: the reading must
+            // survive close/open cycles (explicit reset = R key / 0° button).
             leftFilterCount = 0;
             rightFilterCount = 0;
             holdTimer = 0f;
@@ -255,6 +430,10 @@ namespace UBOAT.Mods.RadioNavigation
             pain = false;
             lastFormattedArc = double.MinValue;
             lastSunAltLine = null;
+            lastBodiesLine = null;
+            lastFixCardLine = null;
+            fixPanelTimer = 0f;
+            bodiesReadoutTimer = 0f;
             sunDriftLogTimer = 0f; // force the first SUNDRIFT line on open
             renderCheckDone = false;
             renderCheckTimer = 1.0f;
@@ -511,7 +690,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
             if (renderCheckTex == null)
-                renderCheckTex = new Texture2D(1, 1, TextureFormat.RGB24, false);
+                renderCheckTex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
             try
             {
                 RenderTexture prev = RenderTexture.active;
@@ -523,11 +702,14 @@ namespace UBOAT.Mods.RadioNavigation
                 Color rb = SampleRt(rightRt, 0.1f);
                 RenderTexture.active = prev;
                 Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} RENDERCHECK {1} left(t/m/b)=#{2}/#{3}/#{4} right(t/m/b)=#{5}/#{6}/#{7}",
+                    "{0} RENDERCHECK {1} left(t/m/b)=#{2}({3:F2})/#{4}({5:F2})/#{6}({7:F2}) right(t/m/b)=#{8}({9:F2})/#{10}({11:F2})/#{12}({13:F2})",
                     LogPrefix, tag,
-                    ColorUtility.ToHtmlStringRGB(lt), ColorUtility.ToHtmlStringRGB(lm),
-                    ColorUtility.ToHtmlStringRGB(lb), ColorUtility.ToHtmlStringRGB(rtTop),
-                    ColorUtility.ToHtmlStringRGB(rm), ColorUtility.ToHtmlStringRGB(rb)));
+                    ColorUtility.ToHtmlStringRGB(lt), lt.a,
+                    ColorUtility.ToHtmlStringRGB(lm), lm.a,
+                    ColorUtility.ToHtmlStringRGB(lb), lb.a,
+                    ColorUtility.ToHtmlStringRGB(rtTop), rtTop.a,
+                    ColorUtility.ToHtmlStringRGB(rm), rm.a,
+                    ColorUtility.ToHtmlStringRGB(rb), rb.a));
             }
             catch (Exception e)
             {
@@ -645,6 +827,304 @@ namespace UBOAT.Mods.RadioNavigation
         {
             arcAngle = 0.0;
             Debug.Log(LogPrefix + " ARC reset to 0");
+        }
+
+        // ---- running fix worksheet (v1.9) ---------------------------------------
+
+        private void HandleFixKeys()
+        {
+            // I records a sight (only with the sun identified and held),
+            // O starts a new worksheet series.
+            if (Input.GetKeyDown(KeyCode.I))
+                CaptureObservation();
+            if (Input.GetKeyDown(KeyCode.O))
+                ResetSeries();
+        }
+
+        private void CaptureObservation()
+        {
+            if (identifiedName != SunName)
+            {
+                fixStatusLine = FixCardNoSight;
+                fixStatusTimer = FixStatusSeconds;
+                fixPanelTimer = 0f;
+                Debug.Log(LogPrefix + " FIXKEY I ignored - sun not identified");
+                return;
+            }
+            float latF, lonF;
+            if (!positionProvider.TryGetPosition(out latF, out lonF))
+            {
+                fixStatusLine = FixCardNoPosition;
+                fixStatusTimer = FixStatusSeconds;
+                fixPanelTimer = 0f;
+                Debug.Log(LogPrefix + " FIXKEY I ignored - no sandbox position");
+                return;
+            }
+
+            double ho = SextantArc.Quantize(arcAngle);
+            SextantObservation obs = RunningFixCalculator.BuildObservation(
+                GameTimeResolver.GetUtcNow(), ho, latF, lonF);
+            runningFix.Record(obs);
+            FixMapMarker.OnNewObservation();
+            // v1.13: the fix is a snapshot computed at record time only.
+            if (runningFix.CanSolve)
+                RecomputeFixSnapshot();
+            else
+                fixSectionText = null;
+            bool isSecond = runningFix.Observation2 == obs;
+            fixStatusLine = isSecond ? FixCardRecorded2 : FixCardRecorded1;
+            fixStatusTimer = FixStatusSeconds;
+            fixPanelTimer = 0f;
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} OBS n={1} ho={2:F2} dr=({3:F4},{4:F4}) hc={5:F2} az={6:F2} a={7:F1}NM",
+                LogPrefix, isSecond ? 2 : 1, ho, latF, lonF,
+                obs.HcDeg, obs.AzDeg, obs.InterceptNm));
+        }
+
+        private void ResetSeries()
+        {
+            runningFix.Reset();
+            FixMapMarker.Clear();
+            fixSectionText = null;
+            fixStatusLine = FixCardNewSeries;
+            fixStatusTimer = FixStatusSeconds;
+            fixPanelTimer = 0f;
+            Debug.Log(LogPrefix + " FIX series reset");
+        }
+
+        /// <summary>
+        /// Course/speed over ground from the recent position track (10 s
+        /// window, 2 s sampling). Below the transfer speed threshold the boat
+        /// counts as anchored: speed 0, course keeps its last value.
+        /// </summary>
+        private void UpdateCourseSampler(float dt)
+        {
+            courseSampleTimer -= dt;
+            if (courseSampleTimer > 0f)
+                return;
+            courseSampleTimer = CourseSampleIntervalSeconds;
+
+            float latF, lonF;
+            if (!positionProvider.TryGetPosition(out latF, out lonF))
+                return;
+            DateTime utc = GameTimeResolver.GetUtcNow();
+            trackSamples.Add(new TrackSample { Utc = utc, Lat = latF, Lon = lonF });
+            while (trackSamples.Count > 0 &&
+                   (utc - trackSamples[0].Utc).TotalSeconds > CourseSampleWindowSeconds + 2.0)
+                trackSamples.RemoveAt(0);
+            if (trackSamples.Count < 2)
+                return;
+
+            TrackSample first = trackSamples[0];
+            TrackSample last = trackSamples[trackSamples.Count - 1];
+            double spanHours = (last.Utc - first.Utc).TotalHours;
+            if (spanHours < CourseSampleWindowSeconds / 3600.0 * 0.6)
+                return; // not enough baseline yet right after opening
+
+            double distKm = GeoMath.HaversineKm(
+                (float)first.Lat, (float)first.Lon, (float)last.Lat, (float)last.Lon);
+            double kn = distKm / 1.852 / spanHours;
+            if (kn >= MinTransferSpeedKn)
+            {
+                smoothedCourseDeg = GeoMath.InitialBearingDeg(
+                    (float)first.Lat, (float)first.Lon, (float)last.Lat, (float)last.Lon);
+                smoothedSpeedKn = (float)kn;
+            }
+            else
+            {
+                smoothedSpeedKn = 0f;
+            }
+        }
+
+        private void UpdateFixPanel(float dt)
+        {
+            if (fixCardText == null)
+                return;
+            if (fixStatusTimer > 0f)
+                fixStatusTimer -= dt;
+            fixPanelTimer -= dt;
+            if (fixPanelTimer > 0f)
+                return;
+            fixPanelTimer = FixPanelIntervalSeconds;
+
+            string card = BuildFixCard();
+            if (card != lastFixCardLine)
+            {
+                fixCardText.text = card;
+                lastFixCardLine = card;
+            }
+        }
+
+        private void AppendObservation(StringBuilder sb, SextantObservation obs, int index)
+        {
+            // F-Tafel block order: UT -> gamma/SHA/GHA -> lambda_g/LHA ->
+            // delta -> h_b/h1 -> Az/intercept.
+            sb.Append(FixCardSight).Append(" \u2116").Append(index).Append('\n');
+            sb.Append("UT ").Append(obs.Utc.ToString("HH:mm:ss", CultureInfo.InvariantCulture)).Append('\n');
+            sb.Append("\u03B3 ").Append(FormatDm(obs.GhaAriesDeg));
+            // Same D°M.m′ format as gamma/GHA: a 0.1° decimal SHA read as
+            // 198°18.0′ made gamma+SHA look 2′ off GHA on the card (in-game
+            // verification 2026-08-30) — the chain is exact, only the old
+            // display rounded SHA to ±3′.
+            sb.Append("  SHA ").Append(FormatDm(obs.ShaSunDeg)).Append('\n');
+            sb.Append("GHA ").Append(FormatDm(obs.GhaSunDeg)).Append('\n');
+            sb.Append("\u03BBg ").Append(FormatLatLon(obs.DrLonDeg, false));
+            sb.Append("  LHA ").Append(FormatDm(obs.LhaDeg));
+            sb.Append(' ').Append(FixCardQuadrant).Append(obs.Quadrant)
+              .Append(obs.QuadrantWest ? " W" : " O").Append('\n');
+            sb.Append("\u03B4 ").Append(FormatSignedDm(obs.DecDeg)).Append('\n');
+            sb.Append("hb ").Append(FormatDm(obs.HoDeg));
+            sb.Append("  h1 ").Append(FormatDm(obs.HcDeg)).Append('\n');
+            sb.Append("Az ").Append(obs.AzDeg.ToString("F1", CultureInfo.InvariantCulture));
+            sb.Append("  a ").Append(obs.InterceptNm >= 0 ? "+" : "\u2212")
+              .Append(Math.Abs(obs.InterceptNm).ToString("F1", CultureInfo.InvariantCulture))
+              .Append(" NM");
+        }
+
+        private string BuildFixCard()
+        {
+            StringBuilder sb = new StringBuilder(512);
+            sb.Append(FixCardTitle).Append('\n');
+            if (fixStatusTimer > 0f && !string.IsNullOrEmpty(fixStatusLine))
+                sb.Append(fixStatusLine).Append('\n');
+            double calMinutes = SunEphemerisCalibration.DeltaMinutes;
+            if (Math.Abs(calMinutes) > 0.01)
+            {
+                sb.Append(FixCardCalibration).Append(" \u0394t ")
+                  .Append(calMinutes >= 0 ? "+" : "\u2212")
+                  .Append(Math.Abs(calMinutes).ToString("F1", CultureInfo.InvariantCulture))
+                  .Append(' ').Append(FixCardMinutes).Append('\n');
+            }
+
+            if (runningFix.Observation1 == null)
+            {
+                sb.Append(FixCardFirstHint);
+                return sb.ToString();
+            }
+            AppendObservation(sb, runningFix.Observation1, 1);
+            sb.Append('\n');
+            if (runningFix.Observation2 == null)
+            {
+                sb.Append('\n').Append(FixCardAwaitSecond);
+                return sb.ToString();
+            }
+            sb.Append('\n');
+            AppendObservation(sb, runningFix.Observation2, 2);
+            sb.Append('\n').Append('\n');
+
+            // v1.13: the Versetzung/geometry/FIX tail is a SNAPSHOT computed
+            // once when observation 2 was recorded (I key) — reopening the
+            // sextant or the passage of time never recomputes it. The math
+            // belongs to the two recorded sights, not to the live view.
+            if (fixSectionText != null)
+                sb.Append(fixSectionText);
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Builds the frozen Versetzung/geometry/FIX section from the two
+        /// recorded observations with the course/speed current at record
+        /// time. Called only from CaptureObservation (and cleared by
+        /// ResetSeries) — never on the 1 Hz card refresh.
+        /// </summary>
+        private void RecomputeFixSnapshot()
+        {
+            StringBuilder sb = new StringBuilder(256);
+
+            double dtHours = (runningFix.Observation2.Utc - runningFix.Observation1.Utc).TotalHours;
+            if (dtHours < 0.0)
+                dtHours = 0.0;
+            double transferNm = smoothedSpeedKn * dtHours;
+            sb.Append(FixCardVersetzung).Append('\n');
+            sb.Append(FixCardCourse).Append(' ')
+              .Append(smoothedCourseDeg.ToString("F0", CultureInfo.InvariantCulture)).Append('\u00B0')
+              .Append(' ').Append(FixCardSpeed).Append(' ')
+              .Append(smoothedSpeedKn.ToString("F1", CultureInfo.InvariantCulture)).Append(" kn\n");
+            sb.Append("\u0394t ").Append((dtHours * 60.0).ToString("F0", CultureInfo.InvariantCulture))
+              .Append(' ').Append(FixCardMinutes).Append(' ')
+              .Append(FixCardTransfer).Append(' ')
+              .Append(transferNm.ToString("F1", CultureInfo.InvariantCulture)).Append(" NM\n");
+
+            // Crossing-angle quality: shallow geometry amplifies small
+            // intercept errors (~1/sin θ) — warn the navigator.
+            double crossDeg = RunningFixCalculator.CrossingAngleDeg(
+                runningFix.Observation1, runningFix.Observation2);
+            sb.Append(FixCardGeometry).Append(' ')
+              .Append(crossDeg.ToString("F0", CultureInfo.InvariantCulture))
+              .Append('\u00B0').Append(" \u2014 ");
+            if (crossDeg > 30.0)
+                sb.Append(FixCardGeomGood).Append('\n');
+            else if (crossDeg >= 15.0)
+                sb.Append(FixCardGeomFair).Append('\n');
+            else
+                sb.Append(FixCardGeomPoor).Append('\n')
+                  .Append(FixCardGeomAdvice).Append('\n');
+
+            double fixLat, fixLon;
+            if (!runningFix.CalculateFix(smoothedCourseDeg, smoothedSpeedKn, out fixLat, out fixLon))
+            {
+                FixMapMarker.Clear();
+                sb.Append("FIX \u2014");
+                fixSectionText = sb.ToString();
+                return;
+            }
+            sb.Append("FIX\n");
+            sb.Append("\u03C6 ").Append(FormatLatLon(fixLat, true));
+            sb.Append("  \u03BB ").Append(FormatLatLon(fixLon, false)).Append('\n');
+            FixMapMarker.Set(fixLat, fixLon,
+                "FIX " + runningFix.Observation2.Utc.ToString("HH:mm:ss", CultureInfo.InvariantCulture) +
+                "\nlat " + FormatLatLonAscii(fixLat, true) +
+                " lon " + FormatLatLonAscii(fixLon, false));
+            float curLat, curLon;
+            if (positionProvider.TryGetPosition(out curLat, out curLon))
+            {
+                double errNm = RunningFixCalculator.FixErrorNm(fixLat, fixLon, curLat, curLon);
+                sb.Append(FixCardError).Append(' ')
+                  .Append(errNm.ToString("F1", CultureInfo.InvariantCulture)).Append(" NM");
+            }
+            fixSectionText = sb.ToString();
+        }
+
+        /// <summary>"221°04.2′" (invariant culture; wraps 59.96′ rounding).</summary>
+        private static string FormatDm(double deg)
+        {
+            double d = Math.Floor(deg);
+            double m = (deg - d) * 60.0;
+            if (m >= 59.95)
+            {
+                d += 1.0;
+                m = 0.0;
+            }
+            return string.Format(CultureInfo.InvariantCulture,
+                "{0}\u00B0{1:00.0}\u2032", (int)d, m);
+        }
+
+        private static string FormatSignedDm(double deg)
+        {
+            return (deg < 0 ? "\u2212" : "+") + FormatDm(Math.Abs(deg));
+        }
+
+        private static string FormatLatLon(double deg, bool isLat)
+        {
+            string hemi = isLat ? (deg >= 0 ? "N" : "S") : (deg >= 0 ? "E" : "W");
+            return FormatDm(Math.Abs(deg)) + hemi;
+        }
+
+        /// <summary>Latin legend variant for the map marker tooltip: the
+        /// game's TMP font has no Cyrillic and no U+2032 prime glyph, so
+        /// this uses an ASCII apostrophe (in-game 2026-08-30).</summary>
+        private static string FormatLatLonAscii(double deg, bool isLat)
+        {
+            string hemi = isLat ? (deg >= 0 ? "N" : "S") : (deg >= 0 ? "E" : "W");
+            double d = Math.Floor(Math.Abs(deg));
+            double m = (Math.Abs(deg) - d) * 60.0;
+            if (m >= 59.95)
+            {
+                d += 1.0;
+                m = 0.0;
+            }
+            return string.Format(CultureInfo.InvariantCulture,
+                "{0}\u00B0{1:00.0}'{2}", (int)d, m, hemi);
         }
 
         private void ZoomIn()
@@ -1202,8 +1682,103 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private void ApplyGlare(float g)
+        /// <summary>
+        /// Small-font readout below the sun line: Moon altitude plus the nav
+        /// stars currently above the horizon (top N by altitude). Throttled
+        /// to 1 s - bodies move far too slowly to justify per-frame strings.
+        /// </summary>
+        private void UpdateBodiesReadout(float dt)
         {
+            if (bodiesAltText == null)
+                return;
+            bodiesReadoutTimer -= dt;
+            if (bodiesReadoutTimer > 0f)
+                return;
+            bodiesReadoutTimer = BodiesReadoutIntervalSeconds;
+
+            float lat, lon;
+            if (!positionProvider.TryGetPosition(out lat, out lon))
+            {
+                SetBodiesLine(null);
+                return;
+            }
+
+            DateTime utc = GameTimeResolver.GetUtcNow();
+            double jd = AstroMath.ToJulianDay(utc);
+            double lstDeg = AstroMath.LstDeg(jd, lon);
+
+            var entries = new List<KeyValuePair<float, string>>();
+            float moonAlt;
+            bool moonUp = TryGetMoonAlt(jd, lstDeg, lat, out moonAlt);
+
+            foreach (StarEntry star in StarCatalog.Stars)
+            {
+                if (!star.IsNav)
+                    continue;
+                double altRad, azRad, e, n, u;
+                AstroMath.RaDecToEnu(star.RaDeg * Mathf.Deg2Rad, star.DecDeg * Mathf.Deg2Rad,
+                    lstDeg, lat, out altRad, out azRad, out e, out n, out u);
+                float alt = (float)(altRad * Mathf.Rad2Deg);
+                if (alt <= 0f)
+                    continue;
+                string name = NavStarNames.TryGetName(star.Hip, out string starName)
+                    ? starName
+                    : "HIP " + star.Hip.ToString(CultureInfo.InvariantCulture);
+                entries.Add(new KeyValuePair<float, string>(alt, name + " " + FormatAlt(alt)));
+            }
+
+            entries.Sort((a, b) => b.Key.CompareTo(a.Key));
+
+            // Eye height above sea level first (HE, meters - the value a
+            // navigator needs for the dip correction), then the Moon, then
+            // stars: top N by altitude.
+            var sb = new StringBuilder();
+            if (viewCamera != null)
+                sb.Append(EyeHeightLabel + " " +
+                    viewCamera.transform.position.y.ToString("F1", CultureInfo.InvariantCulture) + " \u043C");
+            if (moonUp)
+            {
+                if (sb.Length > 0)
+                    sb.Append('\n');
+                sb.Append(MoonLabel + " " + FormatAlt(moonAlt));
+            }
+            int shown = 0;
+            for (int i = 0; i < entries.Count && shown < BodiesMaxStars; i++)
+            {
+                if (sb.Length > 0)
+                    sb.Append('\n');
+                sb.Append(entries[i].Value);
+                shown++;
+            }
+            SetBodiesLine(sb.Length > 0 ? sb.ToString() : null);
+        }
+
+        private void SetBodiesLine(string line)
+        {
+            if (line == lastBodiesLine)
+                return;
+            bodiesAltText.text = line ?? "";
+            lastBodiesLine = line;
+        }
+
+        private static string FormatAlt(float altDeg)
+        {
+            return altDeg.ToString("F1", CultureInfo.InvariantCulture) + "\u00B0";
+        }
+
+        /// <summary>Own Meeus moon altitude (negative below the horizon).</summary>
+        private static bool TryGetMoonAlt(double jd, double lstDeg, double lat, out float altDeg)
+        {
+            altDeg = 0f;
+            if (!AstroMath.MoonRaDec(jd, out double raRad, out double decRad))
+                return false;
+            AstroMath.RaDecToEnu(raRad, decRad, lstDeg, lat,
+                out double altRad, out _, out _, out _, out _);
+            altDeg = (float)(altRad * Mathf.Rad2Deg);
+            return true;
+        }
+
+        private void ApplyGlare(float g)        {
             if (glareImage != null)
             {
                 Color c = glareImage.color;
@@ -1240,7 +1815,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return false;
 
             DateTime utc = GameTimeResolver.GetUtcNow();
-            double jd = AstroMath.ToJulianDay(utc);
+            double jd = SunEphemerisCalibration.CalibratedJd(utc);
             double lstDeg = AstroMath.LstDeg(jd, lon);
 
             double raRad, decRad;
@@ -1410,6 +1985,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         private string FindNearestBodyName(out float bodyAltDeg)
         {
+            // Sun ID aims at the direction the player actually sees: the disc
+            // is drawn on the GAME sun (SUNDRIFT sep ~1.6° would never fit
+            // the 0.5° cone against our own ephemeris). Own ephemeris stays
+            // the fallback when the game sun is unavailable via reflection.
             Vector3 sunDir;
             float sunAlt;
             float sunAz;
@@ -1419,11 +1998,18 @@ namespace UBOAT.Mods.RadioNavigation
                 bodyAltDeg = -1f;
                 return null;
             }
-            if (TryGetOwnSun(out sunDir, out sunAlt, out sunAz)
-                && Vector3.Angle(pipFwd, sunDir) <= IdentifyConeDeg)
+            if (TryGetOwnSun(out sunDir, out sunAlt, out sunAz))
             {
-                bodyAltDeg = sunAlt;
-                return SunName;
+                Vector3 idTarget = sunDir;
+                Vector3 gameDir;
+                float gameAlt;
+                if (TryGetGameSun(out gameDir, out gameAlt))
+                    idTarget = gameDir;
+                if (Vector3.Angle(pipFwd, idTarget) <= IdentifyConeDeg)
+                {
+                    bodyAltDeg = sunAlt;
+                    return SunName;
+                }
             }
 
             bodyAltDeg = -1f;
@@ -1523,6 +2109,18 @@ namespace UBOAT.Mods.RadioNavigation
             veil.color = new Color(0f, 0f, 0f, VeilAlpha);
             Stretch(veil.rectTransform);
 
+            // Eyecup (наглазник): black shade larger than the ocular, drawn
+            // between the veil and the lens so the world around the field of
+            // view sinks into near-black while instrument texts (later
+            // siblings) stay readable. Solid over the ocular rim, long soft
+            // falloff outward - out-of-focus rubber close to the eye.
+            GameObject eyecupGo = new GameObject("Eyecup", typeof(Image));
+            eyecupGo.transform.SetParent(canvasRoot.transform, false);
+            Image eyecup = eyecupGo.GetComponent<Image>();
+            eyecup.sprite = CreateEyecupSprite();
+            eyecup.raycastTarget = false;
+            AnchorCenter(eyecup.rectTransform, EyecupSizeUnits, EyecupSizeUnits);
+
             // Ocular: square container clipped to a circle (in-game finding
             // 2026-08-26: unclipped corners painted opaque black over the live
             // horizon). Mask clips both RT views, glare and ring to the circle;
@@ -1576,13 +2174,37 @@ namespace UBOAT.Mods.RadioNavigation
             rightViewImage.rectTransform.offsetMax = Vector2.zero;
             rightViewImage.uvRect = new Rect(0.5f, 0f, 0.5f, 1f);
 
-            // Vertical split line between the halves.
+            // Opaque view material (bundle shader RadioNav/UIOpaque, Blend
+            // One Zero): the game's post stack writes alpha < 1 into the
+            // RTs (RENDERCHECK 2026-08-28: 0.29-0.47) and the stock UI
+            // shader blends the black lens backing through, darkening the
+            // picture. With the opaque shader the views render at full
+            // brightness; the backing stays only as a safety layer.
+            opaqueViewMaterial = ResolveOpaqueViewMaterial();
+            if (opaqueViewMaterial != null)
+            {
+                leftViewImage.material = opaqueViewMaterial;
+                rightViewImage.material = opaqueViewMaterial;
+            }
+
+            // Vertical sight line (1 physical pixel — drum alignment hairline
+            // between the direct/mirror halves).
             GameObject splitGo = new GameObject("VerticalSplit", typeof(Image));
             splitGo.transform.SetParent(pipGo.transform, false);
             Image splitImage = splitGo.GetComponent<Image>();
-            splitImage.color = new Color(1f, 1f, 1f, 0.35f);
+            splitImage.color = new Color(1f, 1f, 1f, 0.5f);
             splitImage.raycastTarget = false;
-            AnchorCenter(splitImage.rectTransform, 2f, OcularSizeUnits);
+            AnchorCenter(splitImage.rectTransform, 1f / canvas.scaleFactor, OcularSizeUnits);
+
+            // Horizontal sight line (1 physical pixel, crosshair) — line of
+            // sight, drawn above the views/below filter dims so it stays
+            // subtle and never interferes with the lenses.
+            GameObject horizGo = new GameObject("HorizontalSight", typeof(Image));
+            horizGo.transform.SetParent(pipGo.transform, false);
+            Image horizImage = horizGo.GetComponent<Image>();
+            horizImage.color = new Color(1f, 1f, 1f, 0.5f);
+            horizImage.raycastTarget = false;
+            AnchorCenter(horizImage.rectTransform, OcularSizeUnits, 1f / canvas.scaleFactor);
 
             // Shade filters dim the scope view (v1.5): separate left (horizon)
             // and right (sun) half dimmers - like the separate shade glasses
@@ -1691,6 +2313,51 @@ namespace UBOAT.Mods.RadioNavigation
             sunAltText = MakeLabel("SunAltText", 14, TextAnchor.MiddleLeft, new Color(0.75f, 0.9f, 1f));
             SetChild(sunColumn, sunAltText, 160f);
 
+            // Small-font body altitudes: Moon + nav stars above the horizon
+            // (updated on a 1 s cadence, see UpdateBodiesReadout).
+            bodiesAltText = MakeLabel("BodiesAltText", 11, TextAnchor.UpperLeft, new Color(0.62f, 0.70f, 0.78f));
+            SetChild(sunColumn, bodiesAltText, 130f);
+
+            // Running-fix worksheet column (F-Tafel card): second column left
+            // of the ocular; on narrow aspects (4:3, side zone < ~740 units)
+            // it stacks below the reading column instead.
+            GameObject fixColumnGo = new GameObject("FixColumn");
+            fixColumnGo.transform.SetParent(canvasRoot.transform, false);
+            RectTransform fixColumn = fixColumnGo.AddComponent<RectTransform>();
+            float refWidthUnits = 1080f * Screen.width / Mathf.Max(1, Screen.height);
+            float sideUnits = (refWidthUnits - OcularSizeUnits) * 0.5f;
+            bool fixStacked = sideUnits <
+                ColumnWidthUnits + FixColumnWidthUnits + 3f * ColumnGapUnits;
+            fixColumn.anchorMin = new Vector2(0.5f, 0.5f);
+            fixColumn.anchorMax = new Vector2(0.5f, 0.5f);
+            fixColumn.sizeDelta = new Vector2(FixColumnWidthUnits, FixCardHeightUnits);
+            if (fixStacked)
+            {
+                fixColumn.pivot = new Vector2(1f, 1f);
+                fixColumn.anchoredPosition = new Vector2(
+                    -OcularSizeUnits * 0.5f - ColumnGapUnits, -110f);
+            }
+            else
+            {
+                fixColumn.pivot = new Vector2(1f, 0.5f);
+                fixColumn.anchoredPosition = new Vector2(
+                    -OcularSizeUnits * 0.5f - ColumnGapUnits - ColumnWidthUnits - ColumnGapUnits, 0f);
+            }
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} FIXLAYOUT refW={1:F0} side={2:F0} stacked={3}",
+                LogPrefix, refWidthUnits, sideUnits, fixStacked));
+
+            fixCardText = MakeLabel("FixCardText", FixCardFontSize,
+                TextAnchor.UpperLeft, new Color(0.82f, 0.88f, 0.82f));
+            fixCardText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            fixCardText.text = "";
+            fixCardText.rectTransform.SetParent(fixColumn, false);
+            RectTransform fixCardRect = fixCardText.rectTransform;
+            fixCardRect.anchorMin = Vector2.zero;
+            fixCardRect.anchorMax = Vector2.one;
+            fixCardRect.offsetMin = Vector2.zero;
+            fixCardRect.offsetMax = Vector2.zero;
+
             // Bottom hint line.
             Text hint = MakeLabel("HintText", 13, TextAnchor.MiddleCenter,
                 new Color(0.75f, 0.75f, 0.75f));
@@ -1703,52 +2370,10 @@ namespace UBOAT.Mods.RadioNavigation
             hr.sizeDelta = new Vector2(1100f, 40f);
             hr.anchoredPosition = new Vector2(0f, HintYUnits);
 
-            // Control buttons under the ocular: zoom out, reset to 0, zoom in.
-            MakeSextantButton("ZoomOutBtn", "\u2212", new Vector2(-110f, -OcularSizeUnits * 0.5f - 70f), ZoomOut);
-            MakeSextantButton("ResetArcBtn", "0\u00B0", new Vector2(0f, -OcularSizeUnits * 0.5f - 70f), ResetArc);
-            MakeSextantButton("ZoomInBtn", "+", new Vector2(110f, -OcularSizeUnits * 0.5f - 70f), ZoomIn);
-
+            // No on-screen control buttons: zoom is +/- keys, arc reset is R
+            // (see HintText). Mouse stays free for aiming.
             canvasRoot.SetActive(false);
             Debug.Log(LogPrefix + " overlay built");
-        }
-
-        private Button MakeSextantButton(string btnName, string labelText, Vector2 anchoredPos, UnityEngine.Events.UnityAction onClick)
-        {
-            GameObject go = new GameObject(btnName, typeof(RectTransform));
-            go.transform.SetParent(canvasRoot.transform, false);
-            RectTransform r = go.GetComponent<RectTransform>();
-            r.anchorMin = new Vector2(0.5f, 0.5f);
-            r.anchorMax = new Vector2(0.5f, 0.5f);
-            r.pivot = new Vector2(0.5f, 0.5f);
-            r.sizeDelta = new Vector2(90f, 46f);
-            r.anchoredPosition = anchoredPos;
-
-            Image img = go.AddComponent<Image>();
-            img.color = new Color(0.03f, 0.04f, 0.05f, 0.85f);
-            img.raycastTarget = true;
-
-            Button btn = go.AddComponent<Button>();
-            btn.targetGraphic = img;
-            ColorBlock cb = btn.colors;
-            cb.highlightedColor = new Color(0.25f, 0.3f, 0.35f, 1f);
-            cb.pressedColor = new Color(0.1f, 0.12f, 0.15f, 1f);
-            btn.colors = cb;
-            btn.onClick.AddListener(onClick);
-
-            GameObject labelGo = new GameObject("Label", typeof(Text));
-            labelGo.transform.SetParent(go.transform, false);
-            Text label = labelGo.GetComponent<Text>();
-            label.font = GetSextantOsFont();
-            label.fontSize = 15;
-            label.alignment = TextAnchor.MiddleCenter;
-            label.color = Color.white;
-            label.raycastTarget = false;
-            label.horizontalOverflow = HorizontalWrapMode.Overflow;
-            label.verticalOverflow = VerticalWrapMode.Overflow;
-            label.text = labelText;
-            Stretch(label.rectTransform);
-
-            return btn;
         }
 
         private Text MakeLabel(string labelName, int fontSize, TextAnchor anchor, Color color)
@@ -1796,6 +2421,34 @@ namespace UBOAT.Mods.RadioNavigation
             r.anchoredPosition = new Vector2(0f, y);
         }
 
+        /// <summary>
+        /// Loads the opaque view material from the mod's AssetBundle
+        /// (RadioNavOpaqueView, shader RadioNav/UIOpaque). Returns null when
+        /// unavailable — the views then keep the stock UI shader.
+        /// </summary>
+        private Material ResolveOpaqueViewMaterial()
+        {
+            if (opaqueViewWarned)
+                return opaqueViewMaterial;
+            if (resourceManager == null)
+            {
+                opaqueViewWarned = true;
+                Debug.LogWarning(LogPrefix +
+                    " resourceManager unavailable - ocular views keep the stock UI shader (alpha darkening possible)");
+                return null;
+            }
+
+            Resource<Material> material =
+                resourceManager.RetrieveAsset<Material>("RadioNavOpaqueView", this, false);
+            if (material.Valid && material.Asset != null)
+                return material.Asset;
+
+            opaqueViewWarned = true;
+            Debug.LogWarning(LogPrefix +
+                " 'RadioNavOpaqueView' not found in bundle - ocular views keep the stock UI shader (alpha darkening possible)");
+            return null;
+        }
+
         private static void Stretch(RectTransform r)
         {
             r.anchorMin = Vector2.zero;
@@ -1827,19 +2480,59 @@ namespace UBOAT.Mods.RadioNavigation
                     float dx = (x + 0.5f - half) / half;
                     float dy = (y + 0.5f - half) / half;
                     float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    // Tube light falloff: clear center, gradual shadow, fully
+                    // black before the mask edge so no seam shows at the rim.
                     float a;
-                    if (r <= 0.78f) a = 0f;
-                    else if (r >= 1f) a = 1f;
+                    if (r <= TubeShadowStart) a = 0f;
+                    else if (r >= TubeShadowFull) a = 1f;
+                    else if (r <= TubeShadowMid)
+                    {
+                        float t = (r - TubeShadowStart) / (TubeShadowMid - TubeShadowStart);
+                        a = TubeShadowMidAlpha * (t * t * (3f - 2f * t));
+                    }
                     else
                     {
-                        float t = (r - 0.78f) / 0.22f;
-                        a = t * t * (3f - 2f * t); // smoothstep
+                        float t = (r - TubeShadowMid) / (TubeShadowFull - TubeShadowMid);
+                        a = TubeShadowMidAlpha + (1f - TubeShadowMidAlpha) * (t * t * (3f - 2f * t));
                     }
                     ringTexture.SetPixel(x, y, new Color(0f, 0f, 0f, a));
                 }
             }
             ringTexture.Apply();
             return Sprite.Create(ringTexture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        /// <summary>
+        /// Eyecup shade sprite: solid black over the ocular rim, long soft
+        /// falloff outward (out-of-focus rubber close to the eye).
+        /// </summary>
+        private Sprite CreateEyecupSprite()
+        {
+            const int size = 256;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.name = "RadioNavSextantEyecup";
+            tex.hideFlags = HideFlags.DontSave;
+            float half = size * 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + 0.5f - half) / half;
+                    float dy = (y + 0.5f - half) / half;
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a;
+                    if (r <= EyecupSolidTo) a = 1f;
+                    else if (r >= 1f) a = 0f;
+                    else
+                    {
+                        float t = (r - EyecupSolidTo) / (1f - EyecupSolidTo);
+                        a = 1f - t * t * (3f - 2f * t);
+                    }
+                    tex.SetPixel(x, y, new Color(0f, 0f, 0f, a));
+                }
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
         }
 
         /// <summary>
