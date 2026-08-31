@@ -72,6 +72,10 @@
         {
             switch (CurrentPhase)
             {
+                case Phase.Callsign:
+                case Phase.Navigation:
+                    break;
+
                 case Phase.Pause:
                     pauseTicksRemaining--;
                     if (pauseTicksRemaining.IsNonPositive())

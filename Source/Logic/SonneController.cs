@@ -197,8 +197,7 @@ namespace UBOAT.Mods.RadioNavigation
                     break;
             }
             signalEntries.Add(new SignalEntry(c, type));
-            if (type != SignalCharType.Separator)
-                morseCharCount++;
+            morseCharCount++;
             SignalRichTextFormatter.TrimEntries(signalEntries, ref morseCharCount);
 
             if (isCallsign)

@@ -113,8 +113,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             currentAngle = cursorAngle + Constants.CursorOffsetDeg;
             float freq = DialConfig.AngleToFrequency(currentAngle, currentZoneIndex);
-            if (OnFrequencyChanged.IsNotNull())
-                OnFrequencyChanged(freq, currentZoneIndex);
+            OnFrequencyChanged?.Invoke(freq, currentZoneIndex);
         }
     }
 }

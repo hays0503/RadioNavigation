@@ -599,7 +599,7 @@ namespace UBOAT.Mods.RadioNavigation
                 string fullScreen = "?";
                 string devEn = "?";
                 string devRT = "?";
-                string intEn = "?";
+                string intEn;
                 if (mc.CurrentMode.ToString() == "Generic" &&
                     mc.GenericController.IsNotNull() &&
                     mc.GenericController.ExternalController is PeriscopeController pc &&

@@ -99,8 +99,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             ToggleHandler.SetGroundActive(!isActive);
 
-            if (OnValueChanged.IsNotNull())
-                OnValueChanged(!isActive);
+            OnValueChanged?.Invoke(!isActive);
         }
     }
 }

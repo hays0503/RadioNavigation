@@ -126,7 +126,7 @@ namespace UBOAT.Mods.RadioNavigation
             stageField = typeof(RadioStory).GetField(StageFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
 
             decisionsProp = storyType.GetProperty("Decisions",
-                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
+                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
 
             onUpdatedMethod = FindMethodDeep(typeof(RadioStory), "OnUpdated", Type.EmptyTypes);
 

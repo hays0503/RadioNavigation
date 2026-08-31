@@ -5,6 +5,12 @@ radionavigation.deps.json
 bin/
 obj/
 
+# PVS-Studio reports (regenerable)
+pvs-report.plog
+pvs-report.txt
+pvs-report.json
+pvs-report.sarif
+
 # Analysis
 graphify-out/
 

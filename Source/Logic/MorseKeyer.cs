@@ -98,6 +98,9 @@ namespace UBOAT.Mods.RadioNavigation
 
             switch (state)
             {
+                case State.Idle:
+                    break;
+
                 case State.ElementOn:
                     if (ticksInState >= GetCurrentSoundTicks())
                     {

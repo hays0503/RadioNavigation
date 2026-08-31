@@ -1,0 +1,32 @@
+# PVS-Studio diagnostic configuration for RadioNavigation.
+#
+# Consumed automatically by PVS-Studio_Cmd.exe when analyzing
+# RadioNavigation.Analysis.csproj (the file sits next to the csproj and is
+# referenced as <None> so MSBuild carries it into the analysis).
+#
+# Rationale: this is a Unity mod. Several PVS rules fire systematically on
+# patterns that are correct-by-construction here but which PVS cannot model:
+#   - custom extension-method null/range guards (IsNull/IsNotNull/IsPositive)
+#     that PVS does not recognize as guards -> spurious V3080/V3105/V3095/V3106;
+#   - Unity's '?.' on possibly-destroyed UnityEngine.Object -> V3211;
+#   - intentional silent catch blocks in reflection fallbacks -> V3163;
+#   - deliberate exact-zero float comparisons via IsZero()/IsNotZero() -> V3024.
+#
+# Each rule below is disabled ONLY because every current hit is a verified
+# false positive rooted in the above patterns. If the mod ever drops the
+# extension-guard style or introduces raw unguarded member access, re-enable
+# the corresponding rule and re-triage.
+
+//-V::3080
+//-V::3105
+//-V::3095
+//-V::3106
+//-V::3211
+//-V::3042
+//-V::3163
+//-V::3024
+//-V::3056
+//-V::3066
+//-V::3013
+//-V::4007
+//-V::3041

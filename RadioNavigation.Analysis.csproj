@@ -64,6 +64,16 @@
     <Compile Include="Source\**\*.cs" />
   </ItemGroup>
 
+  <!--
+    PVS-Studio diagnostic configuration. Placed next to this csproj and
+    referenced here so PVS-Studio_Cmd.exe discovers it automatically when
+    analyzing this project (see RadioNavigation.pvsconfig for what is disabled
+    and why).
+  -->
+  <ItemGroup>
+    <None Include="RadioNavigation.pvsconfig" />
+  </ItemGroup>
+
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>$(GameManaged)\Assembly-CSharp.dll</HintPath>

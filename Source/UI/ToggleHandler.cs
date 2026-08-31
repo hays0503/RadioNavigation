@@ -118,8 +118,7 @@ namespace UBOAT.Mods.RadioNavigation
                 dialImage.color = isOn ? DialActiveColor : originalDialColor;
             }
 
-            if (OnValueChanged.IsNotNull())
-                OnValueChanged(isOn);
+            OnValueChanged?.Invoke(isOn);
         }
 
         private void OnDestroy()

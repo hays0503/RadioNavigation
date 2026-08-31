@@ -26,8 +26,7 @@ namespace UBOAT.Mods.RadioNavigation
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = index;
             SetAlpha(currentIndex, visibleAlpha);
-            if (OnZoneChanged.IsNotNull())
-                OnZoneChanged(currentIndex);
+            OnZoneChanged?.Invoke(currentIndex);
         }
         private Transform parentTransform;
 
@@ -96,8 +95,7 @@ namespace UBOAT.Mods.RadioNavigation
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex + 1) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
-            if (OnZoneChanged.IsNotNull())
-                OnZoneChanged(currentIndex);
+            OnZoneChanged?.Invoke(currentIndex);
 #if DEBUG
             Debug.Log("[RadioNav][Zone] switched to " + ZoneNames[currentIndex]);
 #endif
@@ -110,8 +108,7 @@ namespace UBOAT.Mods.RadioNavigation
             SetAlpha(currentIndex, hiddenAlpha);
             currentIndex = (currentIndex - 1 + ZoneNames.Length) % ZoneNames.Length;
             SetAlpha(currentIndex, visibleAlpha);
-            if (OnZoneChanged.IsNotNull())
-                OnZoneChanged(currentIndex);
+            OnZoneChanged?.Invoke(currentIndex);
 #if DEBUG
             Debug.Log("[RadioNav][Zone] switched to " + ZoneNames[currentIndex]);
 #endif

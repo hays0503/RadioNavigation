@@ -119,9 +119,8 @@ namespace UBOAT.Mods.RadioNavigation
             try
             {
                 object holder = uiDialsDataHolderField.GetValue(null);
-                Vector2 current = (Vector2)chronoPosOverrideProp.GetValue(holder, null);
                 Vector2 screenPos = container.position;
-                current = ChronometerMapDragMath.ToNormalizedOverride(screenPos, Screen.width, Screen.height);
+                Vector2 current = ChronometerMapDragMath.ToNormalizedOverride(screenPos, Screen.width, Screen.height);
                 Vector2 limited = (Vector2)applyToolPositionLimitsMethod.Invoke(
                     null, new object[] { current, container });
                 chronoPosOverrideProp.SetValue(holder, limited, null);

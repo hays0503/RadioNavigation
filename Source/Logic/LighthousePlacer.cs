@@ -195,7 +195,7 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 placement.Group = existing;
                 placement.RotatorWaitAttempts = 0;
-                LighthouseEntity = existing.Entities.Count > 0 ? existing.Entities[0] : null;
+                LighthouseEntity = existing.Entities[0];
                 // Old saves may carry the entity with DisplayInUI/IsPublic
                 // true — reset so the game stops creating its own marker.
                 for (int i = 0; i < existing.Entities.Count; i++)

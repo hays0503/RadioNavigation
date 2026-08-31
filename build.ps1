@@ -107,3 +107,16 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "[RadioNavigation] Build FAILED (exit $LASTEXITCODE)"
     exit $LASTEXITCODE
 }
+
+# PVS-Studio static-analysis gate (always runs; blocking).
+# Analyzes RadioNavigation.Analysis.csproj (net48 + real game DLLs) via
+# pvs.ps1. A non-zero result (issues found or analyzer failure) fails the
+# build so regressions can't slip in silently.
+Write-Host "[RadioNavigation] Running PVS-Studio gate ..."
+& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "pvs.ps1") -Configuration $Configuration
+$pvsCode = $LASTEXITCODE
+if ($pvsCode -ne 0) {
+    Write-Host "[RadioNavigation] PVS-Studio gate FAILED (exit $pvsCode). See pvs-report.txt"
+    exit $pvsCode
+}
+Write-Host "[RadioNavigation] PVS-Studio gate passed."

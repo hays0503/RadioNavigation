@@ -50,6 +50,8 @@ powershell -File build.ps1 [-GamePath <path>] [-Configuration Debug|Release] [-O
 
 Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output: `radionavigation.dll` in project root.
 
+**PVS-Studio gate (always runs, blocking):** after a successful csc compile, `build.ps1` invokes `pvs.ps1`, which analyzes `RadioNavigation.Analysis.csproj` (net48 + real game DLLs) with `PVS-Studio_Cmd.exe` and converts the report to `pvs-report.txt`. A non-zero PVS result fails the build. Run standalone via `powershell -File pvs.ps1 [-Configuration Debug|Release] [-Json] [-Sarif]`. Suppressions live in `RadioNavigation.pvsconfig` (referenced by Analysis.csproj) — disabled codes are Unity/extension-guard false positives documented there; do NOT re-add inline `//-V:` comments (C++-only, ignored for C#). Keep PVS clean before committing.
+
 **Important:** game **recompiles mod from `Source\*.cs`** at load (Roslyn, `Mod.cs Compile()`) вЂ” build.ps1 DLL unused at runtime. Game compile defines: `UBOAT`, `UBOAT_2024_1`, `UNITY_STANDALONE_WIN` вЂ” **no `DEBUG`**, so `#if DEBUG` blocks stripped at runtime regardless of build.ps1 config. Local builds = IDE/static checks only.
 
 ## Static analysis (Roslynator + custom Harmony analyzer)

@@ -71,7 +71,7 @@ namespace UBOAT.Mods.RadioNavigation
             // Preserve SonneBeam.cs tie behaviour: an equal-distance tie uses dashes.
             bool matchedDots = dotDistance < dashDistance;
             int matchedCount = matchedDots ? dotCount : dashCount;
-            if (matchedCount < 0 || matchedCount > SonneBeam.TotalElements)
+            if (matchedCount > SonneBeam.TotalElements)
                 return false;
 
             int otherCount = SonneBeam.TotalElements - matchedCount;

@@ -205,7 +205,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             // Create quad between p0 and p1 with given width
             Vector3 direction = (p1 - p0).normalized;
-            Vector3 perpendicular = Vector3.Cross(direction, (p0 - Vector3.zero).normalized).normalized;
+            Vector3 perpendicular = Vector3.Cross(direction, p0.normalized).normalized;
             if (perpendicular.sqrMagnitude < 0.001f)
                 perpendicular = Vector3.up;
 

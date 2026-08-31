@@ -44,8 +44,7 @@ namespace UBOAT.Mods.RadioNavigation
         }
         protected virtual void OnAngleUpdated(float angle)
         {
-            if (OnValueChanged.IsNotNull())
-                OnValueChanged(angle);
+            OnValueChanged?.Invoke(angle);
         }
 
         protected virtual void Awake()
