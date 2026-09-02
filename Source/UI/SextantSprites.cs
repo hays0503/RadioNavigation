@@ -99,8 +99,8 @@ namespace UBOAT.Mods.RadioNavigation
             return Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f));
         }
 
-        /// <summary>Hard circle sprite for the ocular Mask (smooth AA at the rim).</summary>
-        public static Sprite CreateCircleMaskSprite()
+        /// <summary>Creates the circle-mask texture; caller owns and must destroy it.</summary>
+        public static Texture2D CreateCircleMaskTexture()
         {
             const int size = 256;
             Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
@@ -122,7 +122,13 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
             tex.Apply();
-            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+            return tex;
+        }
+
+        /// <summary>Hard circle sprite for the ocular Mask (smooth AA at the rim).</summary>
+        public static Sprite CreateCircleMaskSprite(Texture2D tex)
+        {
+            return Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f));
         }
     }
 }
