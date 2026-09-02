@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -26,13 +26,13 @@ namespace UBOAT.Mods.RadioNavigation
     /// Shade filters 1/2/3, gaussian glare with pain hysteresis, star/sun
     /// identification after a 5 s hold.
     /// Layout is resolution-independent: own overlay canvas + CanvasScaler
-    /// (1920x1080 reference, match height), SEXTANT_PLAN пїЅ13.
+    /// (1920x1080 reference, match height), SEXTANT_PLAN §13.
     /// </summary>
     public sealed class SextantController : MonoBehaviour
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
 
-        // пїЅ13.3 layout constants (1080-space units).
+        // §13.3 layout constants (1080-space units).
         private const float OcularSizeUnits = 600f;
         private const int RtWidth = 512;
         private const int RtHeight = 512;
@@ -73,7 +73,7 @@ namespace UBOAT.Mods.RadioNavigation
         private int zoomIndex = 2;
         private float PipFovDivisor { get { return ZoomSteps[zoomIndex]; } }
         private const float IdentifyConeDeg = 0.5f;
-        // v1.12: 2.5 s (was 5 s) пїЅ author request, faster sight workflow.
+        // v1.12: 2.5 s (was 5 s) — author request, faster sight workflow.
         private const float IdentifyHoldSeconds = 2.5f;
         private const float StarIdIntervalSeconds = 0.2f;
         private const float PainOnGlare = 0.6f;
@@ -140,7 +140,7 @@ namespace UBOAT.Mods.RadioNavigation
             "<15\u00B0: \u0440\u0430\u0437\u043D\u0435\u0441\u0438\u0442\u0435 " +
             "\u0437\u0430\u043C\u0435\u0440\u044B \u043F\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0438";
 
-        /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (пїЅ7.4).</summary>
+        /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
         public static bool IsOpen { get; private set; }
 
         internal double arcAngle;
@@ -192,15 +192,12 @@ namespace UBOAT.Mods.RadioNavigation
         private UBOAT.Game.Scene.Rendering.AdditionalCameraData registeredWaterData;
         private bool waterAttachWarned;
 
-        // 1:1 mirror of the main camera's rendering stack (periscope camera
-        // pattern): effect components are copied from the FPP camera onto the
-        // PIP cameras so the SRP renders them with the same fog/post look.
-        private Component pipSsmsFog;
-        private Component pipSsms;
+        // 1:1 mirror of the main camera's rendering stack lives in
+        // SextantEffectMirror (extracted); the controller keeps the live
+        // source references it feeds to the mirror each frame.
+        private readonly SextantEffectMirror effectMirror = new SextantEffectMirror();
         private Component sourceSsmsFog;
         private Component sourceSsms;
-        private readonly System.Collections.Generic.Dictionary<Type, MemberInfo[]> mirrorMemberCache =
-            new System.Collections.Generic.Dictionary<Type, MemberInfo[]>();
 
         private GameObject canvasRoot;
         private RectTransform pipRect;
@@ -220,17 +217,8 @@ namespace UBOAT.Mods.RadioNavigation
         private Texture2D circleMaskTexture;
         private static Font sextantOsFont;
 
-        // PPv2 bloom-cut volumes: one per PIP camera on dedicated layers
-        // present ONLY in that camera's volumeLayer mask, so each shade
-        // filter disables its own half's sun glow independently (the main
-        // camera never consumes those layers - real filter look).
-        private GameObject bloomCutLeftGo;
-        private GameObject bloomCutRightGo;
-        private int bloomCutLeftLayer;
-        private int bloomCutRightLayer;
-        private const int BloomCutLayerCandidateLeft = 7;
-        private const int BloomCutLayerCandidateRight = 6;
-        private bool bloomCutLogged;
+        // PPv2 bloom-cut volumes live in SextantBloomCut (extracted).
+        private readonly SextantBloomCut bloomCut = new SextantBloomCut();
         private bool sunDiscSourceLogged;
 
         private readonly IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
@@ -291,7 +279,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (!TryGetGameSun(out gameDir, out gameAlt))
                 return;
 
-            // v1.13: never re-solve mid-series пїЅ observation 1 was recorded
+            // v1.13: never re-solve mid-series — observation 1 was recorded
             // under the stored ?t, a new ?t would put the two sights on
             // different ephemerides and skew the LOPs. Re-solving happens
             // only when the next open starts with an empty series.
@@ -368,8 +356,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (canvasRoot != null) Destroy(canvasRoot);
             if (pipLeftCamera != null) Destroy(pipLeftCamera.gameObject);
             if (pipRightCamera != null) Destroy(pipRightCamera.gameObject);
-            if (bloomCutLeftGo != null) Destroy(bloomCutLeftGo);
-            if (bloomCutRightGo != null) Destroy(bloomCutRightGo);
+            bloomCut.Destroy();
             if (leftRt != null)
             {
                 leftRt.Release();
@@ -432,7 +419,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void ResetReadingState()
         {
             // arcAngle is intentionally NOT reset here: the reading must
-            // survive close/open cycles (explicit reset = R key / 0пїЅ button).
+            // survive close/open cycles (explicit reset = R key / 0° button).
             leftFilterCount = 0;
             rightFilterCount = 0;
             holdTimer = 0f;
@@ -495,10 +482,7 @@ namespace UBOAT.Mods.RadioNavigation
             DetachWaterCameras();
             SunDiscRenderer.Active = false;
             SunDiscRenderer.ResetDirection();
-            if (bloomCutLeftGo != null)
-                bloomCutLeftGo.SetActive(false);
-            if (bloomCutRightGo != null)
-                bloomCutRightGo.SetActive(false);
+            bloomCut.Hide();
             if (pipLeftCamera != null)
                 pipLeftCamera.enabled = false;
             if (pipRightCamera != null)
@@ -557,7 +541,7 @@ namespace UBOAT.Mods.RadioNavigation
             registeredWaterData = null;
         }
 
-        // пїЅ13.4 camera gate: sextant exists only in live deck views.
+        // §13.4 camera gate: sextant exists only in live deck views.
         private bool IsLiveViewMode()
         {
             if (gameMainCamera == null)
@@ -1007,10 +991,10 @@ namespace UBOAT.Mods.RadioNavigation
             sb.Append(FixCardSight).Append(" \u2116").Append(index).Append('\n');
             sb.Append("UT ").Append(obs.Utc.ToString("HH:mm:ss", CultureInfo.InvariantCulture)).Append('\n');
             sb.Append("\u03B3 ").Append(SextantDmFormat.FormatDm(obs.GhaAriesDeg));
-            // Same DпїЅM.m? format as gamma/GHA: a 0.1пїЅ decimal SHA read as
-            // 198пїЅ18.0? made gamma+SHA look 2? off GHA on the card (in-game
-            // verification 2026-08-30) пїЅ the chain is exact, only the old
-            // display rounded SHA to пїЅ3?.
+            // Same D°M.m′ format as gamma/GHA: a 0.1° decimal SHA read as
+            // 198°18.0′ made gamma+SHA look 2′ off GHA on the card (in-game
+            // verification 2026-08-30) — the chain is exact, only the old
+            // display rounded SHA to ±3′.
             sb.Append("  SHA ").Append(SextantDmFormat.FormatDm(obs.ShaSunDeg)).Append('\n');
             sb.Append("GHA ").Append(SextantDmFormat.FormatDm(obs.GhaSunDeg)).Append('\n');
             sb.Append("\u03BBg ").Append(SextantDmFormat.FormatLatLon(obs.DrLonDeg, false));
@@ -1058,7 +1042,7 @@ namespace UBOAT.Mods.RadioNavigation
             sb.Append('\n').Append('\n');
 
             // v1.13: the Versetzung/geometry/FIX tail is a SNAPSHOT computed
-            // once when observation 2 was recorded (I key) пїЅ reopening the
+            // once when observation 2 was recorded (I key) — reopening the
             // sextant or the passage of time never recomputes it. The math
             // belongs to the two recorded sights, not to the live view.
             if (fixSectionText != null)
@@ -1070,7 +1054,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// Builds the frozen Versetzung/geometry/FIX section from the two
         /// recorded observations with the course/speed current at record
         /// time. Called only from CaptureObservation (and cleared by
-        /// ResetSeries) пїЅ never on the 1 Hz card refresh.
+        /// ResetSeries) — never on the 1 Hz card refresh.
         /// </summary>
         private void RecomputeFixSnapshot()
         {
@@ -1091,7 +1075,7 @@ namespace UBOAT.Mods.RadioNavigation
               .Append(transferNm.ToString("F1", CultureInfo.InvariantCulture)).Append(" NM\n");
 
             // Crossing-angle quality: shallow geometry amplifies small
-            // intercept errors (~1/sin ?) пїЅ warn the navigator.
+            // intercept errors (~1/sin θ) — warn the navigator.
             double crossDeg = RunningFixCalculator.CrossingAngleDeg(
                 runningFix.Observation1, runningFix.Observation2);
             sb.Append(FixCardGeometry).Append(' ')
@@ -1174,48 +1158,8 @@ namespace UBOAT.Mods.RadioNavigation
             // filter only. The left filter dims the horizon view.
             SunDiscRenderer.Active = IsOpen && rightFilterCount > 0;
 
-            UpdateBloomCut();
-            LogBloomCutOnce();
-        }
-
-        private void UpdateBloomCut()
-        {
-            // Bloom-cut per half: each PIP camera has its own volume.
-            if (bloomCutRightGo != null)
-            {
-                bool rightOn = IsOpen && rightFilterCount > 0;
-                bloomCutRightGo.SetActive(rightOn);
-                Debug.Log(LogPrefix + " BLOOMCUT right " + (rightOn ? "on" : "off") + " (filters=" + rightFilterCount + ")");
-            }
-            if (bloomCutLeftGo != null)
-            {
-                bool leftOn = IsOpen && leftFilterCount > 0;
-                bloomCutLeftGo.SetActive(leftOn);
-                Debug.Log(LogPrefix + " BLOOMCUT left " + (leftOn ? "on" : "off") + " (filters=" + leftFilterCount + ")");
-            }
-        }
-
-        private void LogBloomCutOnce()
-        {
-            if (bloomCutLogged || (leftFilterCount <= 0 && rightFilterCount <= 0))
-                return;
-            bloomCutLogged = true;
-            try
-            {
-                PostProcessLayer pipLeftLayer = pipLeftCamera != null
-                    ? pipLeftCamera.GetComponent<PostProcessLayer>() : null;
-                PostProcessLayer pipRightLayer = pipRightCamera != null
-                    ? pipRightCamera.GetComponent<PostProcessLayer>() : null;
-                PostProcessLayer mainLayer = viewCamera != null
-                    ? viewCamera.GetComponent<PostProcessLayer>() : null;
-                Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} BLOOMCUT applied pipL={1} pipR={2} main={3} leftVol={4} rightVol={5}",
-                    LogPrefix, pipLeftLayer != null, pipRightLayer != null,
-                    mainLayer != null,
-                    bloomCutLeftGo != null && bloomCutLeftGo.activeSelf,
-                    bloomCutRightGo != null && bloomCutRightGo.activeSelf));
-            }
-            catch { }
+            bloomCut.Update(IsOpen, leftFilterCount, rightFilterCount);
+            bloomCut.LogAppliedOnce(pipLeftCamera, pipRightCamera, viewCamera, leftFilterCount, rightFilterCount);
         }
 
         private void UpdateFilterDim()
@@ -1293,7 +1237,8 @@ namespace UBOAT.Mods.RadioNavigation
             // PostProcessLayer + legacy PostProcessingBehaviour + SSMSGlobalFog
             // + SSMS, copied in the exact component order of the FPP camera,
             // so the SRP renders the PIP views with the same fog/post look.
-            AddMirroredEffectComponents(go);
+            ResolveMirrorSources();
+            effectMirror.AddMirroredEffectComponents(viewCamera, go);
 
             // PlayWay renders the sea only for cameras carrying a WaterCamera
             // (waterCamerasCache registry; HullEffectsRenderer.GetWaterCamera
@@ -1313,7 +1258,7 @@ namespace UBOAT.Mods.RadioNavigation
                     WaterCamera mainWater = viewCamera.GetComponent<WaterCamera>();
                     if (mainWater != null)
                     {
-                        CopyMembers(mainWater, waterCam, GetMirrorMembers(mainWater.GetType()));
+                        effectMirror.MirrorComponent(mainWater, waterCam);
                         Debug.Log(LogPrefix + " WATERCAM copied to " + name + " from main camera");
                     }
                     else
@@ -1333,7 +1278,7 @@ namespace UBOAT.Mods.RadioNavigation
             // installed the sun's glow is disabled inside that half's lens;
             // the main camera's PostProcessLayer never consumes this layer,
             // so the FPP view keeps its normal bloom.
-            EnsureBloomCutVolume(go, rightSide);
+            bloomCut.EnsureVolume(go, rightSide);
 
             SextantCameraProbe probe = go.AddComponent<SextantCameraProbe>();
             probe.tracked = cam;
@@ -1361,107 +1306,6 @@ namespace UBOAT.Mods.RadioNavigation
             return null;
         }
 
-        private void AddMirroredEffectComponents(GameObject go)
-        {
-            ResolveMirrorSources();
-            if (viewCamera == null)
-                return;
-
-            // Preserve the exact component order of the source camera so the
-            // SRP/effect chain matches the reference render 1:1.
-            MonoBehaviour[] comps = viewCamera.GetComponents<MonoBehaviour>();
-            for (int i = 0; i < comps.Length; i++)
-            {
-                if (comps[i] == null)
-                    continue;
-                Type t = comps[i].GetType();
-                string name = t.Name;
-                if (name != "PostProcessLayer" && name != "PostProcessingBehaviour" &&
-                    name != "SSMSGlobalFog" && name != "SSMS")
-                    continue;
-
-                Component source = comps[i];
-                Component dst = go.AddComponent(t);
-                MemberInfo[] members = GetMirrorMembers(t);
-                CopyMembers(source, dst, members);
-                if (name == "PostProcessLayer")
-                    CopyPrivatePostLayerFields(source, dst);
-                else if (name == "SSMSGlobalFog")
-                    pipSsmsFog = dst;
-                else if (name == "SSMS")
-                    pipSsms = dst;
-            }
-
-            LogPipStack(go);
-        }
-
-        private static MemberInfo[] GetMirrorMembers(Type t)
-        {
-            var list = new System.Collections.Generic.List<MemberInfo>();
-            foreach (FieldInfo f in t.GetFields(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (f.IsInitOnly || f.IsStatic)
-                    continue;
-                list.Add(f);
-            }
-            foreach (PropertyInfo p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-            {
-                if (!p.CanRead || !p.CanWrite || p.GetIndexParameters().Length > 0)
-                    continue;
-                list.Add(p);
-            }
-            return list.ToArray();
-        }
-
-        private MemberInfo[] GetMirrorMembersCached(Type t)
-        {
-            MemberInfo[] cached;
-            if (!mirrorMemberCache.TryGetValue(t, out cached))
-            {
-                cached = GetMirrorMembers(t);
-                mirrorMemberCache[t] = cached;
-            }
-            return cached;
-        }
-
-        private static void CopyMembers(Component from, Component to, MemberInfo[] members)
-        {
-            if (members == null)
-                return;
-            for (int i = 0; i < members.Length; i++)
-            {
-                try
-                {
-                    FieldInfo f = members[i] as FieldInfo;
-                    if (f != null)
-                        f.SetValue(to, f.GetValue(from));
-                    else
-                        ((PropertyInfo)members[i]).SetValue(to,
-                            ((PropertyInfo)members[i]).GetValue(from, null), null);
-                }
-                catch { }
-            }
-        }
-
-        private static void CopyPrivatePostLayerFields(Component from, Component to)
-        {
-            Type t = from.GetType();
-            foreach (FieldInfo f in t.GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
-            {
-                if (f.Name == "volumeLayer" || f.Name == "m_Resources")
-                {
-                    try { f.SetValue(to, f.GetValue(from)); } catch { }
-                }
-            }
-            try
-            {
-                PostProcessResources[] allResources = Resources.FindObjectsOfTypeAll<PostProcessResources>();
-                PostProcessLayer layer = to as PostProcessLayer;
-                if (allResources != null && allResources.Length > 0 && layer != null)
-                    layer.Init(allResources[0]);
-            }
-            catch { }
-        }
 
         private void LogPipStack(GameObject go)
         {
@@ -1476,59 +1320,10 @@ namespace UBOAT.Mods.RadioNavigation
             Debug.Log(LogPrefix + " PIPSTACK [" + go.name + "] " + sb.ToString());
         }
 
-        private void EnsureBloomCutVolume(GameObject pipGo, bool rightSide)
-        {
-            try
-            {
-                PostProcessLayer pipLayer = pipGo.GetComponent<PostProcessLayer>();
-                if (pipLayer == null)
-                    return;
-
-                GameObject volumeGo = rightSide ? bloomCutRightGo : bloomCutLeftGo;
-                if (volumeGo == null)
-                {
-                    int layer = rightSide ? BloomCutLayerCandidateRight : BloomCutLayerCandidateLeft;
-                    volumeGo = new GameObject(rightSide ? "RadioNavSextantBloomCutRight" : "RadioNavSextantBloomCutLeft");
-                    volumeGo.layer = layer;
-                    PostProcessVolume volume = volumeGo.AddComponent<PostProcessVolume>();
-                    volume.isGlobal = true;
-                    volume.priority = 1000f;
-                    PostProcessProfile profile = ScriptableObject.CreateInstance<PostProcessProfile>();
-                    profile.name = "RadioNavSextantBloomCut";
-                    Bloom bloom = profile.AddSettings<Bloom>();
-                    bloom.enabled.value = false;
-                    volume.sharedProfile = profile;
-                    volumeGo.SetActive(false); // active only while filter>0
-                    if (rightSide)
-                    {
-                        bloomCutRightGo = volumeGo;
-                        bloomCutRightLayer = layer;
-                    }
-                    else
-                    {
-                        bloomCutLeftGo = volumeGo;
-                        bloomCutLeftLayer = layer;
-                    }
-                    Debug.Log(LogPrefix + " BLOOMCUT volume " + (rightSide ? "right" : "left")
-                        + " on layer " + layer + " created (hidden)");
-                }
-
-                // Layer must be in THIS PIP camera's volumeLayer mask only;
-                // the main camera's mask never contains it.
-                pipLayer.volumeLayer |= (1 << volumeGo.layer);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning(LogPrefix + " BLOOMCUT failed: " + e.Message);
-            }
-        }
 
         private void RefreshMirroredState()
         {
-            if (pipSsmsFog != null && sourceSsmsFog != null)
-                CopyMembers(sourceSsmsFog, pipSsmsFog, GetMirrorMembersCached(sourceSsmsFog.GetType()));
-            if (pipSsms != null && sourceSsms != null)
-                CopyMembers(sourceSsms, pipSsms, GetMirrorMembersCached(sourceSsms.GetType()));
+            effectMirror.RefreshSsms(sourceSsmsFog, sourceSsms);
         }
 
         private void UpdatePipPose()
@@ -1653,7 +1448,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 float angle = Vector3.Angle(pipRightCamera.transform.forward, sunDir);
                 g = (float)SextantGlare.Glare(angle, sunAlt, rightFilterCount, pipRightCamera.fieldOfView);
-                // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6пїЅ),
+                // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6°),
                 // so position it on the game direction when available.
                 Vector3 gameDir;
                 float gameAlt;
@@ -1851,7 +1646,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// SUNDRIFT telemetry (SEXTANT_PLAN v1.3): every 10 s while the sextant
         /// is open, log the angular separation between our Meeus sun vector and
         /// the game's TOD_Sky sun vector (read via cached reflection). A steady
-        /// sep above ~0.5пїЅ means an ephemeris or axis-convention drift.
+        /// sep above ~0.5° means an ephemeris or axis-convention drift.
         /// </summary>
         private void LogSunDrift(float dt)
         {
@@ -2000,8 +1795,8 @@ namespace UBOAT.Mods.RadioNavigation
         private string FindNearestBodyName(out float bodyAltDeg)
         {
             // Sun ID aims at the direction the player actually sees: the disc
-            // is drawn on the GAME sun (SUNDRIFT sep ~1.6пїЅ would never fit
-            // the 0.5пїЅ cone against our own ephemeris). Own ephemeris stays
+            // is drawn on the GAME sun (SUNDRIFT sep ~1.6° would never fit
+            // the 0.5° cone against our own ephemeris). Own ephemeris stays
             // the fallback when the game sun is unavailable via reflection.
             Vector3 sunDir;
             float sunAlt;
@@ -2099,7 +1894,7 @@ namespace UBOAT.Mods.RadioNavigation
             filterText.text = sb.ToString().TrimEnd();
         }
 
-        // ---- overlay construction (пїЅ13.3) --------------------------------------
+        // ---- overlay construction (§13.3) --------------------------------------
 
         private void EnsureOverlay()
         {
@@ -2116,14 +1911,14 @@ namespace UBOAT.Mods.RadioNavigation
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 1f;
 
-            // Veil: solid dark layer, no cut-out (пїЅ13.3 - aspect-safe).
+            // Veil: solid dark layer, no cut-out (§13.3 - aspect-safe).
             GameObject veilGo = new GameObject("Veil", typeof(Image));
             veilGo.transform.SetParent(canvasRoot.transform, false);
             Image veil = veilGo.GetComponent<Image>();
             veil.color = new Color(0f, 0f, 0f, VeilAlpha);
             Stretch(veil.rectTransform);
 
-            // Eyecup (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ): black shade larger than the ocular, drawn
+            // Eyecup (наглазник): black shade larger than the ocular, drawn
             // between the veil and the lens so the world around the field of
             // view sinks into near-black while instrument texts (later
             // siblings) stay readable. Solid over the ocular rim, long soft
@@ -2201,7 +1996,7 @@ namespace UBOAT.Mods.RadioNavigation
                 rightViewImage.material = opaqueViewMaterial;
             }
 
-            // Vertical sight line (1 physical pixel пїЅ drum alignment hairline
+            // Vertical sight line (1 physical pixel — drum alignment hairline
             // between the direct/mirror halves).
             GameObject splitGo = new GameObject("VerticalSplit", typeof(Image));
             splitGo.transform.SetParent(pipGo.transform, false);
@@ -2210,7 +2005,7 @@ namespace UBOAT.Mods.RadioNavigation
             splitImage.raycastTarget = false;
             AnchorCenter(splitImage.rectTransform, 1f / canvas.scaleFactor, OcularSizeUnits);
 
-            // Horizontal sight line (1 physical pixel, crosshair) пїЅ line of
+            // Horizontal sight line (1 physical pixel, crosshair) — line of
             // sight, drawn above the views/below filter dims so it stays
             // subtle and never interferes with the lenses.
             GameObject horizGo = new GameObject("HorizontalSight", typeof(Image));
@@ -2282,7 +2077,7 @@ namespace UBOAT.Mods.RadioNavigation
             ring.raycastTarget = false;
             Stretch(ring.rectTransform);
 
-            // Reading column hugging the circle's left edge (пїЅ13.3).
+            // Reading column hugging the circle's left edge (§13.3).
             GameObject columnGo = new GameObject("ReadingColumn");
             columnGo.transform.SetParent(canvasRoot.transform, false);
             RectTransform column = columnGo.AddComponent<RectTransform>();
@@ -2439,7 +2234,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>
         /// Loads the opaque view material from the mod's AssetBundle
         /// (RadioNavOpaqueView, shader RadioNav/UIOpaque). Returns null when
-        /// unavailable пїЅ the views then keep the stock UI shader.
+        /// unavailable — the views then keep the stock UI shader.
         /// </summary>
         private Material ResolveOpaqueViewMaterial()
         {
