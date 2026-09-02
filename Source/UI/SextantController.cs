@@ -73,7 +73,6 @@ namespace UBOAT.Mods.RadioNavigation
         private const float StarIdIntervalSeconds = 0.2f;
         private const float PainOnGlare = 0.6f;
         private const float PainOffGlare = 0.5f;
-        private const float SunDriftLogIntervalSeconds = 10f;
         private const string SunName = "\u0421\u043E\u043B\u043D\u0446\u0435";
         private const string PainMessage =
             "\u041D\u0415 \u041C\u041E\u0413\u0423, \u0413\u041B\u0410\u0417\u0410\u041C \u0411\u041E\u041B\u042C\u041D\u041E \u2014 " +
@@ -105,26 +104,16 @@ namespace UBOAT.Mods.RadioNavigation
         private string identifiedName = "";
         private bool pain;
         private double lastFormattedArc = double.MinValue;
-        private float sunDriftLogTimer;
-        private float renderCheckTimer;
-        private bool renderCheckDone;
-        private bool renderCheckSecondPending;
-        private bool renderCheckSecondDone;
-        private Texture2D renderCheckTex;
+        // RT pixel probe lives in SextantRenderCheck (extracted).
+        private readonly SextantRenderCheck renderCheck = new SextantRenderCheck();
 
         private Camera viewCamera;
         private MainCamera gameMainCamera;
         private GameInput gameInput;
 
-        // Game sun access for SUNDRIFT diagnostics only (SEXTANT_PLAN v1.3):
-        // TOD_Sky is not referenceable by the in-game mod compiler, so the
-        // game values are read via cached reflection and never named.
-        private Weather weather;
-        private PropertyInfo gameSkyProperty;
-        private MemberInfo gameSunDirMember;
-        private MemberInfo gameSunAltMember;
-        private bool gameSunMembersResolved;
-        private bool gameSunUnavailableWarned;
+        // Game sun access for SUNDRIFT diagnostics lives in SextantGameSun
+        // (extracted): TOD_Sky is read via cached reflection there.
+        private readonly SextantGameSun gameSun = new SextantGameSun();
 
         // Water + post stack wiring for the PIP cameras (SEXTANT_PLAN v1.6):
         // the game's render pipeline renders water only for cameras listed on
@@ -261,7 +250,7 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdatePipPose();
                 if (vectorLog.OnViewRotate(viewCamera))
                     LogVectorState("rotate");
-                RenderCheck(Time.unscaledDeltaTime);
+                renderCheck.Update(Time.unscaledDeltaTime, arcAngle, leftRt, rightRt);
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
@@ -299,7 +288,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             if (ringTexture != null) Destroy(ringTexture);
             if (circleMaskTexture != null) Destroy(circleMaskTexture);
-            if (renderCheckTex != null) Destroy(renderCheckTex);
+            renderCheck.Destroy();
         }
 
         // ---- open / close -------------------------------------------------
@@ -362,9 +351,8 @@ namespace UBOAT.Mods.RadioNavigation
             lastBodiesLine = null;
             worksheet.InvalidateCard();
             bodiesReadoutTimer = 0f;
-            sunDriftLogTimer = 0f; // force the first SUNDRIFT line on open
-            renderCheckDone = false;
-            renderCheckTimer = 1.0f;
+            gameSun.ResetDriftTimer(); // force the first SUNDRIFT line on open
+            renderCheck.ResetForOpen();
             SunDiscRenderer.RandomizeDisc(); // fresh sunspot pattern per open
             SunDiscRenderer.Active = false;
         }
@@ -569,84 +557,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         // Rotate telemetry lives in SextantVectorLog.OnViewRotate (Update
         // calls it directly).
-
-        /// <summary>
-        /// RT pixel probe: once ~1 s after open, and once more ~1 s after the
-        /// alidade first passes 20 deg - proves the PIP cameras render and
-        /// that the right RT content follows the pose (frozen = same colors).
-        /// </summary>
-        private void RenderCheck(float dt)
-        {
-            if (renderCheckDone && !renderCheckSecondPending)
-                return;
-
-            if (!renderCheckDone)
-            {
-                renderCheckTimer -= dt;
-                if (renderCheckTimer > 0f)
-                    return;
-                renderCheckDone = true;
-                DoRenderCheck("open");
-                return;
-            }
-
-            if (arcAngle > 20.0 && !renderCheckSecondPending && !renderCheckSecondDone)
-            {
-                renderCheckSecondPending = true;
-                renderCheckTimer = 1.0f;
-            }
-            if (renderCheckSecondPending)
-            {
-                renderCheckTimer -= dt;
-                if (renderCheckTimer > 0f)
-                    return;
-                renderCheckSecondPending = false;
-                renderCheckSecondDone = true;
-                DoRenderCheck("arc20");
-            }
-        }
-
-        private void DoRenderCheck(string tag)
-        {
-            if (leftRt == null || rightRt == null || !leftRt.IsCreated() || !rightRt.IsCreated())
-            {
-                Debug.LogWarning(LogPrefix + " RENDERCHECK rt missing");
-                return;
-            }
-            if (renderCheckTex == null)
-                renderCheckTex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            try
-            {
-                RenderTexture prev = RenderTexture.active;
-                Color lt = SampleRt(leftRt, 0.9f);
-                Color lm = SampleRt(leftRt, 0.5f);
-                Color lb = SampleRt(leftRt, 0.1f);
-                Color rtTop = SampleRt(rightRt, 0.9f);
-                Color rm = SampleRt(rightRt, 0.5f);
-                Color rb = SampleRt(rightRt, 0.1f);
-                RenderTexture.active = prev;
-                Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} RENDERCHECK {1} left(t/m/b)=#{2}({3:F2})/#{4}({5:F2})/#{6}({7:F2}) right(t/m/b)=#{8}({9:F2})/#{10}({11:F2})/#{12}({13:F2})",
-                    LogPrefix, tag,
-                    ColorUtility.ToHtmlStringRGB(lt), lt.a,
-                    ColorUtility.ToHtmlStringRGB(lm), lm.a,
-                    ColorUtility.ToHtmlStringRGB(lb), lb.a,
-                    ColorUtility.ToHtmlStringRGB(rtTop), rtTop.a,
-                    ColorUtility.ToHtmlStringRGB(rm), rm.a,
-                    ColorUtility.ToHtmlStringRGB(rb), rb.a));
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning(LogPrefix + " RENDERCHECK failed: " + e.Message);
-            }
-        }
-
-        private Color SampleRt(RenderTexture target, float v)
-        {
-            RenderTexture.active = target;
-            renderCheckTex.ReadPixels(new Rect(target.width / 2, (int)(target.height * v), 1, 1), 0, 0);
-            return renderCheckTex.GetPixel(0, 0);
-        }
 
         private void HandleFilterKeys()
         {
@@ -1208,108 +1118,22 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// SUNDRIFT telemetry (SEXTANT_PLAN v1.3): every 10 s while the sextant
-        /// is open, log the angular separation between our Meeus sun vector and
-        /// the game's TOD_Sky sun vector (read via cached reflection). A steady
-        /// sep above ~0.5° means an ephemeris or axis-convention drift.
+        /// SUNDRIFT telemetry and game-sun reflection live in
+        /// SextantGameSun (extracted); these wrappers keep the call sites.
         /// </summary>
         private void LogSunDrift(float dt)
         {
-            sunDriftLogTimer -= dt;
-            if (sunDriftLogTimer > 0f)
-                return;
-            sunDriftLogTimer = SunDriftLogIntervalSeconds;
-
             Vector3 ownDir;
-            float ownAlt;
-            float ownAz;
-            if (!TryGetOwnSun(out ownDir, out ownAlt, out ownAz))
-                return; // no sandbox position - nothing to compare against
-
-            Vector3 gameDir;
-            float gameAlt;
-            if (!TryGetGameSun(out gameDir, out gameAlt))
-            {
-                if (!gameSunUnavailableWarned)
-                {
-                    gameSunUnavailableWarned = true;
-                    Debug.LogWarning(LogPrefix + " SUNDRIFT game sun unavailable via reflection - drift unmonitored");
-                }
-                return;
-            }
-
-            float sepDeg = Vector3.Angle(ownDir, gameDir);
-            float dAlt = ownAlt - gameAlt;
-            // Azimuths 0=N +east; game azimuth derived from the world vector
-            // with the same (e>x, n>z) mapping the star sky proved in-game.
-            float gameAz = Mathf.Atan2(gameDir.x, gameDir.z) * Mathf.Rad2Deg;
-            if (gameAz < 0f) gameAz += 360f;
-            float dAz = ownAz - gameAz;
-            if (dAz > 180f) dAz -= 360f;
-            if (dAz < -180f) dAz += 360f;
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} SUNDRIFT sep={1:F3} dalt={2:F3} daz={3:F3} meeus(alt={4:F2} az={5:F1}) game(alt={6:F2} az={7:F1})",
-                LogPrefix, sepDeg, dAlt, dAz, ownAlt, ownAz, gameAlt, gameAz));
+            float ownAlt, ownAz;
+            bool ownOk = TryGetOwnSun(out ownDir, out ownAlt, out ownAz);
+            gameSun.LogDrift(dt, ownOk, ownDir, ownAlt, ownAz);
         }
 
         private bool TryGetGameSun(out Vector3 dir, out float alt)
         {
-            dir = Vector3.zero;
-            alt = 0f;
-            if (weather == null && InjectionFramework.Instance.IsNotNull())
-                weather = InjectionFramework.Instance.GetInstance<Weather>();
-            if (weather == null)
-                return false;
-
-            try
-            {
-                if (gameSkyProperty == null)
-                    gameSkyProperty = weather.GetType().GetProperty("Sky");
-                if (gameSkyProperty == null)
-                    return false;
-
-                object sky = gameSkyProperty.GetValue(weather, null);
-                if (sky == null)
-                    return false;
-
-                if (!gameSunMembersResolved)
-                {
-                    gameSunMembersResolved = true;
-                    gameSunDirMember = FindSunMember(sky.GetType(), "SunDirection");
-                    gameSunAltMember = FindSunMember(sky.GetType(), "SunAltitude");
-                }
-                if (gameSunDirMember == null || gameSunAltMember == null)
-                    return false;
-
-                object dirBoxed = ReadMember(sky, gameSunDirMember);
-                if (!(dirBoxed is Vector3))
-                    return false;
-                dir = (Vector3)dirBoxed;
-                alt = Convert.ToSingle(ReadMember(sky, gameSunAltMember));
-                return true;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning(LogPrefix + " SUNDRIFT reflection failed: " + e.Message);
-                return false;
-            }
+            return gameSun.TryGetSun(out dir, out alt);
         }
 
-        private static MemberInfo FindSunMember(Type type, string name)
-        {
-            PropertyInfo prop = type.GetProperty(name);
-            if (prop != null)
-                return prop;
-            return type.GetField(name);
-        }
-
-        private static object ReadMember(object target, MemberInfo member)
-        {
-            FieldInfo field = member as FieldInfo;
-            if (field != null)
-                return field.GetValue(target);
-            return ((PropertyInfo)member).GetValue(target, null);
-        }
 
         // ---- star / sun identification ---------------------------------------
 
