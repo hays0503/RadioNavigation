@@ -60,9 +60,8 @@ namespace UBOAT.Mods.RadioNavigation
         private const int FineStepQuant = 1;
         private const float FineRepeatDelay = 0.3f;
         private const float FineRepeatInterval = 0.15f;
-        private const bool VectorLogEnabled = true;
-        private const float VectorLogHoldIntervalSeconds = 0.5f;
-        private const float VectorRotateMinDeltaDeg = 0.5f;
+        // Vector telemetry lives in SextantVectorLog (extracted).
+        private readonly SextantVectorLog vectorLog = new SextantVectorLog();
         // Zoom steps (divisor on the main camera's FOV): index 2 = default 3x.
         // Smaller divisor = closer view. Buttons/keys shift the index.
         private static readonly float[] ZoomSteps = { 6f, 4.5f, 3f, 2f, 1.5f, 1f };
@@ -107,15 +106,11 @@ namespace UBOAT.Mods.RadioNavigation
         private bool pain;
         private double lastFormattedArc = double.MinValue;
         private float sunDriftLogTimer;
-        private float vectorLogHoldTimer;
-        private float vectorRotateLogTimer;
-        private float lastVectorLogYaw;
         private float renderCheckTimer;
         private bool renderCheckDone;
         private bool renderCheckSecondPending;
         private bool renderCheckSecondDone;
         private Texture2D renderCheckTex;
-        private float manualRenderLogTimer;
 
         private Camera viewCamera;
         private MainCamera gameMainCamera;
@@ -264,7 +259,8 @@ namespace UBOAT.Mods.RadioNavigation
                 HandleFilterKeys();
                 HandleZoomKeys();
                 UpdatePipPose();
-                UpdateVectorRotateLog();
+                if (vectorLog.OnViewRotate(viewCamera))
+                    LogVectorState("rotate");
                 RenderCheck(Time.unscaledDeltaTime);
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
@@ -404,6 +400,20 @@ namespace UBOAT.Mods.RadioNavigation
             IsOpen = true;
         }
 
+        /// <summary>
+        /// Vector telemetry (extracted to SextantVectorLog): gathers the
+        /// sun reads and delegates the full state dump.
+        /// </summary>
+        private void LogVectorState(string trigger)
+        {
+            Vector3 ownDir, gameDir;
+            float ownAlt, ownAz, gameAlt;
+            bool ownOk = TryGetOwnSun(out ownDir, out ownAlt, out ownAz);
+            bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
+            vectorLog.Log(trigger, pipLeftCamera, pipRightCamera, viewCamera, arcAngle,
+                ownOk, ownDir, ownAlt, ownAz, gameOk, gameDir, gameAlt);
+        }
+
         private void Close()
         {
             if (!IsOpen)
@@ -531,20 +541,24 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            if (VectorLogEnabled)
-            {
-                vectorLogHoldTimer -= dt;
-                bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
-                if (pressed || vectorLogHoldTimer <= 0f)
-                {
-                    vectorLogHoldTimer = VectorLogHoldIntervalSeconds;
-                    LogVectorState(pressed ? "press" : "hold");
-                }
-            }
+            LogArcInputVector(dt);
 
             bool fast = ShiftHeld();
             float rate = RateDegPerSec * (fast ? ShiftMultiplier : 1f);
             arcAngle = SextantArc.Quantize(arcAngle + dir * rate * dt);
+        }
+
+        /// <summary>Hold/press vector telemetry on plain (non-Ctrl) input.</summary>
+        private void LogArcInputVector(float dt)
+        {
+            if (!SextantVectorLog.Enabled)
+                return;
+            bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
+            bool holdDue = vectorLog.OnArcInput(dt);
+            if (pressed)
+                vectorLog.OnArcPressed();
+            if (pressed || holdDue)
+                LogVectorState(pressed ? "press" : "hold");
         }
 
         /// <summary>One fine-adjustment step (0.2' drum tick), always on-grid.</summary>
@@ -553,24 +567,8 @@ namespace UBOAT.Mods.RadioNavigation
             arcAngle = SextantArc.Quantize(arcAngle + dir * FineStepQuant / SextantArc.StepsPerDeg);
         }
 
-        /// <summary>
-        /// Logs the player's eye vector when the view camera rotates
-        /// (mouse look / boat turn) while the sextant is open.
-        /// </summary>
-        private void UpdateVectorRotateLog()
-        {
-            if (!VectorLogEnabled || viewCamera == null)
-                return;
-            vectorRotateLogTimer -= Time.unscaledDeltaTime;
-            if (vectorRotateLogTimer > 0f)
-                return;
-            float yaw = viewCamera.transform.eulerAngles.y;
-            if (Mathf.Abs(Mathf.DeltaAngle(lastVectorLogYaw, yaw)) >= VectorRotateMinDeltaDeg)
-            {
-                vectorRotateLogTimer = VectorLogHoldIntervalSeconds;
-                LogVectorState("rotate");
-            }
-        }
+        // Rotate telemetry lives in SextantVectorLog.OnViewRotate (Update
+        // calls it directly).
 
         /// <summary>
         /// RT pixel probe: once ~1 s after open, and once more ~1 s after the
@@ -648,123 +646,6 @@ namespace UBOAT.Mods.RadioNavigation
             RenderTexture.active = target;
             renderCheckTex.ReadPixels(new Rect(target.width / 2, (int)(target.height * v), 1, 1), 0, 0);
             return renderCheckTex.GetPixel(0, 0);
-        }
-
-        /// <summary>
-        /// Vector telemetry on alidade input: left camera (player eyes, pitch
-        /// 0), right camera (eyes + alidade angle), the player view camera,
-        /// derived angles and the sun vectors (own Meeus vs game TOD_Sky).
-        /// </summary>
-        private void LogVectorState(string trigger)
-        {
-            ResolveViewCamera();
-            var l = ReadCameraVectors(pipLeftCamera);
-            var r = ReadCameraVectors(pipRightCamera);
-            var v = ReadCameraVectors(viewCamera);
-            var sun = ReadSunVectors();
-            double q = SextantArc.Quantize(arcAngle);
-            float angLR = pipLeftCamera != null && pipRightCamera != null
-                ? Vector3.Angle(l.Forward, r.Forward) : 0f;
-            float dotLR = pipLeftCamera != null && pipRightCamera != null
-                ? Vector3.Dot(l.Forward, r.Forward) : 0f;
-
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} VECL {1} pos={2} eul={3} fwd={4} up={5} rgt={6}",
-                LogPrefix, trigger, V3(l.Position), V3(l.Euler), V3(l.Forward), V3(l.Up), V3(l.Right)));
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} VECR {1} pos={2} eul={3} fwd={4} up={5} rgt={6}",
-                LogPrefix, trigger, V3(r.Position), V3(r.Euler), V3(r.Forward), V3(r.Up), V3(r.Right)));
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} VECV {1} pos={2} eul={3} fwd={4}",
-                LogPrefix, trigger, V3(v.Position), V3(v.Euler), V3(v.Forward)));
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} VECD {1} arc={2:F6} quant={3:F6} fmt={4} angLR={5:F3} dotLR={6:F6}",
-                LogPrefix, trigger, arcAngle, q, SextantArc.Format(q), angLR, dotLR));
-            LogSunLines(trigger, r.Forward, sun);
-        }
-
-        private void ResolveViewCamera()
-        {
-            if (viewCamera == null && !CameraResolver.TryResolve(out viewCamera))
-                viewCamera = FindObjectOfType<Camera>();
-            if (viewCamera != null)
-                lastVectorLogYaw = viewCamera.transform.eulerAngles.y;
-        }
-
-        private struct CameraVectors
-        {
-            public Vector3 Forward;
-            public Vector3 Up;
-            public Vector3 Right;
-            public Vector3 Position;
-            public Vector3 Euler;
-        }
-
-        private static CameraVectors ReadCameraVectors(Camera cam)
-        {
-            if (cam == null)
-                return default;
-            return new CameraVectors
-            {
-                Forward = cam.transform.forward,
-                Up = cam.transform.up,
-                Right = cam.transform.right,
-                Position = cam.transform.position,
-                Euler = cam.transform.eulerAngles,
-            };
-        }
-
-        private struct SunVectors
-        {
-            public bool Own;
-            public Vector3 OwnDir;
-            public float OwnAlt;
-            public float OwnAz;
-            public bool Game;
-            public Vector3 GameDir;
-            public float GameAlt;
-        }
-
-        private SunVectors ReadSunVectors()
-        {
-            var sun = new SunVectors();
-            sun.Own = TryGetOwnSun(out sun.OwnDir, out sun.OwnAlt, out sun.OwnAz);
-            sun.Game = TryGetGameSun(out sun.GameDir, out sun.GameAlt);
-            return sun;
-        }
-
-        private void LogSunLines(string trigger, Vector3 rightFwd, SunVectors sun)
-        {
-            if (sun.Own || sun.Game)
-            {
-                float angSun = sun.Own ? Vector3.Angle(rightFwd, sun.OwnDir) : -1f;
-                float sep = sun.Own && sun.Game ? Vector3.Angle(sun.OwnDir, sun.GameDir) : -1f;
-                Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} VECSUN {1} own{2} alt={3:F2} az={4:F1} game{5} galt={6:F2} angSunR={7:F3} sep={8:F3}",
-                    LogPrefix, trigger, sun.Own ? V3(sun.OwnDir) : " n/a", sun.OwnAlt, sun.OwnAz,
-                    sun.Game ? V3(sun.GameDir) : " n/a", sun.GameAlt, angSun, sep));
-            }
-            if (sun.Own && pipRightCamera != null)
-            {
-                // Sun projected into the right camera's viewport: proves the
-                // rendered picture matches the astro math (center = 0.5,0.5).
-                Vector3 sunNdc = pipRightCamera.WorldToViewportPoint(pipRightCamera.transform.position + sun.OwnDir * 1000f);
-                float nx = (sunNdc.x - 0.5f) * 2f;
-                float ny = (sunNdc.y - 0.5f) * 2f;
-                float tanHalf = Mathf.Tan(pipRightCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
-                if (tanHalf < 0.001f) tanHalf = 0.176f;
-                float dxDeg = Mathf.Atan2(nx * tanHalf, 1f) * Mathf.Rad2Deg;
-                float dyDeg = Mathf.Atan2(ny * tanHalf, 1f) * Mathf.Rad2Deg;
-                Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} VECSP {1} ndc=({2:F3},{3:F3}) offDeg=({4:F2},{5:F2}) fov={6:F1}",
-                    LogPrefix, trigger, sunNdc.x, sunNdc.y, dxDeg, dyDeg,
-                    pipRightCamera.fieldOfView));
-            }
-        }
-
-        private static string V3(Vector3 v)
-        {
-            return string.Format(CultureInfo.InvariantCulture, "({0:F3},{1:F3},{2:F3})", v.x, v.y, v.z);
         }
 
         private void HandleFilterKeys()
@@ -1041,17 +922,8 @@ namespace UBOAT.Mods.RadioNavigation
             // The game's SRP renders attached cameras once and never
             // refreshes them with the updated pose; force the render so the
             // right RT follows the alidade.
-            if (VectorLogEnabled)
-            {
-                manualRenderLogTimer -= Time.unscaledDeltaTime;
-                if (manualRenderLogTimer <= 0f)
-                {
-                    manualRenderLogTimer = 1f;
-                    Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                        "{0} MANUALRENDER frame={1} arc={2:F2}",
-                        LogPrefix, Time.frameCount, arcAngle));
-                }
-            }
+            if (SextantVectorLog.Enabled)
+                vectorLog.OnManualRender(arcAngle);
             try
             {
                 pipLeftCamera.Render();
@@ -1155,7 +1027,7 @@ namespace UBOAT.Mods.RadioNavigation
                     Debug.Log(string.Format(CultureInfo.InvariantCulture,
                         "{0} SUNDISC src={1} sep={2:F3} own(alt={3:F2} az={4:F1}) game={5}",
                         LogPrefix, gameOk ? "game" : "own", sep, sunAlt, sunAz,
-                        gameOk ? V3(gameDir) : " n/a"));
+                        gameOk ? SextantVectorLog.V3(gameDir) : " n/a"));
                 }
             }
             else
