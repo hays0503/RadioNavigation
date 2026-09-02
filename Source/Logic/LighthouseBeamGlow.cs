@@ -43,7 +43,6 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private const string SpotLightName = "Spot Light";
         private const string FlareComponentTypeName = "HDRPLensFlare";
-        private const string LighthouseShaderName = "Standard (DWS, Lighthouse)";
         private const float MaxLightRangeM = 2500f;
         private const float MinLightIntensity = 2.5f;
         private const float DaySunIntensityThreshold = 0.6f;
@@ -67,21 +66,18 @@ namespace UBOAT.Mods.RadioNavigation
         // camera is active — same order of magnitude as the game's own
         // FreeFly far clip (26000).
         private const float MinDeviceCameraFarM = 30000f;
-        private const int StreakTextureWidth = 128;
-        private const int StreakTextureHeight = 16;
-        private const int DotTextureSize = 64;
         private const int DotCanvasSortingOrder = 500;
         private const string ImageTypeName = "UnityEngine.UI.Image";
         private const float DiagnosticIntervalSeconds = 2f;
 
         private static readonly Color DotColor = new Color(1f, 0.94f, 0.84f);
-        private static readonly int RotationOffsetId = Shader.PropertyToID("_RotationOffset");
         private static PropertyInfo imageColorProperty;
 
         [Inject] private static Weather weather = null;
 
-        private static Texture2D dotTexture;
-        private static Texture2D streakTexture;
+        // Shared dot/streak textures and window-shader sync live in
+        // LighthouseGlowArt (extracted); the static renderingCamera stays
+        // here (per-frame camera hand-off with CameraResolver).
         private static Camera renderingCamera;
 
         private Transform container;
@@ -157,7 +153,10 @@ namespace UBOAT.Mods.RadioNavigation
                     Debug.LogWarning("[RadioNav][Lighthouse] flare runtime fix failed: " + ex.Message);
                 }
             }
-            FindWindowRenderers(rotator);
+            windowRenderers.Clear();
+            var found = LighthouseGlowArt.FindWindowRenderers(rotator);
+            for (int i = 0; i < found.Count; i++)
+                windowRenderers.Add(found[i]);
             initialized = true;
             // --- Init heights dump (requested) ---
             try
@@ -195,7 +194,7 @@ namespace UBOAT.Mods.RadioNavigation
             EnsureDeviceCameraFarClip();
             UpdateDayNight();
             Vector3 worldPosition = GetWorldPosition();
-            UpdateWindowRotation();
+            LighthouseGlowArt.UpdateWindowRotation(windowRenderers, rotator, ref rotationBlock);
             UpdateSpot(worldPosition);
             UpdateFlare(worldPosition);
             KeepFlareInView();
@@ -349,7 +348,7 @@ namespace UBOAT.Mods.RadioNavigation
                 screen.x, screen.y,
                 Screen.width, Screen.height,
                 iVisual,
-                GetHorizonAngleDeg(renderingCamera, worldPosition));
+                LighthouseGlowArt.GetHorizonAngleDeg(renderingCamera, worldPosition));
             lastDotSize = metrics.Size;
 
             dotRect.anchoredPosition = metrics.CenterOffset;
@@ -452,10 +451,10 @@ namespace UBOAT.Mods.RadioNavigation
             dotCanvas.sortingOrder = DotCanvasSortingOrder;
             dotCanvas.enabled = false;
 
-            Texture2D texture = GetDotTexture();
+            Texture2D texture = LighthouseGlowArt.GetDotTexture();
             Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
 
-            Texture2D streakTex = GetStreakTexture();
+            Texture2D streakTex = LighthouseGlowArt.GetStreakTexture();
             Sprite streakSprite = Sprite.Create(streakTex, new Rect(0f, 0f, streakTex.width, streakTex.height), new Vector2(0.5f, 0.5f));
 
             dotStreakImage = CreateDotImage(canvasRect, "Streak", streakSprite);
@@ -754,16 +753,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public static void ResetStatics()
         {
-            if (dotTexture.IsNotNull())
-            {
-                Object.Destroy(dotTexture);
-                dotTexture = null;
-            }
-            if (streakTexture.IsNotNull())
-            {
-                Object.Destroy(streakTexture);
-                streakTexture = null;
-            }
+            LighthouseGlowArt.ResetStatics();
             renderingCamera = null;
             CameraResolver.ResetForReload();
         }
@@ -1092,49 +1082,6 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        /// <summary>
-        /// Collects renderers whose material uses the lighthouse shader and
-        /// feeds their _RotationOffset so the emissive windows sweep together
-        /// with the rotating beam.
-        /// </summary>
-        private void FindWindowRenderers(Transform rotator)
-        {
-            windowRenderers.Clear();
-            Renderer[] renderers = rotator.root.GetComponentsInChildren<Renderer>(true);
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                Renderer renderer = renderers[i];
-                if (renderer.IsNull() || renderer.sharedMaterial.IsNull())
-                {
-                    continue;
-                }
-                Shader shader = renderer.sharedMaterial.shader;
-                if (shader.IsNotNull() && shader.name == LighthouseShaderName)
-                {
-                    windowRenderers.Add(renderer);
-                }
-            }
-        }
-
-        private void UpdateWindowRotation()
-        {
-            if (windowRenderers.Count == 0 || rotator.IsNull())
-            {
-                return;
-            }
-            if (rotationBlock.IsNull())
-            {
-                rotationBlock = new MaterialPropertyBlock();
-            }
-            rotationBlock.SetFloat(RotationOffsetId, rotator.eulerAngles.y);
-            for (int i = 0; i < windowRenderers.Count; i++)
-            {
-                if (windowRenderers[i].IsNotNull())
-                {
-                    windowRenderers[i].SetPropertyBlock(rotationBlock);
-                }
-            }
-        }
 
         /// <summary>
         /// Beam visibility factor: the lighthouse light is directed along
@@ -1158,101 +1105,6 @@ namespace UBOAT.Mods.RadioNavigation
             float angle = Mathf.Acos(Mathf.Clamp(Vector3.Dot(rotator.forward, flat), -1f, 1f)) * Mathf.Rad2Deg;
             float t = Mathf.Clamp01(1f - angle / BeamVisibleAngleDeg);
             return Mathf.SmoothStep(0f, 1f, t);
-        }
-
-        private static Texture2D GetDotTexture()
-        {
-            if (dotTexture.IsNotNull())
-            {
-                return dotTexture;
-            }
-
-            dotTexture = new Texture2D(DotTextureSize, DotTextureSize, TextureFormat.RGBA32, false);
-            dotTexture.name = "RadioNavLighthouseDot";
-            dotTexture.hideFlags = HideFlags.DontSave;
-            float half = DotTextureSize * 0.5f;
-            for (int y = 0; y < DotTextureSize; y++)
-            {
-                for (int x = 0; x < DotTextureSize; x++)
-                {
-                    float dx = (x + 0.5f - half) / half;
-                    float dy = (y + 0.5f - half) / half;
-                    float r = Mathf.Sqrt(dx * dx + dy * dy);
-                    float falloff = r >= 1f ? 0f : (1f - r) * (1f - r);
-                    Color32 pixel = new Color32(
-                        (byte)Mathf.RoundToInt(DotColor.r * 255f),
-                        (byte)Mathf.RoundToInt(DotColor.g * 255f),
-                        (byte)Mathf.RoundToInt(DotColor.b * 255f),
-                        (byte)Mathf.RoundToInt(falloff * 255f));
-                    dotTexture.SetPixel(x, y, pixel);
-                }
-            }
-            dotTexture.Apply();
-            return dotTexture;
-        }
-
-        /// <summary>
-        /// Horizontal line texture for the screen-space streak element:
-        /// a soft gaussian falloff along the line axis and a tighter one
-        /// across it, so the stretched glow reads as a thin beam.
-        /// </summary>
-        private static Texture2D GetStreakTexture()
-        {
-            if (streakTexture.IsNotNull())
-            {
-                return streakTexture;
-            }
-
-            streakTexture = new Texture2D(StreakTextureWidth, StreakTextureHeight, TextureFormat.RGBA32, false);
-            streakTexture.name = "RadioNavLighthouseStreak";
-            streakTexture.hideFlags = HideFlags.DontSave;
-            float hw = StreakTextureWidth * 0.5f;
-            float hh = StreakTextureHeight * 0.5f;
-            for (int y = 0; y < StreakTextureHeight; y++)
-            {
-                for (int x = 0; x < StreakTextureWidth; x++)
-                {
-                    float dx = (x + 0.5f - hw) / hw;
-                    float dy = (y + 0.5f - hh) / hh;
-                    float falloff = Mathf.Exp(-(dx * dx * 2.5f)) * Mathf.Exp(-(dy * dy * 5f));
-                    Color32 pixel = new Color32(
-                        (byte)Mathf.RoundToInt(DotColor.r * 255f),
-                        (byte)Mathf.RoundToInt(DotColor.g * 255f),
-                        (byte)Mathf.RoundToInt(DotColor.b * 255f),
-                        (byte)Mathf.RoundToInt(Mathf.Clamp01(falloff) * 255f));
-                    streakTexture.SetPixel(x, y, pixel);
-                }
-            }
-            streakTexture.Apply();
-            return streakTexture;
-        }
-
-        /// <summary>
-        /// Screen-space angle of the world horizon line, so the streak
-        /// stays parallel to the ground even when the camera rolls
-        /// (boat heel, wave motion). The world direction is the ground
-        /// plane vector perpendicular to the camera's view direction,
-        /// projected through the camera into screen space.
-        /// </summary>
-        private static float GetHorizonAngleDeg(Camera cam, Vector3 worldPos)
-        {
-            Vector3 forward = cam.transform.forward;
-            Vector3 groundForward = new Vector3(forward.x, 0f, forward.z);
-            if (groundForward.sqrMagnitude < 0.0001f)
-            {
-                return 0f;
-            }
-            groundForward.Normalize();
-            Vector3 horizonDir = Vector3.Cross(groundForward, Vector3.up);
-            Vector3 p0 = cam.WorldToScreenPoint(worldPos);
-            Vector3 p1 = cam.WorldToScreenPoint(worldPos + horizonDir * 1000f);
-            float dx = p1.x - p0.x;
-            float dy = p1.y - p0.y;
-            if (dx * dx + dy * dy < 0.0001f)
-            {
-                return 0f;
-            }
-            return Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
         }
     }
 }
