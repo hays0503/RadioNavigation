@@ -66,12 +66,7 @@ namespace UBOAT.Mods.RadioNavigation
         // camera is active — same order of magnitude as the game's own
         // FreeFly far clip (26000).
         private const float MinDeviceCameraFarM = 30000f;
-        private const int DotCanvasSortingOrder = 500;
-        private const string ImageTypeName = "UnityEngine.UI.Image";
         private const float DiagnosticIntervalSeconds = 2f;
-
-        private static readonly Color DotColor = new Color(1f, 0.94f, 0.84f);
-        private static PropertyInfo imageColorProperty;
 
         [Inject] private static Weather weather = null;
 
@@ -94,18 +89,11 @@ namespace UBOAT.Mods.RadioNavigation
         private MainCamera gameMainCamera;
         private MaterialPropertyBlock rotationBlock;
         private readonly List<Renderer> windowRenderers = new List<Renderer>();
-        private Type imageType;
-        private Canvas dotCanvas;
-        private Component dotImage;
-        private Component dotHaloImage;
-        private Component dotStreakImage;
-        private RectTransform dotRect;
-        private RectTransform dotHaloRect;
-        private RectTransform dotStreakRect;
+        // Screen-space dot overlay lives in LighthouseDotUi (extracted).
+        private readonly LighthouseDotUi dotUi = new LighthouseDotUi();
         private bool initialized;
         private bool hasFlare;
         private bool isNight;
-        private bool dotUiBuilt;
         private bool flareWasActive;
         private bool dotWasActive;
         private float nextDiagnosticTime;
@@ -261,8 +249,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            EnsureDotUi();
-            if (dotCanvas.IsNull())
+            if (!dotUi.EnsureBuilt(name))
             {
                 return;
             }
@@ -351,19 +338,22 @@ namespace UBOAT.Mods.RadioNavigation
                 LighthouseGlowArt.GetHorizonAngleDeg(renderingCamera, worldPosition));
             lastDotSize = metrics.Size;
 
+            RectTransform dotRect = dotUi.CoreRect;
             dotRect.anchoredPosition = metrics.CenterOffset;
             dotRect.sizeDelta = new Vector2(metrics.Size, metrics.Size);
+            RectTransform dotHaloRect = dotUi.HaloRect;
             dotHaloRect.anchoredPosition = metrics.CenterOffset;
             dotHaloRect.sizeDelta = new Vector2(metrics.Size * 3f, metrics.Size * 3f);
+            RectTransform dotStreakRect = dotUi.StreakRect;
             if (dotStreakRect.IsNotNull())
             {
                 dotStreakRect.anchoredPosition = metrics.CenterOffset;
                 dotStreakRect.sizeDelta = new Vector2(metrics.StreakLength, metrics.StreakThickness);
                 dotStreakRect.localRotation = Quaternion.Euler(0f, 0f, metrics.HorizonAngleDeg);
-                SetImageColor(dotStreakImage, metrics.StreakAlphaFinal);
+                dotUi.SetImageColor(dotUi.StreakImage, metrics.StreakAlphaFinal);
             }
-            SetImageColor(dotImage, metrics.CoreAlpha);
-            SetImageColor(dotHaloImage, metrics.HaloAlpha);
+            dotUi.SetImageColor(dotUi.CoreImage, metrics.CoreAlpha);
+            dotUi.SetImageColor(dotUi.HaloImage, metrics.HaloAlpha);
         }
 
         /// <summary>
@@ -374,12 +364,12 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         private void SetDotEnabled(bool enabled, string reason)
         {
-            if (dotCanvas.IsNull())
+            if (!dotUi.Built)
             {
                 return;
             }
             bool previous = dotWasActive;
-            dotCanvas.enabled = enabled;
+            dotUi.SetEnabled(enabled);
             dotWasActive = enabled;
             if (previous != enabled)
             {
@@ -395,7 +385,7 @@ namespace UBOAT.Mods.RadioNavigation
         // strings are built only on the frame the state actually flips.
         private bool DotWillLog(bool enabled)
         {
-            return dotCanvas.IsNotNull() && dotWasActive != enabled;
+            return dotUi.Built && dotWasActive != enabled;
         }
 
         private bool FlareWillLog(GameObject flareObject, bool enabled)
@@ -437,96 +427,11 @@ namespace UBOAT.Mods.RadioNavigation
             return GetBeamVisibilityFactor(worldPosition) > 0.01f;
         }
 
-        private void EnsureDotUi()
-        {
-            if (dotUiBuilt || !ResolveImageType())
-            {
-                return;
-            }
-
-            var canvasGo = new GameObject("RadioNavLighthouseDot_" + name, typeof(RectTransform));
-            var canvasRect = canvasGo.GetComponent<RectTransform>();
-            dotCanvas = canvasGo.AddComponent<Canvas>();
-            dotCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            dotCanvas.sortingOrder = DotCanvasSortingOrder;
-            dotCanvas.enabled = false;
-
-            Texture2D texture = LighthouseGlowArt.GetDotTexture();
-            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
-
-            Texture2D streakTex = LighthouseGlowArt.GetStreakTexture();
-            Sprite streakSprite = Sprite.Create(streakTex, new Rect(0f, 0f, streakTex.width, streakTex.height), new Vector2(0.5f, 0.5f));
-
-            dotStreakImage = CreateDotImage(canvasRect, "Streak", streakSprite);
-            dotImage = CreateDotImage(canvasRect, "Core", sprite);
-            dotHaloImage = CreateDotImage(canvasRect, "Halo", sprite);
-            dotStreakRect = dotStreakImage.GetComponent<RectTransform>();
-            dotRect = dotImage.GetComponent<RectTransform>();
-            dotHaloRect = dotHaloImage.GetComponent<RectTransform>();
-            dotUiBuilt = true;
-        }
-
-        private Component CreateDotImage(RectTransform parent, string childName, Sprite sprite)
-        {
-            var child = new GameObject(childName, typeof(RectTransform));
-            var childRect = child.GetComponent<RectTransform>();
-            childRect.SetParent(parent, false);
-
-            Component image = child.AddComponent(imageType);
-            imageType.GetProperty("sprite", BindingFlags.Public | BindingFlags.Instance)
-                ?.SetValue(image, sprite, null);
-            imageType.GetProperty("raycastTarget", BindingFlags.Public | BindingFlags.Instance)
-                ?.SetValue(image, false, null);
-            return image;
-        }
-
-        private bool ResolveImageType()
-        {
-            if (imageType.IsNotNull())
-            {
-                return true;
-            }
-
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int i = 0; i < assemblies.Length; i++)
-            {
-                Type type = assemblies[i].GetType(ImageTypeName, false);
-                if (type.IsNotNull())
-                {
-                    imageType = type;
-                    return true;
-                }
-            }
-
-            Debug.LogWarning("[RadioNav][Lighthouse] glow: '" + ImageTypeName +
-                "' not found; screen-space dot fallback unavailable");
-            return false;
-        }
-
-        private void SetImageColor(Component image, float alpha)
-        {
-            if (image.IsNull())
-            {
-                return;
-            }
-            // Hot path (dot + halo + streak every frame): resolve the
-            // reflection property once instead of per call.
-            if (imageColorProperty == null)
-            {
-                imageColorProperty = imageType.GetProperty("color", BindingFlags.Public | BindingFlags.Instance);
-            }
-            imageColorProperty
-                ?.SetValue(image, new Color(DotColor.r, DotColor.g, DotColor.b, alpha), null);
-        }
-
         private void OnDestroy()
         {
             // Unity destroyed-object references compare equal to null only through
             // Unity's operator; custom IsNotNull can still pass during scene unload.
-            if (dotCanvas != null)
-            {
-                Object.Destroy(dotCanvas.gameObject);
-            }
+            dotUi.Destroy();
         }
 
         private Vector3 GetWorldPosition()
@@ -792,7 +697,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Container = container,
                 SpotLight = spotLight,
                 GameMainCamera = gameMainCamera,
-                DotCanvas = dotCanvas,
+                DotCanvas = dotUi.Canvas,
                 IsNight = isNight,
                 LastIVisual = lastIVisual,
                 LastDotSize = lastDotSize,
