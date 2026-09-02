@@ -26,13 +26,13 @@ namespace UBOAT.Mods.RadioNavigation
     /// Shade filters 1/2/3, gaussian glare with pain hysteresis, star/sun
     /// identification after a 5 s hold.
     /// Layout is resolution-independent: own overlay canvas + CanvasScaler
-    /// (1920x1080 reference, match height), SEXTANT_PLAN §13.
+    /// (1920x1080 reference, match height), SEXTANT_PLAN пїЅ13.
     /// </summary>
     public sealed class SextantController : MonoBehaviour
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
 
-        // §13.3 layout constants (1080-space units).
+        // пїЅ13.3 layout constants (1080-space units).
         private const float OcularSizeUnits = 600f;
         private const int RtWidth = 512;
         private const int RtHeight = 512;
@@ -53,18 +53,10 @@ namespace UBOAT.Mods.RadioNavigation
         private const float CourseSampleWindowSeconds = 10f;
         private const float MinTransferSpeedKn = 0.5f;
 
-        // Eyecup (наглазник): the rubber shade around the eyepiece. The cup
-        // sprite is larger than the ocular and sits between the veil and the
-        // lens, hiding the world around the field of view; the tube shadow
-        // (EdgeRing) darkens the lens periphery like light falloff in a tube.
+        // Tube falloff / eyecup sprite constants live in SextantSprites
+        // (extracted); the eyecup LAYOUT size stays here.
         private const float EyecupSizeUnits = 1000f;
-        private const float EyecupSolidTo = 0.60f;  // solid black up to the ocular rim (0.6 = 300/500)
-        private const float TubeShadowStart = 0.55f; // tube light falloff begins
-        private const float TubeShadowMid = 0.85f;   // shadow strength at mid-falloff
-        private const float TubeShadowMidAlpha = 0.45f;
-        private const float TubeShadowFull = 0.97f;  // fully black before the mask edge
 
-        // §2 behaviour constants.
         private const float RateDegPerSec = 2f;
         private const float ShiftMultiplier = 5f;
         // Fine adjustment (Ctrl+arrows): one micrometer-drum tick per step,
@@ -81,7 +73,7 @@ namespace UBOAT.Mods.RadioNavigation
         private int zoomIndex = 2;
         private float PipFovDivisor { get { return ZoomSteps[zoomIndex]; } }
         private const float IdentifyConeDeg = 0.5f;
-        // v1.12: 2.5 s (was 5 s) — author request, faster sight workflow.
+        // v1.12: 2.5 s (was 5 s) пїЅ author request, faster sight workflow.
         private const float IdentifyHoldSeconds = 2.5f;
         private const float StarIdIntervalSeconds = 0.2f;
         private const float PainOnGlare = 0.6f;
@@ -148,7 +140,7 @@ namespace UBOAT.Mods.RadioNavigation
             "<15\u00B0: \u0440\u0430\u0437\u043D\u0435\u0441\u0438\u0442\u0435 " +
             "\u0437\u0430\u043C\u0435\u0440\u044B \u043F\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0438";
 
-        /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
+        /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (пїЅ7.4).</summary>
         public static bool IsOpen { get; private set; }
 
         internal double arcAngle;
@@ -299,8 +291,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (!TryGetGameSun(out gameDir, out gameAlt))
                 return;
 
-            // v1.13: never re-solve mid-series — observation 1 was recorded
-            // under the stored Δt, a new Δt would put the two sights on
+            // v1.13: never re-solve mid-series пїЅ observation 1 was recorded
+            // under the stored ?t, a new ?t would put the two sights on
             // different ephemerides and skew the LOPs. Re-solving happens
             // only when the next open starts with an empty series.
             if (runningFix.Observation1 != null)
@@ -440,7 +432,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void ResetReadingState()
         {
             // arcAngle is intentionally NOT reset here: the reading must
-            // survive close/open cycles (explicit reset = R key / 0° button).
+            // survive close/open cycles (explicit reset = R key / 0пїЅ button).
             leftFilterCount = 0;
             rightFilterCount = 0;
             holdTimer = 0f;
@@ -565,7 +557,7 @@ namespace UBOAT.Mods.RadioNavigation
             registeredWaterData = null;
         }
 
-        // §13.4 camera gate: sextant exists only in live deck views.
+        // пїЅ13.4 camera gate: sextant exists only in live deck views.
         private bool IsLiveViewMode()
         {
             if (gameMainCamera == null)
@@ -1014,20 +1006,20 @@ namespace UBOAT.Mods.RadioNavigation
             // delta -> h_b/h1 -> Az/intercept.
             sb.Append(FixCardSight).Append(" \u2116").Append(index).Append('\n');
             sb.Append("UT ").Append(obs.Utc.ToString("HH:mm:ss", CultureInfo.InvariantCulture)).Append('\n');
-            sb.Append("\u03B3 ").Append(FormatDm(obs.GhaAriesDeg));
-            // Same D°M.m′ format as gamma/GHA: a 0.1° decimal SHA read as
-            // 198°18.0′ made gamma+SHA look 2′ off GHA on the card (in-game
-            // verification 2026-08-30) — the chain is exact, only the old
-            // display rounded SHA to ±3′.
-            sb.Append("  SHA ").Append(FormatDm(obs.ShaSunDeg)).Append('\n');
-            sb.Append("GHA ").Append(FormatDm(obs.GhaSunDeg)).Append('\n');
-            sb.Append("\u03BBg ").Append(FormatLatLon(obs.DrLonDeg, false));
-            sb.Append("  LHA ").Append(FormatDm(obs.LhaDeg));
+            sb.Append("\u03B3 ").Append(SextantDmFormat.FormatDm(obs.GhaAriesDeg));
+            // Same DпїЅM.m? format as gamma/GHA: a 0.1пїЅ decimal SHA read as
+            // 198пїЅ18.0? made gamma+SHA look 2? off GHA on the card (in-game
+            // verification 2026-08-30) пїЅ the chain is exact, only the old
+            // display rounded SHA to пїЅ3?.
+            sb.Append("  SHA ").Append(SextantDmFormat.FormatDm(obs.ShaSunDeg)).Append('\n');
+            sb.Append("GHA ").Append(SextantDmFormat.FormatDm(obs.GhaSunDeg)).Append('\n');
+            sb.Append("\u03BBg ").Append(SextantDmFormat.FormatLatLon(obs.DrLonDeg, false));
+            sb.Append("  LHA ").Append(SextantDmFormat.FormatDm(obs.LhaDeg));
             sb.Append(' ').Append(FixCardQuadrant).Append(obs.Quadrant)
               .Append(obs.QuadrantWest ? " W" : " O").Append('\n');
-            sb.Append("\u03B4 ").Append(FormatSignedDm(obs.DecDeg)).Append('\n');
-            sb.Append("hb ").Append(FormatDm(obs.HoDeg));
-            sb.Append("  h1 ").Append(FormatDm(obs.HcDeg)).Append('\n');
+            sb.Append("\u03B4 ").Append(SextantDmFormat.FormatSignedDm(obs.DecDeg)).Append('\n');
+            sb.Append("hb ").Append(SextantDmFormat.FormatDm(obs.HoDeg));
+            sb.Append("  h1 ").Append(SextantDmFormat.FormatDm(obs.HcDeg)).Append('\n');
             sb.Append("Az ").Append(obs.AzDeg.ToString("F1", CultureInfo.InvariantCulture));
             sb.Append("  a ").Append(obs.InterceptNm >= 0 ? "+" : "\u2212")
               .Append(Math.Abs(obs.InterceptNm).ToString("F1", CultureInfo.InvariantCulture))
@@ -1066,7 +1058,7 @@ namespace UBOAT.Mods.RadioNavigation
             sb.Append('\n').Append('\n');
 
             // v1.13: the Versetzung/geometry/FIX tail is a SNAPSHOT computed
-            // once when observation 2 was recorded (I key) — reopening the
+            // once when observation 2 was recorded (I key) пїЅ reopening the
             // sextant or the passage of time never recomputes it. The math
             // belongs to the two recorded sights, not to the live view.
             if (fixSectionText != null)
@@ -1078,7 +1070,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// Builds the frozen Versetzung/geometry/FIX section from the two
         /// recorded observations with the course/speed current at record
         /// time. Called only from CaptureObservation (and cleared by
-        /// ResetSeries) — never on the 1 Hz card refresh.
+        /// ResetSeries) пїЅ never on the 1 Hz card refresh.
         /// </summary>
         private void RecomputeFixSnapshot()
         {
@@ -1099,7 +1091,7 @@ namespace UBOAT.Mods.RadioNavigation
               .Append(transferNm.ToString("F1", CultureInfo.InvariantCulture)).Append(" NM\n");
 
             // Crossing-angle quality: shallow geometry amplifies small
-            // intercept errors (~1/sin θ) — warn the navigator.
+            // intercept errors (~1/sin ?) пїЅ warn the navigator.
             double crossDeg = RunningFixCalculator.CrossingAngleDeg(
                 runningFix.Observation1, runningFix.Observation2);
             sb.Append(FixCardGeometry).Append(' ')
@@ -1122,12 +1114,12 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
             sb.Append("FIX\n");
-            sb.Append("\u03C6 ").Append(FormatLatLon(fixLat, true));
-            sb.Append("  \u03BB ").Append(FormatLatLon(fixLon, false)).Append('\n');
+            sb.Append("\u03C6 ").Append(SextantDmFormat.FormatLatLon(fixLat, true));
+            sb.Append("  \u03BB ").Append(SextantDmFormat.FormatLatLon(fixLon, false)).Append('\n');
             FixMapMarker.Set(fixLat, fixLon,
                 "FIX " + runningFix.Observation2.Utc.ToString("HH:mm:ss", CultureInfo.InvariantCulture) +
-                "\nlat " + FormatLatLonAscii(fixLat, true) +
-                " lon " + FormatLatLonAscii(fixLon, false));
+                "\nlat " + SextantDmFormat.FormatLatLonAscii(fixLat, true) +
+                " lon " + SextantDmFormat.FormatLatLonAscii(fixLon, false));
             float curLat, curLon;
             if (positionProvider.TryGetPosition(out curLat, out curLon))
             {
@@ -1138,47 +1130,7 @@ namespace UBOAT.Mods.RadioNavigation
             fixSectionText = sb.ToString();
         }
 
-        /// <summary>"221°04.2′" (invariant culture; wraps 59.96′ rounding).</summary>
-        private static string FormatDm(double deg)
-        {
-            double d = Math.Floor(deg);
-            double m = (deg - d) * 60.0;
-            if (m >= 59.95)
-            {
-                d += 1.0;
-                m = 0.0;
-            }
-            return string.Format(CultureInfo.InvariantCulture,
-                "{0}\u00B0{1:00.0}\u2032", (int)d, m);
-        }
-
-        private static string FormatSignedDm(double deg)
-        {
-            return (deg < 0 ? "\u2212" : "+") + FormatDm(Math.Abs(deg));
-        }
-
-        private static string FormatLatLon(double deg, bool isLat)
-        {
-            string hemi = isLat ? (deg >= 0 ? "N" : "S") : (deg >= 0 ? "E" : "W");
-            return FormatDm(Math.Abs(deg)) + hemi;
-        }
-
-        /// <summary>Latin legend variant for the map marker tooltip: the
-        /// game's TMP font has no Cyrillic and no U+2032 prime glyph, so
-        /// this uses an ASCII apostrophe (in-game 2026-08-30).</summary>
-        private static string FormatLatLonAscii(double deg, bool isLat)
-        {
-            string hemi = isLat ? (deg >= 0 ? "N" : "S") : (deg >= 0 ? "E" : "W");
-            double d = Math.Floor(Math.Abs(deg));
-            double m = (Math.Abs(deg) - d) * 60.0;
-            if (m >= 59.95)
-            {
-                d += 1.0;
-                m = 0.0;
-            }
-            return string.Format(CultureInfo.InvariantCulture,
-                "{0}\u00B0{1:00.0}'{2}", (int)d, m, hemi);
-        }
+        // DВ°M.mвЂІ formatting lives in SextantDmFormat (extracted).
 
         private void ZoomIn()
         {
@@ -1326,7 +1278,7 @@ namespace UBOAT.Mods.RadioNavigation
             UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd =
                 go.AddComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
             pipAdd.RenderScene = true;
-            SetupRenderPasses(pipAdd,
+            SextantRenderPasses.Setup(pipAdd,
                 viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>(),
                 cam.cullingMask);
             try
@@ -1701,7 +1653,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 float angle = Vector3.Angle(pipRightCamera.transform.forward, sunDir);
                 g = (float)SextantGlare.Glare(angle, sunAlt, rightFilterCount, pipRightCamera.fieldOfView);
-                // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6°),
+                // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6пїЅ),
                 // so position it on the game direction when available.
                 Vector3 gameDir;
                 float gameAlt;
@@ -1862,7 +1814,7 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Own Meeus ephemeris: sun RA/Dec → the same ENU→world mapping the
+        /// Own Meeus ephemeris: sun RA/Dec > the same ENU>world mapping the
         /// star sky uses, so axis conventions are already game-proven.
         /// Needs a valid sandbox position (lat/lon), like star identification.
         /// </summary>
@@ -1899,7 +1851,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// SUNDRIFT telemetry (SEXTANT_PLAN v1.3): every 10 s while the sextant
         /// is open, log the angular separation between our Meeus sun vector and
         /// the game's TOD_Sky sun vector (read via cached reflection). A steady
-        /// sep above ~0.5° means an ephemeris or axis-convention drift.
+        /// sep above ~0.5пїЅ means an ephemeris or axis-convention drift.
         /// </summary>
         private void LogSunDrift(float dt)
         {
@@ -1929,7 +1881,7 @@ namespace UBOAT.Mods.RadioNavigation
             float sepDeg = Vector3.Angle(ownDir, gameDir);
             float dAlt = ownAlt - gameAlt;
             // Azimuths 0=N +east; game azimuth derived from the world vector
-            // with the same (e→x, n→z) mapping the star sky proved in-game.
+            // with the same (e>x, n>z) mapping the star sky proved in-game.
             float gameAz = Mathf.Atan2(gameDir.x, gameDir.z) * Mathf.Rad2Deg;
             if (gameAz < 0f) gameAz += 360f;
             float dAz = ownAz - gameAz;
@@ -2048,8 +2000,8 @@ namespace UBOAT.Mods.RadioNavigation
         private string FindNearestBodyName(out float bodyAltDeg)
         {
             // Sun ID aims at the direction the player actually sees: the disc
-            // is drawn on the GAME sun (SUNDRIFT sep ~1.6° would never fit
-            // the 0.5° cone against our own ephemeris). Own ephemeris stays
+            // is drawn on the GAME sun (SUNDRIFT sep ~1.6пїЅ would never fit
+            // the 0.5пїЅ cone against our own ephemeris). Own ephemeris stays
             // the fallback when the game sun is unavailable via reflection.
             Vector3 sunDir;
             float sunAlt;
@@ -2147,7 +2099,7 @@ namespace UBOAT.Mods.RadioNavigation
             filterText.text = sb.ToString().TrimEnd();
         }
 
-        // ---- overlay construction (§13.3) --------------------------------------
+        // ---- overlay construction (пїЅ13.3) --------------------------------------
 
         private void EnsureOverlay()
         {
@@ -2164,14 +2116,14 @@ namespace UBOAT.Mods.RadioNavigation
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 1f;
 
-            // Veil: solid dark layer, no cut-out (§13.3 - aspect-safe).
+            // Veil: solid dark layer, no cut-out (пїЅ13.3 - aspect-safe).
             GameObject veilGo = new GameObject("Veil", typeof(Image));
             veilGo.transform.SetParent(canvasRoot.transform, false);
             Image veil = veilGo.GetComponent<Image>();
             veil.color = new Color(0f, 0f, 0f, VeilAlpha);
             Stretch(veil.rectTransform);
 
-            // Eyecup (наглазник): black shade larger than the ocular, drawn
+            // Eyecup (пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ): black shade larger than the ocular, drawn
             // between the veil and the lens so the world around the field of
             // view sinks into near-black while instrument texts (later
             // siblings) stay readable. Solid over the ocular rim, long soft
@@ -2179,7 +2131,7 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject eyecupGo = new GameObject("Eyecup", typeof(Image));
             eyecupGo.transform.SetParent(canvasRoot.transform, false);
             Image eyecup = eyecupGo.GetComponent<Image>();
-            eyecup.sprite = CreateEyecupSprite();
+            eyecup.sprite = SextantSprites.CreateEyecupSprite(SextantSprites.CreateEyecupTexture());
             eyecup.raycastTarget = false;
             AnchorCenter(eyecup.rectTransform, EyecupSizeUnits, EyecupSizeUnits);
 
@@ -2192,7 +2144,7 @@ namespace UBOAT.Mods.RadioNavigation
             pipRect = pipGo.GetComponent<RectTransform>();
             AnchorCenter(pipRect, OcularSizeUnits, OcularSizeUnits);
             Image maskGraphic = pipGo.GetComponent<Image>();
-            maskGraphic.sprite = CreateCircleMaskSprite();
+            maskGraphic.sprite = SextantSprites.CreateCircleMaskSprite();
             maskGraphic.raycastTarget = false;
             Mask ocularMask = pipGo.GetComponent<Mask>();
             ocularMask.showMaskGraphic = false;
@@ -2249,7 +2201,7 @@ namespace UBOAT.Mods.RadioNavigation
                 rightViewImage.material = opaqueViewMaterial;
             }
 
-            // Vertical sight line (1 physical pixel — drum alignment hairline
+            // Vertical sight line (1 physical pixel пїЅ drum alignment hairline
             // between the direct/mirror halves).
             GameObject splitGo = new GameObject("VerticalSplit", typeof(Image));
             splitGo.transform.SetParent(pipGo.transform, false);
@@ -2258,7 +2210,7 @@ namespace UBOAT.Mods.RadioNavigation
             splitImage.raycastTarget = false;
             AnchorCenter(splitImage.rectTransform, 1f / canvas.scaleFactor, OcularSizeUnits);
 
-            // Horizontal sight line (1 physical pixel, crosshair) — line of
+            // Horizontal sight line (1 physical pixel, crosshair) пїЅ line of
             // sight, drawn above the views/below filter dims so it stays
             // subtle and never interferes with the lenses.
             GameObject horizGo = new GameObject("HorizontalSight", typeof(Image));
@@ -2325,11 +2277,12 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject ringGo = new GameObject("EdgeRing", typeof(Image));
             ringGo.transform.SetParent(pipGo.transform, false);
             Image ring = ringGo.GetComponent<Image>();
-            ring.sprite = CreateRingSprite();
+            ringTexture = SextantSprites.CreateRingTexture();
+            ring.sprite = SextantSprites.CreateRingSprite(ringTexture);
             ring.raycastTarget = false;
             Stretch(ring.rectTransform);
 
-            // Reading column hugging the circle's left edge (§13.3).
+            // Reading column hugging the circle's left edge (пїЅ13.3).
             GameObject columnGo = new GameObject("ReadingColumn");
             columnGo.transform.SetParent(canvasRoot.transform, false);
             RectTransform column = columnGo.AddComponent<RectTransform>();
@@ -2486,7 +2439,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>
         /// Loads the opaque view material from the mod's AssetBundle
         /// (RadioNavOpaqueView, shader RadioNav/UIOpaque). Returns null when
-        /// unavailable — the views then keep the stock UI shader.
+        /// unavailable пїЅ the views then keep the stock UI shader.
         /// </summary>
         private Material ResolveOpaqueViewMaterial()
         {
@@ -2528,229 +2481,9 @@ namespace UBOAT.Mods.RadioNavigation
             r.anchoredPosition = Vector2.zero;
         }
 
-        private Sprite CreateRingSprite()
-        {
-            const int size = 256;
-            ringTexture = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            ringTexture.name = "RadioNavSextantRing";
-            ringTexture.hideFlags = HideFlags.DontSave;
-            float half = size * 0.5f;
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x + 0.5f - half) / half;
-                    float dy = (y + 0.5f - half) / half;
-                    float r = Mathf.Sqrt(dx * dx + dy * dy);
-                    // Tube light falloff: clear center, gradual shadow, fully
-                    // black before the mask edge so no seam shows at the rim.
-                    float a;
-                    if (r <= TubeShadowStart) a = 0f;
-                    else if (r >= TubeShadowFull) a = 1f;
-                    else if (r <= TubeShadowMid)
-                    {
-                        float t = (r - TubeShadowStart) / (TubeShadowMid - TubeShadowStart);
-                        a = TubeShadowMidAlpha * (t * t * (3f - 2f * t));
-                    }
-                    else
-                    {
-                        float t = (r - TubeShadowMid) / (TubeShadowFull - TubeShadowMid);
-                        a = TubeShadowMidAlpha + (1f - TubeShadowMidAlpha) * (t * t * (3f - 2f * t));
-                    }
-                    ringTexture.SetPixel(x, y, new Color(0f, 0f, 0f, a));
-                }
-            }
-            ringTexture.Apply();
-            return Sprite.Create(ringTexture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
-        }
 
-        /// <summary>
-        /// Eyecup shade sprite: solid black over the ocular rim, long soft
-        /// falloff outward (out-of-focus rubber close to the eye).
-        /// </summary>
-        private Sprite CreateEyecupSprite()
-        {
-            const int size = 256;
-            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            tex.name = "RadioNavSextantEyecup";
-            tex.hideFlags = HideFlags.DontSave;
-            float half = size * 0.5f;
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x + 0.5f - half) / half;
-                    float dy = (y + 0.5f - half) / half;
-                    float r = Mathf.Sqrt(dx * dx + dy * dy);
-                    float a;
-                    if (r <= EyecupSolidTo) a = 1f;
-                    else if (r >= 1f) a = 0f;
-                    else
-                    {
-                        float t = (r - EyecupSolidTo) / (1f - EyecupSolidTo);
-                        a = 1f - t * t * (3f - 2f * t);
-                    }
-                    tex.SetPixel(x, y, new Color(0f, 0f, 0f, a));
-                }
-            }
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
-        }
-
-        /// <summary>
-        /// The game's SRP renders a camera through the passes configured on
-        /// its AdditionalCameraData; a freshly added component has none, so
-        /// the RT stays blank (in-game finding 2026-08-26). Deep-copy the
-        /// main camera's pass list when available - those are the exact
-        /// culling groups the game renders the scene with; otherwise build
-        /// a single enabled pass with the camera's culling mask.
-        /// Backing fields are private: "passes" (CameraPass[]) and
-        /// "useCustomPasses" (bool) - the Passes property is get-only.
-        /// </summary>
-        private static void SetupRenderPasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData data,
-            UBOAT.Game.Scene.Rendering.AdditionalCameraData mainData, int cullingMask)
-        {
-            Type type = data.GetType();
-            Type passType = type.GetNestedType("CameraPass",
-                BindingFlags.Public | BindingFlags.NonPublic);
-            if (passType == null)
-            {
-                Debug.LogWarning(LogPrefix + " CameraPass type not found - PIP may stay blank");
-                return;
-            }
-
-            try
-            {
-                FieldInfo passesField = null;
-                FieldInfo useCustomField = null;
-                FindPassFields(type, passType, ref passesField, ref useCustomField);
-
-                Array source = ReadSourcePasses(mainData, type, passesField);
-                int count = source != null && source.Length > 0 ? source.Length : 1;
-                Array passes = CopyPasses(passType, source, cullingMask);
-
-                WritePasses(data, type, passesField, useCustomField, passes);
-                data.RenderScene = true;
-                Debug.Log(LogPrefix + " PIP render passes configured: " + count + " pass(es), mask=" + cullingMask);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning(LogPrefix + " render pass setup failed: " + e.Message + " " + e.StackTrace);
-            }
-        }
-
-        private static void FindPassFields(Type type, Type passType, ref FieldInfo passesField, ref FieldInfo useCustomField)
-        {
-            // Passes is get-only (CanWrite=false) - find backing field by type
-            foreach (FieldInfo f in type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
-            {
-                if (f.FieldType.IsArray && f.FieldType.GetElementType() == passType)
-                    passesField = f;
-                else if (f.FieldType == typeof(bool) && f.Name.IndexOf("useCustom", StringComparison.OrdinalIgnoreCase) >= 0)
-                    useCustomField = f;
-            }
-            if (passesField == null)
-                passesField = type.GetField("passes", BindingFlags.NonPublic | BindingFlags.Instance);
-            if (useCustomField == null)
-                useCustomField = type.GetField("useCustomPasses", BindingFlags.NonPublic | BindingFlags.Instance);
-        }
-
-        private static Array ReadSourcePasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData mainData,
-            Type type, FieldInfo passesField)
-        {
-            if (mainData == null)
-                return null;
-            PropertyInfo passesProp = type.GetProperty("Passes");
-            Array source = passesProp != null ? passesProp.GetValue(mainData) as Array : null;
-            // fallback: read backing field directly if property missing
-            if (source == null && passesField != null)
-                source = passesField.GetValue(mainData) as Array;
-            return source;
-        }
-
-        private static Array CopyPasses(Type passType, Array source, int cullingMask)
-        {
-            int count = source != null && source.Length > 0 ? source.Length : 1;
-            Array passes = Array.CreateInstance(passType, count);
-            if (source != null && source.Length > 0)
-            {
-                // CameraPass(int cullingMask) is the only public ctor;
-                // Enabled is read-write, ScreenSpaceReflections is
-                // get-only and stays at its default.
-                PropertyInfo cullingProp = passType.GetProperty("CullingMask");
-                PropertyInfo enabledProp = passType.GetProperty("Enabled");
-                for (int i = 0; i < source.Length; i++)
-                {
-                    object src = source.GetValue(i);
-                    int mask = cullingMask;
-                    if (cullingProp != null)
-                    {
-                        object maskBoxed = cullingProp.GetValue(src);
-                        if (maskBoxed is int)
-                            mask = (int)maskBoxed;
-                    }
-                    object copy = Activator.CreateInstance(passType, mask);
-                    if (enabledProp != null)
-                    {
-                        object enabled = enabledProp.GetValue(src);
-                        if (enabled is bool)
-                            enabledProp.SetValue(copy, (bool)enabled);
-                    }
-                    passes.SetValue(copy, i);
-                }
-            }
-            else
-            {
-                object pass = Activator.CreateInstance(passType, cullingMask);
-                passType.GetProperty("Enabled").SetValue(pass, true);
-                passes.SetValue(pass, 0);
-            }
-            return passes;
-        }
-
-        private static void WritePasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData data,
-            Type type, FieldInfo passesField, FieldInfo useCustomField, Array passes)
-        {
-            if (passesField != null)
-                passesField.SetValue(data, passes);
-            else
-                type.GetProperty("Passes").SetValue(data, passes);
-            if (useCustomField != null)
-                useCustomField.SetValue(data, true);
-            else
-            {
-                PropertyInfo useCustomProp = type.GetProperty("UseCustomPasses");
-                if (useCustomProp != null && useCustomProp.CanWrite)
-                    useCustomProp.SetValue(data, true);
-            }
-        }
-
-        /// <summary>Hard circle sprite for the ocular Mask (smooth AA at the rim).</summary>
-        private Sprite CreateCircleMaskSprite()
-        {
-            const int size = 256;
-            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            tex.name = "RadioNavSextantCircleMask";
-            tex.hideFlags = HideFlags.DontSave;
-            float half = size * 0.5f;
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x + 0.5f - half) / half;
-                    float dy = (y + 0.5f - half) / half;
-                    float r = Mathf.Sqrt(dx * dx + dy * dy);
-                    float a;
-                    if (r <= 0.96f) a = 1f;
-                    else if (r >= 1f) a = 0f;
-                    else a = 1f - (r - 0.96f) / 0.04f;
-                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
-                }
-            }
-            tex.Apply();
-            circleMaskTexture = tex;
-            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
-        }
+        // Procedural sprites live in SextantSprites; SRP render-pass
+        // cloning lives in SextantRenderPasses (both extracted).
     }
 
     /// <summary>
