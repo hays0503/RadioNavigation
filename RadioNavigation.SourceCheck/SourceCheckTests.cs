@@ -274,6 +274,99 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Event-subscription balance gate (P5.2): every event subscribed with
+        /// '+=' inside a type must be unsubscribed with '-=' on the same event
+        /// somewhere in the same type. Unbalanced subscriptions leak handlers
+        /// across panel open/close cycles and hot reloads (live checklist C).
+        /// Heuristics (syntax-only):
+        ///   - left side must be a member access ('x.Event', 'arr[i].Event') —
+        ///     a bare identifier is a local variable/field compound ('gmst += 360');
+        ///   - right side must be a method group or lambda — literals/binary
+        ///     expressions are string/arithmetic compounds ('s += "; " + msg');
+        ///   - balance is per EVENT NAME, not per handler: loop/array handlers
+        ///     ('+= elementHandler' vs '-= handlers[i]') are textually unmatchable
+        ///     but still balanced when the event itself is torn down.
+        /// </summary>
+        [Fact]
+        public void EventSubscriptions_AreBalanced()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path).GetRoot();
+                foreach (var typeDecl in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    var subscribed = new Dictionary<string, int>(StringComparer.Ordinal);
+                    var unsubscribed = new HashSet<string>(StringComparer.Ordinal);
+
+                    foreach (var expr in typeDecl.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                    {
+                        bool isAdd = expr.IsKind(SyntaxKind.AddAssignmentExpression);
+                        bool isRemove = expr.IsKind(SyntaxKind.SubtractAssignmentExpression);
+                        if (!isAdd && !isRemove) continue;
+
+                        string eventName = EventNameOf(expr.Left);
+                        if (eventName == null) continue;          // not a member access
+                        if (!IsHandlerExpression(expr.Right)) continue; // compound, not a subscription
+
+                        if (isAdd)
+                        {
+                            subscribed.TryGetValue(eventName, out int n);
+                            subscribed[eventName] = n + 1;
+                        }
+                        else
+                        {
+                            unsubscribed.Add(eventName);
+                        }
+                    }
+
+                    foreach (var kv in subscribed)
+                    {
+                        if (unsubscribed.Contains(kv.Key)) continue;
+                        problems.Add($"{Path.GetFileName(path)} {typeDecl.Identifier.Text}: " +
+                            $"event '{kv.Key}' subscribed {kv.Value}x with '+=' but never unsubscribed '-='");
+                    }
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} unbalanced event subscription(s) — handler leak risk on open/close or hot reload:\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>'x.Event' / 'arr[i].Event' -> 'Event'; bare identifier -> null.</summary>
+        private static string EventNameOf(ExpressionSyntax left)
+        {
+            if (left is MemberAccessExpressionSyntax member && member.Name is IdentifierNameSyntax id)
+                return id.Identifier.Text;
+            return null;
+        }
+
+        /// <summary>
+        /// True when the right side can be a subscription handler: a method
+        /// group (identifier or member access, no invocation), an element
+        /// access (handlers[i]), or a lambda. Literals/binary/invocation
+        /// expressions are compound arithmetic or string concatenation.
+        /// </summary>
+        private static bool IsHandlerExpression(ExpressionSyntax right)
+        {
+            switch (right)
+            {
+                case IdentifierNameSyntax _:
+                case MemberAccessExpressionSyntax m when !(m.Name is GenericNameSyntax):
+                case ElementAccessExpressionSyntax _:
+                case ParenthesizedLambdaExpressionSyntax _:
+                case SimpleLambdaExpressionSyntax _:
+                case MemberBindingExpressionSyntax _:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
         /// McCabe cyclomatic complexity: 1 + number of decision points. Decision points:
         /// if/else-if, switch case, for/foreach/while/do, conditional ?:, &&, ||, catch,
         /// and the null-coalescing/conditional-access operators. Nested lambdas/local

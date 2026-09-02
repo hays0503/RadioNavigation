@@ -154,6 +154,54 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(data.Any(sample => sample != 0f), "keyed signal must not be silent");
         }
 
+        // F71: time compression (x2/x32) suppresses audio even while the keyer
+        // is mid-element — OnAudioFilterRead passes radioOn=false in that state,
+        // so an actively keyed tone must still render as a zeroed buffer.
+        [Fact]
+        public void ProcessAudio_TimeCompressionSuppressesActiveTone()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var schedulers = new[] { new StationScheduler("TEST") };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            // Drive into an actively keyed element (same as
+            // ProcessAudio_KeyOn_ProducesSignal).
+            engine.UpdateStations(0.1f, 1f, stations, schedulers, keyers, carriers, true);
+            Assert.True(keyers[0].KeyOn, "precondition: keyer must be mid-element");
+
+            var data = Enumerable.Repeat(0.5f, 1024).ToArray();
+            engine.ProcessAudio(data, 1, stations, keyers, carriers, false, 0, 0);
+
+            Assert.All(data, sample => Assert.Equal(0f, sample));
+        }
+
+        // F71: pause (timeScale == 0) delivers zero delta time, so the scheduler
+        // and keyer state machine must not advance — the current tone freezes
+        // instead of running away or skipping elements.
+        [Fact]
+        public void UpdateStations_ZeroDelta_FreezesStateMachine()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var schedulers = new[] { new StationScheduler("TEST") };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            // Establish a known state: one tick moves Pause -> Callsign.
+            engine.UpdateStations(0.05f, 1f, stations, schedulers, keyers, carriers, true);
+            Assert.Equal(StationScheduler.Phase.Callsign, schedulers[0].CurrentPhase);
+            bool keyOnBefore = keyers[0].KeyOn;
+
+            // Simulate many paused frames: delta 0 must not advance anything.
+            for (int i = 0; i < 100; i++)
+                engine.UpdateStations(0f, 1f, stations, schedulers, keyers, carriers, true);
+
+            Assert.Equal(StationScheduler.Phase.Callsign, schedulers[0].CurrentPhase);
+            Assert.Equal(keyOnBefore, keyers[0].KeyOn);
+        }
+
         // Pitch-split: with a BeatFrequency set, the carrier target must move
         // above the beat for dots and below it for dashes; equisignal and
         // silence stay on the beat. Stations without BeatFrequency are not
