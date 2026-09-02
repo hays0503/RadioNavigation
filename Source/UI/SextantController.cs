@@ -97,15 +97,13 @@ namespace UBOAT.Mods.RadioNavigation
         internal double arcAngle;
         private int leftFilterCount;
         private int rightFilterCount;
-        private float holdTimer;
         private float fineRepeatTimer;
-        private float starIdTimer;
-        private string lastFoundName;
-        private string identifiedName = "";
         private bool pain;
         private double lastFormattedArc = double.MinValue;
         // RT pixel probe lives in SextantRenderCheck (extracted).
         private readonly SextantRenderCheck renderCheck = new SextantRenderCheck();
+        // Star/sun identification cycle lives in SextantStarId (extracted).
+        private readonly SextantStarId starId = new SextantStarId();
 
         private Camera viewCamera;
         private MainCamera gameMainCamera;
@@ -341,10 +339,7 @@ namespace UBOAT.Mods.RadioNavigation
             // survive close/open cycles (explicit reset = R key / 0° button).
             leftFilterCount = 0;
             rightFilterCount = 0;
-            holdTimer = 0f;
-            starIdTimer = 0f;
-            lastFoundName = null;
-            identifiedName = "";
+            starId.Reset();
             pain = false;
             lastFormattedArc = double.MinValue;
             lastSunAltLine = null;
@@ -589,7 +584,7 @@ namespace UBOAT.Mods.RadioNavigation
             // I records a sight (only with the sun identified and held),
             // O starts a new worksheet series.
             if (Input.GetKeyDown(KeyCode.I))
-                worksheet.CaptureObservation(identifiedName, arcAngle);
+                worksheet.CaptureObservation(starId.IdentifiedName, arcAngle);
             if (Input.GetKeyDown(KeyCode.O))
                 worksheet.ResetSeries();
         }
@@ -1072,8 +1067,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (!pain && g > PainOnGlare)
             {
                 pain = true;
-                holdTimer = 0f;
-                identifiedName = "";
+                starId.Reset();
                 if (painText != null) painText.enabled = true;
             }
             else if (pain && g < PainOffGlare)
@@ -1134,123 +1128,21 @@ namespace UBOAT.Mods.RadioNavigation
             return gameSun.TryGetSun(out dir, out alt);
         }
 
-
-        // ---- star / sun identification ---------------------------------------
+        // ---- star / sun identification lives in SextantStarId (extracted) ----
 
         private void UpdateStarId(float dt)
         {
-            starIdTimer -= dt;
-            bool tick = starIdTimer <= 0f;
-            if (tick)
-                starIdTimer = StarIdIntervalSeconds;
-
-            if (pain)
-            {
-                holdTimer = 0f;
-                identifiedName = "";
-                nameText.text = "";
-                return;
-            }
-
-            if (tick)
-            {
-                float bodyAlt;
-                lastFoundName = FindNearestBodyName(out bodyAlt);
-                if (lastFoundName != null)
-                {
-                    holdTimer += StarIdIntervalSeconds;
-                    if (holdTimer >= IdentifyHoldSeconds)
-                    {
-                        bool justIdentified = identifiedName != lastFoundName;
-                        identifiedName = lastFoundName;
-                        if (justIdentified)
-                            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                                "{0} IDHIT name={1} alt={2:F2} arc={3:F2} |d|={4:F2}",
-                                LogPrefix, lastFoundName, bodyAlt, arcAngle,
-                                Math.Abs(bodyAlt - (float)arcAngle)));
-                    }
-                }
-                else
-                {
-                    holdTimer = 0f;
-                    identifiedName = "";
-                }
-            }
-
-            if (nameText.text != identifiedName)
-                nameText.text = identifiedName;
-        }
-
-        private string FindNearestBodyName(out float bodyAltDeg)
-        {
-            // Sun ID aims at the direction the player actually sees: the disc
-            // is drawn on the GAME sun (SUNDRIFT sep ~1.6° would never fit
-            // the 0.5° cone against our own ephemeris). Own ephemeris stays
-            // the fallback when the game sun is unavailable via reflection.
-            Vector3 sunDir;
-            float sunAlt;
-            float sunAz;
-            Vector3 pipFwd = GetPipForward();
-            if (pipFwd.sqrMagnitude < 0.01f)
-            {
-                bodyAltDeg = -1f;
-                return null;
-            }
-            if (TryGetOwnSun(out sunDir, out sunAlt, out sunAz))
-            {
-                Vector3 idTarget = sunDir;
-                Vector3 gameDir;
-                float gameAlt;
-                if (TryGetGameSun(out gameDir, out gameAlt))
-                    idTarget = gameDir;
-                if (Vector3.Angle(pipFwd, idTarget) <= IdentifyConeDeg)
-                {
-                    bodyAltDeg = sunAlt;
-                    return SunName;
-                }
-            }
-
-            bodyAltDeg = -1f;
+            Vector3 ownDir, gameDir;
+            float ownAlt, ownAz, gameAlt;
+            bool ownOk = TryGetOwnSun(out ownDir, out ownAlt, out ownAz);
+            bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
             float lat, lon;
-            if (!positionProvider.TryGetPosition(out lat, out lon))
-                return null;
-
-            DateTime utc = GameTimeResolver.GetUtcNow();
-            double jd = AstroMath.ToJulianDay(utc);
-            double lstDeg = AstroMath.LstDeg(jd, lon);
-
-            Vector3 fwd = pipFwd;
-            double bestCos = Math.Cos(IdentifyConeDeg * Mathf.Deg2Rad);
-            int bestHip = -1;
-
-            var stars = StarCatalog.Stars;
-            for (int i = 0; i < stars.Length; i++)
-            {
-                if (stars[i].DecDeg < -89.5f && stars[i].Vmag > 6f)
-                    continue; // cheap skip near-pole dim entries costs nothing
-                AstroMath.RaDecToEnu(stars[i].RaDeg * Mathf.Deg2Rad, stars[i].DecDeg * Mathf.Deg2Rad,
-                    lstDeg, lat, out double altRad, out _, out double e, out double n, out double u);
-                if (altRad <= 0)
-                    continue;
-
-                double len = Math.Sqrt(e * e + n * n + u * u);
-                if (len < 1e-9)
-                    continue;
-                double cos = (e * fwd.x + u * fwd.y + n * fwd.z) / len;
-                if (cos > bestCos)
-                {
-                    bestCos = cos;
-                    bestHip = stars[i].Hip;
-                    bodyAltDeg = (float)(altRad * Mathf.Rad2Deg);
-                }
-            }
-
-            if (bestHip < 0)
-                return null;
-
-            string name;
-            return NavStarNames.TryGetName(bestHip, out name) ? name : ("HIP " + bestHip);
+            bool posOk = positionProvider.TryGetPosition(out lat, out lon);
+            starId.Update(dt, pain, GetPipForward(),
+                ownOk, ownDir, ownAlt, gameOk, gameDir, posOk, lat, lon,
+                nameText, arcAngle);
         }
+
 
         // ---- readout -----------------------------------------------------------
 
