@@ -30,3 +30,7 @@
 //-V::3013
 //-V::4007
 //-V::3041
+# V4003: NavMapMarkerBase.BuildMarkerView lambda captures `captured` once at
+# build time (built==false), not per frame; EnsureBuilt is a one-shot gate, so
+# the capture is not in the Update hot path.
+//-V::4003

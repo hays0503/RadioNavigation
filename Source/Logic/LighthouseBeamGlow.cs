@@ -619,9 +619,11 @@ namespace UBOAT.Mods.RadioNavigation
                     return true;
                 }
             }
-            // Both projections failed: report off-screen so the dot hides.
+            // Both projections failed: report failure so the caller falls
+            // back to the plain projection path (which yields an off-screen
+            // z<=0 and hides the dot).
             projected = new Vector3(v.x, v.y, -1f);
-            return true;
+            return false;
         }
 
         private Vector3 FallbackProjection(Vector3 worldPos, bool throttled)
@@ -934,7 +936,9 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject flareObject = lensFlare.gameObject;
             if (!isNight || renderingCamera == null || rotator.IsNull())
             {
-                DisableFlare(flareObject, "night=" + isNight + " cam=" + (renderingCamera.IsNotNull()) + " rot=" + rotator.IsNotNull());
+                DisableFlare(flareObject, FlareWillLog(flareObject, false)
+                    ? "night=" + isNight + " cam=" + (renderingCamera.IsNotNull()) + " rot=" + rotator.IsNotNull()
+                    : null);
                 return;
             }
 
@@ -948,8 +952,10 @@ namespace UBOAT.Mods.RadioNavigation
             bool deviceView = IsDeviceCamera(renderingCamera);
             if (!deviceView && distance > FlareMaxDistanceM)
             {
-                DisableFlare(flareObject, "beyond " + FlareMaxDistanceM.ToString("F0") +
-                    "m (dist=" + distance.ToString("F0") + ")");
+                DisableFlare(flareObject, FlareWillLog(flareObject, false)
+                    ? "beyond " + FlareMaxDistanceM.ToString("F0") +
+                      "m (dist=" + distance.ToString("F0") + ")"
+                    : null);
                 return;
             }
             if (deviceView && distance > FlareMaxDistanceM && Time.unscaledTime >= nextDiagnosticTime)
@@ -963,7 +969,9 @@ namespace UBOAT.Mods.RadioNavigation
             float wideGate = GetBeamVisibilityFactor(worldPosition);
             if (wideGate <= 0.01f)
             {
-                DisableFlare(flareObject, "beam not aligned (wide=" + wideGate.ToString("F2") + ")");
+                DisableFlare(flareObject, FlareWillLog(flareObject, false)
+                    ? "beam not aligned (wide=" + wideGate.ToString("F2") + ")"
+                    : null);
                 return;
             }
 
