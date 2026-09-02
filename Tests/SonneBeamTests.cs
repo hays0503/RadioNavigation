@@ -85,6 +85,62 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(60, signal.DotCount + signal.DashCount);
         }
 
+        // MiniJson escape handling (ParseString/ParseEscape, refactored
+        // 2026-09-02): all 8 standard JSON escapes must decode through the
+        // public SonneBeamStation.Parse consumer contract, and malformed
+        // input must throw FormatException instead of corrupting state.
+        [Theory]
+        [InlineData("\\\"", "\"")]           // \" -> quote
+        [InlineData("\\\\", "\\")]            // \\ -> backslash
+        [InlineData("\\/", "/")]             // \/ -> slash
+        [InlineData("\\b", "\b")]             // \b -> backspace
+        [InlineData("\\f", "\f")]             // \f -> form feed
+        [InlineData("\\n", "\n")]             // \n -> newline
+        [InlineData("\\r", "\r")]             // \r -> carriage return
+        [InlineData("\\t", "\t")]             // \t -> tab
+        public void Parse_StandardEscapes_DecodeInStationName(string escaped, string expected)
+        {
+            var station = SonneBeamStation.Parse(
+                "{\"station\":\"a" + escaped + "b\",\"dashes\":{},\"dots\":{}}");
+
+            Assert.Equal("a" + expected + "b", station.Name);
+        }
+
+        [Fact]
+        public void Parse_UnknownEscape_ThrowsFormat()
+        {
+            Assert.Throws<System.FormatException>(() =>
+                SonneBeamStation.Parse(
+                    "{\"station\":\"a\\qb\",\"dashes\":{},\"dots\":{}}"));
+        }
+
+        // Documents the parser boundary: \uXXXX is NOT supported (the data
+        // files are ASCII station tables). If this ever changes, update the
+        // escape test above instead.
+        [Fact]
+        public void Parse_UnicodeEscape_NotSupported_ThrowsFormat()
+        {
+            Assert.Throws<System.FormatException>(() =>
+                SonneBeamStation.Parse(
+                    "{\"station\":\"a\\u0041b\",\"dashes\":{},\"dots\":{}}"));
+        }
+
+        [Fact]
+        public void Parse_UnterminatedString_ThrowsFormat()
+        {
+            Assert.Throws<System.FormatException>(() =>
+                SonneBeamStation.Parse(
+                    "{\"station\":\"abc,\"dashes\":{},\"dots\":{}}"));
+        }
+
+        [Fact]
+        public void Parse_TrailingBackslash_ThrowsFormat()
+        {
+            Assert.Throws<System.FormatException>(() =>
+                SonneBeamStation.Parse(
+                    "{\"station\":\"abc\\\",\"dashes\":{},\"dots\":{}}"));
+        }
+
         private static void AssertRepeated(
             NavigationElementType[] pattern,
             int start,

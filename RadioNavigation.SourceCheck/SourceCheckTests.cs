@@ -336,6 +336,55 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Callsign-reset wiring gate (P5.2 live checklist: "frequency change
+        /// -> single callsign"). SonneController.OnFrequencyChanged must call
+        /// ClearSignalBuffer (SonneController.cs:308-312) — the mechanism that
+        /// keeps only the latest completed callsign. The behavioral core
+        /// (ClearSignalBuffer clears decodedText/morseDecoderBuffer) cannot be
+        /// unit-tested without linking the whole MonoBehaviour surface, so
+        /// this syntax gate pins the wiring: handler exists AND invokes the
+        /// reset. The handler-existence assert prevents a false green if the
+        /// handler is renamed.
+        /// </summary>
+        [Fact]
+        public void CallsignReset_WiredToFrequencyChange()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            string handlerLoc = null;
+            MethodDeclarationSyntax handler = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path).GetRoot();
+                foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
+                {
+                    if (method.Identifier.Text != "OnFrequencyChanged") continue;
+                    // Only the SonneController handler owns the callsign
+                    // reset; InformationPanelHandler.OnFrequencyChanged is a
+                    // UI refresh handler with its own lastLoggedDecoded reset.
+                    if (method.Parent is TypeDeclarationSyntax type && type.Identifier.Text != "SonneController")
+                        continue;
+                    handler = method;
+                    handlerLoc = $"{Path.GetFileName(path)}:{method.GetLocation().GetLineSpan().StartLinePosition.Line + 1}";
+                }
+            }
+
+            Assert.True(handler != null,
+                "SonneController.OnFrequencyChanged handler not found — the callsign reset wiring is gone");
+
+            // Syntax-level invocation check (not string.Contains): a
+            // commented-out 'ClearSignalBuffer();' must NOT satisfy the gate.
+            bool invokesReset = handler.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(inv => inv.Expression is IdentifierNameSyntax name
+                    && name.Identifier.Text == "ClearSignalBuffer");
+            Assert.True(invokesReset,
+                $"{handlerLoc}: OnFrequencyChanged no longer invokes ClearSignalBuffer — "
+                + "stale callsigns will accumulate across frequency changes (live checklist: "
+                + "'frequency change -> single callsign')");
+        }
+
         /// <summary>'x.Event' / 'arr[i].Event' -> 'Event'; bare identifier -> null.</summary>
         private static string EventNameOf(ExpressionSyntax left)
         {

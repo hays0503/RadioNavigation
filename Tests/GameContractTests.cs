@@ -278,5 +278,43 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                     BindingFlags.Instance | BindingFlags.NonPublic));
             }
         }
+
+        // P5.2 live-gate item B: the pre-flight log must stay free of
+        // "target methods not found". This test mirrors
+        // HarmonyPatchInstaller.ResolveTargets (HarmonyPatchInstaller.cs:47-51)
+        // EXACTLY — same lookups, same BindingFlags, no base-type walk.
+        // .NET GetMethod does not trace base classes for NonPublic members,
+        // so OnDecisionSelected/OnStopped resolve only while RadioStory keeps
+        // its own overrides (Story.cs:332/466 declare them protected virtual).
+        // GenericStory.cs:46 adds a public null-arg OnDecisionSelected() that
+        // must stay excluded by the flags — a visibility change there would
+        // make the installer's lookup throw AmbiguousMatchException at load.
+        // If this test goes red, the mod's radio hooks are dead on the
+        // installed game version.
+        [Fact]
+        public void HarmonyPatchTargets_ResolveExactlyAsInstallerDoes()
+        {
+            RequireGame();
+
+            var radioStory = FindStoryType(RadioStoryName);
+            Assert.NotNull(radioStory);
+
+            var continueStory = radioStory.GetMethod("ContinueStory",
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.NotNull(continueStory);
+
+            var onDecision = radioStory.GetMethod("OnDecisionSelected",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(onDecision);
+
+            var onStopped = radioStory.GetMethod("OnStopped",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(onStopped);
+
+            var locale = Game().GetType("UBOAT.Game.Core.Data.Locale", false);
+            Assert.NotNull(locale);
+            Assert.NotNull(locale.GetMethod("RetrieveString", new[] { typeof(string) }));
+            Assert.NotNull(locale.GetMethod("RetrieveString", new[] { typeof(string), typeof(string) }));
+        }
     }
 }
