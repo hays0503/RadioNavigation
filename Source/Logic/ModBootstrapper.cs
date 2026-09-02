@@ -86,21 +86,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                if (scene.name != "Main Scene")
-                {
-                    Debug.Log("[RadioNav][Main] Scene '" + scene.name + "' is not Main Scene, skipping");
-                    return;
-                }
-
-                // F176: the GUI hierarchy path is a single source of truth
-                // here; keep it in one constant and fail loudly if the game
-                // renames the container.
-                Transform viewport = GameObject.Find(MainSceneViewportPath)?.transform;
+                Transform viewport = EnsureViewport(scene);
                 if (viewport.IsNull())
-                {
-                    Debug.LogWarning("[RadioNav][Main] '" + MainSceneViewportPath + "' not found \u2014 GUI hierarchy may have changed in this UBOAT version");
                     return;
-                }
 
                 if (resourceManager.IsNull())
                 {
@@ -108,92 +96,23 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
 
-                if (RadioHandler.Instance.IsNotNull() && RadioHandler.Instance.gameObject.IsNotNull())
-                {
-                    Debug.Log("[RadioNav][Main] Reusing existing Radio panel");
+                if (HasExistingPanel(viewport))
                     return;
-                }
 
-                if (viewport.Find(RadioRootName).IsNotNull())
-                {
-                    Debug.Log("[RadioNav][Main] Existing stable RadioNavigation panel found");
-                    return;
-                }
-
-                Debug.Log("[RadioNav][Main] InstantiatePrefab(\"Radio\") from resourceManager \u2014 AssetBundle Bundles/testui expected to be loaded by game mod loader");
-                GameObject radio = resourceManager.InstantiatePrefab("Radio");
+                GameObject radio = InstantiateRadio(viewport);
                 if (radio.IsNull())
-                {
-                    Debug.LogError("[RadioNav][Main] Prefab 'Radio' not found in AssetBundle or InstantiatePrefab returned null. Check Bundles/testui");
                     return;
-                }
 
-                radio.name = RadioRootName;
-
-                // ADR-019: централизовано через PrefabNames (best practice, не строковые литералы) + degraded open
-                var missing = PrefabValidator.FindMissing(path => radio.transform.Find(path).IsNotNull());
-                if (missing.Count.IsPositive())
-                {
-                    string msg = "[RadioNav][Main] Prefab structure validation FAILED. Missing: " + string.Join(", ", missing);
-                    // PlayerPrefs RadioNav.SkipValidation=1 → degraded open (ловим бандл-расхождение без краша)
-                    if (PlayerPrefs.GetInt(PrefabValidator.SkipValidationKey, 0) == 1)
-                        Debug.LogWarning(msg + " — SkipValidation=1, continuing degraded");
-                    else
-                    {
-                        Debug.LogError(msg);
-                        Object.Destroy(radio);
-                        return;
-                    }
-                }
-
-                RadioInstaller.Instantiate(radio, viewport);
-                if (radio.GetComponent<StationMapOverlay>().IsNull())
-                    radio.AddComponent<StationMapOverlay>();
-                if (radio.GetComponent<LighthouseMapMarker>().IsNull())
-                    radio.AddComponent<LighthouseMapMarker>();
-                if (radio.GetComponent<StationMapMarker>().IsNull())
-                    radio.AddComponent<StationMapMarker>();
-                if (radio.GetComponent<FixMapMarker>().IsNull())
-                    radio.AddComponent<FixMapMarker>(); // SEXTANT_PLAN v1.10
-                if (radio.GetComponent<ConstellationToggleButton>().IsNull())
-                    radio.AddComponent<ConstellationToggleButton>();
-                if (radio.GetComponent<SextantController>().IsNull())
-                    radio.AddComponent<SextantController>(); // SEXTANT_PLAN §7.9
+                AddMapComponents(radio);
 
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +
                     " radio=created handlers=" + hCount +
                     " visible=" + (RadioHandler.Instance.IsNotNull() ? RadioHandler.Instance.IsVisible.ToString() : "no-instance"));
 
-                // STAR_SKY: create star sky renderer (ADR-021)
-                GameObject starSkyRoot = new GameObject("StarSkyRoot");
-                starSkyRoot.AddComponent<StarsMesh>();
-                Object.DontDestroyOnLoad(starSkyRoot);
-                Debug.Log("[RadioNav][Main] StarSkyRoot created with StarsMesh component");
-
-                // STAR_SKY: create constellation lines renderer
-                GameObject constellationRoot = new GameObject("ConstellationRoot");
-                constellationRoot.AddComponent<ConstellationMesh>();
-                Object.DontDestroyOnLoad(constellationRoot);
-                Debug.Log("[RadioNav][Main] ConstellationRoot created with ConstellationMesh component");
-
-                // STAR_SKY: create planetary billboard renderer once
-                if (GameObject.Find("PlanetRoot").IsNull())
-                {
-                    GameObject planetRoot = new GameObject("PlanetRoot");
-                    planetRoot.AddComponent<PlanetRenderer>();
-                    Object.DontDestroyOnLoad(planetRoot);
-                    Debug.Log("[RadioNav][Main] PlanetRoot created with PlanetRenderer component");
-                }
-
-                // SEXTANT: real-size filtered sun disc (layer 7, PIP cameras only)
-                if (GameObject.Find("SunDiscRoot").IsNull())
-                {
-                    GameObject sunDiscRoot = new GameObject("SunDiscRoot");
-                    sunDiscRoot.AddComponent<SunDiscRenderer>();
-                    Object.DontDestroyOnLoad(sunDiscRoot);
-                    Debug.Log("[RadioNav][Main] SunDiscRoot created with SunDiscRenderer component");
-                }
+                CreateStarSky();
+                CreatePlanetRoot();
+                CreateSunDiscRoot();
 
                 LighthousePlacer.EnsureRunning();
 
@@ -204,6 +123,129 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Debug.LogError("[RadioNav][Main] Error: " + e.Message);
                 Debug.LogException(e);
+            }
+        }
+
+        private Transform EnsureViewport(Scene scene)
+        {
+            if (scene.name != "Main Scene")
+            {
+                Debug.Log("[RadioNav][Main] Scene '" + scene.name + "' is not Main Scene, skipping");
+                return null;
+            }
+
+            // F176: the GUI hierarchy path is a single source of truth
+            // here; keep it in one constant and fail loudly if the game
+            // renames the container.
+            Transform viewport = GameObject.Find(MainSceneViewportPath)?.transform;
+            if (viewport.IsNull())
+            {
+                Debug.LogWarning("[RadioNav][Main] '" + MainSceneViewportPath + "' not found \u2014 GUI hierarchy may have changed in this UBOAT version");
+                return null;
+            }
+            return viewport;
+        }
+
+        private bool HasExistingPanel(Transform viewport)
+        {
+            if (RadioHandler.Instance.IsNotNull() && RadioHandler.Instance.gameObject.IsNotNull())
+            {
+                Debug.Log("[RadioNav][Main] Reusing existing Radio panel");
+                return true;
+            }
+
+            if (viewport.Find(RadioRootName).IsNotNull())
+            {
+                Debug.Log("[RadioNav][Main] Existing stable RadioNavigation panel found");
+                return true;
+            }
+            return false;
+        }
+
+        private GameObject InstantiateRadio(Transform viewport)
+        {
+            Debug.Log("[RadioNav][Main] InstantiatePrefab(\"Radio\") from resourceManager \u2014 AssetBundle Bundles/testui expected to be loaded by game mod loader");
+            GameObject radio = resourceManager.InstantiatePrefab("Radio");
+            if (radio.IsNull())
+            {
+                Debug.LogError("[RadioNav][Main] Prefab 'Radio' not found in AssetBundle or InstantiatePrefab returned null. Check Bundles/testui");
+                return null;
+            }
+
+            radio.name = RadioRootName;
+
+            // ADR-019: централизовано через PrefabNames (best practice, не строковые литералы) + degraded open
+            var missing = PrefabValidator.FindMissing(path => radio.transform.Find(path).IsNotNull());
+            if (missing.Count.IsPositive())
+            {
+                string msg = "[RadioNav][Main] Prefab structure validation FAILED. Missing: " + string.Join(", ", missing);
+                // PlayerPrefs RadioNav.SkipValidation=1 → degraded open (ловим бандл-расхождение без краша)
+                if (PlayerPrefs.GetInt(PrefabValidator.SkipValidationKey, 0) == 1)
+                    Debug.LogWarning(msg + " — SkipValidation=1, continuing degraded");
+                else
+                {
+                    Debug.LogError(msg);
+                    Object.Destroy(radio);
+                    return null;
+                }
+            }
+
+            RadioInstaller.Instantiate(radio, viewport);
+            return radio;
+        }
+
+        private void AddMapComponents(GameObject radio)
+        {
+            if (radio.GetComponent<StationMapOverlay>().IsNull())
+                radio.AddComponent<StationMapOverlay>();
+            if (radio.GetComponent<LighthouseMapMarker>().IsNull())
+                radio.AddComponent<LighthouseMapMarker>();
+            if (radio.GetComponent<StationMapMarker>().IsNull())
+                radio.AddComponent<StationMapMarker>();
+            if (radio.GetComponent<FixMapMarker>().IsNull())
+                radio.AddComponent<FixMapMarker>(); // SEXTANT_PLAN v1.10
+            if (radio.GetComponent<ConstellationToggleButton>().IsNull())
+                radio.AddComponent<ConstellationToggleButton>();
+            if (radio.GetComponent<SextantController>().IsNull())
+                radio.AddComponent<SextantController>(); // SEXTANT_PLAN §7.9
+        }
+
+        private void CreateStarSky()
+        {
+            // STAR_SKY: create star sky renderer (ADR-021)
+            GameObject starSkyRoot = new GameObject("StarSkyRoot");
+            starSkyRoot.AddComponent<StarsMesh>();
+            Object.DontDestroyOnLoad(starSkyRoot);
+            Debug.Log("[RadioNav][Main] StarSkyRoot created with StarsMesh component");
+
+            // STAR_SKY: create constellation lines renderer
+            GameObject constellationRoot = new GameObject("ConstellationRoot");
+            constellationRoot.AddComponent<ConstellationMesh>();
+            Object.DontDestroyOnLoad(constellationRoot);
+            Debug.Log("[RadioNav][Main] ConstellationRoot created with ConstellationMesh component");
+        }
+
+        private void CreatePlanetRoot()
+        {
+            // STAR_SKY: create planetary billboard renderer once
+            if (GameObject.Find("PlanetRoot").IsNull())
+            {
+                GameObject planetRoot = new GameObject("PlanetRoot");
+                planetRoot.AddComponent<PlanetRenderer>();
+                Object.DontDestroyOnLoad(planetRoot);
+                Debug.Log("[RadioNav][Main] PlanetRoot created with PlanetRenderer component");
+            }
+        }
+
+        private void CreateSunDiscRoot()
+        {
+            // SEXTANT: real-size filtered sun disc (layer 7, PIP cameras only)
+            if (GameObject.Find("SunDiscRoot").IsNull())
+            {
+                GameObject sunDiscRoot = new GameObject("SunDiscRoot");
+                sunDiscRoot.AddComponent<SunDiscRenderer>();
+                Object.DontDestroyOnLoad(sunDiscRoot);
+                Debug.Log("[RadioNav][Main] SunDiscRoot created with SunDiscRenderer component");
             }
         }
     }

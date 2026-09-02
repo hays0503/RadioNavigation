@@ -381,30 +381,35 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 if (c == '\\')
                 {
-                    pos++;
-                    if (pos >= s.Length)
-                        throw new FormatException("Unterminated escape");
-
-                    char escape = s[pos];
-                    switch (escape)
-                    {
-                        case '"': sb.Append('"'); break;
-                        case '\\': sb.Append('\\'); break;
-                        case '/': sb.Append('/'); break;
-                        case 'b': sb.Append('\b'); break;
-                        case 'f': sb.Append('\f'); break;
-                        case 'n': sb.Append('\n'); break;
-                        case 'r': sb.Append('\r'); break;
-                        case 't': sb.Append('\t'); break;
-                        default: throw new FormatException("Unknown escape \\" + escape);
-                    }
-                    pos++;
+                    sb.Append(ParseEscape(s, ref pos));
                 }
                 else
                 {
                     sb.Append(c);
                     pos++;
                 }
+            }
+        }
+
+        private static char ParseEscape(string s, ref int pos)
+        {
+            pos++;
+            if (pos >= s.Length)
+                throw new FormatException("Unterminated escape");
+
+            char escape = s[pos];
+            pos++;
+            switch (escape)
+            {
+                case '"': return '"';
+                case '\\': return '\\';
+                case '/': return '/';
+                case 'b': return '\b';
+                case 'f': return '\f';
+                case 'n': return '\n';
+                case 'r': return '\r';
+                case 't': return '\t';
+                default: throw new FormatException("Unknown escape \\" + escape);
             }
         }
 

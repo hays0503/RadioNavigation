@@ -1,9 +1,10 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Debug",
+    [ValidateRange(0, 128)]
+    [int]$Threads = 0,
     [switch]$Json,
-    [switch]$Sarif,
-    [switch]$Text
+    [switch]$Sarif
 )
 
 # PVS-Studio analysis wrapper for RadioNavigation.
@@ -56,53 +57,79 @@ if ($LASTEXITCODE -ne 0) {
 $plog = Join-Path $root "pvs-report.plog"
 $txt = Join-Path $root "pvs-report.txt"
 
+$threadLabel = if ($Threads -eq 0) { "auto" } else { $Threads }
 Write-Host "[RadioNavigation] Running PVS-Studio on $csproj ..."
-& $pvsCmd -t $csproj -o $plog -c $Configuration
+Write-Host "[RadioNavigation] Analysis threads: $threadLabel"
+& $pvsCmd -t $csproj -o $plog -c $Configuration -j $Threads
 $code = $LASTEXITCODE
 
 # Decode the PVS-Studio_Cmd bit-mask exit code.
-$filesFail   = ($code -band 1)   / 1
-$generalErr  = ($code -band 2)   / 2
-$badArgs     = ($code -band 4)   / 4
-$fileNotFound= ($code -band 8)   / 8
-$badCfg      = ($code -band 16)  / 16
-$badSolution = ($code -band 32)  / 32
-$badExt      = ($code -band 64)  / 64
-$noLicense   = ($code -band 128) / 128
-$issuesFound = ($code -band 256) / 256
-$suppressErr = ($code -band 512) / 512
-$licenseSoon = ($code -band 1024)/ 1024
+$filesFail    = (($code -band 1)   -ne 0)
+$generalErr   = (($code -band 2)   -ne 0)
+$badArgs      = (($code -band 4)   -ne 0)
+$fileNotFound = (($code -band 8)   -ne 0)
+$badCfg       = (($code -band 16)  -ne 0)
+$badSolution  = (($code -band 32)  -ne 0)
+$badExt       = (($code -band 64)  -ne 0)
+$noLicense    = (($code -band 128) -ne 0)
+$issuesFound  = (($code -band 256) -ne 0)
+$suppressErr  = (($code -band 512) -ne 0)
+$licenseSoon  = (($code -band 1024) -ne 0)
 
-if ($noLicense -eq 1) {
+if ($noLicense) {
     Write-Error "[RadioNavigation] PVS-Studio license missing/expired (exit $code)."
     exit 1
 }
-if ($generalErr -eq 1 -or $badArgs -eq 1 -or $fileNotFound -eq 1 -or $badCfg -eq 1 -or $badSolution -eq 1 -or $badExt -eq 1) {
+if ($generalErr -or $badArgs -or $fileNotFound -or $badCfg -or $badSolution -or $badExt -or $suppressErr) {
     Write-Error "[RadioNavigation] PVS-Studio run failed (exit $code). See $plog"
     exit 1
 }
-if ($filesFail -eq 1) {
-    Write-Warning "[RadioNavigation] PVS-Studio crashed analyzing some files (exit $code)."
+if ($filesFail) {
+    # A crash on some files means the analysis is INCOMPLETE.
+    # We cannot prove there are no issues in files the analyzer never processed.
+    # For a blocking quality gate that is a failure, not a warning.
+    Write-Error "[RadioNavigation] PVS-Studio crashed analyzing some files; analysis incomplete (exit $code). See $plog"
+    exit 1
+}
+
+if (-not (Test-Path $plog)) {
+    Write-Error "[RadioNavigation] PVS-Studio did not produce report: $plog"
+    exit 1
 }
 
 # Convert to human-readable txt (always) plus optional JSON/SARIF.
 # PlogConverter's -o is an OUTPUT DIRECTORY; the file name comes from -n.
 & $plogConv $plog -t Txt -o $root -n "pvs-report" | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "[RadioNavigation] PlogConverter failed to generate TXT report."
+    exit 1
+}
+if (-not (Test-Path $txt)) {
+    Write-Error "[RadioNavigation] PlogConverter reported success but TXT report was not created: $txt"
+    exit 1
+}
 if ($Json) {
     & $plogConv $plog -t JSON -o $root -n "pvs-report" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "[RadioNavigation] PlogConverter failed to generate JSON report."
+        exit 1
+    }
 }
 if ($Sarif) {
     & $plogConv $plog -t Sarif -o $root -n "pvs-report" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "[RadioNavigation] PlogConverter failed to generate SARIF report."
+        exit 1
+    }
 }
 
-if ($issuesFound -eq 1) {
+if ($licenseSoon) {
+    Write-Warning "[RadioNavigation] PVS-Studio license expires within a month."
+}
+if ($issuesFound) {
     Write-Host "[RadioNavigation] PVS-Studio found issues -> $txt"
     Write-Host "[RadioNavigation] PVS-Studio exit code: $code (bit 256 = issues)"
     exit 1
-}
-
-if ($licenseSoon -eq 1) {
-    Write-Warning "[RadioNavigation] PVS-Studio license expires within a month."
 }
 Write-Host "[RadioNavigation] PVS-Studio clean -> $txt"
 exit 0

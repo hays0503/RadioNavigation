@@ -397,28 +397,48 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void TryOpen()
         {
+            if (!CanOpen())
+                return;
+
+            EnsureOverlay();
+            EnsurePipCameras();
+            SolveSunCalibration();
+
+            ResetReadingState();
+
+            AttachAndConfigureCameras();
+
+            UpdateFilterLabel();
+            UpdateFilterDim();
+            if (painText != null) painText.enabled = false;
+            UpdateReadout(true);
+            Debug.Log(LogPrefix + " opened (two-camera split ocular)");
+        }
+
+        private bool CanOpen()
+        {
             if (!IsLiveViewMode())
             {
                 Debug.Log(LogPrefix + " Z ignored outside live view (mode=" + CurrentModeName() + ")");
-                return;
+                return false;
             }
             if (!CameraResolver.TryResolve(out viewCamera) || viewCamera == null)
             {
                 Debug.Log(LogPrefix + " Z ignored - no rendering camera");
-                return;
+                return false;
             }
             if (gameInput == null && InjectionFramework.Instance.IsNotNull())
                 gameInput = InjectionFramework.Instance.GetInstance<GameInput>();
             if (gameInput == null)
             {
                 Debug.LogWarning(LogPrefix + " GameInput not available - cannot open");
-                return;
+                return false;
             }
+            return true;
+        }
 
-            EnsureOverlay();
-            EnsurePipCameras();
-            SolveSunCalibration();
-
+        private void ResetReadingState()
+        {
             // arcAngle is intentionally NOT reset here: the reading must
             // survive close/open cycles (explicit reset = R key / 0° button).
             leftFilterCount = 0;
@@ -439,7 +459,10 @@ namespace UBOAT.Mods.RadioNavigation
             renderCheckTimer = 1.0f;
             SunDiscRenderer.RandomizeDisc(); // fresh sunspot pattern per open
             SunDiscRenderer.Active = false;
+        }
 
+        private void AttachAndConfigureCameras()
+        {
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
             AttachWaterCameras();
@@ -467,12 +490,6 @@ namespace UBOAT.Mods.RadioNavigation
             UpdatePipPose();
             LogVectorState("open");
             IsOpen = true;
-
-            UpdateFilterLabel();
-            UpdateFilterDim();
-            if (painText != null) painText.enabled = false;
-            UpdateReadout(true);
-            Debug.Log(LogPrefix + " opened (two-camera split ocular)");
         }
 
         private void Close()
@@ -731,62 +748,98 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         private void LogVectorState(string trigger)
         {
+            ResolveViewCamera();
+            var l = ReadCameraVectors(pipLeftCamera);
+            var r = ReadCameraVectors(pipRightCamera);
+            var v = ReadCameraVectors(viewCamera);
+            var sun = ReadSunVectors();
+            double q = SextantArc.Quantize(arcAngle);
+            float angLR = pipLeftCamera != null && pipRightCamera != null
+                ? Vector3.Angle(l.Forward, r.Forward) : 0f;
+            float dotLR = pipLeftCamera != null && pipRightCamera != null
+                ? Vector3.Dot(l.Forward, r.Forward) : 0f;
+
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} VECL {1} pos={2} eul={3} fwd={4} up={5} rgt={6}",
+                LogPrefix, trigger, V3(l.Position), V3(l.Euler), V3(l.Forward), V3(l.Up), V3(l.Right)));
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} VECR {1} pos={2} eul={3} fwd={4} up={5} rgt={6}",
+                LogPrefix, trigger, V3(r.Position), V3(r.Euler), V3(r.Forward), V3(r.Up), V3(r.Right)));
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} VECV {1} pos={2} eul={3} fwd={4}",
+                LogPrefix, trigger, V3(v.Position), V3(v.Euler), V3(v.Forward)));
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} VECD {1} arc={2:F6} quant={3:F6} fmt={4} angLR={5:F3} dotLR={6:F6}",
+                LogPrefix, trigger, arcAngle, q, SextantArc.Format(q), angLR, dotLR));
+            LogSunLines(trigger, r.Forward, sun);
+        }
+
+        private void ResolveViewCamera()
+        {
             if (viewCamera == null && !CameraResolver.TryResolve(out viewCamera))
                 viewCamera = FindObjectOfType<Camera>();
             if (viewCamera != null)
                 lastVectorLogYaw = viewCamera.transform.eulerAngles.y;
+        }
 
-            Vector3 lfwd = pipLeftCamera != null ? pipLeftCamera.transform.forward : Vector3.zero;
-            Vector3 lup = pipLeftCamera != null ? pipLeftCamera.transform.up : Vector3.zero;
-            Vector3 lrgt = pipLeftCamera != null ? pipLeftCamera.transform.right : Vector3.zero;
-            Vector3 lpos = pipLeftCamera != null ? pipLeftCamera.transform.position : Vector3.zero;
-            Vector3 leul = pipLeftCamera != null ? pipLeftCamera.transform.eulerAngles : Vector3.zero;
-            Vector3 rfwd = pipRightCamera != null ? pipRightCamera.transform.forward : Vector3.zero;
-            Vector3 rup = pipRightCamera != null ? pipRightCamera.transform.up : Vector3.zero;
-            Vector3 rrgt = pipRightCamera != null ? pipRightCamera.transform.right : Vector3.zero;
-            Vector3 rpos = pipRightCamera != null ? pipRightCamera.transform.position : Vector3.zero;
-            Vector3 reul = pipRightCamera != null ? pipRightCamera.transform.eulerAngles : Vector3.zero;
-            Vector3 vfwd = viewCamera != null ? viewCamera.transform.forward : Vector3.zero;
-            Vector3 veul = viewCamera != null ? viewCamera.transform.eulerAngles : Vector3.zero;
-            Vector3 vpos = viewCamera != null ? viewCamera.transform.position : Vector3.zero;
-            Vector3 sunDir = Vector3.zero;
-            float sunAlt = 0f, sunAz = 0f;
-            bool own = TryGetOwnSun(out sunDir, out sunAlt, out sunAz);
-            Vector3 gameDir = Vector3.zero;
-            float gameAlt = 0f;
-            bool game = TryGetGameSun(out gameDir, out gameAlt);
-            double q = SextantArc.Quantize(arcAngle);
-            float angLR = pipLeftCamera != null && pipRightCamera != null
-                ? Vector3.Angle(lfwd, rfwd) : 0f;
-            float dotLR = pipLeftCamera != null && pipRightCamera != null
-                ? Vector3.Dot(lfwd, rfwd) : 0f;
+        private struct CameraVectors
+        {
+            public Vector3 Forward;
+            public Vector3 Up;
+            public Vector3 Right;
+            public Vector3 Position;
+            public Vector3 Euler;
+        }
 
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} VECL {1} pos={2} eul={3} fwd={4} up={5} rgt={6}",
-                LogPrefix, trigger, V3(lpos), V3(leul), V3(lfwd), V3(lup), V3(lrgt)));
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} VECR {1} pos={2} eul={3} fwd={4} up={5} rgt={6}",
-                LogPrefix, trigger, V3(rpos), V3(reul), V3(rfwd), V3(rup), V3(rrgt)));
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} VECV {1} pos={2} eul={3} fwd={4}",
-                LogPrefix, trigger, V3(vpos), V3(veul), V3(vfwd)));
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} VECD {1} arc={2:F6} quant={3:F6} fmt={4} angLR={5:F3} dotLR={6:F6}",
-                LogPrefix, trigger, arcAngle, q, SextantArc.Format(q), angLR, dotLR));
-            if (own || game)
+        private static CameraVectors ReadCameraVectors(Camera cam)
+        {
+            if (cam == null)
+                return default;
+            return new CameraVectors
             {
-                float angSun = own ? Vector3.Angle(rfwd, sunDir) : -1f;
-                float sep = own && game ? Vector3.Angle(sunDir, gameDir) : -1f;
+                Forward = cam.transform.forward,
+                Up = cam.transform.up,
+                Right = cam.transform.right,
+                Position = cam.transform.position,
+                Euler = cam.transform.eulerAngles,
+            };
+        }
+
+        private struct SunVectors
+        {
+            public bool Own;
+            public Vector3 OwnDir;
+            public float OwnAlt;
+            public float OwnAz;
+            public bool Game;
+            public Vector3 GameDir;
+            public float GameAlt;
+        }
+
+        private SunVectors ReadSunVectors()
+        {
+            var sun = new SunVectors();
+            sun.Own = TryGetOwnSun(out sun.OwnDir, out sun.OwnAlt, out sun.OwnAz);
+            sun.Game = TryGetGameSun(out sun.GameDir, out sun.GameAlt);
+            return sun;
+        }
+
+        private void LogSunLines(string trigger, Vector3 rightFwd, SunVectors sun)
+        {
+            if (sun.Own || sun.Game)
+            {
+                float angSun = sun.Own ? Vector3.Angle(rightFwd, sun.OwnDir) : -1f;
+                float sep = sun.Own && sun.Game ? Vector3.Angle(sun.OwnDir, sun.GameDir) : -1f;
                 Debug.Log(string.Format(CultureInfo.InvariantCulture,
                     "{0} VECSUN {1} own{2} alt={3:F2} az={4:F1} game{5} galt={6:F2} angSunR={7:F3} sep={8:F3}",
-                    LogPrefix, trigger, own ? V3(sunDir) : " n/a", sunAlt, sunAz,
-                    game ? V3(gameDir) : " n/a", gameAlt, angSun, sep));
+                    LogPrefix, trigger, sun.Own ? V3(sun.OwnDir) : " n/a", sun.OwnAlt, sun.OwnAz,
+                    sun.Game ? V3(sun.GameDir) : " n/a", sun.GameAlt, angSun, sep));
             }
-            if (own && pipRightCamera != null)
+            if (sun.Own && pipRightCamera != null)
             {
                 // Sun projected into the right camera's viewport: proves the
                 // rendered picture matches the astro math (center = 0.5,0.5).
-                Vector3 sunNdc = pipRightCamera.WorldToViewportPoint(pipRightCamera.transform.position + sunDir * 1000f);
+                Vector3 sunNdc = pipRightCamera.WorldToViewportPoint(pipRightCamera.transform.position + sun.OwnDir * 1000f);
                 float nx = (sunNdc.x - 0.5f) * 2f;
                 float ny = (sunNdc.y - 0.5f) * 2f;
                 float tanHalf = Mathf.Tan(pipRightCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
@@ -1169,6 +1222,12 @@ namespace UBOAT.Mods.RadioNavigation
             // filter only. The left filter dims the horizon view.
             SunDiscRenderer.Active = IsOpen && rightFilterCount > 0;
 
+            UpdateBloomCut();
+            LogBloomCutOnce();
+        }
+
+        private void UpdateBloomCut()
+        {
             // Bloom-cut per half: each PIP camera has its own volume.
             if (bloomCutRightGo != null)
             {
@@ -1182,26 +1241,29 @@ namespace UBOAT.Mods.RadioNavigation
                 bloomCutLeftGo.SetActive(leftOn);
                 Debug.Log(LogPrefix + " BLOOMCUT left " + (leftOn ? "on" : "off") + " (filters=" + leftFilterCount + ")");
             }
-            if (!bloomCutLogged && (leftFilterCount > 0 || rightFilterCount > 0))
+        }
+
+        private void LogBloomCutOnce()
+        {
+            if (bloomCutLogged || (leftFilterCount <= 0 && rightFilterCount <= 0))
+                return;
+            bloomCutLogged = true;
+            try
             {
-                bloomCutLogged = true;
-                try
-                {
-                    PostProcessLayer pipLeftLayer = pipLeftCamera != null
-                        ? pipLeftCamera.GetComponent<PostProcessLayer>() : null;
-                    PostProcessLayer pipRightLayer = pipRightCamera != null
-                        ? pipRightCamera.GetComponent<PostProcessLayer>() : null;
-                    PostProcessLayer mainLayer = viewCamera != null
-                        ? viewCamera.GetComponent<PostProcessLayer>() : null;
-                    Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                        "{0} BLOOMCUT applied pipL={1} pipR={2} main={3} leftVol={4} rightVol={5}",
-                        LogPrefix, pipLeftLayer != null, pipRightLayer != null,
-                        mainLayer != null,
-                        bloomCutLeftGo != null && bloomCutLeftGo.activeSelf,
-                        bloomCutRightGo != null && bloomCutRightGo.activeSelf));
-                }
-                catch { }
+                PostProcessLayer pipLeftLayer = pipLeftCamera != null
+                    ? pipLeftCamera.GetComponent<PostProcessLayer>() : null;
+                PostProcessLayer pipRightLayer = pipRightCamera != null
+                    ? pipRightCamera.GetComponent<PostProcessLayer>() : null;
+                PostProcessLayer mainLayer = viewCamera != null
+                    ? viewCamera.GetComponent<PostProcessLayer>() : null;
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "{0} BLOOMCUT applied pipL={1} pipR={2} main={3} leftVol={4} rightVol={5}",
+                    LogPrefix, pipLeftLayer != null, pipRightLayer != null,
+                    mainLayer != null,
+                    bloomCutLeftGo != null && bloomCutLeftGo.activeSelf,
+                    bloomCutRightGo != null && bloomCutRightGo.activeSelf));
             }
+            catch { }
         }
 
         private void UpdateFilterDim()
@@ -2559,86 +2621,107 @@ namespace UBOAT.Mods.RadioNavigation
 
             try
             {
-                // Passes is get-only (CanWrite=false) - find backing field by type
                 FieldInfo passesField = null;
                 FieldInfo useCustomField = null;
-                foreach (FieldInfo f in type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
-                {
-                    if (f.FieldType.IsArray && f.FieldType.GetElementType() == passType)
-                        passesField = f;
-                    else if (f.FieldType == typeof(bool) && f.Name.IndexOf("useCustom", StringComparison.OrdinalIgnoreCase) >= 0)
-                        useCustomField = f;
-                }
-                if (passesField == null)
-                    passesField = type.GetField("passes", BindingFlags.NonPublic | BindingFlags.Instance);
-                if (useCustomField == null)
-                    useCustomField = type.GetField("useCustomPasses", BindingFlags.NonPublic | BindingFlags.Instance);
+                FindPassFields(type, passType, ref passesField, ref useCustomField);
 
-                Array source = null;
-                if (mainData != null)
-                {
-                    PropertyInfo passesProp = type.GetProperty("Passes");
-                    if (passesProp != null)
-                        source = passesProp.GetValue(mainData) as Array;
-                    // fallback: read backing field directly if property missing
-                    if (source == null && passesField != null)
-                        source = passesField.GetValue(mainData) as Array;
-                }
-
+                Array source = ReadSourcePasses(mainData, type, passesField);
                 int count = source != null && source.Length > 0 ? source.Length : 1;
-                Array passes = Array.CreateInstance(passType, count);
-                if (source != null && source.Length > 0)
-                {
-                    // CameraPass(int cullingMask) is the only public ctor;
-                    // Enabled is read-write, ScreenSpaceReflections is
-                    // get-only and stays at its default.
-                    PropertyInfo cullingProp = passType.GetProperty("CullingMask");
-                    PropertyInfo enabledProp = passType.GetProperty("Enabled");
-                    for (int i = 0; i < source.Length; i++)
-                    {
-                        object src = source.GetValue(i);
-                        int mask = cullingMask;
-                        if (cullingProp != null)
-                        {
-                            object maskBoxed = cullingProp.GetValue(src);
-                            if (maskBoxed is int)
-                                mask = (int)maskBoxed;
-                        }
-                        object copy = Activator.CreateInstance(passType, mask);
-                        if (enabledProp != null)
-                        {
-                            object enabled = enabledProp.GetValue(src);
-                            if (enabled is bool)
-                                enabledProp.SetValue(copy, (bool)enabled);
-                        }
-                        passes.SetValue(copy, i);
-                    }
-                }
-                else
-                {
-                    object pass = Activator.CreateInstance(passType, cullingMask);
-                    passType.GetProperty("Enabled").SetValue(pass, true);
-                    passes.SetValue(pass, 0);
-                }
+                Array passes = CopyPasses(passType, source, cullingMask);
 
-                if (passesField != null)
-                    passesField.SetValue(data, passes);
-                else
-                    type.GetProperty("Passes").SetValue(data, passes);
-                if (useCustomField != null)
-                    useCustomField.SetValue(data, true);
-                else
-                {
-                    PropertyInfo useCustomProp = type.GetProperty("UseCustomPasses");
-                    if (useCustomProp != null && useCustomProp.CanWrite)
-                        useCustomProp.SetValue(data, true);
-                }
+                WritePasses(data, type, passesField, useCustomField, passes);
                 data.RenderScene = true;
                 Debug.Log(LogPrefix + " PIP render passes configured: " + count + " pass(es), mask=" + cullingMask);
             }
             catch (Exception e)
             {
                 Debug.LogWarning(LogPrefix + " render pass setup failed: " + e.Message + " " + e.StackTrace);
+            }
+        }
+
+        private static void FindPassFields(Type type, Type passType, ref FieldInfo passesField, ref FieldInfo useCustomField)
+        {
+            // Passes is get-only (CanWrite=false) - find backing field by type
+            foreach (FieldInfo f in type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (f.FieldType.IsArray && f.FieldType.GetElementType() == passType)
+                    passesField = f;
+                else if (f.FieldType == typeof(bool) && f.Name.IndexOf("useCustom", StringComparison.OrdinalIgnoreCase) >= 0)
+                    useCustomField = f;
+            }
+            if (passesField == null)
+                passesField = type.GetField("passes", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (useCustomField == null)
+                useCustomField = type.GetField("useCustomPasses", BindingFlags.NonPublic | BindingFlags.Instance);
+        }
+
+        private static Array ReadSourcePasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData mainData,
+            Type type, FieldInfo passesField)
+        {
+            if (mainData == null)
+                return null;
+            PropertyInfo passesProp = type.GetProperty("Passes");
+            Array source = passesProp != null ? passesProp.GetValue(mainData) as Array : null;
+            // fallback: read backing field directly if property missing
+            if (source == null && passesField != null)
+                source = passesField.GetValue(mainData) as Array;
+            return source;
+        }
+
+        private static Array CopyPasses(Type passType, Array source, int cullingMask)
+        {
+            int count = source != null && source.Length > 0 ? source.Length : 1;
+            Array passes = Array.CreateInstance(passType, count);
+            if (source != null && source.Length > 0)
+            {
+                // CameraPass(int cullingMask) is the only public ctor;
+                // Enabled is read-write, ScreenSpaceReflections is
+                // get-only and stays at its default.
+                PropertyInfo cullingProp = passType.GetProperty("CullingMask");
+                PropertyInfo enabledProp = passType.GetProperty("Enabled");
+                for (int i = 0; i < source.Length; i++)
+                {
+                    object src = source.GetValue(i);
+                    int mask = cullingMask;
+                    if (cullingProp != null)
+                    {
+                        object maskBoxed = cullingProp.GetValue(src);
+                        if (maskBoxed is int)
+                            mask = (int)maskBoxed;
+                    }
+                    object copy = Activator.CreateInstance(passType, mask);
+                    if (enabledProp != null)
+                    {
+                        object enabled = enabledProp.GetValue(src);
+                        if (enabled is bool)
+                            enabledProp.SetValue(copy, (bool)enabled);
+                    }
+                    passes.SetValue(copy, i);
+                }
+            }
+            else
+            {
+                object pass = Activator.CreateInstance(passType, cullingMask);
+                passType.GetProperty("Enabled").SetValue(pass, true);
+                passes.SetValue(pass, 0);
+            }
+            return passes;
+        }
+
+        private static void WritePasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData data,
+            Type type, FieldInfo passesField, FieldInfo useCustomField, Array passes)
+        {
+            if (passesField != null)
+                passesField.SetValue(data, passes);
+            else
+                type.GetProperty("Passes").SetValue(data, passes);
+            if (useCustomField != null)
+                useCustomField.SetValue(data, true);
+            else
+            {
+                PropertyInfo useCustomProp = type.GetProperty("UseCustomPasses");
+                if (useCustomProp != null && useCustomProp.CanWrite)
+                    useCustomProp.SetValue(data, true);
             }
         }
 

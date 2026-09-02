@@ -87,37 +87,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
-            if (markersManager == null)
-            {
-                markersManager = FindObjectOfType<EntityMarkersManager>();
-                if (markersManager == null)
-                    return;
-            }
+            if (!EnsureDependencies())
+                return;
 
-            if (mainCamera == null)
-            {
-                mainCamera = FindObjectOfType<MainCamera>();
-                if (mainCamera == null)
-                    return;
-            }
+            if (!EnsureBuilt())
+                return;
 
-            if (!built)
-            {
-                BuildAll();
-                if (!built)
-                    return;
-            }
-
-            float maintenanceInterval = MaintenanceIntervalSeconds;
-            if (maintenanceInterval > 0f)
-            {
-                maintenanceTimer += Time.unscaledDeltaTime;
-                if (maintenanceTimer >= maintenanceInterval)
-                {
-                    maintenanceTimer = 0f;
-                    OnMaintenance();
-                }
-            }
+            RunMaintenance();
 
             MapCameraController mapController = mainCamera.MapController;
             bool mapOpen = NavMarkerGate.IsMapOpen(
@@ -145,6 +121,50 @@ namespace UBOAT.Mods.RadioNavigation
             float parentLossy = markersManager.transform.lossyScale.x;
             float scale = (float)LighthouseMarkerSizing.MarkerScale(iconPx, unitsPerPixel, parentLossy);
 
+            UpdateViewPositions(elevation, scale, iconPx);
+        }
+
+        private bool EnsureDependencies()
+        {
+            if (markersManager == null)
+            {
+                markersManager = FindObjectOfType<EntityMarkersManager>();
+                if (markersManager == null)
+                    return false;
+            }
+
+            if (mainCamera == null)
+            {
+                mainCamera = FindObjectOfType<MainCamera>();
+                if (mainCamera == null)
+                    return false;
+            }
+            return true;
+        }
+
+        private bool EnsureBuilt()
+        {
+            if (built)
+                return true;
+            BuildAll();
+            return built;
+        }
+
+        private void RunMaintenance()
+        {
+            float maintenanceInterval = MaintenanceIntervalSeconds;
+            if (maintenanceInterval <= 0f)
+                return;
+            maintenanceTimer += Time.unscaledDeltaTime;
+            if (maintenanceTimer >= maintenanceInterval)
+            {
+                maintenanceTimer = 0f;
+                OnMaintenance();
+            }
+        }
+
+        private void UpdateViewPositions(float elevation, float scale, float iconPx)
+        {
             for (int i = 0; i < views.Count; i++)
             {
                 MarkerView view = views[i];

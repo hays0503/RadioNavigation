@@ -51,39 +51,14 @@ namespace UBOAT.Mods.RadioNavigation
                 && RectContains(dragArea, mouse);
 
             if (Input.GetMouseButtonDown(0))
-            {
-                pressedFromZone = scaleHovered || moveHovered;
-                downInScale = scaleHovered;
-                dragExceeded = false;
-                pressScreenPos = mouse;
-            }
+                HandlePressStart(mouse, scaleHovered, moveHovered);
 
             bool lmbHeld = Input.GetMouseButton(0);
             bool lmbUp = Input.GetMouseButtonUp(0);
             bool frozen = pressedFromZone && lmbHeld && !lmbUp;
             if (frozen)
             {
-                // Expanded-body press: the mod takes over the drag.
-                if (!downInScale && owner.IsChronometerExpanded)
-                {
-                    if (!mapDragActive)
-                    {
-                        mapDragActive = true;
-                        lastMapDragMouse = mouse;
-                        owner.OnMapDragBegin();
-                    }
-                    owner.OnMapDragDelta(mouse - lastMapDragMouse);
-                    lastMapDragMouse = mouse;
-                    return;
-                }
-
-                // A press from inside the body is in progress (drag or
-                // pending click): the last cursor stays until release.
-                float threshold = EventSystem.current != null
-                    ? EventSystem.current.pixelDragThreshold
-                    : 10f;
-                if (Vector2.Distance(mouse, pressScreenPos) > threshold)
-                    dragExceeded = true;
+                HandleFrozenDrag(mouse);
                 return;
             }
 
@@ -97,11 +72,47 @@ namespace UBOAT.Mods.RadioNavigation
             owner.SetMoveHover(moveHovered);
 
             if (lmbUp && pressedFromZone)
+                HandleRelease(scaleHovered);
+        }
+
+        private void HandlePressStart(Vector2 mouse, bool scaleHovered, bool moveHovered)
+        {
+            pressedFromZone = scaleHovered || moveHovered;
+            downInScale = scaleHovered;
+            dragExceeded = false;
+            pressScreenPos = mouse;
+        }
+
+        private void HandleFrozenDrag(Vector2 mouse)
+        {
+            // Expanded-body press: the mod takes over the drag.
+            if (!downInScale && owner.IsChronometerExpanded)
             {
-                pressedFromZone = false;
-                if (!dragExceeded && downInScale && scaleHovered)
-                    owner.OnScaleClicked();
+                if (!mapDragActive)
+                {
+                    mapDragActive = true;
+                    lastMapDragMouse = mouse;
+                    owner.OnMapDragBegin();
+                }
+                owner.OnMapDragDelta(mouse - lastMapDragMouse);
+                lastMapDragMouse = mouse;
+                return;
             }
+
+            // A press from inside the body is in progress (drag or
+            // pending click): the last cursor stays until release.
+            float threshold = EventSystem.current != null
+                ? EventSystem.current.pixelDragThreshold
+                : 10f;
+            if (Vector2.Distance(mouse, pressScreenPos) > threshold)
+                dragExceeded = true;
+        }
+
+        private void HandleRelease(bool scaleHovered)
+        {
+            pressedFromZone = false;
+            if (!dragExceeded && downInScale && scaleHovered)
+                owner.OnScaleClicked();
         }
 
         private bool RectTransformContains(Vector2 screenPoint)

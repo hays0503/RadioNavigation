@@ -19,6 +19,28 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void Apply(Harmony harmony)
         {
+            var targets = ResolveTargets();
+
+            string missing;
+            string missingPatches;
+            PreflightCheck(targets, out missing, out missingPatches);
+
+            if (missing.IsNotNull())
+            {
+                Debug.LogError(LogPrefix + " Pre-flight failed \u2014 target methods not found: " + missing.TrimEnd(',', ' '));
+            }
+            else if (missingPatches.IsNotNull())
+            {
+                Debug.LogError(LogPrefix + " Pre-flight failed \u2014 patch methods not found: " + missingPatches.TrimEnd(',', ' '));
+            }
+            else
+            {
+                ApplyPatches(harmony, targets);
+            }
+        }
+
+        private static PatchTarget[] ResolveTargets()
+        {
             var patchType = typeof(RadioStoryIntegration);
             var anyStatic = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
 
@@ -33,54 +55,66 @@ namespace UBOAT.Mods.RadioNavigation
             var handleDecisions = patchType.GetMethod("HandleCustomDecisions", anyStatic);
             var hideOnStop = patchType.GetMethod("HideRadioOnStop", anyStatic);
 
-            var targets = new[]
+            return new[]
             {
-                new { method = continueStory, prefix = (HarmonyMethod)null, postfix = injectT3PLL38.IsNotNull() ? new HarmonyMethod(injectT3PLL38) : null, name = "RadioStory.ContinueStory" },
-                new { method = retrieveString1, prefix = overrideLocale.IsNotNull() ? new HarmonyMethod(overrideLocale) : null, postfix = (HarmonyMethod)null, name = "Locale.RetrieveString" },
-                new { method = retrieveString2, prefix = overrideLocale.IsNotNull() ? new HarmonyMethod(overrideLocale) : null, postfix = (HarmonyMethod)null, name = "Locale.RetrieveString(string,string)" },
-                new { method = onDecision, prefix = handleDecisions.IsNotNull() ? new HarmonyMethod(handleDecisions) : null, postfix = (HarmonyMethod)null, name = "RadioStory.OnDecisionSelected" },
-                new { method = onStopped, prefix = (HarmonyMethod)null, postfix = hideOnStop.IsNotNull() ? new HarmonyMethod(hideOnStop) : null, name = "RadioStory.OnStopped" },
+                new PatchTarget(continueStory, injectT3PLL38.IsNotNull() ? new HarmonyMethod(injectT3PLL38) : null, null, "RadioStory.ContinueStory"),
+                new PatchTarget(retrieveString1, overrideLocale.IsNotNull() ? new HarmonyMethod(overrideLocale) : null, null, "Locale.RetrieveString"),
+                new PatchTarget(retrieveString2, overrideLocale.IsNotNull() ? new HarmonyMethod(overrideLocale) : null, null, "Locale.RetrieveString(string,string)"),
+                new PatchTarget(onDecision, handleDecisions.IsNotNull() ? new HarmonyMethod(handleDecisions) : null, null, "RadioStory.OnDecisionSelected"),
+                new PatchTarget(onStopped, null, hideOnStop.IsNotNull() ? new HarmonyMethod(hideOnStop) : null, "RadioStory.OnStopped"),
             };
+        }
 
-            string missing = null;
-            string missingPatches = null;
+        private static void PreflightCheck(PatchTarget[] targets, out string missing, out string missingPatches)
+        {
+            missing = null;
+            missingPatches = null;
             foreach (var t in targets)
             {
-                if (t.method.IsNull())
-                    missing = (missing ?? "") + t.name + ", ";
-                if (t.prefix.IsNotNull() && t.prefix.method.IsNull())
-                    missingPatches = (missingPatches ?? "") + t.name + " (prefix), ";
-                if (t.postfix.IsNotNull() && t.postfix.method.IsNull())
-                    missingPatches = (missingPatches ?? "") + t.name + " (postfix), ";
+                if (t.Method.IsNull())
+                    missing = (missing ?? "") + t.Name + ", ";
+                if (t.Prefix.IsNotNull() && t.Prefix.method.IsNull())
+                    missingPatches = (missingPatches ?? "") + t.Name + " (prefix), ";
+                if (t.Postfix.IsNotNull() && t.Postfix.method.IsNull())
+                    missingPatches = (missingPatches ?? "") + t.Name + " (postfix), ";
             }
-            if (missing.IsNotNull())
+        }
+
+        private static void ApplyPatches(Harmony harmony, PatchTarget[] targets)
+        {
+            int applied = 0;
+            foreach (var t in targets)
             {
-                Debug.LogError(LogPrefix + " Pre-flight failed \u2014 target methods not found: " + missing.TrimEnd(',', ' '));
-            }
-            else if (missingPatches.IsNotNull())
-            {
-                Debug.LogError(LogPrefix + " Pre-flight failed \u2014 patch methods not found: " + missingPatches.TrimEnd(',', ' '));
-            }
-            else
-            {
-                int applied = 0;
-                foreach (var t in targets)
+                try
                 {
-                    try
-                    {
-                        harmony.Patch(t.method, prefix: t.prefix, postfix: t.postfix);
-                        Debug.Log(LogPrefix + " Patched " + t.name);
-                        applied++;
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogError(LogPrefix + " Patch failed for " + t.name + ": " + ex.Message);
-                        harmony.UnpatchAll(harmony.Id); // F121: bare UnpatchAll() would roll back other mods' patches too
-                        Debug.Log(LogPrefix + " RadioNavigation patches rolled back due to partial failure");
-                        break;
-                    }
+                    harmony.Patch(t.Method, prefix: t.Prefix, postfix: t.Postfix);
+                    Debug.Log(LogPrefix + " Patched " + t.Name);
+                    applied++;
                 }
-                Debug.Log(LogPrefix + " Patches applied: " + applied + "/" + targets.Length);
+                catch (Exception ex)
+                {
+                    Debug.LogError(LogPrefix + " Patch failed for " + t.Name + ": " + ex.Message);
+                    harmony.UnpatchAll(harmony.Id); // F121: bare UnpatchAll() would roll back other mods' patches too
+                    Debug.Log(LogPrefix + " RadioNavigation patches rolled back due to partial failure");
+                    break;
+                }
+            }
+            Debug.Log(LogPrefix + " Patches applied: " + applied + "/" + targets.Length);
+        }
+
+        private sealed class PatchTarget
+        {
+            public MethodInfo Method { get; }
+            public HarmonyMethod Prefix { get; }
+            public HarmonyMethod Postfix { get; }
+            public string Name { get; }
+
+            public PatchTarget(MethodInfo method, HarmonyMethod prefix, HarmonyMethod postfix, string name)
+            {
+                Method = method;
+                Prefix = prefix;
+                Postfix = postfix;
+                Name = name;
             }
         }
     }

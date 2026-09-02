@@ -4,7 +4,8 @@ param(
     [ValidateSet("quick", "full")]
     [string]$Profile = "full",
     [switch]$Fix,
-    [switch]$Json
+    [switch]$Json,
+    [switch]$SkipSourceCheck
 )
 
 # Roslynator CLI analysis wrapper for RadioNavigation.
@@ -35,6 +36,7 @@ param(
 #   powershell -File analyze.ps1 -Severity info      # include info-level rules
 #   powershell -File analyze.ps1 -Fix                # apply auto-fixes
 #   powershell -File analyze.ps1 -Json               # SARIF output to file
+#   powershell -File analyze.ps1 -SkipSourceCheck    # skip neural-slop gate
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
@@ -49,6 +51,26 @@ $roslynator = Get-Command roslynator -ErrorAction SilentlyContinue
 if (-not $roslynator) {
     Write-Error "[RadioNavigation] roslynator not on PATH. Install: dotnet tool install -g roslynator.dotnet.cli"
     exit 1
+}
+
+# Neural-slop gate: compile the mod against the clean (non-obfuscated) game source
+# reference BEFORE static analysis. A hallucinated/wrong-signature game API call
+# fails here instead of passing silently against the obfuscated DLL. The runner
+# exits 0 only when all 3 SourceCheck tests pass. Skip with -SkipSourceCheck.
+if (-not $SkipSourceCheck) {
+    $scproj = Join-Path $root "RadioNavigation.SourceCheck\RadioNavigation.SourceCheck.csproj"
+    if (Test-Path $scproj) {
+        Write-Host "[RadioNavigation] SourceCheck (neural-slop guard) ..."
+        & dotnet run --project $scproj -c Release
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "[RadioNavigation] SourceCheck FAILED - mod references a game API that does not exist / has wrong signature (neural slop). Fix before analyzing."
+            exit $LASTEXITCODE
+        }
+        Write-Host "[RadioNavigation] SourceCheck PASS"
+    }
+    else {
+        Write-Warning "[RadioNavigation] SourceCheck project not found ($scproj) - gate skipped."
+    }
 }
 
 # Always restore so the shared obj/project.assets.json matches THIS project.

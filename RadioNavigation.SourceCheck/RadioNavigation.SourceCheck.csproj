@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Neural-slop guard: compiles the CLEAN (non-obfuscated) UBOAT game source
+    (C:\code\projects\uboat) into an in-memory reference assembly, then compiles
+    the mod's Source\**\*.cs against it. Any CS error = the mod calls a game API
+    that does not exist / has the wrong signature -> FAIL.
+
+    Why this exists: the shipped com.uboat.game.dll is obfuscated, so Roslyn
+    under-reports its members (ShipControlUI: 87 methods in raw metadata, only 30
+    visible to Roslyn). A neural-slop call to a hallucinated game API therefore
+    compiles silently against the DLL. The decompiled game source keeps real names,
+    so compiling the mod against it surfaces every hallucination as a compile error.
+
+    TFM net10.0 matches RadioNavigation.Analyzers.Tests (custom runner, no vstest).
+    The GAME itself is compiled with net40 semantics via CSharpCompilationOptions
+    (see GameSourceCompiler) - independent of this project's TFM.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>RadioNavigation.SourceCheck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="GameSourceCompiler.cs" />
+    <Compile Include="DependencyClosure.cs" />
+    <Compile Include="ModCompiler.cs" />
+    <Compile Include="CleanReferenceCache.cs" />
+    <Compile Include="SourceCheckTests.cs" />
+    <Compile Include="TempProbeTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.11.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+  </ItemGroup>
+
+</Project>

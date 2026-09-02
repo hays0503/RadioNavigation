@@ -222,7 +222,7 @@ namespace UBOAT.Mods.RadioNavigation
             // stabilization) is incompatible with WorldToScreenPoint, and the
             // game itself renders its lighthouse light as a world-space flare
             // in that view (LighthouseLight.cs). The flare takes over there.
-            if (renderingCamera.IsNotNull() && IsDeviceCamera(renderingCamera))
+            if (IsDeviceView())
             {
                 SetDotEnabled(false, "device view, flare renders");
                 return;
@@ -231,8 +231,6 @@ namespace UBOAT.Mods.RadioNavigation
             float distance = renderingCamera.IsNotNull()
                 ? (renderingCamera.transform.position - worldPosition).magnitude
                 : -1f;
-            bool beyondFarClip = renderingCamera.IsNotNull() &&
-                distance > renderingCamera.farClipPlane * 0.9f;
 
             // Hide the dot only when the native flare is actually drawing and
             // the lighthouse is inside the camera's far clip. Beyond the far
@@ -243,13 +241,13 @@ namespace UBOAT.Mods.RadioNavigation
             // FlareRenderingNow() (renderer.isVisible flickers while
             // KeepFlareInView inflates the bounds), which made the dot jump
             // around as the beam rotated.
-            if (FlareActiveByLogic(worldPosition, distance) && !beyondFarClip)
+            if (IsFlareTakingOver(worldPosition, distance))
             {
                 SetDotEnabled(false, "flare rendering, in far clip");
                 return;
             }
 
-            if (!isNight || renderingCamera == null)
+            if (!IsNightVisible())
             {
                 SetDotEnabled(false, "not night or no camera");
                 return;
@@ -291,23 +289,61 @@ namespace UBOAT.Mods.RadioNavigation
             lastIVisual = iVisual;
 
             // Verbose per-dot model dump (once per diag interval, not per frame)
-            if (VerboseDiagnostics && Time.unscaledTime >= nextDiagnosticTime && distance >= 0)
+            if (ShouldLogDotModel(distance))
             {
-                float capDot = (float)LighthouseVisualModel.DotSizePx(distance);
-                float capStreak = (float)LighthouseVisualModel.StreakLengthCapPx(distance);
-                Debug.Log("[RadioNav][Lighthouse] dot model: dist=" + distance.ToString("F0") +
-                    " fog=" + fogDot.ToString("F2") + " A=" + attenDot.ToString("F3") + " T=" + transDot.ToString("F3") +
-                    " wide=" + beamFactor.ToString("F2") + " beam=" + hotDot.ToString("F2") + " Ivis=" + iVisual.ToString("F3") +
-                    " size=" + capDot.ToString("F1") + " streakCap=" + capStreak.ToString("F1") +
-                    " lampY=" + (rotator.IsNotNull() ? rotator.position.y.ToString("F1") : "NaN") +
-                    " farY=" + worldPosition.y.ToString("F1"));
+                LogDotModel(worldPosition, distance, fogDot, attenDot, transDot, beamFactor, hotDot, iVisual);
             }
 
             SetDotEnabled(true, DotWillLog(true)
                 ? "I=" + iVisual.ToString("F2") +
                   " screen=" + screen.x.ToString("F0") + "," + screen.y.ToString("F0") +
-                  " onScreen=" + (screen.x >= 0f && screen.x <= Screen.width && screen.y >= 0f && screen.y <= Screen.height)
+                  " onScreen=" + IsOnScreen(screen)
                 : null);
+            ApplyDotLayout(worldPosition, distance, screen, iVisual);
+        }
+
+        private bool IsDeviceView()
+        {
+            return renderingCamera.IsNotNull() && IsDeviceCamera(renderingCamera);
+        }
+
+        private bool IsFlareTakingOver(Vector3 worldPosition, float distance)
+        {
+            bool beyondFarClip = renderingCamera.IsNotNull() &&
+                distance > renderingCamera.farClipPlane * 0.9f;
+            return FlareActiveByLogic(worldPosition, distance) && !beyondFarClip;
+        }
+
+        private bool IsNightVisible()
+        {
+            return isNight && renderingCamera != null;
+        }
+
+        private bool ShouldLogDotModel(float distance)
+        {
+            return VerboseDiagnostics && Time.unscaledTime >= nextDiagnosticTime && distance >= 0;
+        }
+
+        private bool IsOnScreen(Vector3 screen)
+        {
+            return screen.x >= 0f && screen.x <= Screen.width && screen.y >= 0f && screen.y <= Screen.height;
+        }
+
+        private void LogDotModel(Vector3 worldPosition, float distance, float fogDot,
+            double attenDot, double transDot, float beamFactor, double hotDot, float iVisual)
+        {
+            float capDot = (float)LighthouseVisualModel.DotSizePx(distance);
+            float capStreak = (float)LighthouseVisualModel.StreakLengthCapPx(distance);
+            Debug.Log("[RadioNav][Lighthouse] dot model: dist=" + distance.ToString("F0") +
+                " fog=" + fogDot.ToString("F2") + " A=" + attenDot.ToString("F3") + " T=" + transDot.ToString("F3") +
+                " wide=" + beamFactor.ToString("F2") + " beam=" + hotDot.ToString("F2") + " Ivis=" + iVisual.ToString("F3") +
+                " size=" + capDot.ToString("F1") + " streakCap=" + capStreak.ToString("F1") +
+                " lampY=" + (rotator.IsNotNull() ? rotator.position.y.ToString("F1") : "NaN") +
+                " farY=" + worldPosition.y.ToString("F1"));
+        }
+
+        private void ApplyDotLayout(Vector3 worldPosition, float distance, Vector3 screen, float iVisual)
+        {
             var metrics = LighthouseDotLayout.Compute(
                 distance,
                 screen.x, screen.y,
@@ -538,43 +574,58 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 if (mc.IsNotNull())
                 {
-                    Vector4 v = mc.WorldToScreenPointNonJitteredExternalView(worldPos);
-                    bool njOnScreen = v.x >= 0f && v.x <= Screen.width && v.y >= 0f && v.y <= Screen.height;
-                    if (throttled)
-                    {
-                        LogBinocularDiag(mc, v);
-                    }
-                    if (njOnScreen)
-                    {
-                        return new Vector3(v.x, v.y, 1f);
-                    }
-                    // The non-jittered projection can be stale in device views
-                    // (binoculars/UZO). Fall back to the plain projection of
-                    // the camera that actually renders — its projectionMatrix
-                    // is always current. z<=0 means the light is behind the
-                    // camera, which hides the dot.
-                    if (renderingCamera != null)
-                    {
-                        Vector3 plain = renderingCamera.WorldToScreenPoint(worldPos);
-                        if (throttled)
-                        {
-                            Debug.Log("[RadioNav][Lighthouse] screenPt: nj off-screen, plain=" +
-                                plain.x.ToString("F0") + "," + plain.y.ToString("F0") + " z=" + plain.z.ToString("F1") +
-                                " onScreen=" + (plain.z > 0f && plain.x >= 0f && plain.x <= Screen.width && plain.y >= 0f && plain.y <= Screen.height));
-                        }
-                        if (plain.z > 0f)
-                        {
-                            return plain;
-                        }
-                    }
-                    // Both projections failed: report off-screen so the dot hides.
-                    return new Vector3(v.x, v.y, -1f);
+                    Vector3 projected;
+                    if (TryExternalViewProjection(mc, worldPos, throttled, out projected))
+                        return projected;
                 }
             }
             catch (Exception e)
             {
                 Debug.LogWarning("[RadioNav][Lighthouse] glow: external view screen point failed: " + e.Message);
             }
+            return FallbackProjection(worldPos, throttled);
+        }
+
+        private bool TryExternalViewProjection(MainCamera mc, Vector3 worldPos, bool throttled, out Vector3 projected)
+        {
+            Vector4 v = mc.WorldToScreenPointNonJitteredExternalView(worldPos);
+            bool njOnScreen = v.x >= 0f && v.x <= Screen.width && v.y >= 0f && v.y <= Screen.height;
+            if (throttled)
+            {
+                LogBinocularDiag(mc, v);
+            }
+            if (njOnScreen)
+            {
+                projected = new Vector3(v.x, v.y, 1f);
+                return true;
+            }
+            // The non-jittered projection can be stale in device views
+            // (binoculars/UZO). Fall back to the plain projection of
+            // the camera that actually renders — its projectionMatrix
+            // is always current. z<=0 means the light is behind the
+            // camera, which hides the dot.
+            if (renderingCamera != null)
+            {
+                Vector3 plain = renderingCamera.WorldToScreenPoint(worldPos);
+                if (throttled)
+                {
+                    Debug.Log("[RadioNav][Lighthouse] screenPt: nj off-screen, plain=" +
+                        plain.x.ToString("F0") + "," + plain.y.ToString("F0") + " z=" + plain.z.ToString("F1") +
+                        " onScreen=" + (plain.z > 0f && plain.x >= 0f && plain.x <= Screen.width && plain.y >= 0f && plain.y <= Screen.height));
+                }
+                if (plain.z > 0f)
+                {
+                    projected = plain;
+                    return true;
+                }
+            }
+            // Both projections failed: report off-screen so the dot hides.
+            projected = new Vector3(v.x, v.y, -1f);
+            return true;
+        }
+
+        private Vector3 FallbackProjection(Vector3 worldPos, bool throttled)
+        {
             Vector3 result = renderingCamera != null ? renderingCamera.WorldToScreenPoint(worldPos) : Vector3.zero;
             if (throttled)
             {
@@ -883,9 +934,7 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject flareObject = lensFlare.gameObject;
             if (!isNight || renderingCamera == null || rotator.IsNull())
             {
-                SetFlareActive(flareObject, false, FlareWillLog(flareObject, false)
-                    ? "night=" + isNight + " cam=" + (renderingCamera.IsNotNull()) + " rot=" + rotator.IsNotNull()
-                    : null);
+                DisableFlare(flareObject, "night=" + isNight + " cam=" + (renderingCamera.IsNotNull()) + " rot=" + rotator.IsNotNull());
                 return;
             }
 
@@ -899,10 +948,8 @@ namespace UBOAT.Mods.RadioNavigation
             bool deviceView = IsDeviceCamera(renderingCamera);
             if (!deviceView && distance > FlareMaxDistanceM)
             {
-                SetFlareActive(flareObject, false, FlareWillLog(flareObject, false)
-                    ? "beyond " + FlareMaxDistanceM.ToString("F0") +
-                      "m (dist=" + distance.ToString("F0") + ")"
-                    : null);
+                DisableFlare(flareObject, "beyond " + FlareMaxDistanceM.ToString("F0") +
+                    "m (dist=" + distance.ToString("F0") + ")");
                 return;
             }
             if (deviceView && distance > FlareMaxDistanceM && Time.unscaledTime >= nextDiagnosticTime)
@@ -916,34 +963,41 @@ namespace UBOAT.Mods.RadioNavigation
             float wideGate = GetBeamVisibilityFactor(worldPosition);
             if (wideGate <= 0.01f)
             {
-                SetFlareActive(flareObject, false, FlareWillLog(flareObject, false)
-                    ? "beam not aligned (wide=" + wideGate.ToString("F2") + ")"
-                    : null);
+                DisableFlare(flareObject, "beam not aligned (wide=" + wideGate.ToString("F2") + ")");
                 return;
             }
 
             SetFlareActive(flareObject, true, FlareWillLog(flareObject, true)
                 ? "aligned wide=" + wideGate.ToString("F2")
                 : null);
-            if (flareIntensityProperty.IsNotNull())
+            ApplyFlareIntensity(flareObject, distance, wideGate);
+        }
+
+        private void DisableFlare(GameObject flareObject, string reason)
+        {
+            SetFlareActive(flareObject, false, FlareWillLog(flareObject, false) ? reason : null);
+        }
+
+        private void ApplyFlareIntensity(GameObject flareObject, float distance, float wideGate)
+        {
+            if (flareIntensityProperty.IsNull())
+                return;
+            Vector3 directionToCamera = (renderingCamera.transform.position - flareObject.transform.position).normalized;
+            float hotAlign = Mathf.Abs(Vector3.Dot(directionToCamera, rotator.forward));
+            float fogFlare = SkyVisibilityResolver.GetFogginess();
+            double attenFlare = LighthouseVisualModel.DistanceAttenuation(distance);
+            double transFlare = LighthouseVisualModel.Transmittance(distance, fogFlare);
+            double hotFlare = LighthouseVisualModel.BeamIntensityFactor(hotAlign);
+            float iVisual = (float)LighthouseVisualModel.VisualIntensity(distance, fogFlare, wideGate, hotAlign);
+            float flareIntensityValue = FlareIntensityScale * iVisual;
+            if (VerboseDiagnostics && Time.unscaledTime >= nextDiagnosticTime)
             {
-                Vector3 directionToCamera = (renderingCamera.transform.position - worldPosition).normalized;
-                float hotAlign = Mathf.Abs(Vector3.Dot(directionToCamera, rotator.forward));
-                float fogFlare = SkyVisibilityResolver.GetFogginess();
-                double attenFlare = LighthouseVisualModel.DistanceAttenuation(distance);
-                double transFlare = LighthouseVisualModel.Transmittance(distance, fogFlare);
-                double hotFlare = LighthouseVisualModel.BeamIntensityFactor(hotAlign);
-                float iVisual = (float)LighthouseVisualModel.VisualIntensity(distance, fogFlare, wideGate, hotAlign);
-                float flareIntensityValue = FlareIntensityScale * iVisual;
-                if (VerboseDiagnostics && Time.unscaledTime >= nextDiagnosticTime)
-                {
-                    Debug.Log("[RadioNav][Lighthouse] flare model: dist=" + distance.ToString("F0") +
-                        " A=" + attenFlare.ToString("F3") + " T=" + transFlare.ToString("F3") + " fog=" + fogFlare.ToString("F2") +
-                        " wide=" + wideGate.ToString("F2") + " beam=" + hotFlare.ToString("F2") + " Ivis=" + iVisual.ToString("F3") + " -> flareI=" + flareIntensityValue.ToString("F3") +
-                        " lampY=" + (rotator.IsNotNull() ? rotator.position.y.ToString("F1") : "NaN") + " farY=" + worldPosition.y.ToString("F1"));
-                }
-                flareIntensityProperty.SetValue(lensFlare, flareIntensityValue, null);
+                Debug.Log("[RadioNav][Lighthouse] flare model: dist=" + distance.ToString("F0") +
+                    " A=" + attenFlare.ToString("F3") + " T=" + transFlare.ToString("F3") + " fog=" + fogFlare.ToString("F2") +
+                    " wide=" + wideGate.ToString("F2") + " beam=" + hotFlare.ToString("F2") + " Ivis=" + iVisual.ToString("F3") + " -> flareI=" + flareIntensityValue.ToString("F3") +
+                    " lampY=" + (rotator.IsNotNull() ? rotator.position.y.ToString("F1") : "NaN") + " farY=" + flareObject.transform.position.y.ToString("F1"));
             }
+            flareIntensityProperty.SetValue(lensFlare, flareIntensityValue, null);
         }
 
         /// <summary>
