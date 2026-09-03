@@ -1103,8 +1103,7 @@ namespace RadioNavigation.SourceCheck
         /// <summary>
         /// Signal-transcriber gate (SRP): the element -&gt; glyph mapping must
         /// live in SignalTranscriber as a pure function (tested in
-        /// SignalTranscriberTests), with
-        /// SonneController.OnStationElementCompleted as the buffer-management
+        /// SignalTranscriberTests), with SignalTranscript.AddElement as the
         /// caller. A re-inline of the switch fails here.
         /// </summary>
         [Fact]
@@ -1114,7 +1113,7 @@ namespace RadioNavigation.SourceCheck
 
             var problems = new List<string>();
             TypeDeclarationSyntax transcriber = null;
-            MethodDeclarationSyntax completed = null;
+            MethodDeclarationSyntax add = null;
             foreach (var path in ModCompiler.EnumerateSources())
             {
                 var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
@@ -1123,17 +1122,17 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (type.Identifier.Text == "SignalTranscriber")
                         transcriber = type;
-                    if (type.Identifier.Text == "SonneController")
+                    if (type.Identifier.Text == "SignalTranscript")
                     {
-                        completed = type.Members.OfType<MethodDeclarationSyntax>()
-                            .FirstOrDefault(m => m.Identifier.Text == "OnStationElementCompleted");
+                        add = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "AddElement");
                     }
                 }
             }
 
             if (transcriber == null)
             {
-                problems.Add("type 'SignalTranscriber' not found in Source/ — element mapping regressed into the controller");
+                problems.Add("type 'SignalTranscriber' not found in Source/ — element mapping regressed into the transcript");
             }
             else
             {
@@ -1145,19 +1144,19 @@ namespace RadioNavigation.SourceCheck
                 if (!maps) problems.Add("SignalTranscriber.MapElement(elem, isCallsign, out type, out glyph) public static entry point not found");
             }
 
-            if (completed == null)
+            if (add == null)
             {
-                problems.Add("SonneController.OnStationElementCompleted not found");
+                problems.Add("SignalTranscript.AddElement not found");
             }
             else
             {
-                bool keepsSwitch = completed.DescendantNodes()
+                bool keepsSwitch = add.DescendantNodes()
                     .OfType<SwitchStatementSyntax>()
                     .Any();
                 if (keepsSwitch)
-                    problems.Add("SonneController.OnStationElementCompleted still contains a switch — the mapping belongs to SignalTranscriber");
+                    problems.Add("SignalTranscript.AddElement still contains a switch — the mapping belongs to SignalTranscriber");
 
-                bool invokesTranscriber = completed.DescendantNodes()
+                bool invokesTranscriber = add.DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
                     .Any(inv => (inv.Expression is IdentifierNameSyntax bare
                             && bare.Identifier.Text == "MapElement")
@@ -1165,7 +1164,7 @@ namespace RadioNavigation.SourceCheck
                             && qualified.Name is IdentifierNameSyntax qname
                             && qname.Identifier.Text == "MapElement"));
                 if (!invokesTranscriber)
-                    problems.Add("SonneController.OnStationElementCompleted never invokes MapElement — the tested pure function is bypassed");
+                    problems.Add("SignalTranscript.AddElement never invokes MapElement — the tested pure function is bypassed");
             }
 
             Assert.True(problems.Count == 0,
@@ -1323,6 +1322,107 @@ namespace RadioNavigation.SourceCheck
 
             Assert.True(problems.Count == 0,
                 $"{problems.Count} station-navigator violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Signal-transcript gate (SRP): the live transcript state (entries,
+        /// morse buffer, decoded callsign) and its behavior must live in
+        /// SignalTranscript (tested offline in SignalTranscriptTests), with
+        /// SonneController keeping only the dominant-station gate and
+        /// delegating. A re-inline of the buffers fails here.
+        /// </summary>
+        [Fact]
+        public void SignalTranscript_OwnsBuffers()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax transcript = null;
+            TypeDeclarationSyntax controller = null;
+            MethodDeclarationSyntax completed = null;
+            MethodDeclarationSyntax finished = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "SignalTranscript")
+                        transcript = type;
+                    if (type.Identifier.Text == "SonneController")
+                    {
+                        controller = type;
+                        completed = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "OnStationElementCompleted");
+                        finished = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "OnStationSequenceFinished");
+                    }
+                }
+            }
+
+            if (transcript == null)
+            {
+                problems.Add("type 'SignalTranscript' not found in Source/ — transcript state regressed into the controller");
+            }
+            else
+            {
+                bool adds = transcript.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "AddElement"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword)));
+                bool finishes = transcript.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "FinishSequence"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword)));
+                bool clears = transcript.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Clear"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword)));
+                bool countsDots = transcript.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "CountDots"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword)));
+                if (!adds) problems.Add("SignalTranscript.AddElement public entry point not found");
+                if (!finishes) problems.Add("SignalTranscript.FinishSequence public entry point not found");
+                if (!clears) problems.Add("SignalTranscript.Clear public entry point not found");
+                if (!countsDots) problems.Add("SignalTranscript.CountDots public entry point not found");
+            }
+
+            if (controller == null)
+            {
+                problems.Add("type 'SonneController' not found in Source/");
+            }
+            else
+            {
+                foreach (var field in controller.Members.OfType<FieldDeclarationSyntax>())
+                {
+                    foreach (var v in field.Declaration.Variables)
+                    {
+                        string name = v.Identifier.Text;
+                        if (name == "signalEntries" || name == "morseCharCount"
+                            || name == "morseDecoderBuffer" || name == "decodedText")
+                            problems.Add($"SonneController still declares '{name}' — transcript state crept back into the controller");
+                    }
+                }
+            }
+
+            foreach (var method in new[] { completed, finished })
+            {
+                if (method == null)
+                {
+                    problems.Add("SonneController element/sequence handler not found");
+                    continue;
+                }
+                bool delegates = method.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && (bare.Identifier.Text == "AddElement" || bare.Identifier.Text == "FinishSequence"))
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && (qname.Identifier.Text == "AddElement" || qname.Identifier.Text == "FinishSequence")));
+                if (!delegates)
+                    problems.Add($"SonneController.{method.Identifier.Text} never invokes the transcript — the tested class is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} signal-transcript violation(s):\n"
                 + string.Join("\n", problems));
         }
 

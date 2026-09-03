@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Text;
 using UBOAT.Game.Sandbox;
 using UnityEngine;
 
@@ -45,12 +43,8 @@ namespace UBOAT.Mods.RadioNavigation
         // while scheduler ticks stop with Time.timeScale == 0.
         private volatile bool suppressAudioForTimeCompression;
 
-        // F120: pre-sized lists avoid capacity-doubling allocations on the
-        // audio thread (signalEntries) and in the 5 Hz navigation update.
-        private readonly List<SignalEntry> signalEntries = new List<SignalEntry>(SignalRichTextFormatter.MaxSignalEntries);
-        private int morseCharCount;
-        private readonly StringBuilder morseDecoderBuffer = new StringBuilder();
-        private readonly StringBuilder decodedText = new StringBuilder();
+        // Live signal transcript (entries, morse buffer, decoded callsign).
+        private readonly SignalTranscript transcript = new SignalTranscript();
 
         private float navUpdateTimer;
         private float tuningUpdateTimer;
@@ -178,24 +172,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (!IsProcessingDominantStation(stationIndex))
                 return;
 
-            SignalCharType type;
-            char c;
-            SignalTranscriber.MapElement(elemType, isCallsign, out type, out c);
-            signalEntries.Add(new SignalEntry(c, type));
-            morseCharCount++;
-            SignalRichTextFormatter.TrimEntries(signalEntries, ref morseCharCount);
-
-            if (isCallsign)
-            {
-                if (elemType == NavigationElementType.Dot)
-                    morseDecoderBuffer.Append('.');
-                else if (elemType == NavigationElementType.Dash)
-                    morseDecoderBuffer.Append('-');
-            }
-            else if (morseDecoderBuffer.Length.IsPositive())
-            {
-                DecodeCallsignBuffer(stationIndex);
-            }
+            transcript.AddElement(elemType, isCallsign, BeaconData.Stations[stationIndex]);
         }
 
         private void OnStationSequenceFinished(int stationIndex)
@@ -203,59 +180,22 @@ namespace UBOAT.Mods.RadioNavigation
             if (!IsProcessingDominantStation(stationIndex))
                 return;
 
-            if (morseDecoderBuffer.Length.IsPositive())
-                DecodeCallsignBuffer(stationIndex);
-
-            signalEntries.Add(new SignalEntry(' ', SignalCharType.Separator));
-            SignalRichTextFormatter.TrimEntries(signalEntries, ref morseCharCount);
-        }
-
-        private void DecodeCallsignBuffer(int stationIndex)
-        {
-            if (morseDecoderBuffer.Length.IsZero())
-                return;
-
-            string callsign = null;
-            var station = BeaconData.Stations[stationIndex];
-            StationCallsignResolver.TryGet(station, out callsign);
-
-            if (string.IsNullOrEmpty(callsign))
-            {
-                morseDecoderBuffer.Clear();
-                return;
-            }
-
-            if (morseDecoderBuffer.Length != MorseDecoder.ExpectedLength(callsign))
-            {
-                morseDecoderBuffer.Clear();
-                return;
-            }
-
-            // Keep only the latest completed callsign. Appending every cycle
-            // made the panel grow into "FRQ MWN SL ..." until trimming.
-            decodedText.Clear();
-            decodedText.Append(MorseDecoder.Decode(callsign, morseDecoderBuffer));
-
-            SignalRichTextFormatter.TrimDecodedText(decodedText);
-            morseDecoderBuffer.Clear();
+            transcript.FinishSequence(BeaconData.Stations[stationIndex]);
         }
 
         public string GetSignalRichText()
         {
-            return SignalRichTextFormatter.FormatRichText(signalEntries);
+            return transcript.RichText;
         }
 
         public void ClearSignalBuffer()
         {
-            signalEntries.Clear();
-            morseCharCount = 0;
-            morseDecoderBuffer.Clear();
-            decodedText.Clear();
+            transcript.Clear();
         }
 
         public string GetDecodedText()
         {
-            return decodedText.ToString();
+            return transcript.DecodedText;
         }
 
         /// <summary>
@@ -265,13 +205,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public int GetReceivedNavigationDotCount()
         {
-            int count = 0;
-            for (int i = 0; i < signalEntries.Count; i++)
-            {
-                if (signalEntries[i].Type == SignalCharType.Dot)
-                    count++;
-            }
-            return count;
+            return transcript.CountDots();
         }
 
         /// <summary>
@@ -281,13 +215,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public int GetReceivedNavigationDashCount()
         {
-            int count = 0;
-            for (int i = 0; i < signalEntries.Count; i++)
-            {
-                if (signalEntries[i].Type == SignalCharType.Dash)
-                    count++;
-            }
-            return count;
+            return transcript.CountDashes();
         }
 
         private void OnFrequencyChanged(float frequencyKHz, int zoneIndex)
@@ -505,10 +433,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 if (maxIndex != dominantStationIndex)
                 {
-                    signalEntries.Clear();
-                    morseCharCount = 0;
-                    morseDecoderBuffer.Clear();
-                    decodedText.Clear();
+                    transcript.Clear();
                 }
                 dominantStationIndex = maxIndex;
             }
