@@ -602,47 +602,10 @@ namespace UBOAT.Mods.RadioNavigation
                     && Math.Abs(playerLongitude - lastBearingLogLongitude) < 0.00001f))
                 return;
 
-            Debug.Log("[RadioNav][BEARING] player lat=" + playerLatitude.ToString("F6")
-                + " lon=" + playerLongitude.ToString("F6"));
-
-            for (int i = 0; i < beaconStations.Length; i++)
+            foreach (string line in BearingDiagnostics.BuildLines(
+                playerLatitude, playerLongitude, beaconStations, stations))
             {
-                BeaconStation station = beaconStations[i];
-                float mapBoatToStation = stations[i].CurrentBearing;
-                float mapStationToBoat = stations[i].BearingToBoat;
-                float trueBoatToStation = CalculateBearing(
-                    playerLatitude, playerLongitude,
-                    (float)station.Latitude, (float)station.Longitude);
-                float trueStationToBoat = CalculateBearing(
-                    (float)station.Latitude, (float)station.Longitude,
-                    playerLatitude, playerLongitude);
-                float trueReciprocal = (trueStationToBoat + 180f) % 360f;
-                float trueReciprocalDelta = Math.Abs(trueReciprocal - trueBoatToStation);
-                if (trueReciprocalDelta > 180f)
-                    trueReciprocalDelta = 360f - trueReciprocalDelta;
-                float mapReciprocal = (mapStationToBoat + 180f) % 360f;
-                float mapReciprocalDelta = Math.Abs(mapReciprocal - mapBoatToStation);
-                if (mapReciprocalDelta > 180f)
-                    mapReciprocalDelta = 360f - mapReciprocalDelta;
-
-                Debug.Log("[RadioNav][BEARING] index=" + i
-                    + " name=" + station.Name
-                    + " callsign=" + (station.History.IsNotNull() && station.History.Length.IsPositive()
-                        ? station.History[0].Callsign : "?")
-                    + " station=" + station.Latitude.ToString("F6") + "," + station.Longitude.ToString("F6")
-                    + " mapBoatToStation=" + mapBoatToStation.ToString("F1")
-                    + " trueBoatToStation=" + trueBoatToStation.ToString("F1")
-                    + " trueStationToBoat=" + trueStationToBoat.ToString("F1")
-                    + " mapStationToBoat=" + mapStationToBoat.ToString("F1")
-                    + " distanceKm=" + GeoMath.HaversineKm(
-                        (float)station.Latitude,
-                        (float)station.Longitude,
-                        playerLatitude,
-                        playerLongitude).ToString("F1")
-                    + " trueReciprocalDelta=" + trueReciprocalDelta.ToString("F1")
-                    + " mapReciprocalDelta=" + mapReciprocalDelta.ToString("F1")
-                    + " baseAngle=" + station.BaseAngle.ToString("F1")
-                    + " beamHeading=" + station.BeamHeadingDegTrue.ToString("F1"));
+                Debug.Log(line);
             }
 
             lastBearingLogLatitude = playerLatitude;

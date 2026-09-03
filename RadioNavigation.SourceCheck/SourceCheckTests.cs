@@ -1173,6 +1173,81 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Bearing-diagnostics gate (SRP): the [RadioNav][BEARING] report
+        /// lines must be built by BearingDiagnostics as pure strings
+        /// (tested in BearingDiagnosticsTests), with
+        /// SonneController.LogBearingDiagnostics as the emit-once-per-
+        /// position gate that only logs them. A re-inline of the format
+        /// strings fails here.
+        /// </summary>
+        [Fact]
+        public void BearingDiagnostics_OwnsReportFormat()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax diagnostics = null;
+            MethodDeclarationSyntax log = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "BearingDiagnostics")
+                        diagnostics = type;
+                    if (type.Identifier.Text == "SonneController")
+                    {
+                        log = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "LogBearingDiagnostics");
+                    }
+                }
+            }
+
+            if (diagnostics == null)
+            {
+                problems.Add("type 'BearingDiagnostics' not found in Source/ — report format regressed into the controller");
+            }
+            else
+            {
+                bool builds = diagnostics.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "BuildLines"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 4);
+                if (!builds) problems.Add("BearingDiagnostics.BuildLines(lat, lon, stations, states) public static entry point not found");
+            }
+
+            if (log == null)
+            {
+                problems.Add("SonneController.LogBearingDiagnostics not found");
+            }
+            else
+            {
+                bool keepsFormat = log.DescendantNodes()
+                    .OfType<LiteralExpressionSyntax>()
+                    .Any(lit => lit.Token.ValueText != null
+                        && lit.Token.ValueText.Contains("[RadioNav][BEARING]"));
+                if (keepsFormat)
+                    problems.Add("SonneController.LogBearingDiagnostics still contains [BEARING] format strings — the report belongs to BearingDiagnostics");
+
+                bool invokesDiagnostics = log.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "BuildLines")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "BuildLines"));
+                if (!invokesDiagnostics)
+                    problems.Add("SonneController.LogBearingDiagnostics never invokes BuildLines — the tested pure function is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} bearing-diagnostics violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

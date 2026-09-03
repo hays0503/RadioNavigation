@@ -80,6 +80,7 @@
     <Compile Include="CourseSamplerTests.cs" />
     <Compile Include="StationGainModelTests.cs" />
     <Compile Include="SignalTranscriberTests.cs" />
+    <Compile Include="BearingDiagnosticsTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -138,6 +139,7 @@
     <Compile Include="..\Source\Logic\CourseSampler.cs" Link="Source\Logic\CourseSampler.cs" />
     <Compile Include="..\Source\Logic\StationGainModel.cs" Link="Source\Logic\StationGainModel.cs" />
     <Compile Include="..\Source\Logic\SignalTranscriber.cs" Link="Source\Logic\SignalTranscriber.cs" />
+    <Compile Include="..\Source\Logic\BearingDiagnostics.cs" Link="Source\Logic\BearingDiagnostics.cs" />
   </ItemGroup>
 
 </Project>
