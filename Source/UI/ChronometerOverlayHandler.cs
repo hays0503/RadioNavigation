@@ -20,7 +20,6 @@ namespace UBOAT.Mods.RadioNavigation
         private GameInput gameInput;
         private RectTransform chronometerDragContainer;
         private Toggle chronometerButton;
-        private ChronometerDragShield chronometerDragShield;
         private PanelDragHandler panelDragHandler;
         // Cursor application backend lives in ChronometerCursorBackend
         // (extracted); the request flags stay here (sensor inputs).

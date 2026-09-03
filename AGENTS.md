@@ -54,6 +54,8 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 
 **Important:** game **recompiles mod from `Source\*.cs`** at load (Roslyn, `Mod.cs Compile()`) вЂ” build.ps1 DLL unused at runtime. Game compile defines: `UBOAT`, `UBOAT_2024_1`, `UNITY_STANDALONE_WIN` вЂ” **no `DEBUG`**, so `#if DEBUG` blocks stripped at runtime regardless of build.ps1 config. Local builds = IDE/static checks only.
 
+**C# language version = 7.0 (game RoslynCSharp contract, verified in-game 2026-09-03):** the game compiler rejects anything newer (e.g. `default;` literal = C# 7.1 в†' CS8107) and then loads a broken assembly (`BadImageFormatException`). Mod sources must stay C# 7.0. Enforced statically in three places: (1) `build.ps1` Roslyn branch passes `/langversion:7`; (2) `ModCompiler.GameParityParseOptions` (C#7 + game defines, no DEBUG) pins every mod-source parse in SourceCheck, so `Mod_CompilesAgainstCleanGameApi` fails offline on any newer-feature use; (3) the same test also fails on CS0169 (never-used field вЂ” dead code after extractions). CS0649 (never-assigned `[Inject]` fields) is the DI pattern, allowed. Consequence: never use `const bool` as a feature gate вЂ” const folds away and produces CS0162 unreachable-code in the game compiler; use `static readonly bool`.
+
 ## Static analysis (Roslynator + custom Harmony analyzer)
 
 - `powershell -File analyze.ps1 [-Profile quick|full] [-Severity info|warning|error] [-Fix] [-Json]` — Roslynator CLI over `RadioNavigation.Analysis.csproj` (net48 + real UBOAT/Unity DLLs from `UBOAT_Data\Managed`). Quick=155 RCS, full=3084. Restore-first guards shared-`obj/` assets corruption.

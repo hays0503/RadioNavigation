@@ -138,7 +138,7 @@ namespace RadioNavigation.SourceCheck
 
             var modTrees = ModCompiler.EnumerateSources()
                 .Select(p => CSharpSyntaxTree.ParseText(
-                    File.ReadAllText(p), path: p))
+                    File.ReadAllText(p), options: ModCompiler.GameParityParseOptions, path: p))
                 .ToList();
             var modCompilation = ModCompiler.CreateCompilation(
                 modTrees, ModCompiler.BuildReferences(cleanDll));
@@ -152,6 +152,18 @@ namespace RadioNavigation.SourceCheck
             Assert.True(diags.Count == 0,
                 "Mod references a game API that does not exist / has wrong signature "
                 + "(neural slop):\n" + FormatDiags(diags));
+
+            // Dead-code gate: CS0169 (never-used field) is a real defect the
+            // game compiler also reports — typically a leftover after an
+            // extraction moved the field to a subsystem class. CS0649
+            // (never-assigned) is the [Inject] DI pattern and is allowed.
+            var deadFields = modCompilation.GetDiagnostics()
+                .Where(d => d.Id == "CS0169")
+                .OrderBy(d => d.Location.SourceTree?.FilePath ?? "")
+                .ToList();
+            Assert.True(deadFields.Count == 0,
+                "Never-used fields (CS0169) — dead code left behind by an extraction:\n"
+                + FormatDiags(deadFields));
         }
 
         private static string FormatDiags(IEnumerable<Diagnostic> diags)

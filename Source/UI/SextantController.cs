@@ -849,7 +849,9 @@ namespace UBOAT.Mods.RadioNavigation
         // v1.7 the glare mechanic was disabled for the white-ocular diagnosis;
         // the diagnosis is closed (PIP cameras mirror the FPP post stack), so
         // the full mechanic is back: shade filters, white flash, pain.
-        private const bool GlareEnabled = true;
+        // static readonly (not const): const folds away under the C# 7.0
+        // game compiler and produced CS0162 unreachable-code warnings.
+        private static readonly bool GlareEnabled = true;
 
         private void UpdateGlare(float dt)
         {

@@ -16,7 +16,10 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
 
-        public const bool Enabled = true;
+        // static readonly (not const): a const bool folds away in the C# 7.0
+        // game compiler and produced CS0162 unreachable-code warnings at the
+        // call sites; readonly keeps the gate checks live.
+        public static readonly bool Enabled = true;
         private const float HoldIntervalSeconds = 0.5f;
         private const float RotateMinDeltaDeg = 0.5f;
 
@@ -150,7 +153,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static CameraVectors ReadCameraVectors(Camera cam)
         {
             if (cam == null)
-                return default;
+                return default(CameraVectors);
             return new CameraVectors
             {
                 Forward = cam.transform.forward,

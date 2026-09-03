@@ -87,11 +87,15 @@ $debugFlag = if ($Configuration -eq "Debug") { "/debug:full" } else { "/debug:pd
 $optimizeFlag = if ($Configuration -eq "Debug") { "/optimize-" } else { "/optimize+" }
 
 if ($cscPath.EndsWith(".dll")) {
-    $allArgs = @("/target:library", "/out:$outPath", $debugFlag, $optimizeFlag, "/define:$defineSymbol", "/noconfig")
+    # /langversion:7 mirrors the game's RoslynCSharp mod compiler (C# 7.0):
+    # the game rejects newer language features with CS8107 and then loads a
+    # broken assembly (BadImageFormatException, in-game 2026-09-03).
+    $allArgs = @("/target:library", "/out:$outPath", $debugFlag, $optimizeFlag, "/define:$defineSymbol", "/langversion:7", "/noconfig")
     $allArgs += $refArgs
     $allArgs += $srcFiles
     & dotnet $cscPath $allArgs
 } else {
+    # Legacy framework csc.exe is C# 5 — already stricter than the game.
     & $cscPath /target:library `
         /out:$outPath `
         $debugFlag `

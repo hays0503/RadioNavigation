@@ -22,6 +22,28 @@ namespace RadioNavigation.SourceCheck
         public const string ModRoot =
             @"C:\Users\Sergey Pimenov\AppData\LocalLow\Deep Water Studio\UBOAT\Mods\RadioNavigation";
 
+        /// <summary>
+        /// Exact language/define contract of the game's RoslynCSharp mod
+        /// compiler (Mod.Compile): C# 7.0 with the UBOAT/UBOAT_2024_1/
+        /// UNITY_STANDALONE_WIN symbols and NO DEBUG. Every mod-source
+        /// parse in this tool MUST use these options — a language feature
+        /// newer than 7.0 (e.g. the 'default' literal, C# 7.1) compiles
+        /// fine under the local latest-Roslyn toolchain but fails in-game
+        /// with CS8107 and the game then loads a broken assembly
+        /// (BadImageFormatException, in-game 2026-09-03). Pinning the
+        /// version here turns the whole class of errors into offline
+        /// compile errors in Mod_CompilesAgainstCleanGameApi.
+        /// </summary>
+        public static readonly CSharpParseOptions GameParityParseOptions =
+            CSharpParseOptions.Default
+                .WithLanguageVersion(LanguageVersion.CSharp7)
+                .WithPreprocessorSymbols(new[]
+                {
+                    "UBOAT",
+                    "UBOAT_2024_1",
+                    "UNITY_STANDALONE_WIN",
+                });
+
         internal static readonly string[] ModRefNames =
         {
             "0Harmony.dll",
