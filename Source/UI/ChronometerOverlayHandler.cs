@@ -1,4 +1,4 @@
-﻿using DWS.Common.InjectionFramework;
+using DWS.Common.InjectionFramework;
 using UBOAT.Game.Core.Input;
 using UBOAT.Game.UI;
 using UnityEngine;
@@ -22,10 +22,10 @@ namespace UBOAT.Mods.RadioNavigation
         private Toggle chronometerButton;
         private GraphicRaycaster chronometerRaycaster;
         private ChronometerDragShield chronometerDragShield;
-        private ChronometerScaleControl chronometerScaleControl;
         private PanelDragHandler panelDragHandler;
-        private Texture2D expandCursor;
-        private Texture2D reduceCursor;
+        // Cursor application backend lives in ChronometerCursorBackend
+        // (extracted); the request flags stay here (sensor inputs).
+        private readonly ChronometerCursorBackend cursorBackend = new ChronometerCursorBackend();
         private Canvas chronometerCanvas;
         private Canvas parentCanvas;
         private bool createdCanvas;
@@ -50,17 +50,12 @@ namespace UBOAT.Mods.RadioNavigation
         private bool nativeChangedThisFrame;
         private bool localDragActive;
         private Vector2 localDragPoint;
-        private Vector3 originalChronometerScale;
-        private Vector3 attachedChronometerScale;
-        private bool scaleCaptured;
-        private bool chronometerExpanded;
-        private int lastScaleToggleFrame = -1;
-        private readonly ChronometerCursorPolicy cursorPolicy = new ChronometerCursorPolicy();
+        // Expand/scale subsystem lives in ChronometerScaleSubsystem (extracted).
+        private readonly ChronometerScaleSubsystem scaleSubsystem = new ChronometerScaleSubsystem();
         private bool reqScaleHover;
         private bool reqMoveValid;
         private bool reqMoveHover;
         private bool chronoPointerInsideCached;
-        private static readonly Vector2 ScaleCursorHotspot = new Vector2(16f, 16f);
 
         private void Update()
         {
@@ -133,7 +128,7 @@ namespace UBOAT.Mods.RadioNavigation
                 // Scale input exists from scene start: the container is a
                 // native serialized child, so the control can live under the
                 // game canvas immediately instead of waiting for a raise.
-                EnsureScaleControl();
+                scaleSubsystem.EnsureControl(chronometerDragContainer, this);
                 return true;
             }
 
@@ -152,7 +147,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             parentCanvas = GetComponentInParent<Canvas>(true);
             ResolveChronometerButton();
-            EnsureScaleControl();
+            scaleSubsystem.EnsureControl(chronometerDragContainer, this);
             Debug.Log("[RadioNav][Chronometer] native ShipControlUI bridge resolved");
             return true;
         }
@@ -241,19 +236,19 @@ namespace UBOAT.Mods.RadioNavigation
                 originalParent = chronometerDragContainer.parent;
                 originalSiblingIndex = chronometerDragContainer.GetSiblingIndex();
                 CaptureDefaultPosition();
-                CaptureChronometerScale();
+                scaleSubsystem.Capture(chronometerDragContainer);
                 chronometerDragContainer.SetParent(transform, true);
-                attachedChronometerScale = chronometerDragContainer.localScale;
+                scaleSubsystem.CaptureAttached(chronometerDragContainer);
                 UpdateDefaultPositionForRadioParent();
                 chronometerReparented = true;
             }
-            else if (!scaleCaptured)
+            else if (!scaleSubsystem.ScaleCaptured)
             {
-                CaptureChronometerScale();
-                attachedChronometerScale = chronometerDragContainer.localScale;
+                scaleSubsystem.Capture(chronometerDragContainer);
+                scaleSubsystem.CaptureAttached(chronometerDragContainer);
             }
 
-            EnsureScaleControl();
+            scaleSubsystem.EnsureControl(chronometerDragContainer, this);
 
             chronometerDragContainer.SetAsLastSibling();
             chronometerRaised = true;
@@ -263,7 +258,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void RestoreChronometerLayer()
         {
             EndLocalDrag();
-            ResetChronometerScale();
+            scaleSubsystem.Reset(chronometerDragContainer, this);
 
             if (chronometerCanvas.IsNotNull() && canvasStateCaptured)
             {
@@ -280,7 +275,7 @@ namespace UBOAT.Mods.RadioNavigation
                     chronometerDragContainer.SetParent(originalParent, true);
                     int maxIndex = originalParent.childCount - 1;
                     chronometerDragContainer.SetSiblingIndex(Mathf.Clamp(originalSiblingIndex, 0, maxIndex));
-                    chronometerDragContainer.localScale = originalChronometerScale;
+                    chronometerDragContainer.localScale = scaleSubsystem.OriginalScale;
                 }
 
                 RestoreDefaultPosition();
@@ -290,56 +285,18 @@ namespace UBOAT.Mods.RadioNavigation
                 chronometerReparented = false;
             }
 
-            scaleCaptured = false;
-            originalChronometerScale = Vector3.zero;
-            attachedChronometerScale = Vector3.zero;
+            scaleSubsystem.ClearSnapshot();
 
             // CH-3 leak fix: the mod-owned sensor must not survive inside the
             // native hierarchy after restore. Destroy it so the next raise
             // recreates a fresh, correctly-parented control.
-            ReleaseScaleControl();
+            scaleSubsystem.ReleaseControl();
 
             if (chronometerDragShield.IsNotNull())
                 chronometerDragShield.SetOwner(null);
 
             RestoreRadioSibling();
             chronometerRaised = false;
-        }
-
-        private void EnsureScaleControl()
-        {
-            if (chronometerScaleControl.IsNotNull())
-                return;
-
-            GameObject control = new GameObject(
-                "ChronometerScaleControl",
-                typeof(RectTransform),
-                typeof(Image),
-                typeof(ChronometerScaleControl));
-            control.transform.SetParent(chronometerDragContainer, false);
-
-            RectTransform controlRect = control.GetComponent<RectTransform>();
-            controlRect.anchorMin = new Vector2(0.5f, 0.5f);
-            controlRect.anchorMax = new Vector2(0.5f, 0.5f);
-            controlRect.pivot = new Vector2(0.5f, 0.5f);
-            controlRect.anchoredPosition = Vector2.zero;
-            controlRect.sizeDelta = new Vector2(52f, 52f);
-
-            Image controlImage = control.GetComponent<Image>();
-            controlImage.color = new Color(0f, 0f, 0f, 0f);
-            controlImage.raycastTarget = true;
-
-            chronometerScaleControl = control.GetComponent<ChronometerScaleControl>();
-            chronometerScaleControl.SetOwner(this);
-        }
-
-        // Destroys the mod-owned scale sensor and clears the reference so a
-        // later raise recreates it fresh. Used on restore (leak fix) and teardown.
-        private void ReleaseScaleControl()
-        {
-            if (chronometerScaleControl.IsNotNull())
-                Destroy(chronometerScaleControl.gameObject);
-            chronometerScaleControl = null;
         }
 
         internal void SetScaleHover(bool value)
@@ -373,85 +330,29 @@ namespace UBOAT.Mods.RadioNavigation
                 panelDragHandler.SetChronometerPointerInside(inside);
         }
 
-        // Single application point: the pure policy decides, this translates
-        // the command to the available backend. GameDefault always goes
-        // through ApplyGameDefaultCursor - foreign UnsetCustomCursor calls
-        // desync the manager's mode and its guarded SetDefaultCursor would
-        // early-out, leaving a custom texture stuck on screen.
+        // Cursor application lives in ChronometerCursorBackend (extracted);
+        // the request flags and the pointer-forward stay here.
         private void RefreshCursor()
         {
-            var cmd = cursorPolicy.Evaluate(reqScaleHover, reqMoveHover, chronometerExpanded);
-            switch (cmd)
-            {
-                case ChronometerCursorCommand.ArrowsExpand:
-                case ChronometerCursorCommand.ArrowsReduce:
-                    EnsureScaleCursors();
-                    Texture2D arrows = cmd == ChronometerCursorCommand.ArrowsReduce
-                        ? reduceCursor
-                        : expandCursor;
-                    if (cursorManager.IsNotNull())
-                        cursorManager.SetCustomCursor(arrows, ScaleCursorHotspot);
-                    else if (panelDragHandler.IsNotNull())
-                        panelDragHandler.SetCursorOverride(arrows, ScaleCursorHotspot);
-                    else
-                        Cursor.SetCursor(arrows, ScaleCursorHotspot, CursorMode.Auto);
-                    break;
-
-                case ChronometerCursorCommand.Crosshair:
-                    Texture2D moveTexture = panelDragHandler.IsNotNull()
-                        ? panelDragHandler.MoveCursorTexture
-                        : null;
-                    Vector2 moveHotspot = panelDragHandler.IsNotNull()
-                        ? panelDragHandler.MoveCursorHotspot
-                        : new Vector2(16f, 16f);
-                    if (moveTexture.IsNull())
-                        break; // no crosshair source - keep current cursor
-                    if (cursorManager.IsNotNull())
-                        cursorManager.SetCustomCursor(moveTexture, moveHotspot);
-                    else if (panelDragHandler.IsNotNull())
-                        panelDragHandler.SetCursorOverride(moveTexture, moveHotspot);
-                    else
-                        Cursor.SetCursor(moveTexture, moveHotspot, CursorMode.Auto);
-                    break;
-
-                case ChronometerCursorCommand.GameDefault:
-                    if (cursorManager.IsNotNull())
-                        ApplyGameDefaultCursor();
-                    else if (panelDragHandler.IsNotNull())
-                        panelDragHandler.ClearCursorOverride();
-                    else
-                        Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
-                    break;
-            }
+            cursorBackend.Apply(reqScaleHover, reqMoveHover, scaleSubsystem.Expanded,
+                cursorManager, panelDragHandler);
         }
 
-        // Sync the manager's mode to Default AND force the texture: foreign
-        // UnsetCustomCursor calls can leave the mode at Default while our
-        // custom texture is still on screen, and the guarded SetDefaultCursor
-        // would early-out and keep it there.
-        private void ApplyGameDefaultCursor()
-        {
-            cursorManager.SetDefaultCursor();
-            Texture2D normal = ShipControlUIBridge.GetGameDefaultCursor(cursorManager);
-            if (normal.IsNotNull())
-                Cursor.SetCursor(normal, Vector2.zero, CursorMode.Auto);
-        }
 
         internal RectTransform GetDragAreaRect()
         {
             return chronometerDragContainer;
         }
 
-        internal bool IsChronometerExpanded => chronometerExpanded;
+        internal bool IsChronometerExpanded => scaleSubsystem.Expanded;
 
         private bool mapDragActive;
 
         internal void OnMapDragBegin()
         {
-            if (!chronometerExpanded || chronometerRaised)
+            if (!scaleSubsystem.Expanded || chronometerRaised)
             {
-                if (chronometerScaleControl.IsNotNull())
-                    chronometerScaleControl.CancelMapDrag();
+                scaleSubsystem.CancelMapDrag();
                 return;
             }
             mapDragActive = true;
@@ -466,7 +367,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (!mapDragActive)
                 return;
-            if (!chronometerExpanded || chronometerRaised)
+            if (!scaleSubsystem.Expanded || chronometerRaised)
             {
                 EndMapDrag();
                 return;
@@ -496,8 +397,7 @@ namespace UBOAT.Mods.RadioNavigation
                 ReleaseInputBlockade();
             }
 
-            if (chronometerScaleControl.IsNotNull())
-                chronometerScaleControl.CancelMapDrag();
+            scaleSubsystem.CancelMapDrag();
         }
 
         private void AcquireInputBlockade()
@@ -529,57 +429,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void ToggleChronometerScale()
         {
-            if (lastScaleToggleFrame == Time.frameCount)
-                return;
-
-            if (!scaleCaptured || chronometerDragContainer.IsNull())
-            {
-                if (chronometerDragContainer.IsNull())
-                    return;
-                CaptureChronometerScale();
-                attachedChronometerScale = chronometerDragContainer.localScale;
-            }
-
-            lastScaleToggleFrame = Time.frameCount;
-            chronometerExpanded = !chronometerExpanded;
-            chronometerDragContainer.localScale = chronometerExpanded
-                ? attachedChronometerScale * 2.5f
-                : attachedChronometerScale;
             // Expanded changed -> the policy re-emits reduce/expand arrows on
             // this refresh even though hover state did not move.
-            RefreshCursor();
+            if (scaleSubsystem.Toggle(chronometerDragContainer))
+                RefreshCursor();
         }
 
-        private void EnsureScaleCursors()
-        {
-            if (expandCursor.IsNotNull() && reduceCursor.IsNotNull())
-                return;
-
-            expandCursor = ChronometerCursorArt.CreateScaleCursor(false);
-            reduceCursor = ChronometerCursorArt.CreateScaleCursor(true);
-        }
-
-        private void CaptureChronometerScale()
-        {
-            if (scaleCaptured)
-                return;
-
-            originalChronometerScale = chronometerDragContainer.localScale;
-            attachedChronometerScale = originalChronometerScale;
-            scaleCaptured = true;
-            chronometerExpanded = false;
-        }
-
-        private void ResetChronometerScale()
-        {
-            if (!scaleCaptured || chronometerDragContainer.IsNull())
-                return;
-
-            chronometerDragContainer.localScale = attachedChronometerScale;
-            chronometerExpanded = false;
-            SetScaleHover(false);
-            SetMoveHover(false);
-        }
+        // Scale snapshot/restore lives in ChronometerScaleSubsystem
+        // (extracted); Raise/Restore call it directly.
 
         // Single reaction point for scale input: the sensor (satellite)
         // reports clicks, this decides what a click means.
@@ -744,11 +601,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (createdDragShield && chronometerDragShield.IsNotNull())
                 Destroy(chronometerDragShield);
 
-            ReleaseScaleControl();
-            if (expandCursor.IsNotNull())
-                Destroy(expandCursor);
-            if (reduceCursor.IsNotNull())
-                Destroy(reduceCursor);
+            scaleSubsystem.ReleaseControl();
+            cursorBackend.Destroy();
         }
     }
 }
