@@ -11,8 +11,8 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private static readonly Dictionary<string, MemberInfo> memberCache = new Dictionary<string, MemberInfo>();
         // P5.1: Type.GetType with assembly-qualified name is a string parse +
-        // assembly scan per call; IsPlayerOutside hits it every frame.
-        private static readonly Dictionary<string, Type> typeCache = new Dictionary<string, Type>();
+        // assembly scan per call; IsPlayerOutside hits it every frame — type
+        // resolution is cached centrally in GameTypeCache.
 
         [Inject] private static Weather weather;
 
@@ -95,11 +95,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static object ReadStatic(string typeName, string memberName)
         {
-            if (!typeCache.TryGetValue(typeName, out Type type))
-            {
-                type = Type.GetType(typeName + ", com.uboat.game");
-                typeCache[typeName] = type;
-            }
+            Type type = GameTypeCache.Resolve(typeName);
             if (type == null)
                 return null;
 

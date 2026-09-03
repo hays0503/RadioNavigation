@@ -76,6 +76,7 @@
     <Compile Include="SextantOverlayLayoutTests.cs" />
     <Compile Include="MarkerArtPixelsTests.cs" />
     <Compile Include="RadioPowerBusTests.cs" />
+    <Compile Include="GameTypeCacheTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -130,6 +131,7 @@
     <Compile Include="..\Source\UI\MarkerArtPixels.cs" Link="Source\UI\MarkerArtPixels.cs" />
     <Compile Include="..\Source\UI\SextantOverlayLayout.cs" Link="Source\UI\SextantOverlayLayout.cs" />
     <Compile Include="..\Source\Logic\RadioPowerBus.cs" Link="Source\Logic\RadioPowerBus.cs" />
+    <Compile Include="..\Source\Logic\GameTypeCache.cs" Link="Source\Logic\GameTypeCache.cs" />
   </ItemGroup>
 
 </Project>

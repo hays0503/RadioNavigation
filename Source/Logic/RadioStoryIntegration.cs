@@ -131,8 +131,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static Type ResolveType(string typeName)
         {
-            return Type.GetType(typeName + ", com.uboat.game")
-                ?? Type.GetType(typeName + ", Assembly-CSharp");
+            return GameTypeCache.Resolve(typeName);
         }
 
         private static void ResolveRuntimeTypes()

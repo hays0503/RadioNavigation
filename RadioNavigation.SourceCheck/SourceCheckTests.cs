@@ -778,6 +778,123 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Game type-cache gate (SRP/P5.1): assembly-qualified Type resolution
+        /// must live in GameTypeCache (cached, probe-list, offline-tested in
+        /// GameTypeCacheTests), not duplicated as RadioStoryIntegration.ResolveType
+        /// (uncached) and SkyVisibilityResolver.typeCache (single-assembly).
+        /// Pins the type surface, the delegation of both call sites, and that
+        /// no raw Type.GetType lookup remains anywhere else in Source/.
+        /// </summary>
+        [Fact]
+        public void GameTypeCache_OwnsTypeResolution()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax cache = null;
+            MethodDeclarationSyntax resolveType = null;
+            TypeDeclarationSyntax sky = null;
+            var roots = new List<Tuple<string, CompilationUnitSyntax>>();
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                roots.Add(Tuple.Create(path, root));
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "GameTypeCache")
+                        cache = type;
+                    if (type.Identifier.Text == "RadioStoryIntegration")
+                    {
+                        resolveType = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "ResolveType");
+                    }
+                    if (type.Identifier.Text == "SkyVisibilityResolver")
+                        sky = type;
+                }
+            }
+
+            if (cache == null)
+            {
+                problems.Add("type 'GameTypeCache' not found in Source/ — type resolution is duplicated again");
+            }
+            else
+            {
+                bool hasDefault = cache.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Resolve"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 1);
+                bool hasProbes = cache.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Resolve"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 2);
+                bool hasClear = cache.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Clear"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!hasDefault) problems.Add("GameTypeCache.Resolve(string) default-probe overload not found");
+                if (!hasProbes) problems.Add("GameTypeCache.Resolve(string, probes) overload not found");
+                if (!hasClear) problems.Add("GameTypeCache.Clear public static method not found");
+            }
+
+            if (resolveType == null)
+            {
+                problems.Add("RadioStoryIntegration.ResolveType not found");
+            }
+            else
+            {
+                bool delegates = resolveType.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax qualified
+                        && qualified.Expression is IdentifierNameSyntax recv
+                        && recv.Identifier.Text == "GameTypeCache"
+                        && qualified.Name is IdentifierNameSyntax qname
+                        && qname.Identifier.Text == "Resolve");
+                if (!delegates)
+                    problems.Add("RadioStoryIntegration.ResolveType no longer delegates to GameTypeCache.Resolve — "
+                        + "the uncached duplicate is back");
+            }
+
+            if (sky == null)
+            {
+                problems.Add("type 'SkyVisibilityResolver' not found in Source/");
+            }
+            else
+            {
+                foreach (var field in sky.Members.OfType<FieldDeclarationSyntax>())
+                {
+                    foreach (var v in field.Declaration.Variables)
+                    {
+                        if (v.Identifier.Text == "typeCache")
+                            problems.Add("SkyVisibilityResolver still declares 'typeCache' — the per-site duplicate is back");
+                    }
+                }
+            }
+
+            foreach (var root in roots)
+            {
+                if (Path.GetFileName(root.Item1) == "GameTypeCache.cs") continue;
+                foreach (var inv in root.Item2.DescendantNodes().OfType<InvocationExpressionSyntax>())
+                {
+                    if (inv.Expression is MemberAccessExpressionSyntax access
+                        && access.Expression is IdentifierNameSyntax recv
+                        && recv.Identifier.Text == "Type"
+                        && access.Name.Identifier.Text == "GetType")
+                    {
+                        problems.Add($"{Path.GetFileName(root.Item1)}: raw Type.GetType outside GameTypeCache — "
+                            + "route it through the cache");
+                    }
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} type-cache violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit
