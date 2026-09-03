@@ -14,7 +14,6 @@ namespace UBOAT.Mods.RadioNavigation
         private const int SonneZoneIndex = 1;
         private const float BfoBase = Constants.BfoBaseHz;
         private const float TimeCompressionThreshold = 1.01f;
-        private const float NavigationBearingChangeThresholdDeg = 0.2f;
 
         private static readonly AudioClip silentClip = AudioClip.Create("SonneSilent", AudioSynthesisEngine.SampleRate * 2, 1, AudioSynthesisEngine.SampleRate, false);
 
@@ -525,70 +524,9 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i < beaconStations.Length; i++)
             {
-                float mapBoatToStation = CalculateMapBearing(
-                    playerLatitude, playerLongitude,
-                    (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude);
-                float mapBearingToBoat = CalculateMapBearing(
-                    (float)beaconStations[i].Latitude, (float)beaconStations[i].Longitude,
-                    playerLatitude, playerLongitude);
-
-                if (beaconStations[i].Role != BeaconStationRole.DirectionalSonne)
-                {
-                    stations[i].InBeam = false;
-                    stations[i].DotCount = 0;
-                    stations[i].IsDashSector = false;
-                    stations[i].SectorNumber = 0;
-                    stations[i].CurrentBearing = mapBoatToStation;
-                    stations[i].BearingToBoat = mapBearingToBoat;
-                    stations[i].HasNavigationBearing = false;
-                    stations[i].LastNavigationBearing = 0f;
-                    stations[i].TransitionIndex = 0;
-                    stations[i].Pattern = new NavigationPattern(Array.Empty<Group>(), 8, 255);
-                    continue;
-                }
-
-                stations[i].CurrentBearing = mapBoatToStation;
-                stations[i].BearingToBoat = mapBearingToBoat;
-                float signalBearing = (mapBearingToBoat + 360f) % 360f;
-                stations[i].InBeam = SonneSignalGenerator.CalculateInBeam(
-                    signalBearing,
-                    (float)beaconStations[i].BaseAngle,
-                    stations[i].Config.SectorWidthDeg);
-                stations[i].SectorNumber = SonneSignalGenerator.CalculateSectorNumber(
-                    signalBearing,
-                    (float)beaconStations[i].BaseAngle);
-
-                bool bearingChanged = !stations[i].HasNavigationBearing
-                    || SonneSignalGenerator.AngularDistance(
-                        stations[i].LastNavigationBearing,
-                        signalBearing) > NavigationBearingChangeThresholdDeg;
-                if (bearingChanged)
-                {
-                    stations[i].HasNavigationBearing = true;
-                    stations[i].LastNavigationBearing = signalBearing;
-
-                    NavigationElementType[] pattern;
-                    SonneBeamSignal signal;
-                    if (SonneBeam.TryGetNavigationPattern(
-                        beaconStations[i].Name,
-                        signalBearing,
-                        out pattern,
-                        out signal))
-                    {
-                        stations[i].DotCount = signal.DotCount;
-                        // DotCount/DashCount are corrected CAP counts. TransitionIndex
-                        // is the actual element index where the equisignal starts.
-                        stations[i].IsDashSector = signal.IsDashSector;
-                        stations[i].TransitionIndex = signal.LeadingCount;
-                        stations[i].Pattern = SonneSignalGenerator.ToNavigationPattern(pattern);
-
-                        // The active keyer owns its current array. Replacing the
-                        // scheduler reference is safe and makes the latest table
-                        // result available for the next navigation phase.
-                        schedulers[i].CurrentConsolPattern = pattern;
-                    }
-                }
-
+                StationNavigator.UpdateStation(
+                    ref stations[i], beaconStations[i],
+                    playerLatitude, playerLongitude, schedulers[i]);
             }
 
             LogBearingDiagnostics(beaconStations);

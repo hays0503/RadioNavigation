@@ -1248,6 +1248,84 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Station-navigator gate (SRP): the per-station navigation update
+        /// (map bearings, in-beam/sector, bearing-change-gated table
+        /// lookup, scheduler pattern feed) must live in StationNavigator
+        /// (tested offline in StationNavigatorTests), with
+        /// SonneController.UpdateStationNavigation as the fleet loop.
+        /// A re-inline of the table lookup fails here.
+        /// </summary>
+        [Fact]
+        public void StationNavigator_OwnsStationUpdate()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax navigator = null;
+            MethodDeclarationSyntax update = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "StationNavigator")
+                        navigator = type;
+                    if (type.Identifier.Text == "SonneController")
+                    {
+                        update = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "UpdateStationNavigation");
+                    }
+                }
+            }
+
+            if (navigator == null)
+            {
+                problems.Add("type 'StationNavigator' not found in Source/ — station update regressed into the controller");
+            }
+            else
+            {
+                bool updates = navigator.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "UpdateStation"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 5);
+                if (!updates) problems.Add("StationNavigator.UpdateStation(state, station, lat, lon, scheduler) public static entry point not found");
+            }
+
+            if (update == null)
+            {
+                problems.Add("SonneController.UpdateStationNavigation not found");
+            }
+            else
+            {
+                bool keepsLookup = update.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "TryGetNavigationPattern")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "TryGetNavigationPattern"));
+                if (keepsLookup)
+                    problems.Add("SonneController.UpdateStationNavigation still calls TryGetNavigationPattern — the lookup belongs to StationNavigator");
+
+                bool invokesNavigator = update.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "UpdateStation")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "UpdateStation"));
+                if (!invokesNavigator)
+                    problems.Add("SonneController.UpdateStationNavigation never invokes StationNavigator.UpdateStation — the tested pure function is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} station-navigator violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit
