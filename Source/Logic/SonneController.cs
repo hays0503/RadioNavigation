@@ -501,14 +501,12 @@ namespace UBOAT.Mods.RadioNavigation
                     continue;
                 }
 
-                float f0 = freq.Value * 1000f;
-                float ratio = f / f0 - f0 / f;
-                float gain = 1f / (float)Math.Sqrt(1.0 + qf * qf * ratio * ratio);
+                float gain = StationGainModel.ComputeGain(currentFrequencyKHz, freq.Value, qf);
 
                 stations[i].Gain = gain;
 
                 float offset = currentFrequencyKHz - freq.Value;
-                stations[i].BeatFrequency = Math.Max(Constants.BfoMinHz, Math.Min(Constants.BfoMaxHz, BfoBase + offset * 1000f));
+                stations[i].BeatFrequency = StationGainModel.ComputeBeatFrequency(offset);
                 carriers[i].Frequency = stations[i].BeatFrequency;
 
                 if (gain > maxGain)

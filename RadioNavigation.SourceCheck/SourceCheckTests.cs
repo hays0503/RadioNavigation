@@ -999,6 +999,107 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Station-gain gate (SRP): the selectivity curve and BFO beat clamp
+        /// must live in StationGainModel as pure functions (tested in
+        /// StationGainModelTests), with SonneController.UpdateStationGains as
+        /// the array-management caller and ShieldTests calling production
+        /// instead of duplicating the formula. A re-inline (or a new local
+        /// copy) fails here.
+        /// </summary>
+        [Fact]
+        public void StationGain_OwnedByModel()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax model = null;
+            TypeDeclarationSyntax controller = null;
+            TypeDeclarationSyntax shield = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "StationGainModel")
+                        model = type;
+                    if (type.Identifier.Text == "SonneController")
+                        controller = type;
+                }
+            }
+            foreach (var path in ModCompiler.EnumerateTests())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "ShieldGainTests")
+                        shield = type;
+                }
+            }
+
+            if (model == null)
+            {
+                problems.Add("type 'StationGainModel' not found in Source/ — gain math regressed into the controller");
+            }
+            else
+            {
+                bool hasGain = model.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "ComputeGain"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 3);
+                bool hasBeat = model.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "ComputeBeatFrequency"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 1);
+                if (!hasGain) problems.Add("StationGainModel.ComputeGain(f, f0, qf) public static entry point not found");
+                if (!hasBeat) problems.Add("StationGainModel.ComputeBeatFrequency(offset) public static entry point not found");
+            }
+
+            if (controller == null)
+            {
+                problems.Add("type 'SonneController' not found in Source/");
+            }
+            else
+            {
+                bool inlinesSqrt = controller.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax access
+                        && access.Name.Identifier.Text == "Sqrt");
+                if (inlinesSqrt)
+                    problems.Add("SonneController still contains a Sqrt gain formula — route it through StationGainModel.ComputeGain");
+
+                bool invokesModel = controller.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax qualified
+                        && qualified.Expression is IdentifierNameSyntax recv
+                        && recv.Identifier.Text == "StationGainModel"
+                        && qualified.Name is IdentifierNameSyntax qname
+                        && qname.Identifier.Text == "ComputeGain");
+                if (!invokesModel)
+                    problems.Add("SonneController never invokes StationGainModel.ComputeGain — the tested pure function is bypassed");
+            }
+
+            if (shield == null)
+            {
+                problems.Add("type 'ShieldGainTests' not found in Tests/");
+            }
+            else
+            {
+                bool keepsLocalCopy = shield.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Gain");
+                if (keepsLocalCopy)
+                    problems.Add("ShieldGainTests still declares a local Gain helper — call StationGainModel instead of duplicating the formula");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} station-gain violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

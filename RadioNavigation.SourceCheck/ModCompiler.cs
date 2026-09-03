@@ -75,6 +75,14 @@ namespace RadioNavigation.SourceCheck
                 .ToImmutableArray();
         }
 
+        public static ImmutableArray<string> EnumerateTests()
+        {
+            var dir = Path.Combine(ModRoot, "Tests");
+            return Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories)
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                .ToImmutableArray();
+        }
+
         public static ImmutableArray<MetadataReference> BuildReferences(byte[] cleanGameDll)
         {
             var refs = new List<MetadataReference>();

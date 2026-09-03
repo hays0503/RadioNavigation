@@ -9,28 +9,18 @@ namespace UBOAT.Mods.RadioNavigation.Tests
     /// </summary>
     public sealed class ShieldGainTests
     {
-        private static float Gain(float fKHz, float f0KHz, float qf)
-        {
-            // SonneController.cs:507 gain = 1 / sqrt(1 + Qf² * ratio²), ratio = f/f0 - f0/f
-            if (float.IsNaN(fKHz) || float.IsNaN(f0KHz) || f0KHz == 0f) return 0f;
-            float f = fKHz * 1000f;
-            float f0 = f0KHz * 1000f;
-            float ratio = f / f0 - f0 / f;
-            return 1f / (float)System.Math.Sqrt(1.0 + qf * qf * ratio * ratio);
-        }
-
         [Fact]
         public void Gain_315_vs_319_QF20_IsAbout089_CrossTalk()
         {
             // F203: дефолт QF=20 даёт 89% — полезный морзе слышен без гула (live-validated, но без щита)
-            float g = Gain(315f, 319f, 20f);
+            float g = StationGainModel.ComputeGain(315f, 319f, 20f);
             Assert.InRange(g, 0.85f, 0.92f);
         }
 
         [Fact]
         public void Gain_315_vs_319_QF200_IsAbout02_Suppressed()
         {
-            float g = Gain(315f, 319f, 200f);
+            float g = StationGainModel.ComputeGain(315f, 319f, 200f);
             Assert.InRange(g, 0.15f, 0.30f);
         }
 
@@ -38,7 +28,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         public void Gain_266_vs_257_QF20_HighCrossTalk()
         {
             // 266 vs 257 delta 9kHz → ratio 0.069 → gain ~0.587 (расчёт), не 0.85
-            float g = Gain(266f, 257f, 20f);
+            float g = StationGainModel.ComputeGain(266f, 257f, 20f);
             Assert.InRange(g, 0.55f, 0.65f);
         }
 
@@ -47,14 +37,14 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [InlineData(257f, float.NaN)]
         public void Gain_NaN_ShouldBeZero(float f, float f0)
         {
-            float g = Gain(f, f0, 20f);
+            float g = StationGainModel.ComputeGain(f, f0, 20f);
             Assert.Equal(0f, g);
         }
 
         [Fact]
         public void Gain_ZeroF0_ShouldBeZero()
         {
-            Assert.Equal(0f, Gain(300f, 0f, 20f));
+            Assert.Equal(0f, StationGainModel.ComputeGain(300f, 0f, 20f));
         }
     }
 
