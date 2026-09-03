@@ -214,13 +214,13 @@ namespace UBOAT.Mods.RadioNavigation
         private void OnVolumeChanged(float angle)
         {
             if (volumeText.IsNotNull())
-                volumeText.text = "Volume: " + Mathf.RoundToInt(angle / 140f * 100f) + "%";
+                volumeText.text = "Volume: " + SpinnerScale.ToPercent(angle) + "%";
         }
 
         private void OnFeedbackChanged(float angle)
         {
             if (feedbackText.IsNotNull())
-                feedbackText.text = "Feedback: " + Mathf.RoundToInt(angle / 140f * 100f) + "%";
+                feedbackText.text = "Feedback: " + SpinnerScale.ToPercent(angle) + "%";
         }
 
         private void OnFrequencyChanged(float freqKHz, int zoneIndex)

@@ -1600,6 +1600,87 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Spinner-scale gate (SRP/dedup): the 140° spinner range mapping
+        /// must live in SpinnerScale as the single source of truth (tested
+        /// in SpinnerScaleTests), with SonneController, InformationPanelHandler
+        /// and AudioSynthesisEngine calling it. PanelStateStore keeps its own
+        /// 140f storage-range clamps (persistence validation, not mapping).
+        /// A new inline angle/140f division fails here.
+        /// </summary>
+        [Fact]
+        public void SpinnerScale_OwnsAngleMapping()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax scale = null;
+            var roots = new List<Tuple<string, CompilationUnitSyntax>>();
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                roots.Add(Tuple.Create(path, root));
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "SpinnerScale")
+                        scale = type;
+                }
+            }
+
+            if (scale == null)
+            {
+                problems.Add("type 'SpinnerScale' not found in Source/ — angle mapping is scattered again");
+            }
+            else
+            {
+                bool hasMax = scale.Members.OfType<FieldDeclarationSyntax>()
+                    .Any(f => f.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && f.Modifiers.Any(x => x.IsKind(SyntaxKind.ConstKeyword))
+                        && f.Declaration.Variables.Any(v => v.Identifier.Text == "MaxAngle"));
+                bool hasUnit = scale.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "ToUnit"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                bool hasPercent = scale.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "ToPercent"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!hasMax) problems.Add("SpinnerScale.MaxAngle public const not found");
+                if (!hasUnit) problems.Add("SpinnerScale.ToUnit public static method not found");
+                if (!hasPercent) problems.Add("SpinnerScale.ToPercent public static method not found");
+            }
+
+            foreach (var root in roots)
+            {
+                string file = Path.GetFileName(root.Item1);
+                if (file == "SpinnerScale.cs" || file == "PanelStateStore.cs") continue;
+                foreach (var lit in root.Item2.DescendantNodes().OfType<LiteralExpressionSyntax>())
+                {
+                    string token = lit.Token.Text;
+                    if (token == "140f" || token == "140F" || token == "140.0f" || token == "140.0F")
+                        problems.Add($"{file}: inline 140° literal outside SpinnerScale (PanelStateStore storage clamps excepted) — route through SpinnerScale");
+                }
+            }
+
+            foreach (var root in roots)
+            {
+                string file = Path.GetFileName(root.Item1);
+                bool invokes = root.Item2.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax qualified
+                        && qualified.Expression is IdentifierNameSyntax recv
+                        && recv.Identifier.Text == "SpinnerScale");
+                if ((file == "SonneController.cs" || file == "InformationPanelHandler.cs"
+                        || file == "AudioSynthesisEngine.cs") && !invokes)
+                    problems.Add($"{file} never invokes SpinnerScale — the tested mapping is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} spinner-scale violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

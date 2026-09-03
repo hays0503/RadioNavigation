@@ -10,7 +10,7 @@ namespace UBOAT.Mods.RadioNavigation
         public event Action<float> OnValueChanged;
 
         [SerializeField] protected float minAngle = 0f;
-        [SerializeField] protected float maxAngle = 140f;
+        [SerializeField] protected float maxAngle = SpinnerScale.MaxAngle;
         [SerializeField] protected float startAngle = 0f;
         [SerializeField] protected float sensitivity = 0.5f;
 

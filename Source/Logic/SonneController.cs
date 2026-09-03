@@ -85,7 +85,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (volumeSpinner.IsNotNull())
             {
-                audioEngine.OutputVolume = Mathf.Clamp(volumeSpinner.Angle / 140f, 0f, 1f);
+                audioEngine.OutputVolume = SpinnerScale.ToUnit(volumeSpinner.Angle);
                 volumeSpinner.OnValueChanged += OnVolumeChanged;
             }
 
@@ -173,7 +173,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnVolumeChanged(float angle)
         {
-            audioEngine.OutputVolume = Mathf.Clamp(angle / 140f, 0f, 1f);
+            audioEngine.OutputVolume = SpinnerScale.ToUnit(angle);
         }
 
         private void OnFeedbackChanged(float angle)

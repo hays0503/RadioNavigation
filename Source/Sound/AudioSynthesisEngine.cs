@@ -48,7 +48,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void ApplyFeedback(float angle)
         {
-            Feedback = Mathf.Clamp01(angle / 140f);
+            Feedback = SpinnerScale.ToUnit(angle);
 
             QualityFactor = Constants.QualityFactorBase + Feedback * Feedback * Constants.QualityFactorFeedbackPerUnit;
 
