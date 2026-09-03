@@ -48,18 +48,27 @@ namespace UBOAT.Mods.RadioNavigation
         private bool previousOpenState;
         private bool hasPreviousOpenState;
         private bool nativeChangedThisFrame;
-        private bool localDragActive;
-        private Vector2 localDragPoint;
-        // Expand/scale subsystem lives in ChronometerScaleSubsystem (extracted).
+        // Expand/scale subsystem lives in ChronometerScaleSubsystem (extracted);
+        // drag mechanics live in ChronometerDragProtocol (extracted).
         private readonly ChronometerScaleSubsystem scaleSubsystem = new ChronometerScaleSubsystem();
+        private ChronometerDragProtocol dragProtocol;
         private bool reqScaleHover;
         private bool reqMoveValid;
         private bool reqMoveHover;
         private bool chronoPointerInsideCached;
 
+        private void Awake()
+        {
+            dragProtocol = new ChronometerDragProtocol(
+                () => chronometerRaised,
+                () => scaleSubsystem.Expanded,
+                () => IsRadioVisible,
+                UpdateDefaultPositionForRadioParent);
+        }
+
         private void Update()
         {
-            if (localDragActive)
+            if (dragProtocol != null && dragProtocol.LocalDragActive)
                 CancelNativeDrag();
         }
 
@@ -301,7 +310,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void SetScaleHover(bool value)
         {
-            if (localDragActive)
+            if (dragProtocol != null && dragProtocol.LocalDragActive)
                 return;
             reqScaleHover = value;
             RefreshCursor();
@@ -310,7 +319,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void SetMoveHover(bool moveHovered)
         {
-            if (localDragActive)
+            if (dragProtocol != null && dragProtocol.LocalDragActive)
                 return;
             reqMoveHover = moveHovered;
             reqMoveValid = true;
@@ -346,74 +355,25 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal bool IsChronometerExpanded => scaleSubsystem.Expanded;
 
-        private bool mapDragActive;
+        // Map-drag path and the input blockade live in
+        // ChronometerDragProtocol (extracted); these wrappers keep the
+        // satellite call sites.
 
         internal void OnMapDragBegin()
         {
-            if (!scaleSubsystem.Expanded || chronometerRaised)
-            {
-                scaleSubsystem.CancelMapDrag();
-                return;
-            }
-            mapDragActive = true;
-            CancelNativeDrag();
-            // Mirror native HandleDialDragging: the GameInput blockade keeps
-            // the map pan and other input consumers from eating the same
-            // left-drag gesture while we move the expanded face.
-            AcquireInputBlockade();
+            dragProtocol.OnMapDragBegin(this, scaleSubsystem, CancelNativeDrag);
         }
 
         internal void OnMapDragDelta(Vector2 delta)
         {
-            if (!mapDragActive)
-                return;
-            if (!scaleSubsystem.Expanded || chronometerRaised)
-            {
-                EndMapDrag();
-                return;
-            }
-            // Native HandleDialDragging would fight us for the same gesture.
-            CancelNativeDrag();
-            chronometerDragContainer.position += new Vector3(delta.x, delta.y, 0f);
-            UpdateDefaultPositionForRadioParent();
-            if (Time.frameCount % 30 == 0)
-                PersistExpandedChronometerPosition();
+            dragProtocol.OnMapDragDelta(chronometerDragContainer, delta, scaleSubsystem,
+                CancelNativeDrag, PersistExpandedChronometerPosition);
         }
 
         internal void OnMapDragEnd()
         {
-            EndMapDrag();
-        }
-
-        private void EndMapDrag()
-        {
-            bool wasActive = mapDragActive;
-            mapDragActive = false;
-
-            if (wasActive)
-            {
-                CancelNativeDrag();
-                PersistExpandedChronometerPosition();
-                ReleaseInputBlockade();
-            }
-
-            scaleSubsystem.CancelMapDrag();
-        }
-
-        private void AcquireInputBlockade()
-        {
-            if (gameInput.IsNull() && InjectionFramework.Instance.IsNotNull())
-                gameInput = InjectionFramework.Instance.GetInstance<GameInput>();
-            if (gameInput.IsNotNull())
-                gameInput.AddBlockade(this);
-        }
-
-        private void ReleaseInputBlockade()
-        {
-            if (gameInput.IsNull() && InjectionFramework.Instance.IsNotNull())
-                gameInput = InjectionFramework.Instance.GetInstance<GameInput>();
-            if (gameInput.IsNotNull())
-                gameInput.RemoveBlockade(this);
+            dragProtocol.OnMapDragEnd(scaleSubsystem, CancelNativeDrag,
+                PersistExpandedChronometerPosition);
         }
 
         // Expanded drag bypasses native HandleDialDragging (its fixed-radius
@@ -485,63 +445,22 @@ namespace UBOAT.Mods.RadioNavigation
                 && (target == chronometerDragContainer || target.IsChildOf(chronometerDragContainer));
         }
 
+        // Local (raised) drag lives in ChronometerDragProtocol (extracted);
+        // the native-drag cancel runs from Update while the drag is active.
+
         internal void BeginLocalDrag(PointerEventData eventData)
         {
-            if (!chronometerRaised || !IsRadioVisible || eventData == null)
-                return;
-
-            if (eventData.pointerPress.IsNotNull()
-                && eventData.pointerPress.GetComponentInParent<Selectable>().IsNotNull())
-            {
-                return;
-            }
-
-            RectTransform parent = chronometerDragContainer.parent as RectTransform;
-            if (parent.IsNull()
-                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    parent,
-                    eventData.position,
-                    eventData.pressEventCamera,
-                    out localDragPoint))
-            {
-                return;
-            }
-
-            localDragActive = true;
-            CancelNativeDrag();
+            dragProtocol.BeginLocalDrag(chronometerDragContainer, eventData);
         }
 
         internal void DragLocal(PointerEventData eventData)
         {
-            if (!localDragActive || eventData == null)
-                return;
-
-            RectTransform parent = chronometerDragContainer.parent as RectTransform;
-            Vector2 currentPoint;
-            if (parent.IsNull()
-                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    parent,
-                    eventData.position,
-                    eventData.pressEventCamera,
-                    out currentPoint))
-            {
-                return;
-            }
-
-            chronometerDragContainer.anchoredPosition += currentPoint - localDragPoint;
-            localDragPoint = currentPoint;
-            UpdateDefaultPositionForRadioParent();
-            CancelNativeDrag();
+            dragProtocol.DragLocal(chronometerDragContainer, eventData);
         }
 
         internal void EndLocalDrag()
         {
-            // The shield receives OnEndDrag for every drag over the container
-            // even when our Begin gates rejected it - only real drags matter.
-            if (!localDragActive)
-                return;
-            localDragActive = false;
-            CancelNativeDrag();
+            dragProtocol.EndLocalDrag();
         }
 
         private void CancelNativeDrag()
