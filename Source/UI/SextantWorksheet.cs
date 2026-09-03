@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using UnityEngine;
@@ -22,9 +21,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         private const float FixPanelIntervalSeconds = 1f;
         private const float FixStatusSeconds = 3f;
-        private const float CourseSampleIntervalSeconds = 2f;
-        private const float CourseSampleWindowSeconds = 10f;
-        private const float MinTransferSpeedKn = 0.5f;
 
         // F-Tafel worksheet card strings (v1.9).
         private const string FixCardTitle =
@@ -79,17 +75,8 @@ namespace UBOAT.Mods.RadioNavigation
         private float statusTimer;
         private float panelTimer;
         private float courseSampleTimer;
-        private float smoothedCourseDeg;
-        private float smoothedSpeedKn;
+        private readonly CourseSampler courseSampler = new CourseSampler();
         private string sectionText;
-
-        private struct TrackSample
-        {
-            public DateTime Utc;
-            public double Lat;
-            public double Lon;
-        }
-        private readonly List<TrackSample> trackSamples = new List<TrackSample>(16);
 
         public SextantWorksheet(IPlayerPositionProvider positionProvider)
         {
@@ -180,47 +167,21 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Course/speed over ground from the recent position track (10 s
-        /// window, 2 s sampling). Below the transfer speed threshold the boat
-        /// counts as anchored: speed 0, course keeps its last value.
+        /// Course/speed sampler adapter: 2 s throttle (the provider read is
+        /// chained reflection), then feeds position + clock into the pure
+        /// CourseSampler. The window math lives there, tested offline.
         /// </summary>
         public void UpdateCourseSampler(float dt)
         {
             courseSampleTimer -= dt;
             if (courseSampleTimer > 0f)
                 return;
-            courseSampleTimer = CourseSampleIntervalSeconds;
+            courseSampleTimer = CourseSampler.SampleIntervalSeconds;
 
             float latF, lonF;
             if (!positionProvider.TryGetPosition(out latF, out lonF))
                 return;
-            DateTime utc = GameTimeResolver.GetUtcNow();
-            trackSamples.Add(new TrackSample { Utc = utc, Lat = latF, Lon = lonF });
-            while (trackSamples.Count > 0 &&
-                   (utc - trackSamples[0].Utc).TotalSeconds > CourseSampleWindowSeconds + 2.0)
-                trackSamples.RemoveAt(0);
-            if (trackSamples.Count < 2)
-                return;
-
-            TrackSample first = trackSamples[0];
-            TrackSample last = trackSamples[trackSamples.Count - 1];
-            double spanHours = (last.Utc - first.Utc).TotalHours;
-            if (spanHours < CourseSampleWindowSeconds / 3600.0 * 0.6)
-                return; // not enough baseline yet right after opening
-
-            double distKm = GeoMath.HaversineKm(
-                (float)first.Lat, (float)first.Lon, (float)last.Lat, (float)last.Lon);
-            double kn = distKm / 1.852 / spanHours;
-            if (kn >= MinTransferSpeedKn)
-            {
-                smoothedCourseDeg = GeoMath.InitialBearingDeg(
-                    (float)first.Lat, (float)first.Lon, (float)last.Lat, (float)last.Lon);
-                smoothedSpeedKn = (float)kn;
-            }
-            else
-            {
-                smoothedSpeedKn = 0f;
-            }
+            courseSampler.AddSample(GameTimeResolver.GetUtcNow(), latF, lonF);
         }
 
         /// <summary>1 Hz card refresh: rebuilds the card text only on change.</summary>
@@ -322,12 +283,12 @@ namespace UBOAT.Mods.RadioNavigation
             double dtHours = (runningFix.Observation2.Utc - runningFix.Observation1.Utc).TotalHours;
             if (dtHours < 0.0)
                 dtHours = 0.0;
-            double transferNm = smoothedSpeedKn * dtHours;
+            double transferNm = courseSampler.SpeedKn * dtHours;
             sb.Append(FixCardVersetzung).Append('\n');
             sb.Append(FixCardCourse).Append(' ')
-              .Append(smoothedCourseDeg.ToString("F0", CultureInfo.InvariantCulture)).Append('\u00B0')
+              .Append(courseSampler.CourseDeg.ToString("F0", CultureInfo.InvariantCulture)).Append('\u00B0')
               .Append(' ').Append(FixCardSpeed).Append(' ')
-              .Append(smoothedSpeedKn.ToString("F1", CultureInfo.InvariantCulture)).Append(" kn\n");
+              .Append(courseSampler.SpeedKn.ToString("F1", CultureInfo.InvariantCulture)).Append(" kn\n");
             sb.Append("\u0394t ").Append((dtHours * 60.0).ToString("F0", CultureInfo.InvariantCulture))
               .Append(' ').Append(FixCardMinutes).Append(' ')
               .Append(FixCardTransfer).Append(' ')
@@ -349,7 +310,7 @@ namespace UBOAT.Mods.RadioNavigation
                   .Append(FixCardGeomAdvice).Append('\n');
 
             double fixLat, fixLon;
-            if (!runningFix.CalculateFix(smoothedCourseDeg, smoothedSpeedKn, out fixLat, out fixLon))
+            if (!runningFix.CalculateFix(courseSampler.CourseDeg, courseSampler.SpeedKn, out fixLat, out fixLon))
             {
                 FixMapMarker.Clear();
                 sb.Append("FIX \u2014");

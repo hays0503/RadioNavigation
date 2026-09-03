@@ -895,6 +895,110 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Course-sampler gate (SRP): the course/speed-over-ground track math
+        /// (10 s window, transfer threshold, anchored logic) must live in
+        /// CourseSampler as pure computation (unit-tested offline in
+        /// CourseSamplerTests), with SextantWorksheet.UpdateCourseSampler as
+        /// a thin throttle + provider + clock adapter that feeds it. Pins the
+        /// type surface, the absence of the track state in the worksheet, and
+        /// the wiring — a re-inline of the window math fails here.
+        /// </summary>
+        [Fact]
+        public void CourseSampler_OwnsTrackMath()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax sampler = null;
+            TypeDeclarationSyntax worksheet = null;
+            MethodDeclarationSyntax update = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "CourseSampler")
+                        sampler = type;
+                    if (type.Identifier.Text == "SextantWorksheet")
+                    {
+                        worksheet = type;
+                        update = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "UpdateCourseSampler");
+                    }
+                }
+            }
+
+            if (sampler == null)
+            {
+                problems.Add("type 'CourseSampler' not found in Source/ — track math regressed into the worksheet");
+            }
+            else
+            {
+                bool addsSample = sampler.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "AddSample"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.ParameterList.Parameters.Count == 3);
+                bool hasCourse = sampler.Members.OfType<PropertyDeclarationSyntax>()
+                    .Any(p => p.Identifier.Text == "CourseDeg"
+                        && p.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword)));
+                bool hasSpeed = sampler.Members.OfType<PropertyDeclarationSyntax>()
+                    .Any(p => p.Identifier.Text == "SpeedKn"
+                        && p.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword)));
+                bool hasReset = sampler.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Reset"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword)));
+                if (!addsSample) problems.Add("CourseSampler.AddSample(utc, lat, lon) public entry point not found");
+                if (!hasCourse) problems.Add("CourseSampler.CourseDeg public property not found");
+                if (!hasSpeed) problems.Add("CourseSampler.SpeedKn public property not found");
+                if (!hasReset) problems.Add("CourseSampler.Reset public method not found");
+            }
+
+            if (worksheet == null)
+            {
+                problems.Add("type 'SextantWorksheet' not found in Source/");
+            }
+            else
+            {
+                foreach (var field in worksheet.Members.OfType<FieldDeclarationSyntax>())
+                {
+                    foreach (var v in field.Declaration.Variables)
+                    {
+                        string name = v.Identifier.Text;
+                        if (name == "trackSamples" || name == "smoothedCourseDeg" || name == "smoothedSpeedKn")
+                            problems.Add($"SextantWorksheet still declares '{name}' — track math crept back into the worksheet");
+                    }
+                }
+                bool keepsTrackSample = worksheet.DescendantNodes().OfType<StructDeclarationSyntax>()
+                    .Any(s => s.Identifier.Text == "TrackSample");
+                if (keepsTrackSample)
+                    problems.Add("SextantWorksheet still declares struct TrackSample — the sample type belongs to CourseSampler");
+            }
+
+            if (update == null)
+            {
+                problems.Add("SextantWorksheet.UpdateCourseSampler not found");
+            }
+            else
+            {
+                bool feedsSampler = update.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "AddSample")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "AddSample"));
+                if (!feedsSampler)
+                    problems.Add("SextantWorksheet.UpdateCourseSampler no longer feeds CourseSampler.AddSample — "
+                        + "the tested pure function is bypassed (or the window math was re-inlined)");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} course-sampler violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit
