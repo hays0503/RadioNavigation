@@ -20,30 +20,17 @@ namespace UBOAT.Mods.RadioNavigation
         private GameInput gameInput;
         private RectTransform chronometerDragContainer;
         private Toggle chronometerButton;
-        private GraphicRaycaster chronometerRaycaster;
         private ChronometerDragShield chronometerDragShield;
         private PanelDragHandler panelDragHandler;
         // Cursor application backend lives in ChronometerCursorBackend
         // (extracted); the request flags stay here (sensor inputs).
         private readonly ChronometerCursorBackend cursorBackend = new ChronometerCursorBackend();
-        private Canvas chronometerCanvas;
+        // Raise/restore snapshot state machine lives in ChronometerRaiseState
+        // (extracted).
+        private readonly ChronometerRaiseState raiseState = new ChronometerRaiseState();
         private Canvas parentCanvas;
-        private bool createdCanvas;
-        private bool createdRaycaster;
-        private bool createdDragShield;
-        private bool originalOverrideSorting;
-        private int originalSortingLayerId;
-        private int originalSortingOrder;
-        private bool originalCanvasEnabled;
-        private bool canvasStateCaptured;
-        private bool chronometerRaised;
-        private Transform originalParent;
-        private int originalSiblingIndex = -1;
-        private bool chronometerReparented;
         private Vector2 originalDefaultPosition;
         private bool defaultPositionCaptured;
-        private int originalRadioSiblingIndex = -1;
-        private bool radioMovedBehind;
         private bool resolveWarningLogged;
         private bool previousOpenState;
         private bool hasPreviousOpenState;
@@ -60,7 +47,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void Awake()
         {
             dragProtocol = new ChronometerDragProtocol(
-                () => chronometerRaised,
+                () => raiseState.Raised,
                 () => scaleSubsystem.Expanded,
                 () => IsRadioVisible,
                 UpdateDefaultPositionForRadioParent);
@@ -94,7 +81,7 @@ namespace UBOAT.Mods.RadioNavigation
             // Hover is re-asserted by the sensor every frame; the restore
             // path (ResetChronometerScale) clears it when the chronometer
             // context actually goes away. No per-frame reset here - on the
-            // map chronometerRaised is false and it would kill the hint.
+            // map the raise state is false and it would kill the hint.
             previousOpenState = isOpen;
             hasPreviousOpenState = true;
             nativeChangedThisFrame = false;
@@ -102,7 +89,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void SyncChronometerLayer(bool isOpen)
         {
-            if (isOpen == chronometerRaised)
+            if (isOpen == raiseState.Raised)
                 return;
 
             if (isOpen)
@@ -194,73 +181,34 @@ namespace UBOAT.Mods.RadioNavigation
                 LogResolveWarning("native chronometer toggle is not ready");
         }
 
+        // Raise/restore snapshot lives in ChronometerRaiseState (extracted);
+        // these orchestrators add the scale snapshot and the leak fixes.
+
         private void RaiseChronometer()
         {
-            Canvas canvas = chronometerDragContainer.GetComponent<Canvas>();
-            if (canvas.IsNull())
-            {
-                canvas = chronometerDragContainer.gameObject.AddComponent<Canvas>();
-                createdCanvas = true;
-            }
+            bool wasReparented = raiseState.Reparented;
+            bool raised = raiseState.Raise(chronometerDragContainer, transform, parentCanvas, this,
+                () => {
+                    CaptureDefaultPosition();
+                    scaleSubsystem.Capture(chronometerDragContainer);
+                },
+                () => {
+                    scaleSubsystem.CaptureAttached(chronometerDragContainer);
+                    UpdateDefaultPositionForRadioParent();
+                });
+            if (!raised)
+                return;
 
-            chronometerCanvas = canvas;
-            chronometerRaycaster = chronometerDragContainer.GetComponent<GraphicRaycaster>();
-            if (chronometerRaycaster.IsNull())
-            {
-                chronometerRaycaster = chronometerDragContainer.gameObject.AddComponent<GraphicRaycaster>();
-                createdRaycaster = true;
-            }
-
-            chronometerDragShield = chronometerDragContainer.GetComponent<ChronometerDragShield>();
-            if (chronometerDragShield.IsNull())
-            {
-                chronometerDragShield = chronometerDragContainer.gameObject.AddComponent<ChronometerDragShield>();
-                createdDragShield = true;
-            }
-            chronometerDragShield.SetOwner(this);
-
-            if (!canvasStateCaptured)
-            {
-                originalOverrideSorting = canvas.overrideSorting;
-                originalSortingLayerId = canvas.sortingLayerID;
-                originalSortingOrder = canvas.sortingOrder;
-                originalCanvasEnabled = canvas.enabled;
-                canvasStateCaptured = true;
-            }
-
-            if (parentCanvas.IsNotNull())
-            {
-                canvas.sortingLayerID = parentCanvas.sortingLayerID;
-                canvas.sortingOrder = parentCanvas.sortingOrder + 100;
-                canvas.overrideSorting = true;
-                canvas.enabled = true;
-            }
-            else
-            {
-                MoveRadioBehindNativeUi();
-            }
-
-            if (!chronometerReparented && chronometerDragContainer.parent != transform)
-            {
-                originalParent = chronometerDragContainer.parent;
-                originalSiblingIndex = chronometerDragContainer.GetSiblingIndex();
-                CaptureDefaultPosition();
-                scaleSubsystem.Capture(chronometerDragContainer);
-                chronometerDragContainer.SetParent(transform, true);
-                scaleSubsystem.CaptureAttached(chronometerDragContainer);
-                UpdateDefaultPositionForRadioParent();
-                chronometerReparented = true;
-            }
-            else if (!scaleSubsystem.ScaleCaptured)
+            // Original else-branch: the container was already reparented
+            // (e.g. a raise without a restore in between) but the scale
+            // snapshot is still missing.
+            if (wasReparented && !scaleSubsystem.ScaleCaptured)
             {
                 scaleSubsystem.Capture(chronometerDragContainer);
                 scaleSubsystem.CaptureAttached(chronometerDragContainer);
             }
 
             scaleSubsystem.EnsureControl(chronometerDragContainer, this);
-
-            chronometerDragContainer.SetAsLastSibling();
-            chronometerRaised = true;
             Debug.Log("[RadioNav][Chronometer] native F7 chronometer attached to radio and raised");
         }
 
@@ -269,30 +217,8 @@ namespace UBOAT.Mods.RadioNavigation
             EndLocalDrag();
             scaleSubsystem.Reset(chronometerDragContainer, this);
 
-            if (chronometerCanvas.IsNotNull() && canvasStateCaptured)
-            {
-                chronometerCanvas.overrideSorting = originalOverrideSorting;
-                chronometerCanvas.sortingLayerID = originalSortingLayerId;
-                chronometerCanvas.sortingOrder = originalSortingOrder;
-                chronometerCanvas.enabled = originalCanvasEnabled;
-            }
-
-            if (chronometerReparented && chronometerDragContainer.IsNotNull())
-            {
-                if (originalParent.IsNotNull())
-                {
-                    chronometerDragContainer.SetParent(originalParent, true);
-                    int maxIndex = originalParent.childCount - 1;
-                    chronometerDragContainer.SetSiblingIndex(Mathf.Clamp(originalSiblingIndex, 0, maxIndex));
-                    chronometerDragContainer.localScale = scaleSubsystem.OriginalScale;
-                }
-
-                RestoreDefaultPosition();
-
-                originalParent = null;
-                originalSiblingIndex = -1;
-                chronometerReparented = false;
-            }
+            raiseState.Restore(chronometerDragContainer, transform,
+                scaleSubsystem.OriginalScale, RestoreDefaultPosition);
 
             scaleSubsystem.ClearSnapshot();
 
@@ -300,13 +226,8 @@ namespace UBOAT.Mods.RadioNavigation
             // native hierarchy after restore. Destroy it so the next raise
             // recreates a fresh, correctly-parented control.
             scaleSubsystem.ReleaseControl();
-
-            if (chronometerDragShield.IsNotNull())
-                chronometerDragShield.SetOwner(null);
-
-            RestoreRadioSibling();
-            chronometerRaised = false;
         }
+
 
         internal void SetScaleHover(bool value)
         {
@@ -474,26 +395,8 @@ namespace UBOAT.Mods.RadioNavigation
                 gameInput.RemoveBlockade(shipControlUI);
         }
 
-        private void MoveRadioBehindNativeUi()
-        {
-            if (radioMovedBehind || transform.parent.IsNull())
-                return;
-
-            originalRadioSiblingIndex = transform.GetSiblingIndex();
-            transform.SetAsFirstSibling();
-            radioMovedBehind = true;
-        }
-
-        private void RestoreRadioSibling()
-        {
-            if (!radioMovedBehind || transform.parent.IsNull())
-                return;
-
-            int maxIndex = transform.parent.childCount - 1;
-            transform.SetSiblingIndex(Mathf.Clamp(originalRadioSiblingIndex, 0, maxIndex));
-            originalRadioSiblingIndex = -1;
-            radioMovedBehind = false;
-        }
+        // Radio-behind-native reordering lives in ChronometerRaiseState
+        // (extracted); Raise/Restore call it internally.
 
         private void LogResolveWarning(string message)
         {
@@ -508,17 +411,10 @@ namespace UBOAT.Mods.RadioNavigation
         {
             EndLocalDrag();
 
-            if (chronometerRaised)
+            if (raiseState.Raised)
                 RestoreChronometerLayer();
 
-            if (createdCanvas && chronometerCanvas.IsNotNull())
-                Destroy(chronometerCanvas);
-
-            if (createdRaycaster && chronometerRaycaster.IsNotNull())
-                Destroy(chronometerRaycaster);
-
-            if (createdDragShield && chronometerDragShield.IsNotNull())
-                Destroy(chronometerDragShield);
+            raiseState.DestroyCreated();
 
             scaleSubsystem.ReleaseControl();
             cursorBackend.Destroy();
