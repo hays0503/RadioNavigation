@@ -1518,6 +1518,88 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Station-diagnostics gate (SRP): the snapshot struct must be a
+        /// top-level type (not nested in the controller) and its assembly
+        /// must live in StationDiagnosticsReport as a pure function (tested
+        /// in StationDiagnosticsReportTests), with
+        /// SonneController.GetStationDiagnostics keeping only validation,
+        /// callsign resolve and the elapsed clock. A re-nesting or
+        /// re-inline fails here.
+        /// </summary>
+        [Fact]
+        public void StationDiagnostics_OwnsAssembly()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax topLevel = null;
+            TypeDeclarationSyntax report = null;
+            TypeDeclarationSyntax controller = null;
+            MethodDeclarationSyntax getter = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "StationDiagnostics"
+                        && type.Parent is NamespaceDeclarationSyntax)
+                        topLevel = type;
+                    if (type.Identifier.Text == "StationDiagnosticsReport")
+                        report = type;
+                    if (type.Identifier.Text == "SonneController")
+                    {
+                        controller = type;
+                        getter = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "GetStationDiagnostics");
+                    }
+                }
+            }
+
+            if (topLevel == null)
+                problems.Add("top-level type 'StationDiagnostics' not found in Source/ — the snapshot is nested in the controller again");
+            if (controller != null
+                && controller.Members.OfType<TypeDeclarationSyntax>()
+                    .Any(t => t.Identifier.Text == "StationDiagnostics"))
+                problems.Add("SonneController still nests StationDiagnostics — keep the snapshot top-level");
+
+            if (report == null)
+            {
+                problems.Add("type 'StationDiagnosticsReport' not found in Source/ — assembly regressed into the controller");
+            }
+            else
+            {
+                bool builds = report.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Build"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 5);
+                if (!builds) problems.Add("StationDiagnosticsReport.Build(station, callsign, state, phase, elapsed) public static entry point not found");
+            }
+
+            if (getter == null)
+            {
+                problems.Add("SonneController.GetStationDiagnostics not found");
+            }
+            else
+            {
+                bool invokesReport = getter.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "Build")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "Build"));
+                if (!invokesReport)
+                    problems.Add("SonneController.GetStationDiagnostics never invokes StationDiagnosticsReport.Build — the tested pure function is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} station-diagnostics violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

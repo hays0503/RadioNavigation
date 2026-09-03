@@ -205,47 +205,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (IsStationNavigating(index))
                 elapsed = Time.time - s.NavigationStartTime;
 
-            return new StationDiagnostics
-            {
-                Name = station.Name,
-                Callsign = callsign,
-                InBeam = s.InBeam,
-                IsDashSector = s.IsDashSector,
-                SectorNumber = s.SectorNumber,
-                Gain = s.Gain,
-                BeatFrequency = s.BeatFrequency,
-                TransitionIndex = s.TransitionIndex,
-                Pattern = s.Pattern,
-                SchedulerPhase = schedulers[index].CurrentPhase,
-                DotCount = s.DotCount,
-                // EqSignIndex is the actual position of the equisignal in the
-                // 60-element emitted pattern, after the lost-sign correction.
-                EqSignIndex = s.TransitionIndex,
-                DashCount = s.Config.MaxNavigationCount - s.DotCount,
-                CurrentBearing = s.CurrentBearing,
-                BearingToBoat = s.BearingToBoat,
-                NavigationElapsed = elapsed
-            };
-        }
-
-        public struct StationDiagnostics
-        {
-            public string Name;
-            public string Callsign;
-            public bool InBeam;
-            public bool IsDashSector;
-            public int SectorNumber;
-            public float Gain;
-            public float BeatFrequency;
-            public int TransitionIndex;
-            public NavigationPattern Pattern;
-            public StationScheduler.Phase SchedulerPhase;
-            public int DotCount;
-            public int EqSignIndex;
-            public int DashCount;
-            public float CurrentBearing;
-            public float BearingToBoat;
-            public float NavigationElapsed;
+            return StationDiagnosticsReport.Build(
+                station, callsign, s, schedulers[index].CurrentPhase, elapsed);
         }
 
         public void UpdatePosition(float latitude, float longitude)

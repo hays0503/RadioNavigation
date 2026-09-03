@@ -313,7 +313,7 @@ namespace UBOAT.Mods.RadioNavigation
 #endif
         }
 
-        private string BuildPatternLine(SonneController.StationDiagnostics diag, int i, int domIdx)
+        private string BuildPatternLine(StationDiagnostics diag, int i, int domIdx)
         {
             string callsign = diag.Callsign ?? "?";
             string beam = diag.InBeam ? "IN BEAM" : "OUTSIDE";
