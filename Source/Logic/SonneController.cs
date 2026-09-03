@@ -181,21 +181,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             SignalCharType type;
             char c;
-            switch (elemType)
-            {
-                case NavigationElementType.Equisignal:
-                    type = SignalCharType.Equisignal;
-                    c = '=';
-                    break;
-                case NavigationElementType.Dash:
-                    type = isCallsign ? SignalCharType.Callsign : SignalCharType.Dash;
-                    c = '-';
-                    break;
-                default:
-                    type = isCallsign ? SignalCharType.Callsign : SignalCharType.Dot;
-                    c = '.';
-                    break;
-            }
+            SignalTranscriber.MapElement(elemType, isCallsign, out type, out c);
             signalEntries.Add(new SignalEntry(c, type));
             morseCharCount++;
             SignalRichTextFormatter.TrimEntries(signalEntries, ref morseCharCount);

@@ -79,6 +79,7 @@
     <Compile Include="GameTypeCacheTests.cs" />
     <Compile Include="CourseSamplerTests.cs" />
     <Compile Include="StationGainModelTests.cs" />
+    <Compile Include="SignalTranscriberTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -136,6 +137,7 @@
     <Compile Include="..\Source\Logic\GameTypeCache.cs" Link="Source\Logic\GameTypeCache.cs" />
     <Compile Include="..\Source\Logic\CourseSampler.cs" Link="Source\Logic\CourseSampler.cs" />
     <Compile Include="..\Source\Logic\StationGainModel.cs" Link="Source\Logic\StationGainModel.cs" />
+    <Compile Include="..\Source\Logic\SignalTranscriber.cs" Link="Source\Logic\SignalTranscriber.cs" />
   </ItemGroup>
 
 </Project>

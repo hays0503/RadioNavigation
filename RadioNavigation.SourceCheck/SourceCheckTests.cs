@@ -1100,6 +1100,79 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Signal-transcriber gate (SRP): the element -&gt; glyph mapping must
+        /// live in SignalTranscriber as a pure function (tested in
+        /// SignalTranscriberTests), with
+        /// SonneController.OnStationElementCompleted as the buffer-management
+        /// caller. A re-inline of the switch fails here.
+        /// </summary>
+        [Fact]
+        public void SignalTranscriber_OwnsElementMapping()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax transcriber = null;
+            MethodDeclarationSyntax completed = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "SignalTranscriber")
+                        transcriber = type;
+                    if (type.Identifier.Text == "SonneController")
+                    {
+                        completed = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "OnStationElementCompleted");
+                    }
+                }
+            }
+
+            if (transcriber == null)
+            {
+                problems.Add("type 'SignalTranscriber' not found in Source/ — element mapping regressed into the controller");
+            }
+            else
+            {
+                bool maps = transcriber.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "MapElement"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 4);
+                if (!maps) problems.Add("SignalTranscriber.MapElement(elem, isCallsign, out type, out glyph) public static entry point not found");
+            }
+
+            if (completed == null)
+            {
+                problems.Add("SonneController.OnStationElementCompleted not found");
+            }
+            else
+            {
+                bool keepsSwitch = completed.DescendantNodes()
+                    .OfType<SwitchStatementSyntax>()
+                    .Any();
+                if (keepsSwitch)
+                    problems.Add("SonneController.OnStationElementCompleted still contains a switch — the mapping belongs to SignalTranscriber");
+
+                bool invokesTranscriber = completed.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "MapElement")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "MapElement"));
+                if (!invokesTranscriber)
+                    problems.Add("SonneController.OnStationElementCompleted never invokes MapElement — the tested pure function is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} signal-transcriber violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit
