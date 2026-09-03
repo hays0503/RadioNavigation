@@ -397,6 +397,92 @@ namespace RadioNavigation.SourceCheck
                 + "'frequency change -> single callsign')");
         }
 
+        /// <summary>
+        /// Harmony patch-slot contract (live 2026-09-03: radio menu missing).
+        /// RadioStoryIntegration.InjectT3PLL38Decision MUST be wired as a
+        /// postfix on RadioStory.ContinueStory, never a prefix:
+        /// (1) the original computes RadioStory.stage from tags at the START
+        /// of its own body (RadioStory.cs:264-284), so a prefix always reads
+        /// the stale stage (0 on a fresh story) and the MainChoices gate can
+        /// never fire on first call;
+        /// (2) base.ContinueStory's ClearDecisions (GenericStory.cs:577) runs
+        /// inside the original, so a prefix injection would be wiped in the
+        /// same call. The full 5-patch wiring matrix is pinned below; any
+        /// slot move changes runtime semantics silently (the preflight gate
+        /// only checks non-null). Handler fragments catch copy-paste wiring
+        /// of the wrong handler into a slot.
+        /// </summary>
+        [Fact]
+        public void HarmonyPatchWiring_MatchesDesignContract()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            // (target name, prefixMustBeNull, postfixMustBeNull, handlerFragment)
+            var contract = new[]
+            {
+                Tuple.Create("RadioStory.ContinueStory", true, false, "injectT3PLL38"),
+                Tuple.Create("Locale.RetrieveString", false, true, "overrideLocale"),
+                Tuple.Create("Locale.RetrieveString(string,string)", false, true, "overrideLocale"),
+                Tuple.Create("RadioStory.OnDecisionSelected", false, true, "handleDecisions"),
+                Tuple.Create("RadioStory.OnStopped", true, false, "hideOnStop"),
+            };
+
+            string installerPath = ModCompiler.EnumerateSources()
+                .FirstOrDefault(p => Path.GetFileName(p) == "HarmonyPatchInstaller.cs");
+            Assert.True(installerPath != null,
+                "HarmonyPatchInstaller.cs not found — the wiring contract is unverifiable");
+
+            var root = CSharpSyntaxTree.ParseText(
+                File.ReadAllText(installerPath), path: installerPath).GetRoot();
+            var creations = root.DescendantNodes()
+                .OfType<ObjectCreationExpressionSyntax>()
+                .Where(c => c.Type.ToString() == "PatchTarget")
+                .ToList();
+
+            var problems = new List<string>();
+            foreach (var row in contract)
+            {
+                var matches = creations
+                    .Where(c => c.ArgumentList != null
+                        && c.ArgumentList.Arguments.Count == 4
+                        && c.ArgumentList.Arguments[3].Expression is LiteralExpressionSyntax lit
+                        && lit.IsKind(SyntaxKind.StringLiteralExpression)
+                        && lit.Token.ValueText == row.Item1)
+                    .ToList();
+                if (matches.Count != 1)
+                {
+                    problems.Add($"target '{row.Item1}': expected exactly 1 PatchTarget creation, found {matches.Count}");
+                    continue;
+                }
+
+                var args = matches[0].ArgumentList.Arguments;
+                string loc = $"{Path.GetFileName(installerPath)}:{matches[0].GetLocation().GetLineSpan().StartLinePosition.Line + 1}";
+                bool prefixNull = IsNullLiteral(args[1].Expression);
+                bool postfixNull = IsNullLiteral(args[2].Expression);
+                if (prefixNull != row.Item2)
+                    problems.Add($"{loc}: '{row.Item1}' prefix slot must be "
+                        + (row.Item2 ? "null" : "wired")
+                        + " — a ContinueStory prefix reads RadioStory.stage before the original computes it from tags");
+                if (postfixNull != row.Item3)
+                    problems.Add($"{loc}: '{row.Item1}' postfix slot must be "
+                        + (row.Item3 ? "null" : "wired"));
+                if (!prefixNull && !args[1].ToString().Contains(row.Item4))
+                    problems.Add($"{loc}: '{row.Item1}' prefix slot does not reference '{row.Item4}' — wrong handler wired");
+                if (!postfixNull && !args[2].ToString().Contains(row.Item4))
+                    problems.Add($"{loc}: '{row.Item1}' postfix slot does not reference '{row.Item4}' — wrong handler wired");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} Harmony wiring violation(s) — patch-slot moves change runtime semantics silently:\n"
+                + string.Join("\n", problems));
+        }
+
+        private static bool IsNullLiteral(ExpressionSyntax expr)
+        {
+            return expr is LiteralExpressionSyntax lit
+                && lit.IsKind(SyntaxKind.NullLiteralExpression);
+        }
+
         /// <summary>'x.Event' / 'arr[i].Event' -> 'Event'; bare identifier -> null.</summary>
         private static string EventNameOf(ExpressionSyntax left)
         {

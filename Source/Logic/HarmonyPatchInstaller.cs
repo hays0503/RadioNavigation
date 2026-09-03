@@ -57,7 +57,16 @@ namespace UBOAT.Mods.RadioNavigation
 
             return new[]
             {
-                new PatchTarget(continueStory, injectT3PLL38.IsNotNull() ? new HarmonyMethod(injectT3PLL38) : null, null, "RadioStory.ContinueStory"),
+                // InjectT3PLL38Decision MUST stay a postfix: it reads the
+                // RadioStory.stage field, which the original computes from
+                // tags at the START of its own body (RadioStory.cs:264-284).
+                // As a prefix it always saw the stale stage (0 on a fresh
+                // story) so the MainChoices gate never fired (live 2026-09-03:
+                // radio menu missing). Postfix injection also runs AFTER
+                // base.ContinueStory's ClearDecisions (GenericStory.cs:577),
+                // so the decision survives the same call. Pinned by
+                // SourceCheck HarmonyPatchWiring_MatchesDesignContract.
+                new PatchTarget(continueStory, null, injectT3PLL38.IsNotNull() ? new HarmonyMethod(injectT3PLL38) : null, "RadioStory.ContinueStory"),
                 new PatchTarget(retrieveString1, overrideLocale.IsNotNull() ? new HarmonyMethod(overrideLocale) : null, null, "Locale.RetrieveString"),
                 new PatchTarget(retrieveString2, overrideLocale.IsNotNull() ? new HarmonyMethod(overrideLocale) : null, null, "Locale.RetrieveString(string,string)"),
                 new PatchTarget(onDecision, handleDecisions.IsNotNull() ? new HarmonyMethod(handleDecisions) : null, null, "RadioStory.OnDecisionSelected"),
