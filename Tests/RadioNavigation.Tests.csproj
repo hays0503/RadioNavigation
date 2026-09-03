@@ -83,6 +83,7 @@
     <Compile Include="BearingDiagnosticsTests.cs" />
     <Compile Include="StationNavigatorTests.cs" />
     <Compile Include="SignalTranscriptTests.cs" />
+    <Compile Include="StationFleetTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -144,6 +145,7 @@
     <Compile Include="..\Source\Logic\BearingDiagnostics.cs" Link="Source\Logic\BearingDiagnostics.cs" />
     <Compile Include="..\Source\Logic\StationNavigator.cs" Link="Source\Logic\StationNavigator.cs" />
     <Compile Include="..\Source\Logic\SignalTranscript.cs" Link="Source\Logic\SignalTranscript.cs" />
+    <Compile Include="..\Source\Logic\StationFleet.cs" Link="Source\Logic\StationFleet.cs" />
   </ItemGroup>
 
 </Project>

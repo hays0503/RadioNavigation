@@ -10,18 +10,17 @@ namespace UBOAT.Mods.RadioNavigation
     public class SonneController : MonoBehaviour
     {
         private const int SonneZoneIndex = 1;
-        private const float BfoBase = Constants.BfoBaseHz;
         private const float TimeCompressionThreshold = 1.01f;
 
         private static readonly AudioClip silentClip = AudioClip.Create("SonneSilent", AudioSynthesisEngine.SampleRate * 2, 1, AudioSynthesisEngine.SampleRate, false);
 
         private int dominantStationIndex = -1;
+        // Station object fleet (single backing store; built in Awake).
+        private StationFleet fleet;
         private StationState[] stations;
         private StationScheduler[] schedulers;
         private MorseKeyer[] keyers;
         private CarrierGenerator[] carriers;
-        private Action<NavigationElementType, bool>[] keyerElementHandlers;
-        private Action[] keyerSequenceHandlers;
         private AudioSynthesisEngine audioEngine;
 
         private float currentFrequencyKHz;
@@ -69,54 +68,11 @@ namespace UBOAT.Mods.RadioNavigation
             if (!SonneBeam.Initialize(tableDirectory))
                 Debug.LogError("[RadioNav][SONNE] Failed to load bearing tables: " + SonneBeam.LastLoadError);
 
-            var beaconStations = BeaconData.Stations;
-            stations = new StationState[beaconStations.Length];
-            schedulers = new StationScheduler[beaconStations.Length];
-            keyers = new MorseKeyer[beaconStations.Length];
-            carriers = new CarrierGenerator[beaconStations.Length];
-            keyerElementHandlers = new Action<NavigationElementType, bool>[beaconStations.Length];
-            keyerSequenceHandlers = new Action[beaconStations.Length];
-
-            for (int i = 0; i < beaconStations.Length; i++)
-            {
-                StationCallsignResolver.TryGet(beaconStations[i], out string callsign);
-
-                var config = ConsolCycleConfig.GetForCycleDuration(beaconStations[i].CycleDurationSeconds);
-                var initialPattern = SonneBeam.BuildPattern(0, false);
-
-                var scheduler = new StationScheduler(callsign)
-                {
-                    Config = config,
-                    CurrentConsolPattern = initialPattern
-                };
-                var keyer = new MorseKeyer();
-                var carrier = new CarrierGenerator(AudioSynthesisEngine.SampleRate);
-
-                schedulers[i] = scheduler;
-                keyers[i] = keyer;
-                carriers[i] = carrier;
-
-                stations[i] = new StationState
-                {
-                    InBeam = false,
-                    TransitionIndex = config.MaxNavigationCount,
-                    Gain = 0f,
-                    BeatFrequency = BfoBase,
-                    Config = config,
-                    DotCount = 0,
-                    CurrentBearing = 0,
-                    BearingToBoat = 0,
-                    Pattern = SonneSignalGenerator.ToNavigationPattern(initialPattern)
-                };
-
-                int stationIndex = i;
-                var elementHandler = new Action<NavigationElementType, bool>((elemType, isCallsign) => OnStationElementCompleted(stationIndex, elemType, isCallsign));
-                var sequenceHandler = new Action(() => OnStationSequenceFinished(stationIndex));
-                keyerElementHandlers[i] = elementHandler;
-                keyerSequenceHandlers[i] = sequenceHandler;
-                keyer.OnElementCompleted += elementHandler;
-                keyer.OnSequenceFinished += sequenceHandler;
-            }
+            fleet = new StationFleet(OnStationElementCompleted, OnStationSequenceFinished);
+            stations = fleet.States;
+            schedulers = fleet.Schedulers;
+            keyers = fleet.Keyers;
+            carriers = fleet.Carriers;
 
             cachedAudioSource = GetComponent<AudioSource>();
             var audio = cachedAudioSource;
@@ -154,17 +110,8 @@ namespace UBOAT.Mods.RadioNavigation
                 volumeSpinner.OnValueChanged -= OnVolumeChanged;
             if (feedbackSpinner.IsNotNull())
                 feedbackSpinner.OnValueChanged -= OnFeedbackChanged;
-            if (keyers.IsNotNull() && keyerElementHandlers.IsNotNull() && keyerSequenceHandlers.IsNotNull())
-            {
-                for (int i = 0; i < keyers.Length; i++)
-                {
-                    if (keyers[i].IsNotNull())
-                    {
-                        keyers[i].OnElementCompleted -= keyerElementHandlers[i];
-                        keyers[i].OnSequenceFinished -= keyerSequenceHandlers[i];
-                    }
-                }
-            }
+            if (fleet.IsNotNull())
+                fleet.Unwire();
         }
 
         private void OnStationElementCompleted(int stationIndex, NavigationElementType elemType, bool isCallsign)

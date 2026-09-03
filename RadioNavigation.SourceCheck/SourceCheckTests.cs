@@ -1426,6 +1426,98 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Station-fleet gate (SRP): station object construction + keyer
+        /// event wiring must live in StationFleet (tested offline in
+        /// StationFleetTests, including symmetric Unwire), with
+        /// SonneController.Awake/OnDestroy delegating. A re-inline of the
+        /// build loop or the unsubscribe block fails here.
+        /// </summary>
+        [Fact]
+        public void StationFleet_OwnsStationWiring()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax fleet = null;
+            MethodDeclarationSyntax awake = null;
+            MethodDeclarationSyntax destroy = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "StationFleet")
+                        fleet = type;
+                    if (type.Identifier.Text == "SonneController")
+                    {
+                        awake = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "Awake");
+                        destroy = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "OnDestroy");
+                    }
+                }
+            }
+
+            if (fleet == null)
+            {
+                problems.Add("type 'StationFleet' not found in Source/ — station wiring regressed into the controller");
+            }
+            else
+            {
+                bool builds = fleet.Members.OfType<ConstructorDeclarationSyntax>().Any();
+                bool unwires = fleet.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Unwire"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword)));
+                bool exposesStates = fleet.Members.OfType<PropertyDeclarationSyntax>()
+                    .Any(p => p.Identifier.Text == "States");
+                if (!builds) problems.Add("StationFleet constructor not found");
+                if (!unwires) problems.Add("StationFleet.Unwire public method not found");
+                if (!exposesStates) problems.Add("StationFleet.States property not found");
+            }
+
+            if (awake == null)
+            {
+                problems.Add("SonneController.Awake not found");
+            }
+            else
+            {
+                bool keepsBuildLoop = awake.DescendantNodes()
+                    .OfType<ForStatementSyntax>()
+                    .Any();
+                if (keepsBuildLoop)
+                    problems.Add("SonneController.Awake still contains a for loop — station construction belongs to StationFleet");
+            }
+
+            if (destroy == null)
+            {
+                problems.Add("SonneController.OnDestroy not found");
+            }
+            else
+            {
+                bool keepsUnsubscribeLoop = destroy.DescendantNodes()
+                    .OfType<ForStatementSyntax>()
+                    .Any();
+                if (keepsUnsubscribeLoop)
+                    problems.Add("SonneController.OnDestroy still contains a for loop — keyer unwiring belongs to StationFleet.Unwire");
+
+                bool invokesUnwire = destroy.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "Unwire")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "Unwire"));
+                if (!invokesUnwire)
+                    problems.Add("SonneController.OnDestroy never invokes Unwire — keyer handlers leak on teardown");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} station-fleet violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit
