@@ -42,7 +42,6 @@ namespace UBOAT.Mods.RadioNavigation
     public sealed class LighthouseBeamGlow : MonoBehaviour
     {
         private const string SpotLightName = "Spot Light";
-        private const string FlareComponentTypeName = "HDRPLensFlare";
         private const float MaxLightRangeM = 2500f;
         private const float MinLightIntensity = 2.5f;
         private const float DaySunIntensityThreshold = 0.6f;
@@ -51,15 +50,10 @@ namespace UBOAT.Mods.RadioNavigation
         // unit-tested). Dot/streak layer constants and layout math live in
         // LighthouseDotLayout (P5.4 LBG-2); pixel sizes come from the model.
         private const float BeamVisibleAngleDeg = 60f;
-        // Native flare is replaced by the screen-space dot beyond this range:
-        // the dot path obeys the model's exact pixel caps (≤10px / ≤13px).
+        // Native flare is replaced by the screen-space dot beyond this range
+        // (mirrors LighthouseFlareDriver.FlareMaxDistanceM; kept here for
+        // the dot-takeover decision in FlareActiveByLogic).
         private const float FlareMaxDistanceM = 1200f;
-        private const float FlareIntensityScale = 2f;
-        // User preference: the flare reads too small through the binoculars,
-        // especially up close. Base sizes were the far pixel caps from the
-        // visual model spec (glow 0.010 ≈ 11px @1080p, streak 0.012×0.006 ≈
-        // 13px, star 0.015); +25% on top.
-        private const float FlareSizeScale = 1.25f;
         // The game hard-codes the periscope/binocular camera far clip to 11000
         // (Periscope.cs:1249). Lighthouses sit beyond it (12+ km), so the
         // device view culls them entirely. Raise the clip while a device
@@ -80,21 +74,15 @@ namespace UBOAT.Mods.RadioNavigation
         private Vector3 rotatorLocalPosition;
         private Light spotLight;
         private Light sun;
-        private Component lensFlare;
-        private PropertyInfo flareIntensityProperty;
-        private MeshFilter flareMeshFilter;
-        private object flareGlowElement;
-        private object flareStreakElement;
-        private object flareStarElement;
+        // HDRPLensFlare pipeline lives in LighthouseFlareDriver (extracted).
+        private readonly LighthouseFlareDriver flareDriver = new LighthouseFlareDriver();
         private MainCamera gameMainCamera;
         private MaterialPropertyBlock rotationBlock;
         private readonly List<Renderer> windowRenderers = new List<Renderer>();
         // Screen-space dot overlay lives in LighthouseDotUi (extracted).
         private readonly LighthouseDotUi dotUi = new LighthouseDotUi();
         private bool initialized;
-        private bool hasFlare;
         private bool isNight;
-        private bool flareWasActive;
         private bool dotWasActive;
         private float nextDiagnosticTime;
         private float lastIVisual;
@@ -112,35 +100,7 @@ namespace UBOAT.Mods.RadioNavigation
             this.rotatorLocalPosition = rotatorLocalPosition;
             FindSun();
             FindSpotLight(rotator);
-            FindLensFlare(rotator);
-            if (lensFlare.IsNotNull())
-            {
-                flareMeshFilter = lensFlare.GetComponent<MeshFilter>();
-                try
-                {
-                    var flareType = lensFlare.GetType();
-                    var nearStart = flareType.GetField("NearFadeStartDistance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (nearStart != null) nearStart.SetValue(lensFlare, 70f);
-                    var nearEnd = flareType.GetField("NearFadeEndDistance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (nearEnd != null) nearEnd.SetValue(lensFlare, 200f);
-                    var flaresField = flareType.GetField("Flares", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (flaresField != null)
-                    {
-                        var flares = flaresField.GetValue(lensFlare) as System.Array;
-                        if (flares != null && flares.Length > 2)
-                        {
-                            flareGlowElement = flares.GetValue(0);
-                            flareStreakElement = flares.GetValue(1);
-                            flareStarElement = flares.GetValue(2);
-                            ApplyFlareElementSizes();
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning("[RadioNav][Lighthouse] flare runtime fix failed: " + ex.Message);
-                }
-            }
+            flareDriver.Initialize(rotator);
             windowRenderers.Clear();
             var found = LighthouseGlowArt.FindWindowRenderers(rotator);
             for (int i = 0; i < found.Count; i++)
@@ -169,7 +129,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Debug.LogWarning("[RadioNav][Lighthouse] init heights log failed: " + ex.Message);
             }
             Debug.Log("[RadioNav][Lighthouse] glow controller ready for '" + lighthouseName +
-                "' (flare=" + (hasFlare ? "yes" : "no, dot fallback") + ", windows=" + windowRenderers.Count + ")");
+                "' (flare=" + (flareDriver.HasFlare ? "yes" : "no, dot fallback") + ", windows=" + windowRenderers.Count + ")");
         }
 
         private void Update()
@@ -184,8 +144,10 @@ namespace UBOAT.Mods.RadioNavigation
             Vector3 worldPosition = GetWorldPosition();
             LighthouseGlowArt.UpdateWindowRotation(windowRenderers, rotator, ref rotationBlock);
             UpdateSpot(worldPosition);
-            UpdateFlare(worldPosition);
-            KeepFlareInView();
+            flareDriver.Update(isNight, renderingCamera, rotator, worldPosition,
+                GetBeamVisibilityFactor(worldPosition), IsDeviceCamera(renderingCamera),
+                VerboseDiagnostics, Time.unscaledTime, nextDiagnosticTime, GetWorldPosition);
+            flareDriver.KeepInView();
             UpdateDot(worldPosition);
             if (VerboseDiagnostics)
             {
@@ -377,7 +339,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Debug.Log("[RadioNav][Lighthouse] glow: dot " + (enabled ? "ON" : "OFF") +
                     (string.IsNullOrEmpty(reason) ? "" : " [" + reason + "]") +
                     " cam='" + camName + "'" +
-                    " flareRendering=" + FlareRenderingNow());
+                    " flareRendering=" + flareDriver.RenderingNow());
             }
         }
 
@@ -388,30 +350,15 @@ namespace UBOAT.Mods.RadioNavigation
             return dotUi.Built && dotWasActive != enabled;
         }
 
-        private bool FlareWillLog(GameObject flareObject, bool enabled)
-        {
-            return flareObject.IsNotNull() && flareWasActive != enabled;
-        }
-
-        private bool FlareRenderingNow()
-        {
-            if (!hasFlare || lensFlare.IsNull() || !lensFlare.gameObject.activeInHierarchy)
-            {
-                return false;
-            }
-            MeshRenderer renderer = lensFlare.GetComponent<MeshRenderer>();
-            return renderer.IsNotNull() && renderer.enabled && renderer.isVisible;
-        }
-
         /// <summary>
-        /// Mirror of UpdateFlare's activation decision (night, camera,
+        /// Mirror of the flare driver's activation decision (night, camera,
         /// distance cap, beam gate). Deterministic per frame — unlike
-        /// FlareRenderingNow(), which depends on renderer.isVisible and
-        /// flickers while KeepFlareInView inflates the flare bounds.
+        /// RenderingNow(), which depends on renderer.isVisible and
+        /// flickers while the bounds inflation is active.
         /// </summary>
         private bool FlareActiveByLogic(Vector3 worldPosition, float distance)
         {
-            if (!hasFlare || lensFlare.IsNull() || !isNight || renderingCamera == null || rotator.IsNull())
+            if (!flareDriver.HasFlare || !flareDriver.LensFlare.IsNotNull() || !isNight || renderingCamera == null || rotator.IsNull())
             {
                 return false;
             }
@@ -690,8 +637,8 @@ namespace UBOAT.Mods.RadioNavigation
 
             var snap = new LighthouseDiagnostics.GlowSnapshot
             {
-                LensFlare = lensFlare,
-                FlareIntensityProperty = flareIntensityProperty,
+                LensFlare = flareDriver.LensFlare,
+                FlareIntensityProperty = flareDriver.IntensityProperty,
                 RenderingCamera = renderingCamera,
                 Rotator = rotator,
                 Container = container,
@@ -784,207 +731,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             bool sunDown = sun.IsNull() || sun.transform.forward.y > -0.05f || sun.intensity < DaySunIntensityThreshold;
             isNight = sunDown;
-        }
-
-        /// <summary>
-        /// Locates the HDRPLensFlare component on the spawned prefab (by type
-        /// name via reflection — assembly-agnostic, works whether the
-        /// component was compiled into the game or into a plugin assembly).
-        /// </summary>
-        private void FindLensFlare(Transform rotator)
-        {
-            Component[] components = rotator.GetComponentsInChildren<Component>(true);
-            for (int i = 0; i < components.Length; i++)
-            {
-                Component component = components[i];
-                if (component.IsNotNull() && component.GetType().Name == FlareComponentTypeName)
-                {
-                    lensFlare = component;
-                    flareIntensityProperty = component.GetType().GetProperty(
-                        "Intensity", BindingFlags.Public | BindingFlags.Instance);
-                    hasFlare = true;
-                    Debug.Log("[RadioNav][Lighthouse] glow: HDRPLensFlare found on '" + component.name + "'");
-                    return;
-                }
-            }
-            hasFlare = false;
-        }
-
-        /// <summary>
-        /// Drives the native HDRPLensFlare with the unified perceptual model:
-        /// intensity = FlareIntensityScale × I_visual, where I_visual already
-        /// contains distance attenuation, atmosphere transmittance, the wide
-        /// 60° loom gate and the 2°/8° hot cone. Beyond FlareMaxDistanceM the
-        /// flare is disabled entirely — the screen-space dot takes over and
-        /// enforces the exact far pixel caps (≤10px dot / ≤13px streak).
-        /// EXCEPTION: in the device view (periscope/binocular/UZO) the dot
-        /// cannot be positioned, so the flare stays active at any distance —
-        /// same as the game's own LighthouseLight (no distance limit).
-        /// </summary>
-        private void UpdateFlare(Vector3 worldPosition)
-        {
-            if (lensFlare.IsNull())
-            {
-                return;
-            }
-
-            GameObject flareObject = lensFlare.gameObject;
-            if (!isNight || renderingCamera == null || rotator.IsNull())
-            {
-                DisableFlare(flareObject, FlareWillLog(flareObject, false)
-                    ? "night=" + isNight + " cam=" + (renderingCamera.IsNotNull()) + " rot=" + rotator.IsNotNull()
-                    : null);
-                return;
-            }
-
-            float distance = (renderingCamera.transform.position - worldPosition).magnitude;
-            // In the device view (periscope/binocular/UZO) the flare is the
-            // only working renderer — the game itself has no distance limit
-            // for its lighthouse flare (LighthouseLight.cs), and the
-            // screen-space dot cannot be positioned there. Mirror the
-            // FlareActiveByLogic exception: keep the flare alive beyond
-            // FlareMaxDistanceM while a device camera renders.
-            bool deviceView = IsDeviceCamera(renderingCamera);
-            if (!deviceView && distance > FlareMaxDistanceM)
-            {
-                DisableFlare(flareObject, FlareWillLog(flareObject, false)
-                    ? "beyond " + FlareMaxDistanceM.ToString("F0") +
-                      "m (dist=" + distance.ToString("F0") + ")"
-                    : null);
-                return;
-            }
-            if (deviceView && distance > FlareMaxDistanceM && Time.unscaledTime >= nextDiagnosticTime)
-            {
-                Debug.Log("[RadioNav][Lighthouse] flare: device view keeps flare active beyond " +
-                    FlareMaxDistanceM.ToString("F0") + "m (dist=" + distance.ToString("F0") +
-                    " cam='" + renderingCamera.name + "')");
-            }
-
-            // B_wide: same 60° loom window as the screen-space dot.
-            float wideGate = GetBeamVisibilityFactor(worldPosition);
-            if (wideGate <= 0.01f)
-            {
-                DisableFlare(flareObject, FlareWillLog(flareObject, false)
-                    ? "beam not aligned (wide=" + wideGate.ToString("F2") + ")"
-                    : null);
-                return;
-            }
-
-            SetFlareActive(flareObject, true, FlareWillLog(flareObject, true)
-                ? "aligned wide=" + wideGate.ToString("F2")
-                : null);
-            ApplyFlareIntensity(flareObject, distance, wideGate);
-        }
-
-        private void DisableFlare(GameObject flareObject, string reason)
-        {
-            SetFlareActive(flareObject, false, FlareWillLog(flareObject, false) ? reason : null);
-        }
-
-        private void ApplyFlareIntensity(GameObject flareObject, float distance, float wideGate)
-        {
-            if (flareIntensityProperty.IsNull())
-                return;
-            Vector3 directionToCamera = (renderingCamera.transform.position - flareObject.transform.position).normalized;
-            float hotAlign = Mathf.Abs(Vector3.Dot(directionToCamera, rotator.forward));
-            float fogFlare = SkyVisibilityResolver.GetFogginess();
-            double attenFlare = LighthouseVisualModel.DistanceAttenuation(distance);
-            double transFlare = LighthouseVisualModel.Transmittance(distance, fogFlare);
-            double hotFlare = LighthouseVisualModel.BeamIntensityFactor(hotAlign);
-            float iVisual = (float)LighthouseVisualModel.VisualIntensity(distance, fogFlare, wideGate, hotAlign);
-            float flareIntensityValue = FlareIntensityScale * iVisual;
-            if (VerboseDiagnostics && Time.unscaledTime >= nextDiagnosticTime)
-            {
-                Debug.Log("[RadioNav][Lighthouse] flare model: dist=" + distance.ToString("F0") +
-                    " A=" + attenFlare.ToString("F3") + " T=" + transFlare.ToString("F3") + " fog=" + fogFlare.ToString("F2") +
-                    " wide=" + wideGate.ToString("F2") + " beam=" + hotFlare.ToString("F2") + " Ivis=" + iVisual.ToString("F3") + " -> flareI=" + flareIntensityValue.ToString("F3") +
-                    " lampY=" + (rotator.IsNotNull() ? rotator.position.y.ToString("F1") : "NaN") + " farY=" + flareObject.transform.position.y.ToString("F1"));
-            }
-            flareIntensityProperty.SetValue(lensFlare, flareIntensityValue, null);
-        }
-
-        /// <summary>
-        /// Transition-only debug logging: reports flare state changes with
-        /// the reason and the camera that was current at the moment of the
-        /// change (periscope/binocular cameras render into a RenderTexture,
-        /// so camera name matters for diagnosing visibility gaps).
-        /// </summary>
-        private void SetFlareActive(GameObject flareObject, bool active, string reason)
-        {
-            bool previous = flareWasActive;
-            flareObject.SetActive(active);
-            flareWasActive = active;
-            if (previous != active)
-            {
-                if (active)
-                {
-                    // HDRPLensFlare may rebuild its flare elements when
-                    // enabled — re-apply the scaled sizes so the +25% holds
-                    // in every enable cycle.
-                    ApplyFlareElementSizes();
-                }
-                string camName = renderingCamera.IsNotNull() ? renderingCamera.name : "null";
-                float distance = renderingCamera.IsNotNull()
-                    ? (renderingCamera.transform.position - GetWorldPosition()).magnitude
-                    : -1f;
-                Debug.Log("[RadioNav][Lighthouse] glow: flare " + (active ? "ON" : "OFF") +
-                    (string.IsNullOrEmpty(reason) ? "" : " [" + reason + "]") +
-                    " cam='" + camName + "' dist=" + distance.ToString("F0"));
-            }
-        }
-
-        /// <summary>
-        /// Screen-space flare element sizes (fractions of screen height),
-        /// scaled by FlareSizeScale (+25% user preference — the light reads
-        /// too small through the binoculars, especially up close). Applied
-        /// at Initialize and re-applied on every flare enable transition.
-        /// </summary>
-        private void ApplyFlareElementSizes()
-        {
-            if (flareGlowElement != null)
-            {
-                var gf = flareGlowElement.GetType().GetField("Size", BindingFlags.Public | BindingFlags.Instance);
-                if (gf != null) gf.SetValue(flareGlowElement, new Vector2(0.010f * FlareSizeScale, 0.010f * FlareSizeScale));
-            }
-            if (flareStreakElement != null)
-            {
-                var sf = flareStreakElement.GetType().GetField("Size", BindingFlags.Public | BindingFlags.Instance);
-                if (sf != null) sf.SetValue(flareStreakElement, new Vector2(0.012f * FlareSizeScale, 0.006f * FlareSizeScale));
-            }
-            if (flareStarElement != null)
-            {
-                var stf = flareStarElement.GetType().GetField("Size", BindingFlags.Public | BindingFlags.Instance);
-                if (stf != null) stf.SetValue(flareStarElement, new Vector2(0.015f * FlareSizeScale, 0.015f * FlareSizeScale));
-            }
-        }
-
-        /// <summary>
-        /// The HDRPLensFlare component rebuilds the flare mesh with bounds
-        /// equal to OcclusionRadius every time it is enabled. Those small
-        /// bounds get frustum-culled when the lighthouse is beyond the
-        /// camera's far clip plane. Inflating the bounds makes Unity keep
-        /// the flare renderer; the shader then keeps the quad inside the
-        /// depth range (_InfinitelyFar), so the light stays visible from
-        /// any distance in every camera mode, exactly like the game's own
-        /// lighthouse flares.
-        /// </summary>
-        private void KeepFlareInView()
-        {
-            if (flareMeshFilter.IsNull() || !lensFlare.gameObject.activeInHierarchy)
-            {
-                return;
-            }
-            Mesh mesh = flareMeshFilter.sharedMesh;
-            if (mesh.IsNull())
-            {
-                return;
-            }
-            Vector3 extents = new Vector3(1e9f, 1e9f, 1e9f);
-            if (mesh.bounds.extents != extents)
-            {
-                mesh.bounds = new Bounds(Vector3.zero, extents * 2f);
-                Debug.Log("[RadioNav][Lighthouse] glow: flare bounds inflated (HDRPLensFlare rebuilds them on enable)");
-            }
         }
 
 
