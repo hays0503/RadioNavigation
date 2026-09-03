@@ -108,7 +108,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             // F198: match CursorHandler/SpinnerHandlerBase/ExpanderHandler —
             // no panel movement while the radio is off or ground is inactive.
-            if (!ToggleHandler.IsInteractable)
+            if (!RadioPowerBus.IsInteractable)
                 return;
 
             // F207: child controls without their own IBeginDragHandler

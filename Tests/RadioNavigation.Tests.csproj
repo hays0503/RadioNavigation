@@ -75,6 +75,7 @@
     <Compile Include="PrefabValidatorTests.cs" />
     <Compile Include="SextantOverlayLayoutTests.cs" />
     <Compile Include="MarkerArtPixelsTests.cs" />
+    <Compile Include="RadioPowerBusTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -128,6 +129,7 @@
     <Compile Include="..\Source\Logic\PrefabValidator.cs" Link="Source\Logic\PrefabValidator.cs" />
     <Compile Include="..\Source\UI\MarkerArtPixels.cs" Link="Source\UI\MarkerArtPixels.cs" />
     <Compile Include="..\Source\UI\SextantOverlayLayout.cs" Link="Source\UI\SextantOverlayLayout.cs" />
+    <Compile Include="..\Source\Logic\RadioPowerBus.cs" Link="Source\Logic\RadioPowerBus.cs" />
   </ItemGroup>
 
 </Project>

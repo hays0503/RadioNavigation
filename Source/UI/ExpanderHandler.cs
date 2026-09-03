@@ -38,7 +38,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (eventData.button != PointerEventData.InputButton.Left) return;
             // F197: mirror CursorHandler/SpinnerHandlerBase — no scaling while
             // the radio is off or ground is inactive.
-            if (!ToggleHandler.IsInteractable) return;
+            if (!RadioPowerBus.IsInteractable) return;
             if (panelRect.IsNull()) return;
             isDragging = true;
             activePointerId = eventData.pointerId;

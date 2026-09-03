@@ -456,7 +456,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             // F01/F29: the scheduler/keyer state machine runs on the main
             // thread; the audio thread only samples the volatile KeyOn flag.
-            audioEngine.UpdateStations(Time.deltaTime, Time.time, stations, schedulers, keyers, carriers, ToggleHandler.IsRadioOn);
+            audioEngine.UpdateStations(Time.deltaTime, Time.time, stations, schedulers, keyers, carriers, RadioPowerBus.IsRadioOn);
         }
 
         private void UpdateStationGains()
@@ -668,7 +668,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnAudioFilterRead(float[] data, int channels)
         {
-            bool audioEnabled = ToggleHandler.IsRadioOn && !suppressAudioForTimeCompression;
+            bool audioEnabled = RadioPowerBus.IsRadioOn && !suppressAudioForTimeCompression;
             audioEngine.ProcessAudio(data, channels, stations, keyers, carriers, audioEnabled, currentZoneIndex, SonneZoneIndex);
         }
 

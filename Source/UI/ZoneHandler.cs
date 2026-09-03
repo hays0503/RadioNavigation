@@ -116,7 +116,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private bool CanSwitchZone()
         {
-            return parentTransform.IsNotNull() && ToggleHandler.IsInteractable;
+            return parentTransform.IsNotNull() && RadioPowerBus.IsInteractable;
         }
 
         private void OnDestroy()

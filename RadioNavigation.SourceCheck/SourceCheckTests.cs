@@ -679,6 +679,105 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Radio power bus gate (SRP): the process-wide on/off + ground state
+        /// (read from the audio thread) must live in RadioPowerBus, not as
+        /// statics on the ToggleHandler MonoBehaviour widget. Pins the type
+        /// with its full public surface, the absence of the state fields in
+        /// ToggleHandler, and that every call site goes through the bus —
+        /// a partial migration (or a creep-back) fails here.
+        /// </summary>
+        [Fact]
+        public void RadioPowerBus_OwnsRadioState()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax bus = null;
+            TypeDeclarationSyntax toggle = null;
+            var roots = new List<Tuple<string, CompilationUnitSyntax>>();
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                roots.Add(Tuple.Create(path, root));
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "RadioPowerBus")
+                        bus = type;
+                    if (type.Identifier.Text == "ToggleHandler")
+                        toggle = type;
+                }
+            }
+
+            if (bus == null)
+            {
+                problems.Add("type 'RadioPowerBus' not found in Source/ — radio state regressed into the ToggleHandler widget");
+            }
+            else
+            {
+                bool hasOn = bus.Members.OfType<PropertyDeclarationSyntax>()
+                    .Any(p => p.Identifier.Text == "IsRadioOn"
+                        && p.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && p.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                bool hasInteractable = bus.Members.OfType<PropertyDeclarationSyntax>()
+                    .Any(p => p.Identifier.Text == "IsInteractable"
+                        && p.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && p.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                bool hasGround = bus.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "SetGroundActive"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                bool hasRadio = bus.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "SetRadioOn"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                bool hasReset = bus.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Reset"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!hasOn) problems.Add("RadioPowerBus.IsRadioOn public static property not found");
+                if (!hasInteractable) problems.Add("RadioPowerBus.IsInteractable public static property not found");
+                if (!hasGround) problems.Add("RadioPowerBus.SetGroundActive public static method not found");
+                if (!hasRadio) problems.Add("RadioPowerBus.SetRadioOn public static method not found");
+                if (!hasReset) problems.Add("RadioPowerBus.Reset public static method not found");
+            }
+
+            if (toggle == null)
+            {
+                problems.Add("type 'ToggleHandler' not found in Source/");
+            }
+            else
+            {
+                foreach (var field in toggle.Members.OfType<FieldDeclarationSyntax>())
+                {
+                    if (!field.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))) continue;
+                    foreach (var v in field.Declaration.Variables)
+                    {
+                        string name = v.Identifier.Text;
+                        if (name == "isRadioOn" || name == "isInteractable" || name == "groundActive")
+                            problems.Add($"ToggleHandler still declares static '{name}' — radio state crept back into the widget");
+                    }
+                }
+            }
+
+            foreach (var root in roots)
+            {
+                foreach (var access in root.Item2.DescendantNodes().OfType<MemberAccessExpressionSyntax>())
+                {
+                    if (!(access.Expression is IdentifierNameSyntax recv)
+                        || recv.Identifier.Text != "ToggleHandler") continue;
+                    string member = access.Name.Identifier.Text;
+                    if (member == "IsRadioOn" || member == "IsInteractable" || member == "SetGroundActive")
+                        problems.Add($"{Path.GetFileName(root.Item1)}: call site still uses ToggleHandler.{member} instead of RadioPowerBus.{member}");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} radio-bus violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

@@ -73,7 +73,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
-            if (!ToggleHandler.IsInteractable) return;
+            if (!RadioPowerBus.IsInteractable) return;
             if (spinnerRect.IsNull())
             {
                 Debug.LogError("[RadioNav][" + DebugTag + "] spinnerRect not initialized");
@@ -98,7 +98,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (!IsActiveDrag(eventData))
                 return;
-            if (!ToggleHandler.IsInteractable) return;
+            if (!RadioPowerBus.IsInteractable) return;
 
             Vector2 dir = eventData.position - (Vector2)spinnerRect.position;
             if (!HandleDragDirection(dir))

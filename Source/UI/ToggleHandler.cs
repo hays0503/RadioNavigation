@@ -10,28 +10,6 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public event Action<bool> OnValueChanged;
 
-        private static volatile bool isRadioOn;
-        private static bool isInteractable;
-        private static bool groundActive;
-
-        public static bool IsRadioOn
-        {
-            get { return isRadioOn; }
-            private set { isRadioOn = value; }
-        }
-
-        public static bool IsInteractable
-        {
-            get { return isInteractable; }
-            private set { isInteractable = value; }
-        }
-
-        public static void SetGroundActive(bool active)
-        {
-            groundActive = active;
-            IsInteractable = IsRadioOn && active;
-        }
-
         private Toggle toggleComp;
         private GameObject onImage;
         private GameObject offImage;
@@ -99,8 +77,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnToggleChanged(bool isOn)
         {
-            IsRadioOn = isOn;
-            IsInteractable = isOn && groundActive;
+            RadioPowerBus.SetRadioOn(isOn);
 
             if (onImage.IsNotNull())
             {
@@ -124,9 +101,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void OnDestroy()
         {
             // F61: static UI state must not leak into the next scene load.
-            isRadioOn = false;
-            isInteractable = false;
-            groundActive = false;
+            RadioPowerBus.Reset();
 
             if (toggleComp.IsNotNull())
                 toggleComp.onValueChanged.RemoveListener(OnToggleChanged);
