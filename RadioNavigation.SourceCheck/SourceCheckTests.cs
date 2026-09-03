@@ -546,6 +546,65 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Flare-driver context gate (SRP): LighthouseFlareDriver.Update must
+        /// take a single FlareFrame parameter instead of a sprawling parameter
+        /// list. A bundled frame object keeps the per-frame call-site contract
+        /// stable while the frame contents evolve freely; parameter regrowth
+        /// fails here.
+        /// </summary>
+        [Fact]
+        public void FlareDriverUpdate_TakesFlareFrame()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax driver = null;
+            TypeDeclarationSyntax frame = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "LighthouseFlareDriver")
+                        driver = type;
+                    if (type.Identifier.Text == "FlareFrame")
+                        frame = type;
+                }
+            }
+
+            if (driver == null)
+            {
+                problems.Add("type 'LighthouseFlareDriver' not found in Source/");
+            }
+            else
+            {
+                var update = driver.Members.OfType<MethodDeclarationSyntax>()
+                    .FirstOrDefault(m => m.Identifier.Text == "Update");
+                if (update == null)
+                {
+                    problems.Add("LighthouseFlareDriver.Update not found");
+                }
+                else
+                {
+                    var pars = update.ParameterList.Parameters;
+                    bool singleFrame = pars.Count == 1 && pars[0].Type != null
+                        && pars[0].Type.ToString() == "FlareFrame";
+                    if (!singleFrame)
+                        problems.Add($"LighthouseFlareDriver.Update takes {pars.Count} parameter(s) "
+                            + "instead of a single FlareFrame — bundle the frame, do not sprawl");
+                }
+            }
+
+            if (frame == null)
+                problems.Add("type 'FlareFrame' not found in Source/");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} flare-driver context violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

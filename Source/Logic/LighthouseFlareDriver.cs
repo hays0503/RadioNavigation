@@ -90,14 +90,10 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Per-frame flare update. The controller supplies the night state,
-        /// the rendering camera, the rotator, the world position, the wide
-        /// beam gate and the diagnostics throttle inputs.
+        /// Per-frame flare update. All frame inputs arrive bundled in a
+        /// single FlareFrame (SRP gate FlareDriverUpdate_TakesFlareFrame).
         /// </summary>
-        public void Update(bool isNight, Camera renderingCamera, Transform rotator,
-            Vector3 worldPosition, float wideGate, bool deviceView,
-            bool verbose, float now, float nextDiagTime,
-            Func<Vector3> worldPositionProvider)
+        public void Update(FlareFrame frame)
         {
             if (lensFlare.IsNull())
             {
@@ -105,47 +101,47 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             GameObject flareObject = lensFlare.gameObject;
-            if (!isNight || renderingCamera == null || rotator.IsNull())
+            if (!frame.isNight || frame.renderingCamera == null || frame.rotator.IsNull())
             {
                 Disable(flareObject, WillLog(flareObject, false)
-                    ? "night=" + isNight + " cam=" + (renderingCamera.IsNotNull()) + " rot=" + rotator.IsNotNull()
-                    : null, renderingCamera, worldPositionProvider);
+                    ? "night=" + frame.isNight + " cam=" + (frame.renderingCamera.IsNotNull()) + " rot=" + frame.rotator.IsNotNull()
+                    : null, frame.renderingCamera, frame.worldPositionProvider);
                 return;
             }
 
-            float distance = (renderingCamera.transform.position - worldPosition).magnitude;
+            float distance = (frame.renderingCamera.transform.position - frame.worldPosition).magnitude;
             // In the device view (periscope/binocular/UZO) the flare is the
             // only working renderer — the game itself has no distance limit
             // for its lighthouse flare (LighthouseLight.cs), and the
             // screen-space dot cannot be positioned there.
-            if (!deviceView && distance > FlareMaxDistanceM)
+            if (!frame.deviceView && distance > FlareMaxDistanceM)
             {
                 Disable(flareObject, WillLog(flareObject, false)
                     ? "beyond " + FlareMaxDistanceM.ToString("F0") +
                       "m (dist=" + distance.ToString("F0") + ")"
-                    : null, renderingCamera, worldPositionProvider);
+                    : null, frame.renderingCamera, frame.worldPositionProvider);
                 return;
             }
-            if (deviceView && distance > FlareMaxDistanceM && now >= nextDiagTime)
+            if (frame.deviceView && distance > FlareMaxDistanceM && frame.now >= frame.nextDiagTime)
             {
                 Debug.Log("[RadioNav][Lighthouse] flare: device view keeps flare active beyond " +
                     FlareMaxDistanceM.ToString("F0") + "m (dist=" + distance.ToString("F0") +
-                    " cam='" + renderingCamera.name + "')");
+                    " cam='" + frame.renderingCamera.name + "')");
             }
 
             // B_wide: same 60° loom window as the screen-space dot.
-            if (wideGate <= 0.01f)
+            if (frame.wideGate <= 0.01f)
             {
                 Disable(flareObject, WillLog(flareObject, false)
-                    ? "beam not aligned (wide=" + wideGate.ToString("F2") + ")"
-                    : null, renderingCamera, worldPositionProvider);
+                    ? "beam not aligned (wide=" + frame.wideGate.ToString("F2") + ")"
+                    : null, frame.renderingCamera, frame.worldPositionProvider);
                 return;
             }
 
             SetFlareActive(flareObject, true, WillLog(flareObject, true)
-                ? "aligned wide=" + wideGate.ToString("F2")
-                : null, renderingCamera, worldPositionProvider);
-            ApplyIntensity(flareObject, renderingCamera, rotator, distance, wideGate, verbose, nextDiagTime);
+                ? "aligned wide=" + frame.wideGate.ToString("F2")
+                : null, frame.renderingCamera, frame.worldPositionProvider);
+            ApplyIntensity(flareObject, frame.renderingCamera, frame.rotator, distance, frame.wideGate, frame.verbose, frame.nextDiagTime);
         }
 
         /// <summary>True while the flare GameObject is active in hierarchy.</summary>
