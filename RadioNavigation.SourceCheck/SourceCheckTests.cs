@@ -477,6 +477,75 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Sextant overlay split gate (SRP): the ~290-line Build method must
+        /// stay decomposed into an ocular builder and a columns builder.
+        /// Pins the split contract, not bodies: both builder types exist with
+        /// public static entry points, and SextantOverlay.Build delegates to
+        /// both. A re-merge of the builders back into Build fails here.
+        /// </summary>
+        [Fact]
+        public void SextantOverlaySplit_OcularAndColumns()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = new List<CompilationUnitSyntax>();
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                roots.Add((CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot());
+            }
+
+            System.Func<string, TypeDeclarationSyntax> findType = name =>
+                roots.SelectMany(r => r.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                    .FirstOrDefault(t => t.Identifier.Text == name);
+
+            // Builder types exist with public static entry points.
+            foreach (var builder in new[] { "SextantOcularBuilder", "SextantColumnsBuilder" })
+            {
+                var decl = findType(builder);
+                if (decl == null)
+                {
+                    problems.Add($"type '{builder}' not found in Source/ — overlay split regressed");
+                    continue;
+                }
+                bool hasEntry = decl.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!hasEntry)
+                    problems.Add($"type '{builder}' exposes no public static entry point");
+            }
+
+            // SextantOverlay.Build delegates to both builders.
+            var overlay = findType("SextantOverlay");
+            if (overlay == null)
+            {
+                problems.Add("type 'SextantOverlay' not found in Source/");
+            }
+            else
+            {
+                var build = overlay.Members.OfType<MethodDeclarationSyntax>()
+                    .FirstOrDefault(m => m.Identifier.Text == "Build");
+                if (build == null)
+                {
+                    problems.Add("SextantOverlay.Build not found");
+                }
+                else
+                {
+                    string body = build.ToString();
+                    if (!body.Contains("SextantOcularBuilder."))
+                        problems.Add("SextantOverlay.Build does not delegate to SextantOcularBuilder");
+                    if (!body.Contains("SextantColumnsBuilder."))
+                        problems.Add("SextantOverlay.Build does not delegate to SextantColumnsBuilder");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} overlay split violation(s) — the builders must stay split out of Build:\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

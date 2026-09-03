@@ -73,6 +73,7 @@
     <Compile Include="SextantRunningFixTests.cs" />
     <Compile Include="SunEphemerisCalibrationTests.cs" />
     <Compile Include="PrefabValidatorTests.cs" />
+    <Compile Include="SextantOverlayLayoutTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -124,6 +125,7 @@
     <Compile Include="..\Source\Logic\SunEphemerisCalibration.cs" Link="Source\Logic\SunEphemerisCalibration.cs" />
     <Compile Include="..\Source\UI\PrefabNames.cs" Link="Source\UI\PrefabNames.cs" />
     <Compile Include="..\Source\Logic\PrefabValidator.cs" Link="Source\Logic\PrefabValidator.cs" />
+    <Compile Include="..\Source\UI\SextantOverlayLayout.cs" Link="Source\UI\SextantOverlayLayout.cs" />
   </ItemGroup>
 
 </Project>

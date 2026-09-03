@@ -1,0 +1,239 @@
+using System;
+using System.Globalization;
+using DWS.Common.Resources;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace UBOAT.Mods.RadioNavigation
+{
+    /// <summary>
+    /// Builds the sextant ocular assembly (§13.3): dark veil, eyecup shade,
+    /// the circular ocular (Mask) with the two PIP RawImage halves, sight
+    /// lines, shade-filter dimmers, glare flash and the edge ring. Extracted
+    /// from SextantOverlay.Build (SRP: lens assembly vs text columns).
+    /// Pure builder: fills the shared Result DTO, owns nothing.
+    /// </summary>
+    internal static class SextantOcularBuilder
+    {
+        private const string LogPrefix = "[RadioNav][Sextant]";
+        private const float VeilAlpha = 0.85f;
+        private const float EyecupSizeUnits = 1000f;
+
+        /// <summary>
+        /// Builds veil, eyecup, ocular, views, sights, dimmers, glare and
+        /// ring under canvasRoot. canvasScaleFactor sizes the 1-pixel sight
+        /// lines; resourceManager/assetContext resolve the opaque view
+        /// material (may yield null — views keep the stock UI shader).
+        /// </summary>
+        public static void BuildOcular(GameObject canvasRoot, float canvasScaleFactor,
+            RenderTexture leftRt, RenderTexture rightRt,
+            ResourceManager resourceManager, UnityEngine.Object assetContext,
+            SextantOverlay.Result result)
+        {
+            // Veil: solid dark layer, no cut-out (§13.3 - aspect-safe).
+            GameObject veilGo = new GameObject("Veil", typeof(Image));
+            veilGo.transform.SetParent(canvasRoot.transform, false);
+            Image veil = veilGo.GetComponent<Image>();
+            veil.color = new Color(0f, 0f, 0f, VeilAlpha);
+            Stretch(veil.rectTransform);
+
+            // Eyecup (наглазник): black shade larger than the ocular, drawn
+            // between the veil and the lens so the world around the field of
+            // view sinks into near-black while instrument texts (later
+            // siblings) stay readable.
+            GameObject eyecupGo = new GameObject("Eyecup", typeof(Image));
+            eyecupGo.transform.SetParent(canvasRoot.transform, false);
+            Image eyecup = eyecupGo.GetComponent<Image>();
+            eyecup.sprite = SextantSprites.CreateEyecupSprite(SextantSprites.CreateEyecupTexture());
+            eyecup.raycastTarget = false;
+            AnchorCenter(eyecup.rectTransform, EyecupSizeUnits, EyecupSizeUnits);
+
+            // Ocular: square container clipped to a circle (in-game finding
+            // 2026-08-26: unclipped corners painted opaque black over the live
+            // horizon). Mask clips both RT views, glare and ring to the circle;
+            // outside it the veil shows through.
+            GameObject pipGo = new GameObject("Ocular", typeof(Image), typeof(Mask));
+            pipGo.transform.SetParent(canvasRoot.transform, false);
+            result.PipRect = pipGo.GetComponent<RectTransform>();
+            AnchorCenter(result.PipRect, SextantOverlayLayout.OcularSizeUnits, SextantOverlayLayout.OcularSizeUnits);
+            Image maskGraphic = pipGo.GetComponent<Image>();
+            result.CircleMaskTexture = SextantSprites.CreateCircleMaskTexture();
+            maskGraphic.sprite = SextantSprites.CreateCircleMaskSprite(result.CircleMaskTexture);
+            maskGraphic.raycastTarget = false;
+            Mask ocularMask = pipGo.GetComponent<Mask>();
+            ocularMask.showMaskGraphic = false;
+
+            // Opaque black plate under the PIP views: hides the world behind
+            // the lenses regardless of the RT alpha left by the game's post
+            // stack. Clipped to the circle by the Mask; the veil outside
+            // stays unchanged (vignette).
+            GameObject backingGo = new GameObject("LensBacking", typeof(Image));
+            backingGo.transform.SetParent(pipGo.transform, false);
+            Image backing = backingGo.GetComponent<Image>();
+            backing.color = new Color(0f, 0f, 0f, 1f);
+            backing.raycastTarget = false;
+            Stretch(backing.rectTransform);
+
+            // Left half: fixed-horizon camera view (pitch 0). Shows only the
+            // left half of its RT so the optical axis sits at the split line
+            // (screen center); the right half of the frame is not drawn.
+            GameObject leftGo = new GameObject("LeftView", typeof(RawImage));
+            leftGo.transform.SetParent(pipGo.transform, false);
+            result.LeftViewImage = leftGo.GetComponent<RawImage>();
+            result.LeftViewImage.raycastTarget = false;
+            result.LeftViewImage.texture = leftRt;
+            result.LeftViewImage.rectTransform.anchorMin = new Vector2(0f, 0f);
+            result.LeftViewImage.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+            result.LeftViewImage.rectTransform.offsetMin = Vector2.zero;
+            result.LeftViewImage.rectTransform.offsetMax = Vector2.zero;
+            result.LeftViewImage.uvRect = new Rect(0f, 0f, 0.5f, 1f);
+
+            // Right half: mirror camera pitched to the arc angle (0-130).
+            // Right half of its RT only; at arc=0 the halves form one
+            // continuous circling picture.
+            GameObject rightGo = new GameObject("RightView", typeof(RawImage));
+            rightGo.transform.SetParent(pipGo.transform, false);
+            result.RightViewImage = rightGo.GetComponent<RawImage>();
+            result.RightViewImage.raycastTarget = false;
+            result.RightViewImage.texture = rightRt;
+            result.RightViewImage.rectTransform.anchorMin = new Vector2(0.5f, 0f);
+            result.RightViewImage.rectTransform.anchorMax = new Vector2(1f, 1f);
+            result.RightViewImage.rectTransform.offsetMin = Vector2.zero;
+            result.RightViewImage.rectTransform.offsetMax = Vector2.zero;
+            result.RightViewImage.uvRect = new Rect(0.5f, 0f, 0.5f, 1f);
+
+            // Opaque view material (bundle shader RadioNav/UIOpaque, Blend
+            // One Zero): the game's post stack writes alpha < 1 into the
+            // RTs and the stock UI shader blends the black lens backing
+            // through, darkening the picture.
+            result.OpaqueViewMaterial = ResolveOpaqueViewMaterial(resourceManager, assetContext);
+            if (result.OpaqueViewMaterial != null)
+            {
+                result.LeftViewImage.material = result.OpaqueViewMaterial;
+                result.RightViewImage.material = result.OpaqueViewMaterial;
+            }
+
+            // Vertical sight line (1 physical pixel — drum alignment hairline
+            // between the direct/mirror halves).
+            GameObject splitGo = new GameObject("VerticalSplit", typeof(Image));
+            splitGo.transform.SetParent(pipGo.transform, false);
+            Image splitImage = splitGo.GetComponent<Image>();
+            splitImage.color = new Color(1f, 1f, 1f, 0.5f);
+            splitImage.raycastTarget = false;
+            AnchorCenter(splitImage.rectTransform, 1f / canvasScaleFactor, SextantOverlayLayout.OcularSizeUnits);
+
+            // Horizontal sight line (1 physical pixel, crosshair) — line of
+            // sight, drawn above the views/below filter dims so it stays
+            // subtle and never interferes with the lenses.
+            GameObject horizGo = new GameObject("HorizontalSight", typeof(Image));
+            horizGo.transform.SetParent(pipGo.transform, false);
+            Image horizImage = horizGo.GetComponent<Image>();
+            horizImage.color = new Color(1f, 1f, 1f, 0.5f);
+            horizImage.raycastTarget = false;
+            AnchorCenter(horizImage.rectTransform, SextantOverlayLayout.OcularSizeUnits, 1f / canvasScaleFactor);
+
+            // Shade filters dim the scope view (v1.5): separate left (horizon)
+            // and right (sun) half dimmers - like the separate shade glasses
+            // of a real sextant.
+            GameObject dimLeftGo = new GameObject("FilterDimLeft", typeof(Image));
+            dimLeftGo.transform.SetParent(pipGo.transform, false);
+            result.FilterDimLeftImage = dimLeftGo.GetComponent<Image>();
+            result.FilterDimLeftImage.color = new Color(0f, 0f, 0f, 0f);
+            result.FilterDimLeftImage.raycastTarget = false;
+            RectTransform dimLeftRt = result.FilterDimLeftImage.rectTransform;
+            dimLeftRt.anchorMin = new Vector2(0f, 0f);
+            dimLeftRt.anchorMax = new Vector2(0.5f, 1f);
+            dimLeftRt.offsetMin = Vector2.zero;
+            dimLeftRt.offsetMax = Vector2.zero;
+
+            GameObject dimRightGo = new GameObject("FilterDimRight", typeof(Image));
+            dimRightGo.transform.SetParent(pipGo.transform, false);
+            result.FilterDimRightImage = dimRightGo.GetComponent<Image>();
+            result.FilterDimRightImage.color = new Color(0f, 0f, 0f, 0f);
+            result.FilterDimRightImage.raycastTarget = false;
+            RectTransform dimRightRt = result.FilterDimRightImage.rectTransform;
+            dimRightRt.anchorMin = new Vector2(0.5f, 0f);
+            dimRightRt.anchorMax = new Vector2(1f, 1f);
+            dimRightRt.offsetMin = Vector2.zero;
+            dimRightRt.offsetMax = Vector2.zero;
+
+            // One-shot placement proof: screen-space corners of both dim
+            // halves (matches the FILTERSIDE logs when a side is pressed).
+            try
+            {
+                Vector3[] corners = new Vector3[4];
+                result.FilterDimLeftImage.rectTransform.GetWorldCorners(corners);
+                Vector2[] tl = new Vector2[4];
+                for (int i = 0; i < 4; i++)
+                    tl[i] = corners[i];
+                result.FilterDimRightImage.rectTransform.GetWorldCorners(corners);
+                Vector2[] tr = new Vector2[4];
+                for (int i = 0; i < 4; i++)
+                    tr[i] = corners[i];
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    LogPrefix + " DIMRECT left=({0:F0},{1:F0})-({2:F0},{3:F0}) right=({4:F0},{5:F0})-({6:F0},{7:F0}) screen={8}x{9}",
+                    tl[0].x, tl[0].y, tl[2].x, tl[2].y,
+                    tr[0].x, tr[0].y, tr[2].x, tr[2].y, Screen.width, Screen.height));
+            }
+            catch { }
+
+            // Glare flash inside the ocular only.
+            GameObject glareGo = new GameObject("Glare", typeof(Image));
+            glareGo.transform.SetParent(pipGo.transform, false);
+            result.GlareImage = glareGo.GetComponent<Image>();
+            result.GlareImage.color = new Color(1f, 1f, 1f, 0f);
+            result.GlareImage.raycastTarget = false;
+            Stretch(result.GlareImage.rectTransform);
+
+            // Soft radial edge blending the ocular rim into the veil.
+            GameObject ringGo = new GameObject("EdgeRing", typeof(Image));
+            ringGo.transform.SetParent(pipGo.transform, false);
+            Image ring = ringGo.GetComponent<Image>();
+            result.RingTexture = SextantSprites.CreateRingTexture();
+            ring.sprite = SextantSprites.CreateRingSprite(result.RingTexture);
+            ring.raycastTarget = false;
+            Stretch(ring.rectTransform);
+        }
+
+        /// <summary>
+        /// Loads the opaque view material from the mod's AssetBundle
+        /// (RadioNavOpaqueView, shader RadioNav/UIOpaque). Returns null when
+        /// unavailable — the views then keep the stock UI shader.
+        /// </summary>
+        private static Material ResolveOpaqueViewMaterial(ResourceManager resourceManager, UnityEngine.Object assetContext)
+        {
+            if (resourceManager == null)
+            {
+                Debug.LogWarning(LogPrefix +
+                    " resourceManager unavailable - ocular views keep the stock UI shader (alpha darkening possible)");
+                return null;
+            }
+
+            Resource<Material> material =
+                resourceManager.RetrieveAsset<Material>("RadioNavOpaqueView", assetContext, false);
+            if (material.Valid && material.Asset != null)
+                return material.Asset;
+
+            Debug.LogWarning(LogPrefix +
+                " 'RadioNavOpaqueView' not found in bundle - ocular views keep the stock UI shader (alpha darkening possible)");
+            return null;
+        }
+
+        private static void Stretch(RectTransform r)
+        {
+            r.anchorMin = Vector2.zero;
+            r.anchorMax = Vector2.one;
+            r.offsetMin = Vector2.zero;
+            r.offsetMax = Vector2.zero;
+        }
+
+        private static void AnchorCenter(RectTransform r, float w, float h)
+        {
+            r.anchorMin = new Vector2(0.5f, 0.5f);
+            r.anchorMax = new Vector2(0.5f, 0.5f);
+            r.pivot = new Vector2(0.5f, 0.5f);
+            r.sizeDelta = new Vector2(w, h);
+            r.anchoredPosition = Vector2.zero;
+        }
+    }
+}
