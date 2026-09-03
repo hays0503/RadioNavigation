@@ -605,6 +605,80 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Marker backdrop art gate (SRP): the procedural pixel math behind
+        /// NavMapMarkerBase.GetBackdropSprite must live in MarkerArtPixels as
+        /// pure Color32[] computation (unit-tested offline in
+        /// MarkerArtPixelsTests), with GetBackdropSprite as a thin caching
+        /// wrapper that invokes it. Pins the extraction AND the wiring: a
+        /// re-inline of the pixel loop, or a wrapper that stops calling the
+        /// pure function, fails here. The TMP font fallback chain stays in
+        /// the base — it needs game TMP assets and is honestly untestable
+        /// offline, so this gate deliberately does not cover it.
+        /// </summary>
+        [Fact]
+        public void MarkerArtPixels_UsedByBackdropSprite()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax pixels = null;
+            MethodDeclarationSyntax backdrop = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "MarkerArtPixels")
+                        pixels = type;
+                    if (type.Identifier.Text == "NavMapMarkerBase")
+                    {
+                        backdrop = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "GetBackdropSprite");
+                    }
+                }
+            }
+
+            if (pixels == null)
+            {
+                problems.Add("type 'MarkerArtPixels' not found in Source/ — backdrop pixel math regressed into the base");
+            }
+            else
+            {
+                bool rendersPixels = pixels.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "RenderBackdropPixels"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ReturnType != null
+                        && m.ReturnType.ToString() == "Color32[]");
+                if (!rendersPixels)
+                    problems.Add("MarkerArtPixels.RenderBackdropPixels public static Color32[] entry point not found");
+            }
+
+            if (backdrop == null)
+            {
+                problems.Add("NavMapMarkerBase.GetBackdropSprite not found");
+            }
+            else
+            {
+                bool invokesPure = backdrop.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "RenderBackdropPixels")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "RenderBackdropPixels"));
+                if (!invokesPure)
+                    problems.Add("NavMapMarkerBase.GetBackdropSprite no longer invokes RenderBackdropPixels — "
+                        + "the tested pure function is bypassed (or the pixel loop was re-inlined)");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} marker-art violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

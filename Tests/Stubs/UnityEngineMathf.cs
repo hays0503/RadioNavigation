@@ -6,6 +6,8 @@ namespace UnityEngine
     {
         public static int RoundToInt(float f) => (int)Math.Round(f);
 
+        public static float Sqrt(float f) => (float)Math.Sqrt(f);
+
         public static float Clamp(float value, float min, float max)
         {
             if (value < min) return min;
