@@ -204,8 +204,6 @@ namespace UBOAT.Mods.RadioNavigation
                 radio.AddComponent<StationMapMarker>();
             if (radio.GetComponent<FixMapMarker>().IsNull())
                 radio.AddComponent<FixMapMarker>(); // SEXTANT_PLAN v1.10
-            if (radio.GetComponent<ConstellationToggleButton>().IsNull())
-                radio.AddComponent<ConstellationToggleButton>();
             if (radio.GetComponent<SextantController>().IsNull())
                 radio.AddComponent<SextantController>(); // SEXTANT_PLAN §7.9
         }
