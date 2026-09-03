@@ -41,11 +41,6 @@ namespace UBOAT.Mods.RadioNavigation
     /// </summary>
     public sealed class LighthouseBeamGlow : MonoBehaviour
     {
-        private const string SpotLightName = "Spot Light";
-        private const float MaxLightRangeM = 2500f;
-        private const float MinLightIntensity = 2.5f;
-        private const float DaySunIntensityThreshold = 0.6f;
-
         // Unified perceptual model lives in LighthouseVisualModel (pure math,
         // unit-tested). Dot/streak layer constants and layout math live in
         // LighthouseDotLayout (P5.4 LBG-2); pixel sizes come from the model.
@@ -62,8 +57,6 @@ namespace UBOAT.Mods.RadioNavigation
         private const float MinDeviceCameraFarM = 30000f;
         private const float DiagnosticIntervalSeconds = 2f;
 
-        [Inject] private static Weather weather = null;
-
         // Shared dot/streak textures and window-shader sync live in
         // LighthouseGlowArt (extracted); the static renderingCamera stays
         // here (per-frame camera hand-off with CameraResolver).
@@ -72,8 +65,9 @@ namespace UBOAT.Mods.RadioNavigation
         private Transform container;
         private Transform rotator;
         private Vector3 rotatorLocalPosition;
-        private Light spotLight;
-        private Light sun;
+        // Spot-light world illumination + day/night gate live in
+        // LighthouseSpotLight (extracted).
+        private readonly LighthouseSpotLight spotLightDriver = new LighthouseSpotLight();
         // HDRPLensFlare pipeline lives in LighthouseFlareDriver (extracted).
         private readonly LighthouseFlareDriver flareDriver = new LighthouseFlareDriver();
         private MainCamera gameMainCamera;
@@ -82,7 +76,6 @@ namespace UBOAT.Mods.RadioNavigation
         // Screen-space dot overlay lives in LighthouseDotUi (extracted).
         private readonly LighthouseDotUi dotUi = new LighthouseDotUi();
         private bool initialized;
-        private bool isNight;
         private bool dotWasActive;
         private float nextDiagnosticTime;
         private float lastIVisual;
@@ -98,8 +91,7 @@ namespace UBOAT.Mods.RadioNavigation
             this.container = container;
             this.rotator = rotator;
             this.rotatorLocalPosition = rotatorLocalPosition;
-            FindSun();
-            FindSpotLight(rotator);
+            spotLightDriver.Initialize(rotator);
             flareDriver.Initialize(rotator);
             windowRenderers.Clear();
             var found = LighthouseGlowArt.FindWindowRenderers(rotator);
@@ -113,7 +105,7 @@ namespace UBOAT.Mods.RadioNavigation
                 float hBeaconInit = container.IsNotNull() ? container.position.y : float.NaN;
                 float hLampInit = rotator.IsNotNull() ? rotator.position.y : float.NaN;
                 float hObjInit = transform.position.y;
-                float hSpotInit = spotLight.IsNotNull() ? spotLight.transform.position.y : float.NaN;
+                float hSpotInit = spotLightDriver.Spot.IsNotNull() ? spotLightDriver.Spot.transform.position.y : float.NaN;
                 float hFarInit = wp.y;
                 Debug.Log("[RadioNav][Lighthouse] init heights for '" + lighthouseName + "':" +
                     " beaconY=" + hBeaconInit.ToString("F1") +
@@ -140,11 +132,12 @@ namespace UBOAT.Mods.RadioNavigation
             }
             ResolveCamera();
             EnsureDeviceCameraFarClip();
-            UpdateDayNight();
+            spotLightDriver.UpdateDayNight();
             Vector3 worldPosition = GetWorldPosition();
             LighthouseGlowArt.UpdateWindowRotation(windowRenderers, rotator, ref rotationBlock);
-            UpdateSpot(worldPosition);
-            flareDriver.Update(isNight, renderingCamera, rotator, worldPosition,
+            spotLightDriver.Update(worldPosition, renderingCamera,
+                VerboseDiagnostics, nextDiagnosticTime);
+            flareDriver.Update(spotLightDriver.IsNight, renderingCamera, rotator, worldPosition,
                 GetBeamVisibilityFactor(worldPosition), IsDeviceCamera(renderingCamera),
                 VerboseDiagnostics, Time.unscaledTime, nextDiagnosticTime, GetWorldPosition);
             flareDriver.KeepInView();
@@ -202,7 +195,8 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            Vector3 screen = GetExternalViewScreenPoint(worldPosition);
+            Vector3 screen = LighthouseScreenProjection.Project(gameMainCamera, renderingCamera,
+                worldPosition, VerboseDiagnostics && Time.unscaledTime >= nextDiagnosticTime);
             if (screen.z <= 0f)
             {
                 SetDotEnabled(false, DotWillLog(false)
@@ -264,7 +258,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private bool IsNightVisible()
         {
-            return isNight && renderingCamera != null;
+            return spotLightDriver.IsNight && renderingCamera != null;
         }
 
         private bool ShouldLogDotModel(float distance)
@@ -358,7 +352,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         private bool FlareActiveByLogic(Vector3 worldPosition, float distance)
         {
-            if (!flareDriver.HasFlare || !flareDriver.LensFlare.IsNotNull() || !isNight || renderingCamera == null || rotator.IsNull())
+            if (!flareDriver.HasFlare || !flareDriver.LensFlare.IsNotNull() || !spotLightDriver.IsNight || renderingCamera == null || rotator.IsNull())
             {
                 return false;
             }
@@ -389,9 +383,9 @@ namespace UBOAT.Mods.RadioNavigation
             // spot intensity, flare, screen-space dot — reads the same world
             // position and stays consistent with the model regardless of any
             // container rescale by the game.
-            if (spotLight.IsNotNull() && spotLight.transform.IsNotNull())
+            if (spotLightDriver.Spot.IsNotNull() && spotLightDriver.Spot.transform.IsNotNull())
             {
-                return spotLight.transform.position;
+                return spotLightDriver.Spot.transform.position;
             }
             if (rotator.IsNotNull())
             {
@@ -404,134 +398,6 @@ namespace UBOAT.Mods.RadioNavigation
             return container.TransformPoint(rotatorLocalPosition);
         }
 
-        /// <summary>
-        /// Screen-space position of the light for the overlay dot, using the
-        /// game's own MainCamera.WorldToScreenPointNonJitteredExternalView:
-        /// it handles every periscope mode — FullScreenView (periscope/UZO)
-        /// and the windowed 3D lens (binoculars: Vision mesh → LensCenter →
-        /// interiorCamera) — and uses the non-jittered projection matrix, so
-        /// the dot does not swim with TAA. Falls back to the plain camera
-        /// projection when the game camera is unavailable.
-        /// </summary>
-        private Vector3 GetExternalViewScreenPoint(Vector3 worldPos)
-        {
-            bool throttled = VerboseDiagnostics && Time.unscaledTime >= nextDiagnosticTime;
-            try
-            {
-                MainCamera mc = gameMainCamera;
-                if (mc.IsNull())
-                {
-                    mc = Object.FindObjectOfType<MainCamera>();
-                }
-                if (mc.IsNotNull())
-                {
-                    Vector3 projected;
-                    if (TryExternalViewProjection(mc, worldPos, throttled, out projected))
-                        return projected;
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[RadioNav][Lighthouse] glow: external view screen point failed: " + e.Message);
-            }
-            return FallbackProjection(worldPos, throttled);
-        }
-
-        private bool TryExternalViewProjection(MainCamera mc, Vector3 worldPos, bool throttled, out Vector3 projected)
-        {
-            Vector4 v = mc.WorldToScreenPointNonJitteredExternalView(worldPos);
-            bool njOnScreen = v.x >= 0f && v.x <= Screen.width && v.y >= 0f && v.y <= Screen.height;
-            if (throttled)
-            {
-                LogBinocularDiag(mc, v);
-            }
-            if (njOnScreen)
-            {
-                projected = new Vector3(v.x, v.y, 1f);
-                return true;
-            }
-            // The non-jittered projection can be stale in device views
-            // (binoculars/UZO). Fall back to the plain projection of
-            // the camera that actually renders — its projectionMatrix
-            // is always current. z<=0 means the light is behind the
-            // camera, which hides the dot.
-            if (renderingCamera != null)
-            {
-                Vector3 plain = renderingCamera.WorldToScreenPoint(worldPos);
-                if (throttled)
-                {
-                    Debug.Log("[RadioNav][Lighthouse] screenPt: nj off-screen, plain=" +
-                        plain.x.ToString("F0") + "," + plain.y.ToString("F0") + " z=" + plain.z.ToString("F1") +
-                        " onScreen=" + (plain.z > 0f && plain.x >= 0f && plain.x <= Screen.width && plain.y >= 0f && plain.y <= Screen.height));
-                }
-                if (plain.z > 0f)
-                {
-                    projected = plain;
-                    return true;
-                }
-            }
-            // Both projections failed: report failure so the caller falls
-            // back to the plain projection path (which yields an off-screen
-            // z<=0 and hides the dot).
-            projected = new Vector3(v.x, v.y, -1f);
-            return false;
-        }
-
-        private Vector3 FallbackProjection(Vector3 worldPos, bool throttled)
-        {
-            Vector3 result = renderingCamera != null ? renderingCamera.WorldToScreenPoint(worldPos) : Vector3.zero;
-            if (throttled)
-            {
-                Debug.Log("[RadioNav][Lighthouse] screenPt: src=fallback" +
-                    " v=" + result.x.ToString("F0") + "," + result.y.ToString("F0") +
-                    " onScreen=" + (result.x >= 0f && result.x <= Screen.width && result.y >= 0f && result.y <= Screen.height) +
-                    " cam=" + (renderingCamera != null ? renderingCamera.name : "null"));
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// Throttled diagnostic dump for the periscope/binocular/UZO view:
-        /// which projection path the game used, where the dot landed, and the
-        /// enabled/targetTexture state of every camera involved.
-        /// </summary>
-        private void LogBinocularDiag(MainCamera mc, Vector4 v)
-        {
-            try
-            {
-                string devCtl = "none";
-                string fullScreen = "?";
-                string devEn = "?";
-                string devRT = "?";
-                string intEn;
-                if (mc.CurrentMode.ToString() == "Generic" &&
-                    mc.GenericController.IsNotNull() &&
-                    mc.GenericController.ExternalController is PeriscopeController pc &&
-                    pc.IsNotNull() && pc.Periscope.IsNotNull())
-                {
-                    devCtl = "PeriscopeController";
-                    fullScreen = pc.Periscope.FullScreenView.ToString();
-                    Camera devCam = pc.Periscope.PeriscopeCamera;
-                    devEn = devCam != null ? devCam.enabled.ToString() : "null";
-                    devRT = devCam != null && devCam.targetTexture != null ? "yes" : "no";
-                }
-                intEn = LighthouseDiagnostics.GetInteriorCameraEnabled(mc);
-                Debug.Log("[RadioNav][Lighthouse] screenPt: src=maincam" +
-                    " mode=" + mc.CurrentMode +
-                    " dev=" + devCtl +
-                    " fullScreen=" + fullScreen +
-                    " devEn=" + devEn + " devRT=" + devRT +
-                    " intEn=" + intEn +
-                    " mainEn=" + (mc.Camera != null ? mc.Camera.enabled.ToString() : "?") +
-                    " v=" + v.x.ToString("F0") + "," + v.y.ToString("F0") +
-                    " onScreen=" + (v.x >= 0f && v.x <= Screen.width && v.y >= 0f && v.y <= Screen.height) +
-                    " screen=" + Screen.width + "x" + Screen.height);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[RadioNav][Lighthouse] screenPt diag failed: " + e.Message);
-            }
-        }
 
         /// <summary>
         /// Resolves the camera that actually renders the current view.
@@ -610,19 +476,6 @@ namespace UBOAT.Mods.RadioNavigation
             CameraResolver.ResetForReload();
         }
 
-        private void FindSun()
-        {
-            Light[] lights = Object.FindObjectsOfType<Light>();
-            for (int i = 0; i < lights.Length; i++)
-            {
-                if (lights[i].type == LightType.Directional)
-                {
-                    sun = lights[i];
-                    return;
-                }
-            }
-        }
-
         /// <summary>
         /// Periodic state dump (throttled) used to diagnose why the flare
         /// is or is not visible in a given camera mode.
@@ -642,10 +495,10 @@ namespace UBOAT.Mods.RadioNavigation
                 RenderingCamera = renderingCamera,
                 Rotator = rotator,
                 Container = container,
-                SpotLight = spotLight,
+                SpotLight = spotLightDriver.Spot,
                 GameMainCamera = gameMainCamera,
                 DotCanvas = dotUi.Canvas,
-                IsNight = isNight,
+                IsNight = spotLightDriver.IsNight,
                 LastIVisual = lastIVisual,
                 LastDotSize = lastDotSize,
                 ObjectY = transform.position.y,
@@ -654,83 +507,6 @@ namespace UBOAT.Mods.RadioNavigation
                 StreakAlpha = LighthouseDotLayout.StreakAlpha * lastIVisual,
             };
             LighthouseDiagnostics.Log(snap, worldPosition);
-        }
-
-        private void FindSpotLight(Transform rotator)
-        {
-            Transform spot = TransformHelpers.FindChildRecursive(rotator, SpotLightName);
-            if (spot.IsNull())
-            {
-                Debug.LogWarning("[RadioNav][Lighthouse] glow: '" + SpotLightName + "' not found under '" + rotator.name + "'");
-                return;
-            }
-            spotLight = spot.GetComponent<Light>();
-            if (spotLight.IsNull())
-            {
-                Debug.LogWarning("[RadioNav][Lighthouse] glow: '" + SpotLightName + "' has no Light component");
-                return;
-            }
-            spotLight.range = Mathf.Max(spotLight.range, MaxLightRangeM);
-            spotLight.intensity = Mathf.Max(spotLight.intensity, MinLightIntensity);
-            if (Vector3.Dot(spot.forward, rotator.forward) < -0.5f)
-            {
-                spot.localRotation *= Quaternion.Euler(0f, 180f, 0f);
-                Debug.Log("[RadioNav][Lighthouse] spot auto-flipped 180 (prefab opposite)");
-            }
-        }
-
-        /// <summary>
-        /// World illumination channel: the Spot Light is driven by the
-        /// physical A(r)·T(r) attenuation (no display gamma, no cones — the
-        /// rotating cone is the spotlight transform itself). Without this the
-        /// beam floodlights terrain like a stadium even when the source on
-        /// screen has shrunk to a 10px point. Off during daytime.
-        /// </summary>
-        private float lastLoggedSpotIntensity = float.NaN;
-        private void UpdateSpot(Vector3 worldPosition)
-        {
-            if (spotLight.IsNull())
-            {
-                return;
-            }
-            if (!isNight || renderingCamera.IsNull())
-            {
-                if (spotLight.intensity != 0f)
-                    Debug.Log("[RadioNav][Lighthouse] spot OFF (night=" + isNight + " camNull=" + renderingCamera.IsNull() + ") was=" + spotLight.intensity.ToString("F2"));
-                spotLight.intensity = 0f;
-                return;
-            }
-            float distance = (renderingCamera.transform.position - worldPosition).magnitude;
-            float fog = SkyVisibilityResolver.GetFogginess();
-            double atten = LighthouseVisualModel.DistanceAttenuation(distance);
-            double trans = LighthouseVisualModel.Transmittance(distance, fog);
-            float worldI = (float)LighthouseVisualModel.WorldLightIntensity(distance, fog);
-            float newIntensity = MinLightIntensity * worldI;
-            // Throttled verbose: log once per diag interval (not per frame)
-            bool significant = float.IsNaN(lastLoggedSpotIntensity) || Mathf.Abs(newIntensity - lastLoggedSpotIntensity) > 0.15f;
-            if (significant && VerboseDiagnostics && Time.unscaledTime >= nextDiagnosticTime)
-            {
-                float hSpot = spotLight.transform.position.y;
-                float hFar = worldPosition.y;
-                Debug.Log("[RadioNav][Lighthouse] spot: dist=" + distance.ToString("F0") +
-                    " A=" + atten.ToString("F3") + " T=" + trans.ToString("F3") + " fog=" + fog.ToString("F2") +
-                    " worldI=" + worldI.ToString("F3") + " -> intensity " + spotLight.intensity.ToString("F2") + "->" + newIntensity.ToString("F2") +
-                    " heights spotY=" + hSpot.ToString("F1") + " farY=" + hFar.ToString("F1"));
-                lastLoggedSpotIntensity = newIntensity;
-            }
-            spotLight.intensity = newIntensity;
-        }
-
-        private void UpdateDayNight()
-        {
-            if (weather.IsNotNull())
-            {
-                isNight = weather.IsDarkWeather;
-                return;
-            }
-
-            bool sunDown = sun.IsNull() || sun.transform.forward.y > -0.05f || sun.intensity < DaySunIntensityThreshold;
-            isNight = sunDown;
         }
 
 
