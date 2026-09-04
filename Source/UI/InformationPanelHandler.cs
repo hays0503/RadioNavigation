@@ -330,32 +330,18 @@ namespace UBOAT.Mods.RadioNavigation
             if (sonneController.IsNull() || signalText.IsNull())
                 return;
 
-            if (!sonneController.IsInSonneZone)
-            {
-                signalText.text = "--- Signal: ";
-                signalText.color = Color.gray;
-                if (decodedText.IsNotNull())
-                    decodedText.text = "Decoded: ";
-                return;
-            }
+            bool inZone = sonneController.IsInSonneZone;
+            string rich = inZone ? sonneController.GetSignalRichText() : null;
+            string decoded = inZone ? sonneController.GetDecodedText() : null;
 
-            string rich = sonneController.GetSignalRichText();
-            if (string.IsNullOrEmpty(rich))
-            {
-                signalText.text = "--- Signal: ";
-                signalText.color = Color.gray;
-                if (decodedText.IsNotNull())
-                    decodedText.text = "Decoded: ";
-                return;
-            }
-
-            signalText.text = "--- Signal: " + rich;
-            signalText.color = Color.white;
+            SignalPanelView.State view = SignalPanelView.Resolve(
+                rich, DecodedDisplayTracker.DisplayText(decoded));
+            signalText.text = view.SignalText;
+            signalText.color = view.Dimmed ? Color.gray : Color.white;
 
             if (decodedText.IsNotNull())
             {
-                string decoded = sonneController.GetDecodedText();
-                decodedText.text = DecodedDisplayTracker.DisplayText(decoded);
+                decodedText.text = view.DecodedText;
 
                 if (decodedTracker.ShouldLog(decoded))
                 {

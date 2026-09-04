@@ -2044,6 +2044,78 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Signal-view gate (SRP): the signal-block state (text + dimmed
+        /// flag) must live in SignalPanelView as a pure function (tested in
+        /// SignalPanelViewTests), with
+        /// InformationPanelHandler.UpdateSignalDisplay applying Text/color
+        /// only. A re-inline of the placeholder fails here.
+        /// </summary>
+        [Fact]
+        public void SignalView_OwnsBlockState()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax view = null;
+            MethodDeclarationSyntax display = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "SignalPanelView")
+                        view = type;
+                    if (type.Identifier.Text == "InformationPanelHandler")
+                    {
+                        display = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "UpdateSignalDisplay");
+                    }
+                }
+            }
+
+            if (view == null)
+            {
+                problems.Add("type 'SignalPanelView' not found in Source/ — block state regressed into the panel");
+            }
+            else
+            {
+                bool resolves = view.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Resolve"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!resolves) problems.Add("SignalPanelView.Resolve public static entry point not found");
+            }
+
+            if (display == null)
+            {
+                problems.Add("InformationPanelHandler.UpdateSignalDisplay not found");
+            }
+            else
+            {
+                bool keepsPlaceholder = display.DescendantNodes()
+                    .OfType<LiteralExpressionSyntax>()
+                    .Any(lit => lit.Token.Text.Contains("--- Signal: "));
+                if (keepsPlaceholder)
+                    problems.Add("InformationPanelHandler.UpdateSignalDisplay still contains the '--- Signal: ' placeholder — block state belongs to SignalPanelView");
+
+                bool invokes = display.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "Resolve")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "Resolve"));
+                if (!invokes)
+                    problems.Add("InformationPanelHandler.UpdateSignalDisplay never invokes Resolve — the tested pure function is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} signal-view violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Frequency-text gate (SRP): the frequency/station header lines
         /// must live in FrequencyPanelText as pure functions (tested in
         /// FrequencyPanelTextTests), with
