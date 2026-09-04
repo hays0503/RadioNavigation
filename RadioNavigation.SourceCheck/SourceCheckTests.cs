@@ -2647,6 +2647,92 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Frame-hot allocation gate (risk register iter5, P5.1): the mesh
+        /// rebuild must reuse a scratch list instead of allocating per
+        /// polyline, and the scene-wide ship-control fallback must be
+        /// frame-throttled instead of running every LateUpdate. A
+        /// re-introduced per-frame alloc fails here.
+        /// </summary>
+        [Fact]
+        public void FrameHot_NoPerFrameAllocs()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax throttle = null;
+            MethodDeclarationSyntax resolve = null;
+            MethodDeclarationSyntax rebuild = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "FrameThrottle")
+                        throttle = type;
+                    if (type.Identifier.Text == "ChronometerOverlayHandler")
+                    {
+                        resolve = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "TryResolveChronometer");
+                    }
+                    if (type.Identifier.Text == "ConstellationMesh")
+                    {
+                        rebuild = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "RebuildMesh");
+                    }
+                }
+            }
+
+            if (throttle == null)
+            {
+                problems.Add("type 'FrameThrottle' not found in Source/ — retry math regressed into the handler");
+            }
+            else
+            {
+                bool retries = throttle.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "ShouldRetry"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 3);
+                if (!retries) problems.Add("FrameThrottle.ShouldRetry(last, current, interval) public static entry point not found");
+            }
+
+            if (resolve == null)
+            {
+                problems.Add("ChronometerOverlayHandler.TryResolveChronometer not found");
+            }
+            else
+            {
+                bool throttled = resolve.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "ShouldRetry")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "ShouldRetry"));
+                if (!throttled)
+                    problems.Add("ChronometerOverlayHandler.TryResolveChronometer never invokes ShouldRetry — FindObjectsOfTypeAll runs every frame again");
+            }
+
+            if (rebuild == null)
+            {
+                problems.Add("ConstellationMesh.RebuildMesh not found");
+            }
+            else
+            {
+                bool allocates = rebuild.DescendantNodes()
+                    .OfType<ObjectCreationExpressionSyntax>()
+                    .Any(o => o.Type.ToString().Contains("List<Vector3>"));
+                if (allocates)
+                    problems.Add("ConstellationMesh.RebuildMesh allocates List<Vector3> — use the scratch list");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} frame-hot violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

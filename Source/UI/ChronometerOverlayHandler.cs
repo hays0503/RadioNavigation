@@ -42,6 +42,11 @@ namespace UBOAT.Mods.RadioNavigation
         private bool reqMoveValid;
         private bool reqMoveHover;
         private bool chronoPointerInsideCached;
+        // Expensive scene-wide fallback (Resources.FindObjectsOfTypeAll)
+        // runs at most once per interval while the bridge is unresolved —
+        // not every LateUpdate.
+        private int lastFindFrame = -1000;
+        private const int FindRetryFrames = 60;
 
         private void Awake()
         {
@@ -108,8 +113,12 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 if (InjectionFramework.Instance.IsNotNull())
                     shipControlUI = InjectionFramework.Instance.GetInstance<ShipControlUI>();
-                if (shipControlUI.IsNull())
+                if (shipControlUI.IsNull()
+                    && FrameThrottle.ShouldRetry(lastFindFrame, Time.frameCount, FindRetryFrames))
+                {
+                    lastFindFrame = Time.frameCount;
                     shipControlUI = FindShipControlUI();
+                }
             }
 
             if (shipControlUI.IsNull())

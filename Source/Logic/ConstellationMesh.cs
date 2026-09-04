@@ -29,6 +29,9 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<Vector3> vertices = new List<Vector3>();
         private readonly List<int> triangles = new List<int>();
         private readonly List<Color> colors = new List<Color>();
+        // RebuildMesh scratch: one polyline at a time, reused across
+        // rebuilds — no per-polyline List alloc (class contract above).
+        private readonly List<Vector3> worldPointsScratch = new List<Vector3>(64);
 
         /// <summary>Base key of the constellation toggle combo; effective binding is Shift+Z (SEXTANT_PLAN v1.2 — plain Z opens the sextant). Game occupies F4-F10/F11; Z verified free (source grep + 80-axis dump).</summary>
         private const KeyCode ToggleKey = KeyCode.Z;
@@ -153,7 +156,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (polyline.Length < 2) continue;
 
                 // Convert all points to world positions
-                List<Vector3> worldPoints = new List<Vector3>();
+                worldPointsScratch.Clear();
                 for (int i = 0; i < polyline.Length; i++)
                 {
                     int starIdx = polyline[i];
@@ -170,14 +173,14 @@ namespace UBOAT.Mods.RadioNavigation
 
                     Vector3 dir = new Vector3((float)e, (float)u, (float)n).normalized;
                     Vector3 worldPos = cam.transform.position + dir * safeRadius;
-                    worldPoints.Add(worldPos);
+                    worldPointsScratch.Add(worldPos);
                 }
 
                 // Draw segments between consecutive visible points
-                for (int i = 0; i < worldPoints.Count - 1; i++)
+                for (int i = 0; i < worldPointsScratch.Count - 1; i++)
                 {
-                    Vector3 p0 = worldPoints[i];
-                    Vector3 p1 = worldPoints[i + 1];
+                    Vector3 p0 = worldPointsScratch[i];
+                    Vector3 p1 = worldPointsScratch[i + 1];
                     AddLineSegment(p0, p1, lineWidthRad * safeRadius);
                     visibleSegments++;
                 }
