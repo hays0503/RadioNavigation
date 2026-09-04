@@ -352,9 +352,20 @@ powershell -ExecutionPolicy Bypass -File tests.ps1
 
 ### 8.3 Generate Coverage Report
 
-```bash
-# Не настроено; сборка покрытия — целевая задача (см. 9.2)
+```powershell
+# Custom runner => no vstest => coverlet is out. Process-level coverage:
+dotnet tool install -g dotnet-coverage   # once
+powershell -ExecutionPolicy Bypass -File coverage.ps1
+# -> ./coverage.cobertura.xml
 ```
+Ceiling: only the 70/138 Source files linked into `Tests/*.csproj` are
+reachable (2026-09-04 inventory: Data 12/14, Logic 48/72, UI 8/50,
+Sound 2/2). The rest is MonoBehaviour/scene code — live-gate territory.
+Measured 2026-09-04: Source-only 7213/7435 lines (97.0%), branch 84%,
+65 files instrumented, 20 below 100%, none at zero. Worst:
+RadioNavDiagnostics (2/14), StoryDecisionGateway (32/129),
+ComparisonExtensions (16/22). No blocking threshold: a global % lies
+on a Unity codebase (report only).
 
 ## 9. Test Maintenance
 
@@ -372,7 +383,7 @@ powershell -ExecutionPolicy Bypass -File tests.ps1
 | Базовая xunit-инфраструктура | High | — | ✅ F22, 2026-08-01 |
 | Тесты UI-хендлеров (зависимы от Unity) | Medium | 3-4h | Открыто |
 | Тесты циклов Consol 60/240s | Medium | 1-2h | Открыто (Фаза 4) |
-| Покрытие (OpenCover/ReportGenerator) | Low | 2-3h | Открыто |
+| Покрытие (OpenCover/ReportGenerator) | Low | 2-3h | Скрипт `coverage.ps1` готов (dotnet-coverage, без vstest); первый прогон не выполнен — нужен shell |
 | Обновление manual-чеклистов под live-игру | Low | 1-2h | Открыто |
 
 ---
