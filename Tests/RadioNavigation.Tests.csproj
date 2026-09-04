@@ -91,6 +91,7 @@
     <Compile Include="FrequencyPanelTextTests.cs" />
     <Compile Include="DecodedDisplayTrackerTests.cs" />
     <Compile Include="PatternRowPackerTests.cs" />
+    <Compile Include="StatusLineTextTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -161,6 +162,7 @@
     <Compile Include="..\Source\Logic\FrequencyPanelText.cs" Link="Source\Logic\FrequencyPanelText.cs" />
     <Compile Include="..\Source\Logic\DecodedDisplayTracker.cs" Link="Source\Logic\DecodedDisplayTracker.cs" />
     <Compile Include="..\Source\Logic\PatternRowPacker.cs" Link="Source\Logic\PatternRowPacker.cs" />
+    <Compile Include="..\Source\Logic\StatusLineText.cs" Link="Source\Logic\StatusLineText.cs" />
   </ItemGroup>
 
 </Project>

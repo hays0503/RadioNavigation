@@ -1950,6 +1950,100 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Status-lines gate (SRP): the Toggle/Ground/Zone label assembly
+        /// must live in StatusLineText as pure functions (tested in
+        /// StatusLineTextTests), with InformationPanelHandler delegating.
+        /// A re-inline of the literals fails here. (Start() keeps its own
+        /// initial label texts — creation, not update.)
+        /// </summary>
+        [Fact]
+        public void StatusLines_OwnsOneLiners()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax text = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "StatusLineText")
+                        text = type;
+                }
+            }
+
+            if (text == null)
+            {
+                problems.Add("type 'StatusLineText' not found in Source/ — label assembly regressed into the panel");
+            }
+            else
+            {
+                foreach (var name in new[] { "Toggle", "Ground", "Zone" })
+                {
+                    bool has = text.Members.OfType<MethodDeclarationSyntax>()
+                        .Any(m => m.Identifier.Text == name
+                            && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                            && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                    if (!has) problems.Add($"StatusLineText.{name} public static method not found");
+                }
+            }
+
+            var expectedCall = new Dictionary<string, string>
+            {
+                { "OnToggleChanged", "Toggle" },
+                { "OnGroundChanged", "Ground" },
+                { "OnZoneChanged", "Zone" },
+            };
+            var expectedLiteral = new Dictionary<string, string>
+            {
+                { "OnToggleChanged", "Toggle: " },
+                { "OnGroundChanged", "Ground: " },
+                { "OnZoneChanged", "Zone: " },
+            };
+            foreach (var kv in expectedCall)
+            {
+                MethodDeclarationSyntax method = null;
+                foreach (var path in ModCompiler.EnumerateSources())
+                {
+                    var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                        File.ReadAllText(path), path: path).GetRoot();
+                    foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                    {
+                        if (type.Identifier.Text != "InformationPanelHandler") continue;
+                        method = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == kv.Key);
+                    }
+                }
+                if (method == null)
+                {
+                    problems.Add($"InformationPanelHandler.{kv.Key} not found");
+                    continue;
+                }
+                bool invokes = method.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == kv.Value)
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == kv.Value));
+                if (!invokes)
+                    problems.Add($"InformationPanelHandler.{kv.Key} never invokes StatusLineText.{kv.Value} — the tested pure function is bypassed");
+                string literal = expectedLiteral[kv.Key];
+                bool inlines = method.DescendantNodes()
+                    .OfType<LiteralExpressionSyntax>()
+                    .Any(lit => lit.Token.Text.Contains(literal.Trim()));
+                if (inlines)
+                    problems.Add($"InformationPanelHandler.{kv.Key} still inlines '{literal.Trim()}' — label assembly belongs to StatusLineText");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} status-lines violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Frequency-text gate (SRP): the frequency/station header lines
         /// must live in FrequencyPanelText as pure functions (tested in
         /// FrequencyPanelTextTests), with

@@ -196,19 +196,19 @@ namespace UBOAT.Mods.RadioNavigation
         private void OnToggleChanged(bool isOn)
         {
             if (toggleText.IsNotNull())
-                toggleText.text = "Toggle: " + (isOn ? "ON" : "OFF");
+                toggleText.text = StatusLineText.Toggle(isOn);
         }
 
         private void OnGroundChanged(bool active)
         {
             if (groundText.IsNotNull())
-                groundText.text = "Ground: " + (active ? "Active" : "Dimmed");
+                groundText.text = StatusLineText.Ground(active);
         }
 
         private void OnZoneChanged(int index)
         {
             if (zoneText.IsNotNull())
-                zoneText.text = "Zone: " + (index + 1);
+                zoneText.text = StatusLineText.Zone(index);
         }
 
         private void OnVolumeChanged(float angle)
