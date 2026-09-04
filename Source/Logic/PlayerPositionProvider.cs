@@ -46,10 +46,13 @@ namespace UBOAT.Mods.RadioNavigation
                 GeoPositionConverter.ToLatLong(position.x, position.y, out latitude, out longitude);
                 return IsFinite(latitude) && IsFinite(longitude);
             }
-            catch
+            catch (Exception e)
             {
-                // No ship in scene (menu, port loading), member renamed by a game
-                // update, or Unity API unavailable — the caller must not show a fix.
+                // No ship in scene (menu, port loading) is expected; a game
+                // update renaming members is not — log once per session so
+                // the two are distinguishable in Player.log.
+                if (WarnOnce.ShouldLog("PlayerPositionProvider.TryGetPosition"))
+                    Debug.LogWarning("[RadioNav][POSITION] player position unavailable: " + e.Message);
                 return false;
             }
         }

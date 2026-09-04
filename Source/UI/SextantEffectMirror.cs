@@ -122,7 +122,13 @@ namespace UBOAT.Mods.RadioNavigation
                         ((PropertyInfo)members[i]).SetValue(to,
                             ((PropertyInfo)members[i]).GetValue(from, null), null);
                 }
-                catch { }
+                catch (Exception e)
+                {
+                    // A game update renaming post-stack members must surface
+                    // once instead of diverging the PIP look silently.
+                    if (WarnOnce.ShouldLog("SextantEffectMirror.CopyMembers." + members[i].Name))
+                        Debug.LogWarning("[RadioNav][Sextant] CopyMembers failed for '" + members[i].Name + "': " + e.Message);
+                }
             }
         }
 
@@ -133,7 +139,12 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 if (f.Name == "volumeLayer" || f.Name == "m_Resources")
                 {
-                    try { f.SetValue(to, f.GetValue(from)); } catch { }
+                    try { f.SetValue(to, f.GetValue(from)); }
+                    catch (Exception e)
+                    {
+                        if (WarnOnce.ShouldLog("SextantEffectMirror.CopyPrivatePostLayerFields." + f.Name))
+                            Debug.LogWarning("[RadioNav][Sextant] post-layer field '" + f.Name + "' copy failed: " + e.Message);
+                    }
                 }
             }
             try
@@ -143,7 +154,11 @@ namespace UBOAT.Mods.RadioNavigation
                 if (allResources != null && allResources.Length > 0 && layer != null)
                     layer.Init(allResources[0]);
             }
-            catch { }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SextantEffectMirror.CopyPrivatePostLayerFields.Init"))
+                    Debug.LogWarning("[RadioNav][Sextant] post-layer Init failed: " + e.Message);
+            }
         }
     }
 }

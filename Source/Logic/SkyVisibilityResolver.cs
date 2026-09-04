@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UBOAT.Game.Scene.Environment;
+using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -32,9 +33,13 @@ namespace UBOAT.Mods.RadioNavigation
                 float fogginess = ReadFloat(atmosphere, "Fogginess");
                 return Math.Max(0f, Math.Min(1f, fogginess));
             }
-            catch
+            catch (Exception e)
             {
-                // A scene transition can temporarily invalidate injected Unity references.
+                // Scene transitions can temporarily invalidate injected Unity
+                // references; log once per session so a permanent failure
+                // (game rename) is visible instead of silently wrong.
+                if (WarnOnce.ShouldLog("SkyVisibilityResolver.GetFogginess"))
+                    Debug.LogWarning("[RadioNav][Sky] GetFogginess failed: " + e.Message);
                 return 0f;
             }
         }
@@ -56,9 +61,10 @@ namespace UBOAT.Mods.RadioNavigation
                 float visibility = (1f - fogginess) * (1f - lerpValue);
                 return Math.Max(0f, Math.Min(1f, visibility));
             }
-            catch
+            catch (Exception e)
             {
-                // A scene transition can temporarily invalidate injected Unity references.
+                if (WarnOnce.ShouldLog("SkyVisibilityResolver.GetVisibility"))
+                    Debug.LogWarning("[RadioNav][Sky] GetVisibility failed: " + e.Message);
                 return 1f;
             }
         }
@@ -87,8 +93,10 @@ namespace UBOAT.Mods.RadioNavigation
 
                 return true;
             }
-            catch
+            catch (Exception e)
             {
+                if (WarnOnce.ShouldLog("SkyVisibilityResolver.IsPlayerOutside"))
+                    Debug.LogWarning("[RadioNav][Sky] IsPlayerOutside failed: " + e.Message);
                 return false;
             }
         }

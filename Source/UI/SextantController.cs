@@ -331,7 +331,12 @@ namespace UBOAT.Mods.RadioNavigation
             int attachedCount = 0;
             if (registeredWaterData != null)
             {
-                try { attachedCount = registeredWaterData.AttachedCameras.Count; } catch { }
+                try { attachedCount = registeredWaterData.AttachedCameras.Count; }
+                catch (Exception e)
+                {
+                    if (WarnOnce.ShouldLog("SextantController.AttachedCameras"))
+                        Debug.LogWarning("[RadioNav][Sextant] AttachedCameras read failed: " + e.Message);
+                }
             }
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} ATTACH water={1} attached={2} leftEn={3} rightEn={4} fov={5:F1} pipFov={6:F1}",
@@ -672,7 +677,11 @@ namespace UBOAT.Mods.RadioNavigation
                 if (mainAdd != null)
                     pipAdd.ShadowDistance = mainAdd.ShadowDistance;
             }
-            catch { }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SextantController.ShadowDistance"))
+                    Debug.LogWarning("[RadioNav][Sextant] ShadowDistance mirror failed: " + e.Message);
+            }
 
             // 1:1 mirror of the main camera's rendering stack: PPv2
             // PostProcessLayer + legacy PostProcessingBehaviour + SSMSGlobalFog
@@ -829,7 +838,13 @@ namespace UBOAT.Mods.RadioNavigation
                     }
                 }
             }
-            catch { }
+            catch (Exception e)
+            {
+                // Culling/sun-layer divergence must surface once instead of
+                // silently rendering a wrong PIP stack every pose update.
+                if (WarnOnce.ShouldLog("SextantController.SyncCameraState"))
+                    Debug.LogWarning("[RadioNav][Sextant] SyncCameraState failed: " + e.Message);
+            }
         }
 
         private Vector3 GetPipForward()

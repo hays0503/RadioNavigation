@@ -175,7 +175,11 @@ namespace UBOAT.Mods.RadioNavigation
                     tl[0].x, tl[0].y, tl[2].x, tl[2].y,
                     tr[0].x, tr[0].y, tr[2].x, tr[2].y, Screen.width, Screen.height));
             }
-            catch { }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SextantOcularBuilder.DimRect"))
+                    Debug.LogWarning("[RadioNav][Sextant] DIMRECT proof failed: " + e.Message);
+            }
 
             // Glare flash inside the ocular only.
             GameObject glareGo = new GameObject("Glare", typeof(Image));

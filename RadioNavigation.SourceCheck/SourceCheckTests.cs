@@ -2531,6 +2531,40 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// No-silent-catch gate (risk register iter3): every catch clause in
+        /// Source/ must contain at least one statement. An empty catch is a
+        /// silent dead feature — per-frame/setup reflection failures (game
+        /// renames) diverge without a trace in Player.log. The policy is
+        /// WarnOnce.ShouldLog + Debug.LogWarning (first failure visible, no
+        /// spam); behavior (fallback values) is unchanged.
+        /// </summary>
+        [Fact]
+        public void NoSilentCatches()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                string file = Path.GetFileName(path);
+                foreach (var clause in root.DescendantNodes().OfType<CatchClauseSyntax>())
+                {
+                    if (clause.Block == null || clause.Block.Statements.Count == 0)
+                    {
+                        var line = clause.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+                        problems.Add($"{file}:{line} empty catch block — log the first failure via WarnOnce");
+                    }
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} silent-catch violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

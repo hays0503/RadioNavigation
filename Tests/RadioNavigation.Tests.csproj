@@ -79,6 +79,7 @@
     <Compile Include="RadioPowerBusTests.cs" />
     <Compile Include="GameTypeCacheTests.cs" />
     <Compile Include="CourseSamplerTests.cs" />
+    <Compile Include="WarnOnceTests.cs" />
     <Compile Include="StationGainModelTests.cs" />
     <Compile Include="SignalTranscriberTests.cs" />
     <Compile Include="BearingDiagnosticsTests.cs" />
@@ -151,6 +152,7 @@
     <Compile Include="..\Source\UI\SextantOverlayLayout.cs" Link="Source\UI\SextantOverlayLayout.cs" />
     <Compile Include="..\Source\Logic\RadioPowerBus.cs" Link="Source\Logic\RadioPowerBus.cs" />
     <Compile Include="..\Source\Logic\GameTypeCache.cs" Link="Source\Logic\GameTypeCache.cs" />
+    <Compile Include="..\Source\Logic\WarnOnce.cs" Link="Source\Logic\WarnOnce.cs" />
     <Compile Include="..\Source\Logic\CourseSampler.cs" Link="Source\Logic\CourseSampler.cs" />
     <Compile Include="..\Source\Logic\StationGainModel.cs" Link="Source\Logic\StationGainModel.cs" />
     <Compile Include="..\Source\Logic\SignalTranscriber.cs" Link="Source\Logic\SignalTranscriber.cs" />

@@ -105,7 +105,11 @@ namespace UBOAT.Mods.RadioNavigation
                     leftGo != null && leftGo.activeSelf,
                     rightGo != null && rightGo.activeSelf));
             }
-            catch { }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SextantBloomCut.LogAppliedOnce"))
+                    Debug.LogWarning("[RadioNav][Sextant] BLOOMCUT diag failed: " + e.Message);
+            }
         }
 
         /// <summary>Hides both volumes (sextant closed).</summary>
