@@ -2116,6 +2116,79 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Entity-rows gate (SRP): the 18-column Entities/Types layout must
+        /// live in EntityTypeRowValues as a pure function (tested in
+        /// EntityTypeRowValuesTests), with LighthousePlacer.CreateEntityType
+        /// keeping buffer ownership (P5.1) and game row construction. A
+        /// re-inline of the values.Add block fails here.
+        /// </summary>
+        [Fact]
+        public void EntityRows_OwnsValues()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax rows = null;
+            MethodDeclarationSyntax create = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "EntityTypeRowValues")
+                        rows = type;
+                    if (type.Identifier.Text == "LighthousePlacer")
+                    {
+                        create = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "CreateEntityType");
+                    }
+                }
+            }
+
+            if (rows == null)
+            {
+                problems.Add("type 'EntityTypeRowValues' not found in Source/ — row layout regressed into the placer");
+            }
+            else
+            {
+                bool builds = rows.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "BuildValues"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!builds) problems.Add("EntityTypeRowValues.BuildValues public static entry point not found");
+            }
+
+            if (create == null)
+            {
+                problems.Add("LighthousePlacer.CreateEntityType not found");
+            }
+            else
+            {
+                bool keepsAdds = create.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax access
+                        && access.Name.Identifier.Text == "Add");
+                if (keepsAdds)
+                    problems.Add("LighthousePlacer.CreateEntityType still calls values.Add — the layout belongs to EntityTypeRowValues");
+
+                bool invokesBuild = create.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "BuildValues")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "BuildValues"));
+                if (!invokesBuild)
+                    problems.Add("LighthousePlacer.CreateEntityType never invokes BuildValues — the tested pure function is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} entity-rows violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Frequency-text gate (SRP): the frequency/station header lines
         /// must live in FrequencyPanelText as pure functions (tested in
         /// FrequencyPanelTextTests), with

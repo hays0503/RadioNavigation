@@ -93,6 +93,7 @@
     <Compile Include="PatternRowPackerTests.cs" />
     <Compile Include="StatusLineTextTests.cs" />
     <Compile Include="SignalPanelViewTests.cs" />
+    <Compile Include="EntityTypeRowValuesTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -165,6 +166,7 @@
     <Compile Include="..\Source\Logic\PatternRowPacker.cs" Link="Source\Logic\PatternRowPacker.cs" />
     <Compile Include="..\Source\Logic\StatusLineText.cs" Link="Source\Logic\StatusLineText.cs" />
     <Compile Include="..\Source\Logic\SignalPanelView.cs" Link="Source\Logic\SignalPanelView.cs" />
+    <Compile Include="..\Source\Logic\EntityTypeRowValues.cs" Link="Source\Logic\EntityTypeRowValues.cs" />
   </ItemGroup>
 
 </Project>

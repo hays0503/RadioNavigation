@@ -503,25 +503,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             List<string> values = entityTypeValues;
-            values.Clear();
-            values.Add(typeName);       // 0: name
-            values.Add("Structure");    // 1: category
-            values.Add("0");            // 2: speed
-            values.Add("0");            // 3: standard displacement
-            values.Add("0");            // 4: full displacement
-            values.Add("0");            // 5: length
-            values.Add("0");            // 6: beam
-            values.Add("0");            // 7: draught
-            values.Add("0");            // 8: mast height
-            values.Add(prefabPath);     // 9: keyed as "Prefab Path"
-            values.Add("0");            // 10: range
-            values.Add("0");            // 11: crew
-            values.Add("0");            // 12: threat
-            values.Add("False");        // 13: military
-            values.Add("False");        // 14: is class
-            values.Add("0");            // 15: reward
-            values.Add("0");            // 16: iron cross
-            values.Add("0");            // 17: estimated durability
+            EntityTypeRowValues.BuildValues(typeName, prefabPath, values);
 
             var row = new GameDataRow("Entities/Types", entityTypeKeys, entityTypeKeyHashes, values);
             return new EntityType(row);
