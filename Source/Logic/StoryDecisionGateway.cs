@@ -89,7 +89,11 @@ namespace UBOAT.Mods.RadioNavigation
 
             insertMethod = FindMethodDeep(typeof(RadioStory), "InsertDecision", null);
             if (insertMethod.IsNotNull())
-                decisionType = insertMethod.GetParameters()[1].ParameterType;
+            {
+                var insertParams = insertMethod.GetParameters();
+                if (insertParams.Length >= 2)
+                    decisionType = insertParams[1].ParameterType;
+            }
             if (decisionType.IsNull())
             {
                 Debug.LogError("[RadioNav] Decision type not found — check game version " + gameVersion);
@@ -135,6 +139,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static bool IsStageMainChoices(RadioStory instance)
         {
+            // Init may have failed (game update) — fail closed instead of NRE.
+            if (stageField.IsNull() || instance.IsNull())
+                return false;
             // Convert.ToInt32 works on boxed enums ((int) would throw
             // InvalidCastException). RadioStoryStage: Unknown=0, MainChoices=1.
             int stageValue = Convert.ToInt32(stageField.GetValue(instance));
@@ -162,7 +169,13 @@ namespace UBOAT.Mods.RadioNavigation
                 return list.Count;
 
             if (decisions.IsNull()) return -1;
-            int count = (int)decisions.GetType().GetProperty("Count").GetValue(decisions);
+            var countProp = decisions.GetType().GetProperty("Count");
+            if (countProp.IsNull())
+            {
+                Debug.LogWarning("[RadioNav] Decisions has no Count property");
+                return -1;
+            }
+            int count = (int)countProp.GetValue(decisions);
             Debug.LogWarning("[RadioNav] Decisions does not implement IList, using reflection fallback");
             return count;
         }
@@ -198,6 +211,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static object CreateDecision(string localeKey, Action openAction)
         {
+            if (decisionCtor.IsNull())
+            {
+                Debug.LogError("[RadioNav] Cannot create decision — constructor not resolved");
+                return null;
+            }
             int paramCount = decisionCtor.GetParameters().Length;
             object[] ctorArgs = new object[paramCount];
             ctorArgs[0] = localeKey;
@@ -228,6 +246,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static void InsertDecision(RadioStory instance, int index, object decision)
         {
+            if (insertMethod.IsNull())
+            {
+                Debug.LogError("[RadioNav] Cannot insert decision — InsertDecision not resolved");
+                return;
+            }
             try
             {
                 insertMethod.Invoke(instance, new object[] { index, decision });

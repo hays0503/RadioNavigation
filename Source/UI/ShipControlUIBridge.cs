@@ -41,16 +41,22 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static RectTransform GetDragContainer(ShipControlUI ui)
         {
+            if (ui.IsNull())
+                return null;
             return DragContainerField == null ? null : DragContainerField.GetValue(ui) as RectTransform;
         }
 
         public static Toggle GetButton(ShipControlUI ui)
         {
+            if (ui.IsNull())
+                return null;
             return ButtonField == null ? null : ButtonField.GetValue(ui) as Toggle;
         }
 
         public static Vector2? GetDefaultPosition(ShipControlUI ui)
         {
+            if (ui.IsNull())
+                return null;
             if (DefaultPositionField == null)
                 return null;
             object value = DefaultPositionField.GetValue(ui);
@@ -59,6 +65,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void SetDefaultPosition(ShipControlUI ui, Vector2 position)
         {
+            if (ui.IsNull())
+                return;
             if (DefaultPositionField != null)
                 DefaultPositionField.SetValue(ui, position);
         }
@@ -66,6 +74,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Forces the native drag state back to None (enum boxed to its underlying type).</summary>
         public static void ResetNativeDragState(ShipControlUI ui)
         {
+            if (ui.IsNull())
+                return;
             if (DragStateField == null)
                 return;
             // Cache the boxed None value: this runs every frame during an

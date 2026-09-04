@@ -198,6 +198,36 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void IsStageMainChoices_AfterReset_ReturnsFalseWithoutThrow()
+        {
+            StoryDecisionGateway.Reset();
+            Assert.False(StoryDecisionGateway.IsStageMainChoices(null));
+            StoryDecisionGateway.Reset();
+        }
+
+        [Fact]
+        public void CreateDecision_AfterReset_ReturnsNullWithoutThrow()
+        {
+            StoryDecisionGateway.Reset();
+            Assert.Null(StoryDecisionGateway.CreateDecision("Radio/OpenT3PLL38", null));
+            StoryDecisionGateway.Reset();
+        }
+
+        [Fact]
+        public void InsertDecision_AfterReset_NoThrow()
+        {
+            StoryDecisionGateway.Reset();
+            StoryDecisionGateway.InsertDecision(null, 0, new object());
+            StoryDecisionGateway.Reset();
+        }
+
+        [Fact]
+        public void GetDecisionCount_NoCountProperty_ReturnsMinusOne()
+        {
+            Assert.Equal(-1, StoryDecisionGateway.GetDecisionCount(new object(), null));
+        }
+
+        [Fact]
         public void Properties_AfterReset_AllNull()
         {
             StoryDecisionGateway.Reset();

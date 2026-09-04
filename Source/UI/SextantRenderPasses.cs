@@ -118,7 +118,11 @@ namespace UBOAT.Mods.RadioNavigation
             else
             {
                 object pass = Activator.CreateInstance(passType, cullingMask);
-                passType.GetProperty("Enabled").SetValue(pass, true);
+                PropertyInfo enabledOnlyProp = passType.GetProperty("Enabled");
+                if (enabledOnlyProp != null)
+                    enabledOnlyProp.SetValue(pass, true);
+                else if (WarnOnce.ShouldLog("SextantRenderPasses.EnabledProp"))
+                    Debug.LogWarning(LogPrefix + " CameraPass.Enabled property not found - pass left at default");
                 passes.SetValue(pass, 0);
             }
             return passes;
@@ -130,7 +134,13 @@ namespace UBOAT.Mods.RadioNavigation
             if (passesField != null)
                 passesField.SetValue(data, passes);
             else
-                type.GetProperty("Passes").SetValue(data, passes);
+            {
+                PropertyInfo passesProp = type.GetProperty("Passes");
+                if (passesProp != null)
+                    passesProp.SetValue(data, passes);
+                else if (WarnOnce.ShouldLog("SextantRenderPasses.PassesProp"))
+                    Debug.LogWarning(LogPrefix + " AdditionalCameraData.Passes property not found - passes not written");
+            }
             if (useCustomField != null)
                 useCustomField.SetValue(data, true);
             else

@@ -185,6 +185,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void FindLensFlare(Transform rotator)
         {
+            if (rotator.IsNull())
+                return;
             Component[] components = rotator.GetComponentsInChildren<Component>(true);
             for (int i = 0; i < components.Length; i++)
             {

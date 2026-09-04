@@ -411,6 +411,14 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             registeredWaterData = data;
+            // The game's list itself can be null after an update — guard the
+            // deref, not just the component.
+            if (data.AttachedCameras == null)
+            {
+                if (WarnOnce.ShouldLog("SextantController.AttachedCamerasList"))
+                    Debug.LogWarning(LogPrefix + " AdditionalCameraData.AttachedCameras is null - no water in PIP");
+                return;
+            }
             if (pipLeftCamera != null)
             {
                 data.AttachedCameras.Remove(pipLeftCamera);
@@ -425,12 +433,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void DetachWaterCameras()
         {
-            if (registeredWaterData == null)
-                return;
-            if (pipLeftCamera != null)
-                registeredWaterData.AttachedCameras.Remove(pipLeftCamera);
-            if (pipRightCamera != null)
-                registeredWaterData.AttachedCameras.Remove(pipRightCamera);
+            if (registeredWaterData != null && registeredWaterData.AttachedCameras != null)
+            {
+                if (pipLeftCamera != null)
+                    registeredWaterData.AttachedCameras.Remove(pipLeftCamera);
+                if (pipRightCamera != null)
+                    registeredWaterData.AttachedCameras.Remove(pipRightCamera);
+            }
             registeredWaterData = null;
         }
 
@@ -650,6 +659,13 @@ namespace UBOAT.Mods.RadioNavigation
         private Camera ConfigurePipCamera(string name, RenderTexture target, bool rightSide)
         {
             GameObject go = new GameObject(name);
+            if (viewCamera == null)
+            {
+                if (WarnOnce.ShouldLog("SextantController.ConfigurePipCamera"))
+                    Debug.LogWarning(LogPrefix + " viewCamera is null, cannot configure " + name);
+                UnityEngine.Object.Destroy(go);
+                return null;
+            }
             Camera cam = go.AddComponent<Camera>();
             cam.CopyFrom(viewCamera);
             cam.clearFlags = CameraClearFlags.SolidColor;

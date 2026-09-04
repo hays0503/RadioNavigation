@@ -28,15 +28,25 @@ namespace UBOAT.Mods.RadioNavigation
 
             try
             {
-                object ship = ResolvePlayerShipField().GetValue(null);
+                FieldInfo shipField = ResolvePlayerShipField();
+                if (shipField.IsNull())
+                    return false;
+                object ship = shipField.GetValue(null);
                 if (ship.IsNull())
                     return false;
 
-                object sandbox = ResolveSandboxShipProperty(ship.GetType()).GetValue(ship, null);
+                object sandbox = null;
+                PropertyInfo sandboxProp = ResolveSandboxShipProperty(ship.GetType());
+                if (sandboxProp.IsNotNull())
+                    sandbox = sandboxProp.GetValue(ship, null);
                 if (sandbox.IsNull())
                     return false;
 
-                Vector2 position = (Vector2)ResolvePositionProperty(sandbox.GetType()).GetValue(sandbox, null);
+                Vector2 position = Vector2.zero;
+                PropertyInfo positionProp = ResolvePositionProperty(sandbox.GetType());
+                if (positionProp.IsNull())
+                    return false;
+                position = (Vector2)positionProp.GetValue(sandbox, null);
                 // SandboxGroup starts with an uninitialized (NaN, NaN) position
                 // before the scene finishes placing the player ship. Do not let
                 // that value mark the fix pipeline as available permanently.

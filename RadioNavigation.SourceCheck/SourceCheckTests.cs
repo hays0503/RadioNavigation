@@ -2565,6 +2565,88 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Game-boundary null-guard gate (risk register iter4): entry points
+        /// that dereference game-provided objects or cached reflection
+        /// handles must null-check THAT handle before use — a game update
+        /// renaming a member must degrade gracefully, never NRE. Each
+        /// listed method must invoke IsNull/IsNotNull on its handle
+        /// (receiver-aware: an unrelated IsNull elsewhere does not count).
+        /// </summary>
+        [Fact]
+        public void GameBoundary_NullGuards()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            // Type -> (method -> handle that must be null-checked).
+            var targets = new Dictionary<string, Dictionary<string, string>>
+            {
+                {
+                    "StoryDecisionGateway",
+                    new Dictionary<string, string>
+                    {
+                        { "IsStageMainChoices", "stageField" },
+                        { "CreateDecision", "decisionCtor" },
+                        { "InsertDecision", "insertMethod" },
+                    }
+                },
+                {
+                    "ShipControlUIBridge",
+                    new Dictionary<string, string>
+                    {
+                        { "GetDragContainer", "ui" },
+                        { "GetButton", "ui" },
+                        { "GetDefaultPosition", "ui" },
+                        { "SetDefaultPosition", "ui" },
+                        { "ResetNativeDragState", "ui" },
+                    }
+                },
+            };
+            var seen = new Dictionary<string, HashSet<string>>();
+            foreach (var kv in targets)
+            {
+                seen[kv.Key] = new HashSet<string>();
+            }
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (!targets.ContainsKey(type.Identifier.Text))
+                        continue;
+                    foreach (var method in type.Members.OfType<MethodDeclarationSyntax>())
+                    {
+                        if (!targets[type.Identifier.Text].TryGetValue(method.Identifier.Text, out string handle))
+                            continue;
+                        seen[type.Identifier.Text].Add(method.Identifier.Text);
+                        bool isGuarded = method.DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Any(inv => inv.Expression is MemberAccessExpressionSyntax access
+                                && access.Expression is IdentifierNameSyntax recv
+                                && recv.Identifier.Text == handle
+                                && access.Name is IdentifierNameSyntax qname
+                                && (qname.Identifier.Text == "IsNull" || qname.Identifier.Text == "IsNotNull"));
+                        if (!isGuarded)
+                            problems.Add($"{type.Identifier.Text}.{method.Identifier.Text} never null-checks '{handle}' — game-boundary deref without a guard on its handle");
+                    }
+                }
+            }
+            foreach (var kv in targets)
+            {
+                foreach (var name in kv.Value.Keys)
+                {
+                    if (!seen[kv.Key].Contains(name))
+                        problems.Add($"{kv.Key}.{name} not found in Source/");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} game-boundary violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit
