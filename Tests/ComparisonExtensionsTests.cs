@@ -22,6 +22,10 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(0f.IsZero());
             Assert.True(1.5f.IsPositive());
             Assert.True((-0.5f).IsNegative());
+            Assert.True(1.5f.IsNotZero());
+            Assert.False(0f.IsNotZero());
+            Assert.True(0f.IsNonNegative());
+            Assert.False((-0.5f).IsNonNegative());
         }
 
         [Fact]
@@ -29,6 +33,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             Assert.True(0.0.IsZero());
             Assert.True(0.0001.IsPositive());
+            Assert.True(0.0001.IsNotZero());
+            Assert.False(0.0.IsNotZero());
+            Assert.True((-0.0001).IsNegative());
+            Assert.True(0.0.IsNonNegative());
+            Assert.True(0.0.IsNonPositive());
+            Assert.True((-5.0).IsNonPositive());
         }
 
         [Fact]
