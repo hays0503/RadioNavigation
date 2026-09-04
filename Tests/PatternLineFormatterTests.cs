@@ -93,5 +93,23 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal("02:05", PatternLineFormatter.FormatDuration(125f));
             Assert.Equal("59:59", PatternLineFormatter.FormatDuration(3599f));
         }
+
+        [Fact]
+        public void StationSuffix_WithElapsed_AppendsPhaseAndTime()
+        {
+            string text = PatternLineFormatter.StationSuffix(
+                "Quimper", StationScheduler.Phase.Navigation, 65f);
+
+            Assert.Equal("Quimper [Navigation] 01:05", text);
+        }
+
+        [Fact]
+        public void StationSuffix_WithoutElapsed_OmitsTime()
+        {
+            string text = PatternLineFormatter.StationSuffix(
+                "Quimper", StationScheduler.Phase.Pause, 0f);
+
+            Assert.Equal("Quimper [Pause]", text);
+        }
     }
 }

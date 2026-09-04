@@ -48,5 +48,13 @@ namespace UBOAT.Mods.RadioNavigation
             int sec = s % 60;
             return min.ToString("D2") + ":" + sec.ToString("D2");
         }
+
+        public static string StationSuffix(string baseText, StationScheduler.Phase phase, float navigationElapsed)
+        {
+            string suffix = " [" + phase.ToString() + "]";
+            if (navigationElapsed.IsPositive())
+                suffix += " " + FormatDuration(navigationElapsed);
+            return baseText + suffix;
+        }
     }
 }

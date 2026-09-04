@@ -1811,8 +1811,13 @@ namespace RadioNavigation.SourceCheck
                     .Any(m => m.Identifier.Text == "FormatDuration"
                         && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
                         && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                bool suffixes = formatter.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "StationSuffix"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
                 if (!builds) problems.Add("PatternLineFormatter.BuildLine(diag, index, domIdx, recvDots, recvDashes) public static entry point not found");
                 if (!formats) problems.Add("PatternLineFormatter.FormatDuration public static method not found");
+                if (!suffixes) problems.Add("PatternLineFormatter.StationSuffix public static method not found");
             }
 
             if (build == null)
@@ -1843,6 +1848,25 @@ namespace RadioNavigation.SourceCheck
                 && panel.Members.OfType<MethodDeclarationSyntax>()
                     .Any(m => m.Identifier.Text == "FormatTime"))
                 problems.Add("InformationPanelHandler still declares FormatTime — use PatternLineFormatter.FormatDuration");
+
+            var stationText = panel?.Members.OfType<MethodDeclarationSyntax>()
+                .FirstOrDefault(m => m.Identifier.Text == "UpdateStationText");
+            if (stationText == null)
+            {
+                problems.Add("InformationPanelHandler.UpdateStationText not found");
+            }
+            else
+            {
+                bool invokesSuffix = stationText.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "StationSuffix")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "StationSuffix"));
+                if (!invokesSuffix)
+                    problems.Add("InformationPanelHandler.UpdateStationText never invokes StationSuffix — the tested pure function is bypassed");
+            }
 
             Assert.True(problems.Count == 0,
                 $"{problems.Count} pattern-line violation(s):\n"
