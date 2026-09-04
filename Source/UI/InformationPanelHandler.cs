@@ -29,7 +29,7 @@ namespace UBOAT.Mods.RadioNavigation
         private SonneController sonneController;
 
         private string stationBaseText = "";
-        private string lastLoggedDecoded = "";
+        private readonly DecodedDisplayTracker decodedTracker = new DecodedDisplayTracker();
         private float patternUpdateTimer;
         private const float PatternUpdateInterval = 0.5f;
         private const float PatternLabelHeight = 60f;
@@ -225,7 +225,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnFrequencyChanged(float freqKHz, int zoneIndex)
         {
-            lastLoggedDecoded = "";
+            decodedTracker.Reset();
 
             if (frequencyText.IsNotNull())
                 frequencyText.text = FrequencyPanelText.FreqLine(freqKHz, zoneIndex);
@@ -358,12 +358,12 @@ namespace UBOAT.Mods.RadioNavigation
             if (decodedText.IsNotNull())
             {
                 string decoded = sonneController.GetDecodedText();
-                decodedText.text = string.IsNullOrEmpty(decoded) ? "Decoded: " : "Decoded: " + decoded;
+                decodedText.text = DecodedDisplayTracker.DisplayText(decoded);
 
-                if (!string.IsNullOrEmpty(decoded) && decoded != lastLoggedDecoded)
+                if (decodedTracker.ShouldLog(decoded))
                 {
                     Debug.Log("[RadioNav][PANEL] decoded=[" + decoded + "]");
-                    lastLoggedDecoded = decoded;
+                    decodedTracker.MarkLogged(decoded);
                 }
             }
         }

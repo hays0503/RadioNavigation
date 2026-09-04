@@ -1929,6 +1929,95 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Decoded-display gate (SRP): the decoded text selection + log-once
+        /// latch must live in DecodedDisplayTracker (tested in
+        /// DecodedDisplayTrackerTests), with
+        /// InformationPanelHandler.UpdateSignalDisplay delegating. A
+        /// re-inline of the latch field fails here.
+        /// </summary>
+        [Fact]
+        public void DecodedDisplay_OwnsLatch()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax tracker = null;
+            TypeDeclarationSyntax panel = null;
+            MethodDeclarationSyntax display = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "DecodedDisplayTracker")
+                        tracker = type;
+                    if (type.Identifier.Text == "InformationPanelHandler")
+                    {
+                        panel = type;
+                        display = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "UpdateSignalDisplay");
+                    }
+                }
+            }
+
+            if (tracker == null)
+            {
+                problems.Add("type 'DecodedDisplayTracker' not found in Source/ — latch regressed into the panel");
+            }
+            else
+            {
+                foreach (var name in new[] { "DisplayText", "ShouldLog", "MarkLogged", "Reset" })
+                {
+                    bool has = tracker.Members.OfType<MethodDeclarationSyntax>()
+                        .Any(m => m.Identifier.Text == name
+                            && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword)));
+                    if (!has) problems.Add($"DecodedDisplayTracker.{name} public method not found");
+                }
+            }
+
+            if (panel != null)
+            {
+                foreach (var field in panel.Members.OfType<FieldDeclarationSyntax>())
+                {
+                    foreach (var v in field.Declaration.Variables)
+                    {
+                        if (v.Identifier.Text == "lastLoggedDecoded")
+                            problems.Add("InformationPanelHandler still declares 'lastLoggedDecoded' — the latch belongs to DecodedDisplayTracker");
+                    }
+                }
+            }
+            else
+            {
+                problems.Add("type 'InformationPanelHandler' not found in Source/");
+            }
+
+            if (display == null)
+            {
+                problems.Add("InformationPanelHandler.UpdateSignalDisplay not found");
+            }
+            else
+            {
+                foreach (var name in new[] { "DisplayText", "ShouldLog" })
+                {
+                    bool invokes = display.DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                                && bare.Identifier.Text == name)
+                            || (inv.Expression is MemberAccessExpressionSyntax qualified
+                                && qualified.Name is IdentifierNameSyntax qname
+                                && qname.Identifier.Text == name));
+                    if (!invokes)
+                        problems.Add($"InformationPanelHandler.UpdateSignalDisplay never invokes {name} — the tested class is bypassed");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} decoded-display violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit
