@@ -2433,6 +2433,104 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Reload-lifecycle gate (risk register iter2): cross-scene static
+        /// state must be reset on mod reload and DDOL roots Find-guarded.
+        /// CreateStarSky needs a GameObject.Find guard per root or every
+        /// Main Scene entry stacks another DontDestroyOnLoad duplicate with
+        /// a zombie LateUpdate; the OnLoaded reload branch must reset the
+        /// camera hook, power bus, type cache and fix pin; Reset must drop
+        /// the scene-bound lighthouse entity.
+        /// </summary>
+        [Fact]
+        public void ReloadLifecycle_ResetsCrossSceneState()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            MethodDeclarationSyntax createStarSky = null;
+            MethodDeclarationSyntax onLoaded = null;
+            MethodDeclarationSyntax placerReset = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "ModBootstrapper")
+                    {
+                        createStarSky = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "CreateStarSky");
+                        onLoaded = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "OnLoaded");
+                    }
+                    if (type.Identifier.Text == "LighthousePlacer")
+                    {
+                        placerReset = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "Reset"
+                                && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                    }
+                }
+            }
+
+            if (createStarSky == null)
+            {
+                problems.Add("ModBootstrapper.CreateStarSky not found");
+            }
+            else
+            {
+                int findGuards = createStarSky.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Count(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "Find")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "Find"));
+                if (findGuards < 2)
+                    problems.Add($"ModBootstrapper.CreateStarSky has {findGuards} Find guard(s), need 2 (StarSkyRoot + ConstellationRoot) — unguarded DDOL creation stacks duplicates every scene entry");
+            }
+
+            if (onLoaded == null)
+            {
+                problems.Add("ModBootstrapper.OnLoaded not found");
+            }
+            else
+            {
+                var calls = new HashSet<string>();
+                foreach (var inv in onLoaded.DescendantNodes().OfType<InvocationExpressionSyntax>())
+                {
+                    if (inv.Expression is MemberAccessExpressionSyntax qualified
+                        && qualified.Expression is IdentifierNameSyntax recv
+                        && qualified.Name is IdentifierNameSyntax qname)
+                        calls.Add(recv.Identifier.Text + "." + qname.Identifier.Text);
+                }
+                foreach (var required in new[] { "CameraResolver.ResetForReload", "RadioPowerBus.Reset", "GameTypeCache.Clear", "FixMapMarker.Clear" })
+                {
+                    if (!calls.Contains(required))
+                        problems.Add($"ModBootstrapper.OnLoaded reload branch never calls {required} — stale cross-scene state survives reload");
+                }
+            }
+
+            if (placerReset == null)
+            {
+                problems.Add("LighthousePlacer.Reset not found");
+            }
+            else
+            {
+                bool dropsEntity = placerReset.DescendantNodes()
+                    .OfType<AssignmentExpressionSyntax>()
+                    .Any(a => a.Left is IdentifierNameSyntax left
+                        && left.Identifier.Text == "LighthouseEntity"
+                        && IsNullLiteral(a.Right));
+                if (!dropsEntity)
+                    problems.Add("LighthousePlacer.Reset never nulls LighthouseEntity — scene-bound entity reference survives teardown");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} reload-lifecycle violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

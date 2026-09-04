@@ -43,6 +43,14 @@ namespace UBOAT.Mods.RadioNavigation
                 LighthousePlacer.Reset();
                 LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
                 GameTimeResolver.Reset();
+                // Lifecycle sweep (risk register iter2): stale cross-scene
+                // state that the four resets above do not cover — camera hook
+                // + cached cameras, radio power latch, type/member caches
+                // (game update may rename), stale fix pin.
+                CameraResolver.ResetForReload();
+                RadioPowerBus.Reset();
+                GameTypeCache.Clear();
+                FixMapMarker.Clear();
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
             }
 
@@ -210,17 +218,26 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void CreateStarSky()
         {
-            // STAR_SKY: create star sky renderer (ADR-021)
-            GameObject starSkyRoot = new GameObject("StarSkyRoot");
-            starSkyRoot.AddComponent<StarsMesh>();
-            Object.DontDestroyOnLoad(starSkyRoot);
-            Debug.Log("[RadioNav][Main] StarSkyRoot created with StarsMesh component");
+            // STAR_SKY: create star sky renderer (ADR-021). Find-guarded like
+            // Planet/Sun roots below: OnSceneStart fires on every Main Scene
+            // entry, and without the guard each entry would stack another
+            // DontDestroyOnLoad duplicate with its own zombie LateUpdate.
+            if (GameObject.Find("StarSkyRoot").IsNull())
+            {
+                GameObject starSkyRoot = new GameObject("StarSkyRoot");
+                starSkyRoot.AddComponent<StarsMesh>();
+                Object.DontDestroyOnLoad(starSkyRoot);
+                Debug.Log("[RadioNav][Main] StarSkyRoot created with StarsMesh component");
+            }
 
             // STAR_SKY: create constellation lines renderer
-            GameObject constellationRoot = new GameObject("ConstellationRoot");
-            constellationRoot.AddComponent<ConstellationMesh>();
-            Object.DontDestroyOnLoad(constellationRoot);
-            Debug.Log("[RadioNav][Main] ConstellationRoot created with ConstellationMesh component");
+            if (GameObject.Find("ConstellationRoot").IsNull())
+            {
+                GameObject constellationRoot = new GameObject("ConstellationRoot");
+                constellationRoot.AddComponent<ConstellationMesh>();
+                Object.DontDestroyOnLoad(constellationRoot);
+                Debug.Log("[RadioNav][Main] ConstellationRoot created with ConstellationMesh component");
+            }
         }
 
         private void CreatePlanetRoot()

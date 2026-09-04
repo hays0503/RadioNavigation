@@ -100,6 +100,10 @@ namespace UBOAT.Mods.RadioNavigation
             if (instance.IsNotNull())
                 UnityEngine.Object.Destroy(instance.gameObject);
             instance = null;
+            // The entity belongs to the destroyed scene: drop the static so
+            // LighthouseMapMarker re-resolves instead of reading a dead ref
+            // (IsNull now reports destroyed objects as null).
+            LighthouseEntity = null;
         }
 
         private void Update()
