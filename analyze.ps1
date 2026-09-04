@@ -5,7 +5,8 @@ param(
     [string]$Profile = "full",
     [switch]$Fix,
     [switch]$Json,
-    [switch]$SkipSourceCheck
+    [switch]$SkipSourceCheck,
+    [switch]$IdeAudit
 )
 
 # Roslynator CLI analysis wrapper for RadioNavigation.
@@ -37,6 +38,7 @@ param(
 #   powershell -File analyze.ps1 -Fix                # apply auto-fixes
 #   powershell -File analyze.ps1 -Json               # SARIF output to file
 #   powershell -File analyze.ps1 -SkipSourceCheck    # skip neural-slop gate
+#   powershell -File analyze.ps1 -IdeAudit             # IDE0051/IDE0052 dead-member audit (own phase, see below)
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
@@ -78,6 +80,63 @@ if (-not $SkipSourceCheck) {
 if ($LASTEXITCODE -ne 0) {
     Write-Error "[RadioNavigation] dotnet restore failed for $csproj"
     exit $LASTEXITCODE
+}
+
+# IDE0051 (unused private member) + IDE0052 (unread private member) audit
+# (risk register iter6). Roslynator CLI never surfaces IDE rules, so this
+# phase builds the analysis project with -p:EnforceCodeStyleInBuild=true
+# instead. Enforcement is CLI-only: the repo carries just the inert severity
+# lines in .editorconfig, so quick/full runs, tests.ps1 and build.ps1 are
+# unaffected. NoWarn drops CS0414 for one run to compare the compiler's own
+# write-only-field detector against IDE0052 (decision logged in AGENTS.md).
+# Triage: Unity engine-called methods (Awake/Update/...) are noise — the
+# engine invokes them, Roslyn cannot see it. Everything else blocks (exit 1).
+if ($IdeAudit) {
+    $unityNoise = @('Awake','Start','Update','LateUpdate','FixedUpdate',
+        'OnDestroy','OnEnable','OnDisable','OnValidate','OnDrawGizmos',
+        'OnPreRender','OnPostRender','OnAudioFilterRead','OnTriggerEnter',
+        'OnTriggerExit','OnCollisionEnter','OnPointerClick','OnPointerEnter',
+        'OnPointerExit','OnDrag','OnBeginDrag','OnEndDrag','OnScroll')
+    # NOTE: semicolons in -p: values MUST be %3B-escaped — MSBuild splits a
+    # bare -p:NoWarn="a;b" into junk properties (MSB1006) after PowerShell
+    # strips the quotes, and the audit would report a vacuous clean.
+    $buildLines = & dotnet build $csproj -c Release -p:EnforceCodeStyleInBuild=true -p:NoWarn="CS8032%3BCS0162%3BCS0219%3BCS0649" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "[RadioNavigation] IdeAudit build failed (exit $LASTEXITCODE) - refusing to report a clean audit on a broken compile"
+        $buildLines | ForEach-Object { Write-Host $_ }
+        exit $LASTEXITCODE
+    }
+    $buildOut = $buildLines | Out-String
+    # Build warnings repeat (project + target passes) — dedupe so counts
+    # are stable run over run.
+    $hits = @($buildOut -split "`r?`n" | Select-String -Pattern 'warning (IDE0051|IDE0052|CS0414)' | ForEach-Object { $_.Line.Trim() } | Sort-Object -Unique)
+    $genuine = @()
+    $noise = @()
+    foreach ($h in $hits) {
+        # Roslyn quotes the symbol in DOUBLE quotes ("Type.Member").
+        $m = [regex]::Match($h, '"([^"]+)"')
+        $memberName = ""
+        if ($m.Success) {
+            $dotted = $m.Groups[1].Value
+            $dot = $dotted.LastIndexOf('.')
+            if ($dot -ge 0) { $memberName = $dotted.Substring($dot + 1) }
+        }
+        if ($memberName -ne "" -and $unityNoise -contains $memberName) { $noise += $h }
+        else { $genuine += $h }
+    }
+    Write-Host "[RadioNavigation] IdeAudit: $($hits.Count) hit(s) ($($genuine.Count) genuine, $($noise.Count) Unity-noise)"
+    if ($noise.Count -gt 0) {
+        Write-Host "--- Unity-noise (engine-called, ignored) ---"
+        $noise | ForEach-Object { Write-Host $_ }
+    }
+    if ($genuine.Count -gt 0) {
+        Write-Host "--- GENUINE (fix or justify) ---"
+        $genuine | ForEach-Object { Write-Host $_ }
+        Write-Host "[RadioNavigation] IdeAudit FAILED - genuine dead members found"
+        exit 1
+    }
+    Write-Host "[RadioNavigation] IdeAudit clean"
+    exit 0
 }
 
 # High-signal rules for the 'quick' profile - only rules that catch real bugs,

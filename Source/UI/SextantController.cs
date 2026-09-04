@@ -99,7 +99,6 @@ namespace UBOAT.Mods.RadioNavigation
         private Component sourceSsms;
 
         private GameObject canvasRoot;
-        private RectTransform pipRect;
         private Image filterDimLeftImage;
         private Image filterDimRightImage;
         private Image glareImage;
@@ -190,9 +189,6 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         [Inject] private static ResourceManager resourceManager = null;
-        // Opaque view material from the bundle; kept referenced so Unity
-        // does not unload it while the overlay lives (built by SextantOverlay).
-        private Material opaqueViewMaterial;
 
         private void Update()
         {
@@ -773,20 +769,6 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
 
-        private void LogPipStack(GameObject go)
-        {
-            UnityEngine.Object[] comps = go.GetComponents(typeof(UnityEngine.Component));
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < comps.Length; i++)
-            {
-                if (i > 0)
-                    sb.Append(",");
-                sb.Append(comps[i] != null ? comps[i].GetType().Name : "null");
-            }
-            Debug.Log(LogPrefix + " PIPSTACK [" + go.name + "] " + sb.ToString());
-        }
-
-
         private void RefreshMirroredState()
         {
             effectMirror.RefreshSsms(sourceSsmsFog, sourceSsms);
@@ -1079,7 +1061,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             var ui = SextantOverlay.Build(leftRt, rightRt, resourceManager, this);
             canvasRoot = ui.CanvasRoot;
-            pipRect = ui.PipRect;
             leftViewImage = ui.LeftViewImage;
             rightViewImage = ui.RightViewImage;
             filterDimLeftImage = ui.FilterDimLeftImage;
@@ -1092,7 +1073,10 @@ namespace UBOAT.Mods.RadioNavigation
             ringTexture = ui.RingTexture;
             circleMaskTexture = ui.CircleMaskTexture;
             eyecupTexture = ui.EyecupTexture;
-            opaqueViewMaterial = ui.OpaqueViewMaterial;
+            // NOTE: ui.OpaqueViewMaterial intentionally not cached here — the
+            // ocular images already hold it (SextantOcularBuilder assigns
+            // Left/RightViewImage.material), so no extra reference is needed
+            // to keep Unity from unloading it.
             bodiesReadout.BindLabels(ui.SunAltText, ui.BodiesAltText);
             worksheet.BindCard(ui.FixCardText);
         }

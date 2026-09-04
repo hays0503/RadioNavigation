@@ -12,7 +12,8 @@ namespace UBOAT.Mods.RadioNavigation
     [RequireComponent(typeof(MeshRenderer))]
     public sealed class ConstellationMesh : MonoBehaviour
     {
-        private const float WorldRadiusM = 3900f;
+        // NOTE: no local WorldRadiusM — the single source of truth lives in
+        // CameraResolver (SafeRadius); the dead duplicate was removed (iter6).
         private const float LineWidthArcMin = 2f; // angular width in arcminutes
         private static readonly Color LineColor = new Color(0.55f, 0.22f, 0.15f, 0.4f); // reddish-brown
 

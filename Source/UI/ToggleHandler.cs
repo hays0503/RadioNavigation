@@ -13,7 +13,6 @@ namespace UBOAT.Mods.RadioNavigation
         private Toggle toggleComp;
         private GameObject onImage;
         private GameObject offImage;
-        private RectTransform toggleRect;
         private Image dialImage;
         private Color originalDialColor;
 
@@ -30,14 +29,8 @@ namespace UBOAT.Mods.RadioNavigation
             }
             toggleComp.graphic = null;
 
-            toggleRect = GetComponent<RectTransform>();
-            if (toggleRect.IsNull())
-            {
-                Debug.LogError("[RadioNav][ToggleHandler] RectTransform not found, disabling");
-                enabled = false;
-                return;
-            }
-
+            // NOTE: no RectTransform guard — a GameObject carrying Toggle
+            // (a Graphic) always has one; Unity adds it automatically.
             Transform bg = transform.Find(PrefabNames.Background);
             if (bg.IsNotNull())
             {

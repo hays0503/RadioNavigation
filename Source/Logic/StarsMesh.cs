@@ -12,7 +12,8 @@ namespace UBOAT.Mods.RadioNavigation
     [RequireComponent(typeof(MeshRenderer))]
     public sealed class StarsMesh : MonoBehaviour
     {
-        private const float WorldRadiusM = 3900f;
+        // NOTE: no local WorldRadiusM — the single source of truth lives in
+        // CameraResolver (SafeRadius); the dead duplicate was removed (iter6).
         private const float MinStarSizePx = 2f;
         private const float MaxStarSizePx = 20f;
         private const float NavStarMultiplier = 1.9f;
