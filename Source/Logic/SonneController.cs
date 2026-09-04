@@ -242,15 +242,11 @@ namespace UBOAT.Mods.RadioNavigation
                 if (positionLogTimer >= PositionLogInterval)
                 {
                     positionLogTimer = 0f;
-                    DateTime utcNow = GameTimeResolver.GetUtcNow();
-                    Debug.Log("[RadioNav][POSITION] provider returned " + posLat.ToString("F5") + "," + posLon.ToString("F5")
-                        + " | " + posLat.ToString("F4") + "," + posLon.ToString("F4")
-                        + " | " + utcNow.ToString("yyyy-MM-dd HH-mm-ss", CultureInfo.InvariantCulture));
+                    Debug.Log(PositionFeed.FormatLogLine(posLat, posLon, GameTimeResolver.GetUtcNow()));
                 }
 
                 if (!positionAvailable
-                    || Math.Abs(posLat - playerLatitude) > 0.0001f
-                    || Math.Abs(posLon - playerLongitude) > 0.0001f)
+                    || PositionFeed.HasMoved(posLat, posLon, playerLatitude, playerLongitude))
                 {
                     UpdatePosition(posLat, posLon);
                 }

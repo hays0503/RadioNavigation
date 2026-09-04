@@ -1681,6 +1681,88 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Position-feed gate (SRP): the significant-movement threshold and
+        /// the 10 s position log line must live in PositionFeed as pure
+        /// functions (tested in PositionFeedTests, InvariantCulture like
+        /// BearingDiagnostics), with SonneController.Update keeping only
+        /// the provider read and gating. A re-inline fails here.
+        /// </summary>
+        [Fact]
+        public void PositionFeed_OwnsPollDecisions()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax feed = null;
+            MethodDeclarationSyntax update = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "PositionFeed")
+                        feed = type;
+                    if (type.Identifier.Text == "SonneController")
+                    {
+                        update = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "Update");
+                    }
+                }
+            }
+
+            if (feed == null)
+            {
+                problems.Add("type 'PositionFeed' not found in Source/ — poll decisions regressed into the controller");
+            }
+            else
+            {
+                bool moves = feed.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "HasMoved"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                bool formats = feed.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "FormatLogLine"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!moves) problems.Add("PositionFeed.HasMoved public static method not found");
+                if (!formats) problems.Add("PositionFeed.FormatLogLine public static method not found");
+            }
+
+            if (update == null)
+            {
+                problems.Add("SonneController.Update not found");
+            }
+            else
+            {
+                foreach (var lit in update.DescendantNodes().OfType<LiteralExpressionSyntax>())
+                {
+                    if (lit.Token.Text == "\"F5\"")
+                        problems.Add("SonneController.Update still formats F5 coordinates inline — the log line belongs to PositionFeed (InvariantCulture)");
+                    if (lit.Token.Text == "0.0001f")
+                        problems.Add("SonneController.Update still hardcodes the 0.0001 movement threshold — it belongs to PositionFeed");
+                }
+
+                foreach (var name in new[] { "HasMoved", "FormatLogLine" })
+                {
+                    bool invokes = update.DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                                && bare.Identifier.Text == name)
+                            || (inv.Expression is MemberAccessExpressionSyntax qualified
+                                && qualified.Name is IdentifierNameSyntax qname
+                                && qname.Identifier.Text == name));
+                    if (!invokes)
+                        problems.Add($"SonneController.Update never invokes {name} — the tested pure function is bypassed");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} position-feed violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

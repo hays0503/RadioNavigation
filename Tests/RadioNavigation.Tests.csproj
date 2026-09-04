@@ -86,6 +86,7 @@
     <Compile Include="StationFleetTests.cs" />
     <Compile Include="StationDiagnosticsReportTests.cs" />
     <Compile Include="SpinnerScaleTests.cs" />
+    <Compile Include="PositionFeedTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -151,6 +152,7 @@
     <Compile Include="..\Source\Data\StationDiagnostics.cs" Link="Source\Data\StationDiagnostics.cs" />
     <Compile Include="..\Source\Logic\StationDiagnosticsReport.cs" Link="Source\Logic\StationDiagnosticsReport.cs" />
     <Compile Include="..\Source\Logic\SpinnerScale.cs" Link="Source\Logic\SpinnerScale.cs" />
+    <Compile Include="..\Source\Logic\PositionFeed.cs" Link="Source\Logic\PositionFeed.cs" />
   </ItemGroup>
 
 </Project>
