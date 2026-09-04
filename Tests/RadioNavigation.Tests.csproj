@@ -94,6 +94,7 @@
     <Compile Include="StatusLineTextTests.cs" />
     <Compile Include="SignalPanelViewTests.cs" />
     <Compile Include="EntityTypeRowValuesTests.cs" />
+    <Compile Include="FixCardComposerTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -167,6 +168,8 @@
     <Compile Include="..\Source\Logic\StatusLineText.cs" Link="Source\Logic\StatusLineText.cs" />
     <Compile Include="..\Source\Logic\SignalPanelView.cs" Link="Source\Logic\SignalPanelView.cs" />
     <Compile Include="..\Source\Logic\EntityTypeRowValues.cs" Link="Source\Logic\EntityTypeRowValues.cs" />
+    <Compile Include="..\Source\UI\FixCardComposer.cs" Link="Source\UI\FixCardComposer.cs" />
+    <Compile Include="..\Source\UI\SextantDmFormat.cs" Link="Source\UI\SextantDmFormat.cs" />
   </ItemGroup>
 
 </Project>

@@ -2189,6 +2189,82 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Fix-card gate (SRP): the F-Tafel worksheet card assembly must
+        /// live in FixCardComposer as a pure function (tested in
+        /// FixCardComposerTests), with SextantWorksheet.BuildCard as a thin
+        /// adapter. A re-inline of the sight blocks fails here.
+        /// </summary>
+        [Fact]
+        public void FixCard_OwnsCardAssembly()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax composer = null;
+            MethodDeclarationSyntax build = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "FixCardComposer")
+                        composer = type;
+                    if (type.Identifier.Text == "SextantWorksheet")
+                    {
+                        build = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "BuildCard");
+                    }
+                }
+            }
+
+            if (composer == null)
+            {
+                problems.Add("type 'FixCardComposer' not found in Source/ — card assembly regressed into the worksheet");
+            }
+            else
+            {
+                bool composes = composer.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Compose"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 5);
+                if (!composes) problems.Add("FixCardComposer.Compose(obs1, obs2, section, status, calMinutes) public static entry point not found");
+            }
+
+            if (build == null)
+            {
+                problems.Add("SextantWorksheet.BuildCard not found");
+            }
+            else
+            {
+                bool keepsBlocks = build.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "AppendObservation")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "AppendObservation"));
+                if (keepsBlocks)
+                    problems.Add("SextantWorksheet.BuildCard still calls AppendObservation — sight blocks belong to FixCardComposer");
+
+                bool invokesCompose = build.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "Compose")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "Compose"));
+                if (!invokesCompose)
+                    problems.Add("SextantWorksheet.BuildCard never invokes Compose — the tested pure function is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} fix-card violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Frequency-text gate (SRP): the frequency/station header lines
         /// must live in FrequencyPanelText as pure functions (tested in
         /// FrequencyPanelTextTests), with
