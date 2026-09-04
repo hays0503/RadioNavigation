@@ -196,5 +196,122 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             int count = StoryDecisionGateway.GetDecisionCount(list, list);
             Assert.Equal(2, count);
         }
+
+        [Fact]
+        public void Properties_AfterReset_AllNull()
+        {
+            StoryDecisionGateway.Reset();
+            Assert.Null(StoryDecisionGateway.DecisionType);
+            Assert.Null(StoryDecisionGateway.DecisionCtor);
+            Assert.Null(StoryDecisionGateway.LocalizationKeyField);
+            Assert.Null(StoryDecisionGateway.LocalizationKeyProp);
+            Assert.Null(StoryDecisionGateway.StageField);
+            Assert.Null(StoryDecisionGateway.DecisionsProp);
+            Assert.Null(StoryDecisionGateway.InsertMethod);
+            Assert.Null(StoryDecisionGateway.OnUpdatedMethod);
+        }
+
+        [Fact]
+        public void TryEnsureInitialized_WithoutGame_ReturnsFalse()
+        {
+            StoryDecisionGateway.Reset();
+            Assert.False(StoryDecisionGateway.TryEnsureInitialized());
+            StoryDecisionGateway.Reset();
+        }
+
+        [Fact]
+        public void GetLocalizationKey_NoCache_ReturnsNull()
+        {
+            StoryDecisionGateway.Reset();
+            Assert.Null(StoryDecisionGateway.GetLocalizationKey(new object()));
+            StoryDecisionGateway.Reset();
+        }
+
+        [Fact]
+        public void GetDecisionCount_NullDecisions_ReturnsMinusOne()
+        {
+            Assert.Equal(-1, StoryDecisionGateway.GetDecisionCount(null, null));
+        }
+
+        [Fact]
+        public void GetDecisionCount_ReflectionFallback()
+        {
+            var bits = new System.Collections.BitArray(10);
+            Assert.Equal(10, StoryDecisionGateway.GetDecisionCount(bits, null));
+        }
+
+        [Fact]
+        public void GetDecisions_NullProp_ReturnsNull()
+        {
+            StoryDecisionGateway.Reset();
+            Assert.Null(StoryDecisionGateway.GetDecisions(null));
+            StoryDecisionGateway.Reset();
+        }
+
+        private static object NullDecisions => null;
+
+        [Fact]
+        public void GetDecisions_NullValue_WarnsAndReturnsNull()
+        {
+            var propField = typeof(StoryDecisionGateway).GetField("decisionsProp", BindingFlags.NonPublic | BindingFlags.Static);
+            object saved = propField.GetValue(null);
+            try
+            {
+                propField.SetValue(null, typeof(StoryDecisionGatewayTests).GetProperty("NullDecisions", BindingFlags.NonPublic | BindingFlags.Static));
+                Assert.Null(StoryDecisionGateway.GetDecisions(null));
+            }
+            finally
+            {
+                propField.SetValue(null, saved);
+            }
+        }
+
+        private sealed class FakeDecisions
+        {
+            private readonly object[] items;
+            public FakeDecisions(params object[] items) { this.items = items; }
+            public int Count => items.Length;
+            public object this[int index] => items[index];
+        }
+
+        [Fact]
+        public void DecisionAlreadyExists_NonListBranch()
+        {
+            var field = typeof(DecisionWithField).GetField("LocalizationKey");
+            var gatewayField = typeof(StoryDecisionGateway).GetField("localizationKeyField", BindingFlags.NonPublic | BindingFlags.Static);
+            var gatewayProp = typeof(StoryDecisionGateway).GetField("localizationKeyProp", BindingFlags.NonPublic | BindingFlags.Static);
+            object savedField = gatewayField.GetValue(null);
+            object savedProp = gatewayProp.GetValue(null);
+            try
+            {
+                gatewayField.SetValue(null, field);
+                gatewayProp.SetValue(null, null);
+
+                var decisions = new FakeDecisions(new DecisionWithField("Radio/OpenT3PLL38"));
+                Assert.True(StoryDecisionGateway.DecisionAlreadyExists(decisions, null, 1, "Radio/OpenT3PLL38"));
+                Assert.False(StoryDecisionGateway.DecisionAlreadyExists(decisions, null, 1, "Radio/Missing"));
+            }
+            finally
+            {
+                gatewayField.SetValue(null, savedField);
+                gatewayProp.SetValue(null, savedProp);
+            }
+        }
+
+        [Fact]
+        public void InsertDecision_NullMethod_Swallowed()
+        {
+            StoryDecisionGateway.Reset();
+            StoryDecisionGateway.InsertDecision(null, 0, new object());
+            StoryDecisionGateway.Reset();
+        }
+
+        [Fact]
+        public void NotifyUpdated_MissingMethod_WarnsWithoutThrow()
+        {
+            StoryDecisionGateway.Reset();
+            StoryDecisionGateway.NotifyUpdated(null);
+            StoryDecisionGateway.Reset();
+        }
     }
 }

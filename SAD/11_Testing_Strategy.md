@@ -383,7 +383,7 @@ on a Unity codebase (report only).
 | Базовая xunit-инфраструктура | High | — | ✅ F22, 2026-08-01 |
 | Тесты UI-хендлеров (зависимы от Unity) | Medium | 3-4h | Открыто |
 | Тесты циклов Consol 60/240s | Medium | 1-2h | Открыто (Фаза 4) |
-| Покрытие (OpenCover/ReportGenerator) | Low | 2-3h | Скрипт `coverage.ps1` готов (dotnet-coverage, без vstest); первый прогон не выполнен — нужен shell |
+| Покрытие (OpenCover/ReportGenerator) | Low | 2-3h | ✅ 2026-09-04: `coverage.ps1` (dotnet-coverage, без vstest), Source-only 97.0% |
 | Обновление manual-чеклистов под live-игру | Low | 1-2h | Открыто |
 
 ---
