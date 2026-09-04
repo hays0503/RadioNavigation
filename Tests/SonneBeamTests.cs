@@ -85,6 +85,72 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(60, signal.DotCount + signal.DashCount);
         }
 
+        private static string FindDataDirectory()
+        {
+            DirectoryInfo directory = new DirectoryInfo(AppContext.BaseDirectory);
+            while (directory != null
+                && !Directory.Exists(Path.Combine(directory.FullName, "Source", "Data")))
+            {
+                directory = directory.Parent;
+            }
+
+            Assert.NotNull(directory);
+            return Path.Combine(directory.FullName, "Source", "Data");
+        }
+
+        [Fact]
+        public void Initialize_MissingDirectory_ReturnsFalse()
+        {
+            try
+            {
+                Assert.False(SonneBeam.Initialize(
+                    Path.Combine(Path.GetTempPath(), "rn-no-such-dir")));
+                Assert.Contains("not found", SonneBeam.LastLoadError);
+            }
+            finally
+            {
+                Assert.True(SonneBeam.Initialize(FindDataDirectory()), SonneBeam.LastLoadError);
+            }
+        }
+
+        [Fact]
+        public void Initialize_DirectoryWithoutTables_AppendsErrors()
+        {
+            // The test output directory holds assemblies but no station
+            // tables — no filesystem writes needed (restricted tokens deny
+            // Temp dir creation), yet all five per-file errors trigger.
+            try
+            {
+                Assert.False(SonneBeam.Initialize(AppContext.BaseDirectory));
+                Assert.Contains("Bushmills.json", SonneBeam.LastLoadError);
+                Assert.Contains(";", SonneBeam.LastLoadError);
+            }
+            finally
+            {
+                Assert.True(SonneBeam.Initialize(FindDataDirectory()), SonneBeam.LastLoadError);
+            }
+        }
+
+        [Fact]
+        public void TryGetNavigationPattern_UnknownStation_ReturnsFalse()
+        {
+            NavigationElementType[] pattern;
+            SonneBeamSignal signal;
+            Assert.False(SonneBeam.TryGetNavigationPattern(
+                "NoSuchStation",
+                0.0,
+                out pattern,
+                out signal));
+            Assert.Null(pattern);
+        }
+
+        [Fact]
+        public void BuildPattern_OutOfRange_Throws()
+        {
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => SonneBeam.BuildPattern(-1, false));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => SonneBeam.BuildPattern(61, true));
+        }
+
         // MiniJson escape handling (ParseString/ParseEscape, refactored
         // 2026-09-02): all 8 standard JSON escapes must decode through the
         // public SonneBeamStation.Parse consumer contract, and malformed
