@@ -1763,6 +1763,92 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Pattern-line gate (SRP): the per-station card line + mm:ss
+        /// duration must live in PatternLineFormatter as pure functions
+        /// (tested in PatternLineFormatterTests, InvariantCulture like
+        /// BearingDiagnostics), with InformationPanelHandler delegating.
+        /// A re-inline of the BFO/ToBoat format fails here.
+        /// </summary>
+        [Fact]
+        public void PatternLine_OwnsLineFormat()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax formatter = null;
+            MethodDeclarationSyntax build = null;
+            TypeDeclarationSyntax panel = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "PatternLineFormatter")
+                        formatter = type;
+                    if (type.Identifier.Text == "InformationPanelHandler")
+                    {
+                        panel = type;
+                        build = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "BuildPatternLine");
+                    }
+                }
+            }
+
+            if (formatter == null)
+            {
+                problems.Add("type 'PatternLineFormatter' not found in Source/ — line format regressed into the panel");
+            }
+            else
+            {
+                bool builds = formatter.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "BuildLine"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword))
+                        && m.ParameterList.Parameters.Count == 5);
+                bool formats = formatter.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "FormatDuration"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!builds) problems.Add("PatternLineFormatter.BuildLine(diag, index, domIdx, recvDots, recvDashes) public static entry point not found");
+                if (!formats) problems.Add("PatternLineFormatter.FormatDuration public static method not found");
+            }
+
+            if (build == null)
+            {
+                problems.Add("InformationPanelHandler.BuildPatternLine not found");
+            }
+            else
+            {
+                foreach (var lit in build.DescendantNodes().OfType<LiteralExpressionSyntax>())
+                {
+                    string token = lit.Token.Text;
+                    if (token.Contains("BFO:") || token.Contains("ToBoat:"))
+                        problems.Add($"InformationPanelHandler.BuildPatternLine still contains {token} — the line format belongs to PatternLineFormatter");
+                }
+
+                bool invokes = build.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "BuildLine")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "BuildLine"));
+                if (!invokes)
+                    problems.Add("InformationPanelHandler.BuildPatternLine never invokes BuildLine — the tested pure function is bypassed");
+            }
+
+            if (panel != null
+                && panel.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "FormatTime"))
+                problems.Add("InformationPanelHandler still declares FormatTime — use PatternLineFormatter.FormatDuration");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} pattern-line violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit

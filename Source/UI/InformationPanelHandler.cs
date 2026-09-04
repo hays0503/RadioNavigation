@@ -300,7 +300,7 @@ namespace UBOAT.Mods.RadioNavigation
             string phase = diag.SchedulerPhase.ToString();
             string suffix = " [" + phase + "]";
             if (diag.NavigationElapsed.IsPositive())
-                suffix += " " + FormatTime(diag.NavigationElapsed);
+                suffix += " " + PatternLineFormatter.FormatDuration(diag.NavigationElapsed);
             stationText.text = stationBaseText + suffix;
 
 #if DEBUG
@@ -315,28 +315,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         private string BuildPatternLine(StationDiagnostics diag, int i, int domIdx)
         {
-            string callsign = diag.Callsign ?? "?";
-            string beam = diag.InBeam ? "IN BEAM" : "OUTSIDE";
-            string bfo = diag.BeatFrequency.ToString("F0") + "Hz";
-            string gain = Mathf.RoundToInt(diag.Gain * 100f) + "%";
-            string phase = diag.SchedulerPhase.ToString();
-
-            string line = callsign + " [" + beam + "] " + gain + " BFO:" + bfo
-                + " " + phase + " ToBoat:" + diag.BearingToBoat.ToString("F1") + "\u00B0";
-            if (diag.NavigationElapsed.IsPositive())
-                line += " " + FormatTime(diag.NavigationElapsed);
-            line += "\n  Zone:S" + diag.SectorNumber
-                + (diag.IsDashSector ? "(DASH)" : "(DOT)")
-                + " EQ@" + diag.EqSignIndex + "/" + (diag.DotCount + diag.DashCount)
-                + " Dots:" + diag.DotCount
-                + " Dashes:" + diag.DashCount
-                + " Bearing:" + diag.CurrentBearing.ToString("F1") + "\u00B0";
+            int recvDots = 0;
+            int recvDashes = 0;
             if (i == domIdx)
             {
-                line += "\n  Recv: " + sonneController.GetReceivedNavigationDotCount()
-                    + "\u2022 " + sonneController.GetReceivedNavigationDashCount() + "\u25AC";
+                recvDots = sonneController.GetReceivedNavigationDotCount();
+                recvDashes = sonneController.GetReceivedNavigationDashCount();
             }
-            return line;
+            return PatternLineFormatter.BuildLine(diag, i, domIdx, recvDots, recvDashes);
         }
 
         private void ClearRemainingPatterns(int displayIndex)
@@ -384,14 +370,6 @@ namespace UBOAT.Mods.RadioNavigation
                     lastLoggedDecoded = decoded;
                 }
             }
-        }
-
-        private string FormatTime(float seconds)
-        {
-            int s = Mathf.RoundToInt(seconds);
-            int min = s / 60;
-            int sec = s % 60;
-            return min.ToString("D2") + ":" + sec.ToString("D2");
         }
 
         private void OnDestroy()
