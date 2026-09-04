@@ -245,5 +245,65 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(sawBeatDuringSilence, "silence must return the carrier to the beat");
             Assert.True(sawDashPitch, "dash element must key the carrier below the beat");
         }
+
+        [Fact]
+        public void OutputVolume_ClampsToUnit()
+        {
+            var engine = CreateEngine();
+            engine.OutputVolume = 2f;
+            Assert.Equal(1f, engine.OutputVolume);
+            engine.OutputVolume = -0.5f;
+            Assert.Equal(0f, engine.OutputVolume);
+            engine.OutputVolume = 0.7f;
+            Assert.Equal(0.7f, engine.OutputVolume);
+        }
+
+        [Fact]
+        public void Reset_ClearsAccumulatedState()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var schedulers = new[] { CreateSchedulerInPreNavPause() };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+            engine.UpdateStations(1f, 1f, stations, schedulers, keyers, carriers, true);
+
+            engine.Reset();
+
+            Assert.Equal(1f, engine.OutputVolume);
+        }
+
+        [Fact]
+        public void ApplyFeedback_MapsAngle()
+        {
+            var engine = CreateEngine();
+            engine.ApplyFeedback(70f);
+            Assert.Equal(0.5f, engine.Feedback);
+            Assert.Equal(20f + 0.25f * 180f, engine.QualityFactor);
+
+            engine.ApplyFeedback(140f);
+            Assert.Equal(1f, engine.Feedback);
+            Assert.Equal(200f, engine.QualityFactor);
+        }
+
+        [Fact]
+        public void UpdateStations_EmptyNavigationSequence_SkipsToPostNav()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var scheduler = CreateSchedulerInPreNavPause();
+            for (int i = 0; i < 60; i++)
+                scheduler.Tick();
+            Assert.Equal(StationScheduler.Phase.Navigation, scheduler.CurrentPhase);
+            scheduler.Navigation = new NavigationPattern(new Group[0], 8);
+            scheduler.CurrentConsolPattern = null;
+            var schedulers = new[] { scheduler };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            engine.UpdateStations(0.05f, 1f, stations, schedulers, keyers, carriers, true);
+
+            Assert.Equal(StationScheduler.Phase.PostNavSilence, scheduler.CurrentPhase);
+        }
     }
 }
