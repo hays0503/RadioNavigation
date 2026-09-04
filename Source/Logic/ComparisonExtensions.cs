@@ -4,8 +4,20 @@ namespace UBOAT.Mods.RadioNavigation
 {
     public static class ComparisonExtensions
     {
-        public static bool IsNull(this object obj) => obj == null;
-        public static bool IsNotNull(this object obj) => obj != null;
+        // Unity fake-null: a destroyed object is a non-null reference that
+        // compares == null via the overloaded operator. The static parameter
+        // type is object, so plain == would use reference equality and lie.
+        // Route UnityEngine.Object instances through the overload instead.
+        // (Fully qualified: a using would collide with System.Object.)
+        public static bool IsNull(this object obj)
+        {
+            var unityObj = obj as UnityEngine.Object;
+            if (!ReferenceEquals(unityObj, null))
+                return unityObj == null;
+            return obj == null;
+        }
+
+        public static bool IsNotNull(this object obj) => !IsNull(obj);
 
         public static bool IsZero(this int value) => value == 0;
         public static bool IsNotZero(this int value) => value != 0;

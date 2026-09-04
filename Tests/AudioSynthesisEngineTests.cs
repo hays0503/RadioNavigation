@@ -259,6 +259,29 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void ProcessAudio_NullInputs_NoThrow()
+        {
+            var engine = CreateEngine();
+            engine.ProcessAudio(null, 2, null, null, null, true, 1, 1);
+            engine.ProcessAudio(new float[8], 0, null, null, null, true, 1, 1);
+        }
+
+        [Fact]
+        public void ProcessAudio_RaggedFleet_ClampsToShortest()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var keyers = new MorseKeyer[1];
+            var carriers = new CarrierGenerator[0]; // ragged: zero carriers
+
+            float[] data = new float[8];
+            engine.ProcessAudio(data, 1, stations, keyers, carriers, true, 1, 1);
+
+            // Zero-length carriers => zero stations processed => silence.
+            Assert.All(data, s => Assert.Equal(0f, s));
+        }
+
+        [Fact]
         public void Reset_ClearsAccumulatedState()
         {
             var engine = CreateEngine();

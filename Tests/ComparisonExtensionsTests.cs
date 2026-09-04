@@ -59,5 +59,20 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(obj.IsNotNull());
             Assert.False(obj.IsNull());
         }
+
+        [Fact]
+        public void UnityObject_FakeNull()
+        {
+            var live = new UnityEngine.Object();
+            Assert.False(live.IsNull());
+            Assert.True(live.IsNotNull());
+
+            live.DestroySelf();
+            Assert.True(live.IsNull());
+            Assert.False(live.IsNotNull());
+
+            UnityEngine.Object destroyedNull = null;
+            Assert.True(destroyedNull.IsNull());
+        }
     }
 }

@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <Compile Include="Stubs\UnityEngineMathf.cs" />
+    <Compile Include="Stubs\UnityEngineObject.cs" />
     <Compile Include="Stubs\UnityEngineVector2.cs" />
     <Compile Include="Stubs\UnityEngineDebug.cs" />
     <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />

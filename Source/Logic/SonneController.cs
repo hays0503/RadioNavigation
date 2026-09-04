@@ -24,7 +24,9 @@ namespace UBOAT.Mods.RadioNavigation
         private AudioSynthesisEngine audioEngine;
 
         private float currentFrequencyKHz;
-        private int currentZoneIndex;
+        // Main-thread writes (UpdateTuning), audio-thread read
+        // (OnAudioFilterRead) — volatile.
+        private volatile int currentZoneIndex;
         private float playerLatitude;
         private float playerLongitude;
         private bool positionAvailable;
@@ -41,6 +43,10 @@ namespace UBOAT.Mods.RadioNavigation
         // intentionally leaves this false: the current tone keeps sounding
         // while scheduler ticks stop with Time.timeScale == 0.
         private volatile bool suppressAudioForTimeCompression;
+        // F89/F115 race guard: set before OnDestroy tears the fleet down so a
+        // concurrently running OnAudioFilterRead bails out instead of
+        // touching half-destroyed arrays.
+        private volatile bool tearingDown;
 
         // Live signal transcript (entries, morse buffer, decoded callsign).
         private readonly SignalTranscript transcript = new SignalTranscript();
@@ -95,6 +101,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
+            // Flag first: the audio thread may be inside OnAudioFilterRead
+            // right now (F89/F115).
+            tearingDown = true;
+
             // F89: stop the audio source so OnAudioFilterRead cannot run on a
             // partially-destroyed object during teardown.
             if (cachedAudioSource.IsNotNull())
@@ -382,6 +392,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnAudioFilterRead(float[] data, int channels)
         {
+            // Audio-thread entry guards: any throw here kills the whole
+            // audio graph. During teardown the fleet arrays may already be
+            // gone (tearingDown) — bail out before touching them.
+            if (tearingDown || data.IsNull() || channels.IsNonPositive())
+                return;
+
             bool audioEnabled = RadioPowerBus.IsRadioOn && !suppressAudioForTimeCompression;
             audioEngine.ProcessAudio(data, channels, stations, keyers, carriers, audioEnabled, currentZoneIndex, SonneZoneIndex);
         }
