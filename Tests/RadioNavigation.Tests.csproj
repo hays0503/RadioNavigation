@@ -90,6 +90,7 @@
     <Compile Include="PatternLineFormatterTests.cs" />
     <Compile Include="FrequencyPanelTextTests.cs" />
     <Compile Include="DecodedDisplayTrackerTests.cs" />
+    <Compile Include="PatternRowPackerTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -159,6 +160,7 @@
     <Compile Include="..\Source\Logic\PatternLineFormatter.cs" Link="Source\Logic\PatternLineFormatter.cs" />
     <Compile Include="..\Source\Logic\FrequencyPanelText.cs" Link="Source\Logic\FrequencyPanelText.cs" />
     <Compile Include="..\Source\Logic\DecodedDisplayTracker.cs" Link="Source\Logic\DecodedDisplayTracker.cs" />
+    <Compile Include="..\Source\Logic\PatternRowPacker.cs" Link="Source\Logic\PatternRowPacker.cs" />
   </ItemGroup>
 
 </Project>

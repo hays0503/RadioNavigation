@@ -251,17 +251,17 @@ namespace UBOAT.Mods.RadioNavigation
             int domIdx = sonneController.DominantStationIndex;
             UpdateStationText(domIdx);
 
+            int count = sonneController.StationCount;
+            var diags = new StationDiagnostics[count];
+            for (int i = 0; i < count; i++)
+                diags[i] = sonneController.GetStationDiagnostics(i);
+
             int displayIndex = 0;
-            for (int i = 0; i < sonneController.StationCount && displayIndex < patternTexts.Length; i++)
+            foreach (int i in PatternRowPacker.Pack(diags, patternTexts.Length))
             {
-                var diag = sonneController.GetStationDiagnostics(i);
-                if (diag.Gain.IsNegligible(0.001f))
-                    continue;
+                patternTexts[displayIndex].text = BuildPatternLine(diags[i], i, domIdx);
 
-                string line = BuildPatternLine(diag, i, domIdx);
-                patternTexts[displayIndex].text = line;
-
-                if (diag.InBeam)
+                if (diags[i].InBeam)
                     patternTexts[displayIndex].color = Color.green;
                 else
                     patternTexts[displayIndex].color = new Color(0.6f, 0.6f, 0.6f);

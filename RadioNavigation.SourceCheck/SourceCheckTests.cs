@@ -1874,6 +1874,82 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Pattern-rows gate (SRP): the gain-gated row selection must live
+        /// in PatternRowPacker as a pure function (tested in
+        /// PatternRowPackerTests), with
+        /// InformationPanelHandler.UpdatePatterns rendering only. A
+        /// re-inline of the gain filter fails here.
+        /// </summary>
+        [Fact]
+        public void PatternRows_OwnsPacking()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax packer = null;
+            MethodDeclarationSyntax patterns = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "PatternRowPacker")
+                        packer = type;
+                    if (type.Identifier.Text == "InformationPanelHandler")
+                    {
+                        patterns = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "UpdatePatterns");
+                    }
+                }
+            }
+
+            if (packer == null)
+            {
+                problems.Add("type 'PatternRowPacker' not found in Source/ — row selection regressed into the panel");
+            }
+            else
+            {
+                bool packs = packer.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "Pack"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!packs) problems.Add("PatternRowPacker.Pack public static entry point not found");
+            }
+
+            if (patterns == null)
+            {
+                problems.Add("InformationPanelHandler.UpdatePatterns not found");
+            }
+            else
+            {
+                bool keepsFilter = patterns.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "IsNegligible")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "IsNegligible"));
+                if (keepsFilter)
+                    problems.Add("InformationPanelHandler.UpdatePatterns still filters by IsNegligible — row selection belongs to PatternRowPacker");
+
+                bool invokesPack = patterns.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "Pack")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "Pack"));
+                if (!invokesPack)
+                    problems.Add("InformationPanelHandler.UpdatePatterns never invokes Pack — the tested pure function is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} pattern-rows violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Frequency-text gate (SRP): the frequency/station header lines
         /// must live in FrequencyPanelText as pure functions (tested in
         /// FrequencyPanelTextTests), with
