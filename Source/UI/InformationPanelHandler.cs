@@ -227,16 +227,12 @@ namespace UBOAT.Mods.RadioNavigation
         {
             lastLoggedDecoded = "";
 
-            string formatted = DialConfig.FormatFrequency(freqKHz, zoneIndex);
-            string bandId = zoneIndex.IsNonNegative() && zoneIndex < DialConfig.Bands.Length
-                ? DialConfig.Bands[zoneIndex].Id : "?";
             if (frequencyText.IsNotNull())
-                frequencyText.text = "Freq: " + formatted + " (Band " + bandId + ")";
+                frequencyText.text = FrequencyPanelText.FreqLine(freqKHz, zoneIndex);
 
-            string stationName = StationMatchFormatter.Format(freqKHz, zoneIndex);
-            stationBaseText = stationName;
+            stationBaseText = FrequencyPanelText.StationName(freqKHz, zoneIndex);
             if (stationText.IsNotNull())
-                stationText.text = stationName;
+                stationText.text = stationBaseText;
 
             UpdatePatterns();
         }

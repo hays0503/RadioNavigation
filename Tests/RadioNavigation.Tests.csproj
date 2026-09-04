@@ -88,6 +88,7 @@
     <Compile Include="SpinnerScaleTests.cs" />
     <Compile Include="PositionFeedTests.cs" />
     <Compile Include="PatternLineFormatterTests.cs" />
+    <Compile Include="FrequencyPanelTextTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -155,6 +156,7 @@
     <Compile Include="..\Source\Logic\SpinnerScale.cs" Link="Source\Logic\SpinnerScale.cs" />
     <Compile Include="..\Source\Logic\PositionFeed.cs" Link="Source\Logic\PositionFeed.cs" />
     <Compile Include="..\Source\Logic\PatternLineFormatter.cs" Link="Source\Logic\PatternLineFormatter.cs" />
+    <Compile Include="..\Source\Logic\FrequencyPanelText.cs" Link="Source\Logic\FrequencyPanelText.cs" />
   </ItemGroup>
 
 </Project>

@@ -1849,6 +1849,86 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// Frequency-text gate (SRP): the frequency/station header lines
+        /// must live in FrequencyPanelText as pure functions (tested in
+        /// FrequencyPanelTextTests), with
+        /// InformationPanelHandler.OnFrequencyChanged delegating. A
+        /// re-inline of the Band lookup fails here.
+        /// </summary>
+        [Fact]
+        public void FrequencyText_OwnsHeaderLines()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax text = null;
+            MethodDeclarationSyntax changed = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "FrequencyPanelText")
+                        text = type;
+                    if (type.Identifier.Text == "InformationPanelHandler")
+                    {
+                        changed = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "OnFrequencyChanged");
+                    }
+                }
+            }
+
+            if (text == null)
+            {
+                problems.Add("type 'FrequencyPanelText' not found in Source/ — header lines regressed into the panel");
+            }
+            else
+            {
+                bool freqs = text.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "FreqLine"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                bool names = text.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "StationName"
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.PublicKeyword))
+                        && m.Modifiers.Any(x => x.IsKind(SyntaxKind.StaticKeyword)));
+                if (!freqs) problems.Add("FrequencyPanelText.FreqLine public static method not found");
+                if (!names) problems.Add("FrequencyPanelText.StationName public static method not found");
+            }
+
+            if (changed == null)
+            {
+                problems.Add("InformationPanelHandler.OnFrequencyChanged not found");
+            }
+            else
+            {
+                bool keepsBandLookup = changed.DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Any(access => access.Name.Identifier.Text == "Bands");
+                if (keepsBandLookup)
+                    problems.Add("InformationPanelHandler.OnFrequencyChanged still reads DialConfig.Bands — the lookup belongs to FrequencyPanelText");
+
+                foreach (var name in new[] { "FreqLine", "StationName" })
+                {
+                    bool invokes = changed.DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                                && bare.Identifier.Text == name)
+                            || (inv.Expression is MemberAccessExpressionSyntax qualified
+                                && qualified.Name is IdentifierNameSyntax qname
+                                && qname.Identifier.Text == name));
+                    if (!invokes)
+                        problems.Add($"InformationPanelHandler.OnFrequencyChanged never invokes {name} — the tested pure function is bypassed");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} frequency-text violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit
