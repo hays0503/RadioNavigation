@@ -35,8 +35,9 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly SextantVectorLog vectorLog = new SextantVectorLog();
         // Ocular zoom steps live in SextantZoom (extracted, P5.4 slice 4a).
         private readonly SextantZoom zoom = new SextantZoom();
-        private const float PainOnGlare = 0.6f;
-        private const float PainOffGlare = 0.5f;
+        // Key polling lives in SextantInputPoller, glare/pain in
+        // SextantGlareCoordinator (extracted); the controller keeps host
+        // services (arc field, filters, logs, telemetry).
 
 
         /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
@@ -45,7 +46,8 @@ namespace UBOAT.Mods.RadioNavigation
         internal double arcAngle;
         private int leftFilterCount;
         private int rightFilterCount;
-        private bool pain;
+        private SextantInputPoller inputPoller;
+        private readonly SextantGlareCoordinator glare = new SextantGlareCoordinator();
         // Reading-column text lives in SextantReadout (extracted, P5.4
         // slice 4d); the controller applies Text/color.
         private readonly SextantReadout readout = new SextantReadout();
@@ -91,7 +93,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         // PPv2 bloom-cut volumes live in SextantBloomCut (extracted).
         private readonly SextantBloomCut bloomCut = new SextantBloomCut();
-        private bool sunDiscSourceLogged;
 
         private readonly IPlayerPositionProvider positionProvider = new GamePlayerPositionProvider();
 
@@ -108,6 +109,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             worksheet = new SextantWorksheet(positionProvider);
             bodiesReadout = new SextantBodiesReadout(positionProvider);
+            inputPoller = new SextantInputPoller(arcInput, worksheet, starId);
             calibrator.Load();
         }
 
@@ -124,9 +126,9 @@ namespace UBOAT.Mods.RadioNavigation
                     Close();
                     return;
                 }
-                HandleArcInput(Time.unscaledDeltaTime);
-                HandleFilterKeys();
-                HandleZoomKeys();
+                inputPoller.PollArc(Time.unscaledDeltaTime, ref arcAngle, ShiftHeld(), LogArcInputVector);
+                inputPoller.PollFilters(SetFilters);
+                inputPoller.PollZoom(ZoomIn, ZoomOut, ResetArc);
                 UpdatePipPose();
                 if (vectorLog.OnViewRotate(viewCamera))
                     LogVectorState("rotate");
@@ -135,7 +137,7 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
                 UpdateBodiesReadout(Time.unscaledDeltaTime);
-                HandleFixKeys();
+                inputPoller.PollFix(arcAngle);
                 worksheet.UpdateCourseSampler(Time.unscaledDeltaTime);
                 worksheet.UpdatePanel(Time.unscaledDeltaTime);
             }
@@ -212,7 +214,7 @@ namespace UBOAT.Mods.RadioNavigation
             leftFilterCount = 0;
             rightFilterCount = 0;
             starId.Reset();
-            pain = false;
+            glare.ResetPain();
             readout.Reset();
             worksheet.InvalidateCard();
             bodiesReadout.Invalidate();
@@ -307,34 +309,8 @@ namespace UBOAT.Mods.RadioNavigation
             return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
         }
 
-        // ---- input ---------------------------------------------------------
-
-        private void HandleArcInput(float dt)
-        {
-            float dir = 0f;
-            if (Input.GetKey(KeyCode.UpArrow)) dir += 1f;
-            if (Input.GetKey(KeyCode.DownArrow)) dir -= 1f;
-            if (dir == 0f)
-            {
-                arcInput.ResetFineHold();
-                return;
-            }
-
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl)
-            {
-                // Fine adjustment: one drum tick (0.2' = 1 quantum) per press,
-                // hold repeats after a short delay - like turning the drum.
-                bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
-                if (arcInput.AdvanceFineHold(dt, pressed))
-                    arcAngle = SextantArcInput.StepFine(arcAngle, dir);
-                return;
-            }
-
-            LogArcInputVector(dt);
-
-            arcAngle = SextantArcInput.StepCoarse(arcAngle, dir, dt, ShiftHeld());
-        }
+        // ---- input polling lives in SextantInputPoller (extracted);
+        // key polling callbacks and host services stay here.
 
         /// <summary>Hold/press vector telemetry on plain (non-Ctrl) input.</summary>
         private void LogArcInputVector(float dt)
@@ -352,40 +328,10 @@ namespace UBOAT.Mods.RadioNavigation
         // Rotate telemetry lives in SextantVectorLog.OnViewRotate (Update
         // calls it directly).
 
-        private void HandleFilterKeys()
-        {
-            // Ctrl toggles the LEFT (horizon) filter; plain keys the RIGHT
-            // (sun) filter - like the separate shade glasses of a sextant.
-            bool left = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1)) SetFilters(1, left);
-            else if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2)) SetFilters(2, left);
-            else if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3)) SetFilters(3, left);
-            else if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0)) SetFilters(0, left);
-        }
-
-        private void HandleZoomKeys()
-        {
-            if (Input.GetKeyDown(KeyCode.Equals) || Input.GetKeyDown(KeyCode.KeypadPlus)) ZoomIn();
-            else if (Input.GetKeyDown(KeyCode.Minus) || Input.GetKeyDown(KeyCode.KeypadMinus)) ZoomOut();
-            if (Input.GetKeyDown(KeyCode.R)) ResetArc();
-        }
-
         private void ResetArc()
         {
             arcAngle = 0.0;
             Debug.Log(LogPrefix + " ARC reset to 0");
-        }
-
-        // ---- running fix worksheet (v1.9): state lives in SextantWorksheet ----
-
-        private void HandleFixKeys()
-        {
-            // I records a sight (only with the sun identified and held),
-            // O starts a new worksheet series.
-            if (Input.GetKeyDown(KeyCode.I))
-                worksheet.CaptureObservation(starId.IdentifiedName, arcAngle);
-            if (Input.GetKeyDown(KeyCode.O))
-                worksheet.ResetSeries();
         }
 
         // D°M.m′ formatting lives in SextantDmFormat; the worksheet card
@@ -438,20 +384,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void UpdateFilterDim()
         {
-            if (!GlareEnabled)
-                return;
-            if (filterDimLeftImage != null)
-            {
-                Color c = filterDimLeftImage.color;
-                c.a = SextantReadout.FilterDimAlpha(leftFilterCount);
-                filterDimLeftImage.color = c;
-            }
-            if (filterDimRightImage != null)
-            {
-                Color c = filterDimRightImage.color;
-                c.a = SextantReadout.FilterDimAlpha(rightFilterCount);
-                filterDimRightImage.color = c;
-            }
+            glare.ApplyDim(filterDimLeftImage, filterDimRightImage,
+                leftFilterCount, rightFilterCount, SextantGlareCoordinator.GlareEnabled);
         }
 
         // Per-frame pose lives in SextantPipPose (extracted, P5.4 slice
@@ -462,66 +396,39 @@ namespace UBOAT.Mods.RadioNavigation
                 ref viewCamera, () => vectorLog.OnManualRender(arcAngle));
         }
 
-        // ---- glare -----------------------------------------------------------
-        // v1.7 the glare mechanic was disabled for the white-ocular diagnosis;
-        // the diagnosis is closed (PIP cameras mirror the FPP post stack), so
-        // the full mechanic is back: shade filters, white flash, pain.
-        // static readonly (not const): const folds away under the C# 7.0
-        // game compiler and produced CS0162 unreachable-code warnings.
-        private static readonly bool GlareEnabled = true;
+        // ---- glare application lives in SextantGlareCoordinator
+        // (extracted); the sun fetches stay here as adapters.
 
         private void UpdateGlare(float dt)
         {
-            if (!GlareEnabled)
-            {
-                ApplyGlare(0f);
-                if (filterDimLeftImage != null)
-                {
-                    Color c = filterDimLeftImage.color;
-                    c.a = 0f;
-                    filterDimLeftImage.color = c;
-                }
-                if (filterDimRightImage != null)
-                {
-                    Color c = filterDimRightImage.color;
-                    c.a = 0f;
-                    filterDimRightImage.color = c;
-                }
-                LogSunDrift(dt);
-                return;
-            }
+            Vector3 sunDir = Vector3.zero;
+            float sunAlt = 0f;
+            float sunAz = 0f;
+            bool ownOk = pipFactory.RightCamera != null
+                && TryGetOwnSun(out sunDir, out sunAlt, out sunAz);
+            Vector3 gameDir = Vector3.zero;
+            float gameAlt = 0f;
+            bool gameOk = false;
+            if (ownOk)
+                gameOk = TryGetGameSun(out gameDir, out gameAlt);
 
-            float g = 0f;
-            Vector3 sunDir;
-            float sunAlt;
-            float sunAz;
-            if (pipFactory.RightCamera != null && TryGetOwnSun(out sunDir, out sunAlt, out sunAz))
-            {
-                float angle = Vector3.Angle(pipFactory.RightCamera.transform.forward, sunDir);
-                g = (float)SextantGlare.Glare(angle, sunAlt, rightFilterCount, pipFactory.RightCamera.fieldOfView);
-                // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6°),
-                // so position it on the game direction when available.
-                Vector3 gameDir;
-                float gameAlt;
-                bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
-                SunDiscRenderer.SunDirection = gameOk ? gameDir : sunDir;
-                UpdateSunReadout(true, sunAlt);
-                if (!sunDiscSourceLogged && SunDiscRenderer.Active)
-                {
-                    sunDiscSourceLogged = true;
-                    float sep = gameOk ? Vector3.Angle(gameDir, sunDir) : -1f;
-                    Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                        "{0} SUNDISC src={1} sep={2:F3} own(alt={3:F2} az={4:F1}) game={5}",
-                        LogPrefix, gameOk ? "game" : "own", sep, sunAlt, sunAz,
-                        gameOk ? SextantVectorLog.V3(gameDir) : " n/a"));
-                }
-            }
-            else
-            {
-                UpdateSunReadout(false, 0f);
-            }
-            ApplyGlare(g);
-            LogSunDrift(dt);
+            GlareFrame frame = new GlareFrame();
+            frame.RightCamera = pipFactory.RightCamera;
+            frame.OwnOk = ownOk;
+            frame.OwnDir = sunDir;
+            frame.OwnAlt = sunAlt;
+            frame.OwnAz = sunAz;
+            frame.GameOk = gameOk;
+            frame.GameDir = gameDir;
+            frame.RightFilterCount = rightFilterCount;
+            frame.GlareImage = glareImage;
+            frame.FilterDimLeft = filterDimLeftImage;
+            frame.FilterDimRight = filterDimRightImage;
+            frame.PainText = painText;
+            frame.SunReadout = UpdateSunReadout;
+            frame.SunDriftLog = LogSunDrift;
+            frame.PainStarIdReset = starId.Reset;
+            glare.Update(dt, frame);
         }
 
         // Sun/bodies readout lives in SextantBodiesReadout (extracted);
@@ -536,26 +443,6 @@ namespace UBOAT.Mods.RadioNavigation
             float eyeHeightM = viewCamera != null
                 ? viewCamera.transform.position.y : 0f;
             bodiesReadout.UpdateBodies(dt, eyeHeightM);
-        }
-
-        private void ApplyGlare(float g)        {
-            if (glareImage != null)
-            {
-                Color c = glareImage.color;
-                c.a = g * 0.9f;
-                glareImage.color = c;
-            }
-            if (!pain && g > PainOnGlare)
-            {
-                pain = true;
-                starId.Reset();
-                if (painText != null) painText.enabled = true;
-            }
-            else if (pain && g < PainOffGlare)
-            {
-                pain = false;
-                if (painText != null) painText.enabled = false;
-            }
         }
 
         /// <summary>
@@ -610,7 +497,7 @@ namespace UBOAT.Mods.RadioNavigation
             bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
             float lat, lon;
             bool posOk = positionProvider.TryGetPosition(out lat, out lon);
-            starId.Update(dt, pain, SextantPipPose.Forward(pipFactory, viewCamera, gameMainCamera, arcAngle),
+            starId.Update(dt, glare.IsPained, SextantPipPose.Forward(pipFactory, viewCamera, gameMainCamera, arcAngle),
                 ownOk, ownDir, ownAlt, gameOk, gameDir, posOk, lat, lon,
                 nameText, arcAngle);
         }
