@@ -2877,6 +2877,401 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>
+        /// True when a method body invokes a call named <paramref name="name"/>,
+        /// bare or qualified. Shared by the satellite-delegation gates below.
+        /// </summary>
+        private static bool InvokesName(MethodDeclarationSyntax method, string name)
+        {
+            return method.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                        && bare.Identifier.Text == name)
+                    || (inv.Expression is MemberAccessExpressionSyntax qualified
+                        && qualified.Name is IdentifierNameSyntax qname
+                        && qname.Identifier.Text == name));
+        }
+
+        private static TypeDeclarationSyntax FindSourceType(
+            List<Tuple<string, CompilationUnitSyntax>> roots, string name)
+        {
+            foreach (var root in roots)
+            {
+                foreach (var type in root.Item2.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == name)
+                        return type;
+                }
+            }
+            return null;
+        }
+
+        private static List<Tuple<string, CompilationUnitSyntax>> ParseAllSources()
+        {
+            var roots = new List<Tuple<string, CompilationUnitSyntax>>();
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                roots.Add(Tuple.Create(path, root));
+            }
+            return roots;
+        }
+
+        private static MethodDeclarationSyntax FindMethod(TypeDeclarationSyntax type, string name)
+        {
+            if (type == null)
+                return null;
+            return type.Members.OfType<MethodDeclarationSyntax>()
+                .FirstOrDefault(m => m.Identifier.Text == name);
+        }
+
+        /// <summary>
+        /// Delegation gate (SRP slices SC-2): tuning flows
+        /// SonneController.UpdateStationGains -&gt; StationManager.UpdateGains and the
+        /// nav tick flows Update -&gt; StationManager.UpdateNavigation. A re-inline
+        /// of gain/nav math into the controller fails here (the pure-function
+        /// gates pin the second hop).
+        /// </summary>
+        [Fact]
+        public void StationManager_ReceivesTuning()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var controller = FindSourceType(roots, "SonneController");
+            if (controller == null)
+            {
+                problems.Add("type 'SonneController' not found in Source/");
+            }
+            else
+            {
+                var gains = FindMethod(controller, "UpdateStationGains");
+                if (gains == null)
+                    problems.Add("SonneController.UpdateStationGains not found");
+                else if (!InvokesName(gains, "UpdateGains"))
+                    problems.Add("SonneController.UpdateStationGains never invokes StationManager.UpdateGains — tuning regressed into the controller");
+                var update = FindMethod(controller, "Update");
+                if (update == null)
+                    problems.Add("SonneController.Update not found");
+                else if (!InvokesName(update, "UpdateNavigation"))
+                    problems.Add("SonneController.Update never invokes StationManager.UpdateNavigation — nav regressed into the controller");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} station-manager delegation violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Gatekeeper gate (SRP slice SC-1): SignalDecoder.AddElement /
+        /// FinishSequence take the dominant gate as an explicit parameter
+        /// and feed the transcript only through it. A gate bypass (direct
+        /// transcript feed) fails here.
+        /// </summary>
+        [Fact]
+        public void SignalDecoder_OwnsGate()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var decoder = FindSourceType(roots, "SignalDecoder");
+            if (decoder == null)
+            {
+                problems.Add("type 'SignalDecoder' not found in Source/ — gate regressed into the controller");
+            }
+            else
+            {
+                foreach (var call in new[] { Tuple.Create("AddElement", "AddElement"), Tuple.Create("FinishSequence", "FinishSequence") })
+                {
+                    var method = FindMethod(decoder, call.Item1);
+                    if (method == null)
+                    {
+                        problems.Add($"SignalDecoder.{call.Item1} not found");
+                        continue;
+                    }
+                    bool gated = method.ParameterList.Parameters
+                        .Any(p => p.Identifier.Text == "processingDominant");
+                    if (!gated)
+                        problems.Add($"SignalDecoder.{call.Item1} lost the processingDominant gate parameter — non-dominant feed is unfiltered");
+                    if (!InvokesName(method, call.Item2))
+                        problems.Add($"SignalDecoder.{call.Item1} never invokes transcript.{call.Item2} — the tested class is bypassed");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} signal-decoder gate violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Factory gate (SRP slice 4a): PIP camera creation flows
+        /// SextantController.TryOpen -&gt; SextantPipFactory.Ensure -&gt;
+        /// ConfigurePipCamera. A re-inline of creation into the controller
+        /// fails here.
+        /// </summary>
+        [Fact]
+        public void SextantPipFactory_BuildsCameras()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var controller = FindSourceType(roots, "SextantController");
+            var factory = FindSourceType(roots, "SextantPipFactory");
+            if (controller == null)
+                problems.Add("type 'SextantController' not found in Source/");
+            else
+            {
+                var open = FindMethod(controller, "TryOpen");
+                if (open == null)
+                    problems.Add("SextantController.TryOpen not found");
+                else if (!InvokesName(open, "Ensure"))
+                    problems.Add("SextantController.TryOpen never invokes SextantPipFactory.Ensure — creation regressed into the controller");
+            }
+            if (factory == null)
+            {
+                problems.Add("type 'SextantPipFactory' not found in Source/ — creation regressed into the controller");
+            }
+            else
+            {
+                var ensure = FindMethod(factory, "Ensure");
+                if (ensure == null)
+                    problems.Add("SextantPipFactory.Ensure not found");
+                else if (!InvokesName(ensure, "ConfigurePipCamera"))
+                    problems.Add("SextantPipFactory.Ensure never invokes ConfigurePipCamera — creation entry point is hollow");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} pip-factory violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Pain-latch gate (SRP slice 4d): glare application flows
+        /// SextantController.UpdateGlare -&gt; SextantGlareCoordinator.Update -&gt;
+        /// ApplyGlare. A re-inline of the hysteresis fails here.
+        /// </summary>
+        [Fact]
+        public void GlareCoordinator_HandlesPain()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var controller = FindSourceType(roots, "SextantController");
+            var coordinator = FindSourceType(roots, "SextantGlareCoordinator");
+            if (controller == null)
+                problems.Add("type 'SextantController' not found in Source/");
+            else
+            {
+                var glare = FindMethod(controller, "UpdateGlare");
+                if (glare == null)
+                    problems.Add("SextantController.UpdateGlare not found");
+                else if (!InvokesName(glare, "Update"))
+                    problems.Add("SextantController.UpdateGlare never invokes SextantGlareCoordinator.Update — glare regressed into the controller");
+            }
+            if (coordinator == null)
+            {
+                problems.Add("type 'SextantGlareCoordinator' not found in Source/ — pain latch regressed into the controller");
+            }
+            else
+            {
+                var update = FindMethod(coordinator, "Update");
+                if (update == null)
+                    problems.Add("SextantGlareCoordinator.Update not found");
+                else if (!InvokesName(update, "ApplyGlare"))
+                    problems.Add("SextantGlareCoordinator.Update never invokes ApplyGlare — the pain latch is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} glare-coordinator violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Label gate (SRP slice RadioLocale): locale override flows
+        /// RadioStoryIntegration.OverrideLocaleKey -&gt; RadioLocale.MatchesLocaleKey /
+        /// GetLocalizedLabel -&gt; GetLabel. A re-inline of the table fails here.
+        /// </summary>
+        [Fact]
+        public void RadioLocale_OwnsLabels()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var integration = FindSourceType(roots, "RadioStoryIntegration");
+            var locale = FindSourceType(roots, "RadioLocale");
+            if (integration == null)
+                problems.Add("type 'RadioStoryIntegration' not found in Source/");
+            else
+            {
+                var over = FindMethod(integration, "OverrideLocaleKey");
+                if (over == null)
+                    problems.Add("RadioStoryIntegration.OverrideLocaleKey not found");
+                else
+                {
+                    if (!InvokesName(over, "MatchesLocaleKey"))
+                        problems.Add("RadioStoryIntegration.OverrideLocaleKey never invokes RadioLocale.MatchesLocaleKey — key match regressed into the facade");
+                    if (!InvokesName(over, "GetLocalizedLabel"))
+                        problems.Add("RadioStoryIntegration.OverrideLocaleKey never invokes RadioLocale.GetLocalizedLabel — labels regressed into the facade");
+                }
+            }
+            if (locale == null)
+            {
+                problems.Add("type 'RadioLocale' not found in Source/ — labels regressed into the facade");
+            }
+            else
+            {
+                var label = FindMethod(locale, "GetLocalizedLabel");
+                if (label == null)
+                    problems.Add("RadioLocale.GetLocalizedLabel not found");
+                else if (!InvokesName(label, "GetLabel"))
+                    problems.Add("RadioLocale.GetLocalizedLabel never invokes GetLabel — table selection is bypassed");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} radio-locale violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Ephemeris gate (SRP slice 4c): own-sun direction flows
+        /// SextantController.TryGetOwnSun -&gt; SunEphemeris.Compute -&gt;
+        /// SunRaDec/RaDecToEnu. A re-inline of the Meeus math fails here.
+        /// </summary>
+        [Fact]
+        public void SunEphemeris_ComputesSun()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var controller = FindSourceType(roots, "SextantController");
+            var ephemeris = FindSourceType(roots, "SunEphemeris");
+            if (controller == null)
+                problems.Add("type 'SextantController' not found in Source/");
+            else
+            {
+                var own = FindMethod(controller, "TryGetOwnSun");
+                if (own == null)
+                    problems.Add("SextantController.TryGetOwnSun not found");
+                else if (!InvokesName(own, "Compute"))
+                    problems.Add("SextantController.TryGetOwnSun never invokes SunEphemeris.Compute — ephemeris regressed into the controller");
+            }
+            if (ephemeris == null)
+            {
+                problems.Add("type 'SunEphemeris' not found in Source/ — ephemeris regressed into the controller");
+            }
+            else
+            {
+                var compute = FindMethod(ephemeris, "Compute");
+                if (compute == null)
+                    problems.Add("SunEphemeris.Compute not found");
+                else
+                {
+                    if (!InvokesName(compute, "SunRaDec"))
+                        problems.Add("SunEphemeris.Compute never invokes SunRaDec — the Meeus source is bypassed");
+                    if (!InvokesName(compute, "RaDecToEnu"))
+                        problems.Add("SunEphemeris.Compute never invokes RaDecToEnu — the axis mapping is bypassed");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} sun-ephemeris violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Visibility gate (SRP slice BeamGate): flare/dot decisions flow
+        /// LighthouseBeamGlow.IsFlareTakingOver -&gt; FlareTakesOver and
+        /// GetBeamVisibilityFactor -&gt; BeamFactor. A re-inline of the cone
+        /// math fails here.
+        /// </summary>
+        [Fact]
+        public void BeamGate_Decides()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var glow = FindSourceType(roots, "LighthouseBeamGlow");
+            var gate = FindSourceType(roots, "LighthouseBeamGate");
+            if (glow == null)
+                problems.Add("type 'LighthouseBeamGlow' not found in Source/");
+            else
+            {
+                var takeover = FindMethod(glow, "IsFlareTakingOver");
+                if (takeover == null)
+                    problems.Add("LighthouseBeamGlow.IsFlareTakingOver not found");
+                else if (!InvokesName(takeover, "FlareTakesOver"))
+                    problems.Add("LighthouseBeamGlow.IsFlareTakingOver never invokes FlareTakesOver — takeover regressed into the glow");
+                var factor = FindMethod(glow, "GetBeamVisibilityFactor");
+                if (factor == null)
+                    problems.Add("LighthouseBeamGlow.GetBeamVisibilityFactor not found");
+                else if (!InvokesName(factor, "BeamFactor"))
+                    problems.Add("LighthouseBeamGlow.GetBeamVisibilityFactor never invokes BeamFactor — cone math regressed into the glow");
+            }
+            if (gate == null)
+                problems.Add("type 'LighthouseBeamGate' not found in Source/ — gates regressed into the glow");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} beam-gate violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Composition gate (SRP slice 1): scene content flows
+        /// ModBootstrapper scene-start -&gt; SceneContentBuilder.Build -&gt;
+        /// EnsureSkyRoots/EnsureMapComponents/EnsureRunners. A re-inline of
+        /// content construction into the bootstrap fails here.
+        /// </summary>
+        [Fact]
+        public void SceneContentBuilder_ComposesRunners()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var bootstrap = FindSourceType(roots, "ModBootstrapper");
+            var builder = FindSourceType(roots, "SceneContentBuilder");
+            if (bootstrap == null)
+                problems.Add("type 'ModBootstrapper' not found in Source/");
+            else
+            {
+                var start = FindMethod(bootstrap, "SceneEventsListener_OnSceneStart");
+                if (start == null)
+                    problems.Add("ModBootstrapper.SceneEventsListener_OnSceneStart not found");
+                else if (!InvokesName(start, "Build"))
+                    problems.Add("ModBootstrapper scene-start never invokes SceneContentBuilder.Build — content regressed into the bootstrap");
+            }
+            if (builder == null)
+            {
+                problems.Add("type 'SceneContentBuilder' not found in Source/ — content regressed into the bootstrap");
+            }
+            else
+            {
+                var build = FindMethod(builder, "Build");
+                if (build == null)
+                    problems.Add("SceneContentBuilder.Build not found");
+                else
+                {
+                    foreach (var step in new[] { "EnsureSkyRoots", "EnsureMapComponents", "EnsureRunners" })
+                    {
+                        if (!InvokesName(build, step))
+                            problems.Add($"SceneContentBuilder.Build never invokes {step} — composition is hollow");
+                    }
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} scene-content violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         private static bool IsNullLiteral(ExpressionSyntax expr)
         {
             return expr is LiteralExpressionSyntax lit
