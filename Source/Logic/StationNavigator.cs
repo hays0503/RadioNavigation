@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -78,6 +79,13 @@ namespace UBOAT.Mods.RadioNavigation
                     // scheduler reference is safe and makes the latest table
                     // result available for the next navigation phase.
                     scheduler.CurrentConsolPattern = pattern;
+                }
+                else if (WarnOnce.ShouldLog("StationNavigator.NoTable:" + station.Name))
+                {
+                    // No table: keep the previous pattern (a missing station
+                    // table is a data issue, logged once per station).
+                    Debug.LogWarning("[RadioNav][NAV] no bearing table for '" + station.Name
+                        + "' — holding previous pattern");
                 }
             }
         }

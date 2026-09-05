@@ -112,6 +112,8 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 cached = (MemberInfo)type.GetProperty(memberName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
                     ?? type.GetField(memberName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (cached.IsNull() && WarnOnce.ShouldLog("SkyVisibilityResolver." + cacheKey))
+                    Debug.LogWarning("[RadioNav][Sky] static member not found: " + cacheKey);
                 memberCache[cacheKey] = cached;
             }
 
@@ -148,6 +150,8 @@ namespace UBOAT.Mods.RadioNavigation
                 Type type = target.GetType();
                 cached = (MemberInfo)type.GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance)
                     ?? type.GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
+                if (cached.IsNull() && WarnOnce.ShouldLog("SkyVisibilityResolver." + cacheKey))
+                    Debug.LogWarning("[RadioNav][Sky] member not found: " + cacheKey);
                 memberCache[cacheKey] = cached;
             }
 

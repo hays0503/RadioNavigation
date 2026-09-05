@@ -70,24 +70,36 @@ namespace UBOAT.Mods.RadioNavigation
         private static FieldInfo ResolvePlayerShipField()
         {
             if (playerShipField.IsNull())
+            {
                 playerShipField = typeof(Entity).GetField("playerShip",
                     BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+                if (playerShipField.IsNull() && WarnOnce.ShouldLog("PlayerPositionProvider.playerShip"))
+                    Debug.LogWarning("[RadioNav][POSITION] Entity.playerShip field not found — game renamed it or DI not ready");
+            }
             return playerShipField;
         }
 
         private static PropertyInfo ResolveSandboxShipProperty(Type shipType)
         {
             if (sandboxShipProperty.IsNull())
+            {
                 sandboxShipProperty = shipType.GetProperty("SandboxPlayerShip",
                     BindingFlags.Public | BindingFlags.Instance);
+                if (sandboxShipProperty.IsNull() && WarnOnce.ShouldLog("PlayerPositionProvider.SandboxPlayerShip"))
+                    Debug.LogWarning("[RadioNav][POSITION] SandboxPlayerShip property not found on " + shipType.Name);
+            }
             return sandboxShipProperty;
         }
 
         private static PropertyInfo ResolvePositionProperty(Type sandboxType)
         {
             if (positionProperty.IsNull())
+            {
                 positionProperty = sandboxType.GetProperty("Position",
                     BindingFlags.Public | BindingFlags.Instance);
+                if (positionProperty.IsNull() && WarnOnce.ShouldLog("PlayerPositionProvider.Position"))
+                    Debug.LogWarning("[RadioNav][POSITION] Position property not found on " + sandboxType.Name);
+            }
             return positionProperty;
         }
 

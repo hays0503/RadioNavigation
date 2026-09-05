@@ -182,9 +182,16 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static bool DecisionAlreadyExists(object decisions, System.Collections.IList list, int count, string localeKey)
         {
+            System.Reflection.PropertyInfo itemProp = null;
+            if (list.IsNull() && decisions.IsNotNull())
+            {
+                itemProp = decisions.GetType().GetProperty("Item");
+                if (itemProp.IsNull() && WarnOnce.ShouldLog("StoryDecisionGateway.DecisionIndexer"))
+                    Debug.LogError("[RadioNav] Decisions has no Item indexer — duplicate check disabled, menu may spam");
+            }
             for (int i = 0; i < count; i++)
             {
-                object item = list.IsNotNull() ? list[i] : decisions.GetType().GetProperty("Item")?.GetValue(decisions, new object[] { i });
+                object item = list.IsNotNull() ? list[i] : itemProp?.GetValue(decisions, new object[] { i });
                 if (item.IsNotNull())
                 {
                     string key = GetLocalizationKey(item);

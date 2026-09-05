@@ -17,16 +17,21 @@ namespace UBOAT.Mods.RadioNavigation
         private Image[] zoneImages;
         private int currentIndex;
         public int CurrentIndex => currentIndex;
+        // Restore may arrive before Start builds the images (sibling Start
+        // order is undefined) — park it and apply once built.
+        private int? pendingZone;
 
         // F15: restore a persisted zone index; no-op outside the valid range.
         public void SetZone(int index)
         {
-            if (zoneImages.IsNull() || index.IsNegative() || index >= ZoneNames.Length)
+            if (index.IsNegative() || index >= ZoneNames.Length)
                 return;
-            SetAlpha(currentIndex, hiddenAlpha);
-            currentIndex = index;
-            SetAlpha(currentIndex, visibleAlpha);
-            OnZoneChanged?.Invoke(currentIndex);
+            if (zoneImages.IsNull())
+            {
+                pendingZone = index;
+                return;
+            }
+            ApplyZone(index);
         }
         private Transform parentTransform;
 
@@ -53,6 +58,12 @@ namespace UBOAT.Mods.RadioNavigation
             currentIndex = 0;
 
             Debug.Log("[RadioNav][Zone] Started, zone=" + ZoneNames[currentIndex]);
+            if (pendingZone.HasValue)
+            {
+                int saved = pendingZone.Value;
+                pendingZone = null;
+                ApplyZone(saved);
+            }
         }
 
         private void SetupClickHandler(GameObject child)
@@ -91,27 +102,31 @@ namespace UBOAT.Mods.RadioNavigation
         private void NextZone()
         {
             if (!CanSwitchZone())
+            {
+                Debug.LogWarning("[RadioNav][Zone] switch blocked (radio not interactable)");
                 return;
-            SetAlpha(currentIndex, hiddenAlpha);
-            currentIndex = (currentIndex + 1) % ZoneNames.Length;
-            SetAlpha(currentIndex, visibleAlpha);
-            OnZoneChanged?.Invoke(currentIndex);
-#if DEBUG
+            }
+            ApplyZone((currentIndex + 1) % ZoneNames.Length);
             Debug.Log("[RadioNav][Zone] switched to " + ZoneNames[currentIndex]);
-#endif
         }
 
         private void PreviousZone()
         {
             if (!CanSwitchZone())
+            {
+                Debug.LogWarning("[RadioNav][Zone] switch blocked (radio not interactable)");
                 return;
+            }
+            ApplyZone((currentIndex - 1 + ZoneNames.Length) % ZoneNames.Length);
+            Debug.Log("[RadioNav][Zone] switched to " + ZoneNames[currentIndex]);
+        }
+
+        private void ApplyZone(int index)
+        {
             SetAlpha(currentIndex, hiddenAlpha);
-            currentIndex = (currentIndex - 1 + ZoneNames.Length) % ZoneNames.Length;
+            currentIndex = index;
             SetAlpha(currentIndex, visibleAlpha);
             OnZoneChanged?.Invoke(currentIndex);
-#if DEBUG
-            Debug.Log("[RadioNav][Zone] switched to " + ZoneNames[currentIndex]);
-#endif
         }
 
         private bool CanSwitchZone()

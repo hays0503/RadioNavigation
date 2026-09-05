@@ -57,6 +57,8 @@ namespace UBOAT.Mods.RadioNavigation
         // LighthouseGlowArt (extracted); the static renderingCamera stays
         // here (per-frame camera hand-off with CameraResolver).
         private static Camera renderingCamera;
+        private Camera farRaisedCamera;
+        private float farRaisedPrevious;
 
         private Transform container;
         private Transform rotator;
@@ -359,6 +361,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             // Unity destroyed-object references compare equal to null only through
             // Unity's operator; custom IsNotNull can still pass during scene unload.
+            RestoreDeviceCameraFarClip();
             dotUi.Destroy();
         }
 
@@ -427,7 +430,14 @@ namespace UBOAT.Mods.RadioNavigation
             Camera cam = renderingCamera;
             if (cam.IsNull() || !IsDeviceCamera(cam))
             {
+                RestoreDeviceCameraFarClip();
                 return;
+            }
+            if (cam != farRaisedCamera)
+            {
+                RestoreDeviceCameraFarClip();
+                farRaisedCamera = cam;
+                farRaisedPrevious = cam.farClipPlane;
             }
             if (cam.farClipPlane < MinDeviceCameraFarM)
             {
@@ -436,6 +446,27 @@ namespace UBOAT.Mods.RadioNavigation
                 Debug.Log("[RadioNav][Lighthouse] device far clip raised " + previous.ToString("F0") +
                     " -> " + cam.farClipPlane.ToString("F0") + " (camera '" + cam.name + "')");
             }
+        }
+
+        /// <summary>
+        /// Returns a previously raised far clip. Only restores the exact
+        /// value we wrote — if the game changed the clip meanwhile, its
+        /// value wins.
+        /// </summary>
+        private void RestoreDeviceCameraFarClip()
+        {
+            if (farRaisedCamera.IsNull())
+            {
+                farRaisedCamera = null;
+                return;
+            }
+            if (farRaisedCamera.farClipPlane == MinDeviceCameraFarM)
+            {
+                farRaisedCamera.farClipPlane = farRaisedPrevious;
+                Debug.Log("[RadioNav][Lighthouse] device far clip restored to "
+                    + farRaisedPrevious.ToString("F0"));
+            }
+            farRaisedCamera = null;
         }
 
         /// <summary>
