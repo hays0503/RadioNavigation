@@ -267,15 +267,5 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static bool IsTimeCompressed(float timeScale) =>
             timeScale > TimeCompressionThreshold;
-
-        public static float CalculateBearing(float lat1, float lon1, float lat2, float lon2)
-        {
-            return GeoMath.InitialBearingDeg(lat1, lon1, lat2, lon2);
-        }
-
-        public static float CalculateMapBearing(float lat1, float lon1, float lat2, float lon2)
-        {
-            return GeoMath.MapBearingDeg(lat1, lon1, lat2, lon2);
-        }
     }
 }
