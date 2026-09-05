@@ -1615,8 +1615,8 @@ namespace RadioNavigation.SourceCheck
         /// must live in SpinnerScale as the single source of truth (tested
         /// in SpinnerScaleTests), with SonneController, InformationPanelHandler
         /// and AudioSynthesisEngine calling it. PanelStateStore keeps its own
-        /// 140f storage-range clamps (persistence validation, not mapping).
-        /// A new inline angle/140f division fails here.
+        /// 140f storage-range clamps via PanelPersistenceLogic (persistence
+        /// validation, not mapping). A new inline angle/140f division fails here.
         /// </summary>
         [Fact]
         public void SpinnerScale_OwnsAngleMapping()
@@ -1664,7 +1664,7 @@ namespace RadioNavigation.SourceCheck
             foreach (var root in roots)
             {
                 string file = Path.GetFileName(root.Item1);
-                if (file == "SpinnerScale.cs" || file == "PanelStateStore.cs") continue;
+                if (file == "SpinnerScale.cs" || file == "PanelStateStore.cs" || file == "PanelPersistenceLogic.cs") continue;
                 foreach (var lit in root.Item2.DescendantNodes().OfType<LiteralExpressionSyntax>())
                 {
                     string token = lit.Token.Text;

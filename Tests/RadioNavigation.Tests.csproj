@@ -36,6 +36,7 @@
     <Compile Include="GeoPositionConverterTests.cs" />
     <Compile Include="PanelStateStoreTests.cs" />
     <Compile Include="PanelStateTests.cs" />
+    <Compile Include="PanelPersistenceLogicTests.cs" />
     <Compile Include="MorseAlphabetTests.cs" />
     <Compile Include="MorseDecoderTests.cs" />
     <Compile Include="MorseKeyerTests.cs" />
@@ -146,6 +147,7 @@
     <Compile Include="..\Source\Sound\DspPipeline.cs" Link="Source\Sound\DspPipeline.cs" />
     <Compile Include="..\Source\UI\PanelStateStore.cs" Link="Source\UI\PanelStateStore.cs" />
     <Compile Include="..\Source\UI\PanelState.cs" Link="Source\UI\PanelState.cs" />
+    <Compile Include="..\Source\UI\PanelPersistenceLogic.cs" Link="Source\UI\PanelPersistenceLogic.cs" />
     <Compile Include="..\Source\UI\ChronometerCursorPolicy.cs" Link="Source\UI\ChronometerCursorPolicy.cs" />
     <Compile Include="..\Source\UI\ChronometerCursorArt.cs" Link="Source\UI\ChronometerCursorArt.cs" />
     <Compile Include="..\Source\UI\ChronometerOpenTracker.cs" Link="Source\UI\ChronometerOpenTracker.cs" />
