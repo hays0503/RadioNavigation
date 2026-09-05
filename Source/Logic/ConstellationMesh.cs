@@ -124,9 +124,10 @@ namespace UBOAT.Mods.RadioNavigation
             double lstDeg = AstroMath.LstDeg(jd, lon);
 
             // Rebuild mesh only if camera/position/LST changed significantly
-            bool needsRebuild = Vector3.Distance(cam.transform.position, lastCamPos) > 10f
-                             || Math.Abs(lstDeg - lastLstDeg) > 0.1
-                             || Math.Abs(lat - lastLat) > 0.01f;
+            bool needsRebuild = MeshRebuildPolicy.NeedsRebuild(
+                cam.transform.position, lastCamPos,
+                cam.transform.rotation, default(Quaternion),
+                lstDeg, lastLstDeg, lat, lastLat, false);
 
             if (!needsRebuild && meshFilter.mesh != null && meshFilter.mesh.vertexCount > 0)
                 return;

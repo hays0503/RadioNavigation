@@ -93,10 +93,10 @@ namespace UBOAT.Mods.RadioNavigation
             double jd = AstroMath.ToJulianDay(GameTimeResolver.GetUtcNow());
             double lstDeg = AstroMath.LstDeg(jd, longitude);
             bool needsRebuild = !meshRenderer.enabled
-                || Vector3.Distance(cam.transform.position, lastCameraPosition) > 10f
-                || Quaternion.Angle(cam.transform.rotation, lastCameraRotation) > 5f
-                || Math.Abs(lstDeg - lastLstDeg) > 0.1
-                || Math.Abs(latitude - lastLatitude) > 0.01f;
+                || MeshRebuildPolicy.NeedsRebuild(
+                    cam.transform.position, lastCameraPosition,
+                    cam.transform.rotation, lastCameraRotation,
+                    lstDeg, lastLstDeg, latitude, lastLatitude, true);
 
             if (!needsRebuild)
                 return;
