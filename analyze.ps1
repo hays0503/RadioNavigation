@@ -6,7 +6,9 @@ param(
     [switch]$Fix,
     [switch]$Json,
     [switch]$SkipSourceCheck,
-    [switch]$IdeAudit
+    [switch]$IdeAudit,
+    [switch]$RnAudit,
+    [switch]$UpdateBaseline
 )
 
 # Roslynator CLI analysis wrapper for RadioNavigation.
@@ -39,6 +41,8 @@ param(
 #   powershell -File analyze.ps1 -Json               # SARIF output to file
 #   powershell -File analyze.ps1 -SkipSourceCheck    # skip neural-slop gate
 #   powershell -File analyze.ps1 -IdeAudit             # IDE0051/IDE0052 dead-member audit (own phase, see below)
+#   powershell -File analyze.ps1 -RnAudit              # custom RN analyzer audit (own phase, see below)
+#   powershell -File analyze.ps1 -UpdateBaseline       # refresh roslynator-baseline.txt (quick profile only)
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
@@ -139,6 +143,51 @@ if ($IdeAudit) {
     exit 0
 }
 
+# RN audit: custom RadioNavigation analyzers (RN0001-RN0010, Harmony/Unity
+# rules) run as part of the Analysis.csproj compilation. Nothing else gates
+# on them, so a new RN hit can sit unnoticed between analyzer-test runs.
+# This phase rebuilds the analyzers + the analysis project and fails on any
+# `warning RNxxxx` line. Dedupe keeps counts stable run over run.
+if ($RnAudit) {
+    $analyzersProj = Join-Path $root "RadioNavigation.Analyzers\RadioNavigation.Analyzers.csproj"
+    & dotnet build $analyzersProj -c Release --nologo -v q 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "[RadioNavigation] analyzers build failed (exit $LASTEXITCODE)"
+        exit $LASTEXITCODE
+    }
+    # Rebuild (not incremental): analyzer warnings only surface when Roslyn
+    # actually compiles; an up-to-date no-op build reports a vacuous clean.
+    $rnLines = & dotnet build $csproj -c Release --no-restore --nologo -v n -t:Rebuild 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "[RadioNavigation] RnAudit build failed (exit $LASTEXITCODE) - refusing to report a clean audit on a broken compile"
+        $rnLines | ForEach-Object { Write-Host $_ }
+        exit $LASTEXITCODE
+    }
+    $hits = @($rnLines | Select-String -Pattern 'warning RN\d+' | ForEach-Object { $_.Line.Trim() -replace '^\d+>', '' } | Sort-Object -Unique)
+    # RN noise allowlist (exact file(line,col) + reason). Reviewed hits only:
+    # - StationMapOverlay.cs(36,38) RN0006: throttled (0.5 s) one-shot retry until
+    #   MapChartingUI exists, then legacyCleanupPending=false stops the loop forever.
+    #   Awake-caching is impossible (scene timing); not a per-frame lookup.
+    $rnNoise = @(
+        'Source/UI/StationMapOverlay.cs(36,38)'
+    )
+    $genuine = @()
+    foreach ($h in $hits) {
+        $m = [regex]::Match($h, 'Source[\\/][^\(]+\(\d+,\d+\)')
+        $loc = if ($m.Success) { $m.Value.Replace('\', '/') } else { "" }
+        if ($loc -ne "" -and $rnNoise -contains $loc) { continue }
+        $genuine += $h
+    }
+    Write-Host "[RadioNavigation] RnAudit: $($hits.Count) hit(s) ($($genuine.Count) genuine)"
+    if ($genuine.Count -gt 0) {
+        $genuine | ForEach-Object { Write-Host $_ }
+        Write-Host "[RadioNavigation] RnAudit FAILED - custom analyzer hits found"
+        exit 1
+    }
+    Write-Host "[RadioNavigation] RnAudit clean"
+    exit 0
+}
+
 # High-signal rules for the 'quick' profile - only rules that catch real bugs,
 # dead code, null/NRE hazards, perf/allocations, or serialization instability.
 # Curated against the actual 3084-diagnostic breakdown of THIS codebase
@@ -185,6 +234,60 @@ if ($Json) {
     & roslynator analyze $csproj --severity-level $Severity @args
     Write-Host "[RadioNavigation] SARIF report -> $out"
     exit $LASTEXITCODE
+}
+
+# Roslynator baseline gate (quick profile, warning severity only): the triaged
+# diagnostic set is committed in roslynator-baseline.txt (rule+file+message,
+# line numbers stripped). A run fails only on NEW diagnostics; fixed ones are
+# reported and the baseline refreshes via -UpdateBaseline (separate commit
+# with a reason). Full-profile and info runs stay advisory.
+function Get-NormalizedDiagnostics {
+    param([string[]]$Lines, [string]$Root)
+    $out = @()
+    foreach ($line in $Lines) {
+        $m = [regex]::Match($line, '^(.*)\(\d+,\d+\):\s*(warning (?:RCS|IDE|CS)\d+):\s*(.*)$')
+        if (-not $m.Success) { continue }
+        $path = $m.Groups[1].Value.Replace('/', '\')
+        if ($path.StartsWith($Root)) { $path = $path.Substring($Root.Length).TrimStart('\') }
+        $out += "$path : $($m.Groups[2].Value): $($m.Groups[4].Value)"
+    }
+    return @($out | Sort-Object -Unique)
+}
+
+$baselineFile = Join-Path $root "roslynator-baseline.txt"
+if ($UpdateBaseline) {
+    $fresh = & roslynator analyze $csproj --severity-level $Severity @args 2>&1
+    $fresh | ForEach-Object { Write-Host $_ }
+    Get-NormalizedDiagnostics $fresh $root | Set-Content -LiteralPath $baselineFile
+    Write-Host "[RadioNavigation] baseline refreshed - commit it with a reason"
+    exit $LASTEXITCODE
+}
+
+if ($Profile -eq "quick" -and $Severity -eq "warning") {
+    $rosOut = & roslynator analyze $csproj --severity-level $Severity @args 2>&1
+    $rosExit = $LASTEXITCODE
+    $rosOut | ForEach-Object { Write-Host $_ }
+    $current = Get-NormalizedDiagnostics $rosOut $root
+    if (-not (Test-Path $baselineFile)) {
+        $current | Set-Content -LiteralPath $baselineFile
+        Write-Host "[RadioNavigation] no baseline found - written ($($current.Count) entries), commit it as reference"
+        exit $rosExit
+    }
+    $baseline = @(Get-Content -LiteralPath $baselineFile)
+    $diff = Compare-Object -ReferenceObject $baseline -DifferenceObject $current
+    $new = @($diff | Where-Object { $_.SideIndicator -eq "=>" } | ForEach-Object { $_.InputObject })
+    $fixed = @($diff | Where-Object { $_.SideIndicator -eq "<=" } | ForEach-Object { $_.InputObject })
+    if ($new.Count -gt 0) {
+        Write-Host "--- NEW diagnostics (blocking) ---"
+        $new | ForEach-Object { Write-Host $_ }
+        Write-Host "[RadioNavigation] baseline gate FAILED - $($new.Count) new diagnostic(s)"
+        exit 1
+    }
+    if ($fixed.Count -gt 0) {
+        Write-Host "[RadioNavigation] improved: $($fixed.Count) baseline diagnostic(s) fixed (run -UpdateBaseline to refresh)"
+    }
+    Write-Host "[RadioNavigation] baseline gate clean"
+    exit $rosExit
 }
 
 & roslynator analyze $csproj --severity-level $Severity @args
