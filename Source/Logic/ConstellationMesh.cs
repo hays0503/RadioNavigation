@@ -40,9 +40,6 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Current layer state, persisted via ConstellationTogglePrefs. Default ON.</summary>
         public static bool Enabled { get; private set; } = ConstellationTogglePrefs.Load();
 
-        /// <summary>Raised after the layer state flips; carries the new value.</summary>
-        public static event Action<bool> EnabledChanged;
-
         public static void SetEnabled(bool value)
         {
             if (Enabled == value)
@@ -51,7 +48,6 @@ namespace UBOAT.Mods.RadioNavigation
             Enabled = value;
             ConstellationTogglePrefs.Save(value);
             Debug.Log("[RadioNav][ConstellationMesh] constellations " + (value ? "ON" : "OFF"));
-            EnabledChanged?.Invoke(value);
         }
 
         private void Update()

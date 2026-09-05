@@ -4,7 +4,7 @@ namespace UBOAT.Mods.RadioNavigation
 {
     public static class ConstellationLines
     {
-        public static readonly int[][] Polylines = new int[215][]
+        internal static readonly int[][] Polylines = new int[215][]
         {
             new int[] { 365, 11, 117 },
             new int[] { 11, 249, 408 },

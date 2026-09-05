@@ -5,6 +5,9 @@ namespace UBOAT.Mods.RadioNavigation
 {
     public class CarrierGenerator
     {
+        private const float MaxFrequencyHz = 20000f;
+        private const float SmoothingFactor = 0.1f;
+
         private double phase;
         private volatile float targetFrequency;
         private float smoothedFrequency;
@@ -16,7 +19,7 @@ namespace UBOAT.Mods.RadioNavigation
             // F40: unbounded carrier frequencies alias above Nyquist; keep
             // the carrier below a sane audio ceiling (well above the
             // 300-1800 Hz beat range the controller actually produces).
-            set => targetFrequency = Math.Max(0f, Math.Min(value, 20000f));
+            set => targetFrequency = Math.Max(0f, Math.Min(value, MaxFrequencyHz));
         }
 
         public CarrierGenerator(float sampleRate)
@@ -31,7 +34,7 @@ namespace UBOAT.Mods.RadioNavigation
         // accumulates float precision loss at large sample counts.
         public float NextSample()
         {
-            smoothedFrequency += (targetFrequency - smoothedFrequency) * 0.1f;
+            smoothedFrequency += (targetFrequency - smoothedFrequency) * SmoothingFactor;
 
             if (smoothedFrequency.IsNonPositive())
                 return 0f;
@@ -122,6 +125,9 @@ namespace UBOAT.Mods.RadioNavigation
 
     public class ReceiverDsp
     {
+        private const double WhistleFrequencyHz = 600.0;
+        private const float WhistleMix = 0.12f;
+
         private readonly float sampleRate;
         private float agcGain;
         private float prevFilter;
@@ -176,10 +182,10 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (WhistleLevel.IsSignificant())
             {
-                float whistle = (float)Math.Sin(2.0 * Math.PI * 600.0 * whistlePhase / sampleRate);
+                float whistle = (float)Math.Sin(2.0 * Math.PI * WhistleFrequencyHz * whistlePhase / sampleRate);
                 whistlePhase += 1.0;
                 if (whistlePhase >= sampleRate) whistlePhase -= sampleRate;
-                saturated += whistle * WhistleLevel * 0.12f;
+                saturated += whistle * WhistleLevel * WhistleMix;
             }
 
             return Mathf.Clamp(saturated, -1f, 1f);

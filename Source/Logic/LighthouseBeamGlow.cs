@@ -133,17 +133,17 @@ namespace UBOAT.Mods.RadioNavigation
             LighthouseGlowArt.UpdateWindowRotation(windowRenderers, rotator, ref rotationBlock);
             spotLightDriver.Update(worldPosition, renderingCamera,
                 VerboseDiagnostics, nextDiagnosticTime);
-            var frame = new FlareFrame();
-            frame.isNight = spotLightDriver.IsNight;
-            frame.renderingCamera = renderingCamera;
-            frame.rotator = rotator;
-            frame.worldPosition = worldPosition;
-            frame.wideGate = GetBeamVisibilityFactor(worldPosition);
-            frame.deviceView = IsDeviceCamera(renderingCamera);
-            frame.verbose = VerboseDiagnostics;
-            frame.now = Time.unscaledTime;
-            frame.nextDiagTime = nextDiagnosticTime;
-            frame.worldPositionProvider = GetWorldPosition;
+            var frame = new FlareFrame(
+                spotLightDriver.IsNight,
+                renderingCamera,
+                rotator,
+                worldPosition,
+                GetBeamVisibilityFactor(worldPosition),
+                IsDeviceCamera(renderingCamera),
+                VerboseDiagnostics,
+                Time.unscaledTime,
+                nextDiagnosticTime,
+                GetWorldPosition);
             flareDriver.Update(frame);
             flareDriver.KeepInView();
             UpdateDot(worldPosition);

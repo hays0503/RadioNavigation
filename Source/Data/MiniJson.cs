@@ -11,9 +11,9 @@ namespace UBOAT.Mods.RadioNavigation
     /// arrays/booleans/null are not needed by the data files and throw.
     /// Extracted from SonneBeam.cs (SRP: parser is not a domain model).
     /// </summary>
-    public static class MiniJson
+    internal static class MiniJson
     {
-        public static Dictionary<string, object> Parse(string json)
+        internal static Dictionary<string, object> Parse(string json)
         {
             if (json == null)
                 throw new ArgumentNullException("json");

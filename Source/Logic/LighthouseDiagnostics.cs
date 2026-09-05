@@ -245,7 +245,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// and returns its enabled state as a string. Shared by the glow diag
         /// and the screenPt diag in LighthouseBeamGlow.
         /// </summary>
-        public static string GetInteriorCameraEnabled(MainCamera mc)
+        internal static string GetInteriorCameraEnabled(MainCamera mc)
         {
             try
             {

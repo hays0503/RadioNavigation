@@ -23,5 +23,21 @@ namespace UBOAT.Mods.RadioNavigation
         public float now;
         public float nextDiagTime;
         public Func<Vector3> worldPositionProvider;
+
+        public FlareFrame(bool isNight, Camera renderingCamera, Transform rotator,
+            Vector3 worldPosition, float wideGate, bool deviceView, bool verbose,
+            float now, float nextDiagTime, Func<Vector3> worldPositionProvider)
+        {
+            this.isNight = isNight;
+            this.renderingCamera = renderingCamera;
+            this.rotator = rotator;
+            this.worldPosition = worldPosition;
+            this.wideGate = wideGate;
+            this.deviceView = deviceView;
+            this.verbose = verbose;
+            this.now = now;
+            this.nextDiagTime = nextDiagTime;
+            this.worldPositionProvider = worldPositionProvider;
+        }
     }
 }
