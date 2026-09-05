@@ -267,6 +267,32 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void ProcessAudio_RaggedTail_StopsBeforePartialFrame()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+            float[] data = { 9f, 9f, 9f, 9f, 9f, 9f, 9f };
+
+            engine.ProcessAudio(data, 2, stations, keyers, carriers, true, 1, 1);
+
+            Assert.Equal(9f, data[6]);
+        }
+
+        [Fact]
+        public void UpdateStations_RaggedArrays_NoThrow()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            engine.UpdateStations(0.05f, 0f, stations, new StationScheduler[0], keyers, carriers, true);
+            engine.UpdateStations(0.05f, 0f, null, null, null, null, true);
+        }
+
+        [Fact]
         public void ProcessAudio_RaggedFleet_ClampsToShortest()
         {
             var engine = CreateEngine();

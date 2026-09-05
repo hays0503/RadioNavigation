@@ -85,11 +85,12 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             tickAccumulator += deltaSeconds;
+            int fleet = SimulationFleetCount(stations, schedulers, keyers, carriers);
             while (tickAccumulator >= TickIntervalSeconds)
             {
                 tickAccumulator -= TickIntervalSeconds;
 
-                for (int s = 0; s < stations.Length; s++)
+                for (int s = 0; s < fleet; s++)
                 {
                     if (stations[s].Gain.IsNegligible(0.001f))
                         continue;
@@ -177,6 +178,14 @@ namespace UBOAT.Mods.RadioNavigation
             return Math.Min(stations.Length, Math.Min(keyers.Length, carriers.Length));
         }
 
+        // Same clamp for the main-thread simulation (schedulers included).
+        private static int SimulationFleetCount(StationState[] stations, StationScheduler[] schedulers, MorseKeyer[] keyers, CarrierGenerator[] carriers)
+        {
+            if (stations.IsNull() || schedulers.IsNull() || keyers.IsNull() || carriers.IsNull())
+                return 0;
+            return Math.Min(stations.Length, Math.Min(schedulers.Length, Math.Min(keyers.Length, carriers.Length)));
+        }
+
         public void ProcessAudio(float[] data, int channels, StationState[] stations, MorseKeyer[] keyers, CarrierGenerator[] carriers, bool radioOn, int currentZoneIndex, int sonneZoneIndex)
         {
             if (data.IsNull() || data.Length.IsZero() || channels.IsNonPositive())
@@ -192,7 +201,11 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            for (int i = 0; i < data.Length; i += channels)
+            // A ragged tail (Length % channels != 0) has no full frame —
+            // stop before it instead of indexing out of range on the audio
+            // thread, where a throw kills the whole graph.
+            int frames = data.Length - data.Length % channels;
+            for (int i = 0; i < frames; i += channels)
             {
                 float sample = 0f;
                 for (int s = 0; s < count; s++)

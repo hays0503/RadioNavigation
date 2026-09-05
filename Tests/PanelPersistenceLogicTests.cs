@@ -33,5 +33,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(90f, PanelPersistenceLogic.ClampCursorAngle(90f));
             Assert.Equal(90f, PanelPersistenceLogic.ClampCursorAngle(100f));
         }
+
+        [Fact]
+        public void Clamps_NaN_ReturnsZero()
+        {
+            Assert.Equal(0f, PanelPersistenceLogic.ClampSpinnerAngle(float.NaN));
+            Assert.Equal(0f, PanelPersistenceLogic.ClampCursorAngle(float.NaN));
+        }
     }
 }

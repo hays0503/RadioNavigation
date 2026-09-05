@@ -15,6 +15,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static float ToUnit(float angle)
         {
+            // NaN comparisons are always false, so a bare Clamp01 would pass
+            // NaN through into gain/Q-factor/DSP state. Sanitize at the entry.
+            if (float.IsNaN(angle))
+                return 0f;
             return Mathf.Clamp01(angle / MaxAngle);
         }
 

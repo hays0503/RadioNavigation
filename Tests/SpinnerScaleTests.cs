@@ -37,6 +37,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void ToUnit_NaN_ReturnsZero()
+        {
+            Assert.Equal(0f, SpinnerScale.ToUnit(float.NaN));
+        }
+
+        [Fact]
         public void ToPercent_ReferencePoints()
         {
             Assert.Equal(0, SpinnerScale.ToPercent(0f));

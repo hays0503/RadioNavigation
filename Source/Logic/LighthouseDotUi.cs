@@ -28,6 +28,10 @@ namespace UBOAT.Mods.RadioNavigation
         private Component coreImage;
         private Component haloImage;
         private Component streakImage;
+        // Sprite.Create assets are NOT owned by the canvas GameObject —
+        // destroying the canvas leaks them unless freed explicitly.
+        private Sprite coreSprite;
+        private Sprite streakSprite;
 
         /// <summary>True after a successful build (false when the Image type
         /// is unavailable — the dot fallback stays disabled).</summary>
@@ -88,14 +92,14 @@ namespace UBOAT.Mods.RadioNavigation
             canvas.enabled = false;
 
             Texture2D texture = LighthouseGlowArt.GetDotTexture();
-            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+            coreSprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
 
             Texture2D streakTex = LighthouseGlowArt.GetStreakTexture();
-            Sprite streakSprite = Sprite.Create(streakTex, new Rect(0f, 0f, streakTex.width, streakTex.height), new Vector2(0.5f, 0.5f));
+            streakSprite = Sprite.Create(streakTex, new Rect(0f, 0f, streakTex.width, streakTex.height), new Vector2(0.5f, 0.5f));
 
             streakImage = CreateImage(canvasRect, "Streak", streakSprite);
-            coreImage = CreateImage(canvasRect, "Core", sprite);
-            haloImage = CreateImage(canvasRect, "Halo", sprite);
+            coreImage = CreateImage(canvasRect, "Core", coreSprite);
+            haloImage = CreateImage(canvasRect, "Halo", coreSprite);
             Built = true;
             return true;
         }
@@ -107,12 +111,23 @@ namespace UBOAT.Mods.RadioNavigation
                 canvas.enabled = enabled;
         }
 
-        /// <summary>Destroys the canvas GameObject (controller teardown).</summary>
+        /// <summary>Destroys the canvas GameObject and the owned sprites
+        /// (controller teardown).</summary>
         public void Destroy()
         {
             if (canvas != null)
                 Object.Destroy(canvas.gameObject);
             canvas = null;
+            coreImage = null;
+            haloImage = null;
+            streakImage = null;
+            if (coreSprite != null)
+                Object.Destroy(coreSprite);
+            if (streakSprite != null)
+                Object.Destroy(streakSprite);
+            coreSprite = null;
+            streakSprite = null;
+            Built = false;
         }
 
         /// <summary>

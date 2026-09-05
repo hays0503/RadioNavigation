@@ -19,6 +19,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static float ClampSpinnerAngle(float value)
         {
+            if (float.IsNaN(value))
+                return 0f;
             return Mathf.Clamp(value, MinSpinnerAngle, MaxSpinnerAngle);
         }
 
@@ -33,6 +35,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static float ClampCursorAngle(float value)
         {
+            if (float.IsNaN(value))
+                return 0f;
             return Mathf.Clamp(value, MinCursorAngle, MaxCursorAngle);
         }
     }

@@ -35,7 +35,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected virtual float GetAngleOffset() => 90f;
         protected virtual bool UseSmoothing() => true;
-        protected virtual float ClampTargetAngle(float raw) => Mathf.Clamp(raw, minAngle, maxAngle);
+        protected virtual float ClampTargetAngle(float raw)
+        {
+            if (float.IsNaN(raw))
+                return minAngle;
+            return Mathf.Clamp(raw, minAngle, maxAngle);
+        }
         protected virtual bool HandleDragDirection(Vector2 dir)
         {
             if (dir.y.IsNegative())
@@ -64,6 +69,11 @@ namespace UBOAT.Mods.RadioNavigation
 
             currentAngle = Mathf.Clamp(startAngle, minAngle, maxAngle);
             spinnerRect.localRotation = Quaternion.Euler(0, 0, -currentAngle);
+
+            if (minAngle > maxAngle)
+                Debug.LogError("[RadioNav][" + DebugTag + "] minAngle > maxAngle — knob is dead");
+            if (sensitivity.IsNonPositive() || float.IsNaN(sensitivity))
+                Debug.LogError("[RadioNav][" + DebugTag + "] non-positive sensitivity — smoothing snaps to target");
 
             Debug.Log("[RadioNav][" + DebugTag + "] Start angle=" + currentAngle
                 + " min=" + minAngle + " max=" + maxAngle);
@@ -111,8 +121,13 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 // F72: frame-rate independent smoothing factor; raw Lerp(t)
                 // per frame is ~2x faster at 60 FPS than at 30 FPS.
+                // Degenerate factor (non-positive/NaN sensitivity, NaN dt)
+                // would extrapolate away from the target — snap instead.
                 float t = 1f - Mathf.Exp(-sensitivity * Time.deltaTime * 60f);
-                currentAngle = Mathf.Lerp(currentAngle, targetAngle, t);
+                if (float.IsNaN(t) || t <= 0f || t > 1f)
+                    currentAngle = targetAngle;
+                else
+                    currentAngle = Mathf.Lerp(currentAngle, targetAngle, t);
             }
             else
                 currentAngle = targetAngle;
