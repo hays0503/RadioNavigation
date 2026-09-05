@@ -99,11 +99,6 @@ namespace UBOAT.Mods.RadioNavigation
             return true;
         }
 
-        private static Type ResolveType(string typeName)
-        {
-            return GameTypeCache.Resolve(typeName);
-        }
-
         public static bool HandleCustomDecisions(RadioStory __instance, object decision)
         {
             try

@@ -805,10 +805,8 @@ namespace RadioNavigation.SourceCheck
         /// <summary>
         /// Game type-cache gate (SRP/P5.1): assembly-qualified Type resolution
         /// must live in GameTypeCache (cached, probe-list, offline-tested in
-        /// GameTypeCacheTests), not duplicated as RadioStoryIntegration.ResolveType
-        /// (uncached) and SkyVisibilityResolver.typeCache (single-assembly).
-        /// Pins the type surface, the delegation of both call sites, and that
-        /// no raw Type.GetType lookup remains anywhere else in Source/.
+        /// GameTypeCacheTests). Pins the type surface and that no raw
+        /// Type.GetType lookup remains anywhere else in Source/.
         /// </summary>
         [Fact]
         public void GameTypeCache_OwnsTypeResolution()
@@ -817,7 +815,6 @@ namespace RadioNavigation.SourceCheck
 
             var problems = new List<string>();
             TypeDeclarationSyntax cache = null;
-            MethodDeclarationSyntax resolveType = null;
             TypeDeclarationSyntax sky = null;
             var roots = new List<Tuple<string, CompilationUnitSyntax>>();
             foreach (var path in ModCompiler.EnumerateSources())
@@ -829,11 +826,6 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (type.Identifier.Text == "GameTypeCache")
                         cache = type;
-                    if (type.Identifier.Text == "RadioStoryIntegration")
-                    {
-                        resolveType = type.Members.OfType<MethodDeclarationSyntax>()
-                            .FirstOrDefault(m => m.Identifier.Text == "ResolveType");
-                    }
                     if (type.Identifier.Text == "SkyVisibilityResolver")
                         sky = type;
                 }
@@ -862,24 +854,6 @@ namespace RadioNavigation.SourceCheck
                 if (!hasDefault) problems.Add("GameTypeCache.Resolve(string) default-probe overload not found");
                 if (!hasProbes) problems.Add("GameTypeCache.Resolve(string, probes) overload not found");
                 if (!hasClear) problems.Add("GameTypeCache.Clear public static method not found");
-            }
-
-            if (resolveType == null)
-            {
-                problems.Add("RadioStoryIntegration.ResolveType not found");
-            }
-            else
-            {
-                bool delegates = resolveType.DescendantNodes()
-                    .OfType<InvocationExpressionSyntax>()
-                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax qualified
-                        && qualified.Expression is IdentifierNameSyntax recv
-                        && recv.Identifier.Text == "GameTypeCache"
-                        && qualified.Name is IdentifierNameSyntax qname
-                        && qname.Identifier.Text == "Resolve");
-                if (!delegates)
-                    problems.Add("RadioStoryIntegration.ResolveType no longer delegates to GameTypeCache.Resolve — "
-                        + "the uncached duplicate is back");
             }
 
             if (sky == null)
