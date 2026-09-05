@@ -2,7 +2,7 @@
 // 215 constellation line segments, indices into StarCatalog.Stars
 namespace UBOAT.Mods.RadioNavigation
 {
-    public static class ConstellationLines
+    internal static class ConstellationLines
     {
         internal static readonly int[][] Polylines = new int[215][]
         {

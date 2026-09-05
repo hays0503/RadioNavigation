@@ -7,7 +7,7 @@ namespace UBOAT.Mods.RadioNavigation
     // frequency) across game sessions via PlayerPrefs so the radio doesn't
     // reset every time the panel is opened. Pure key/codec logic is testable
     // without Unity (PanelPersistenceLogic); this class only wires PlayerPrefs.
-    public static class PanelStateStore
+    internal static class PanelStateStore
     {
         private const string KeyVolume = "RadioNavigation.VolumeAngle";
         private const string KeyFeedback = "RadioNavigation.FeedbackAngle";

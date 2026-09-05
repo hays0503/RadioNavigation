@@ -19,9 +19,9 @@ namespace UBOAT.Mods.RadioNavigation
         private const string LogPrefix = "[RadioNav][Sextant]";
         private const string SunName = "\u0421\u043E\u043B\u043D\u0446\u0435";
 
-        public const float ConeDeg = 0.5f;
+        private const float ConeDeg = 0.5f;
         // v1.12: 2.5 s (was 5 s) — author request, faster sight workflow.
-        public const float HoldSeconds = 2.5f;
+        private const float HoldSeconds = 2.5f;
         private const float TickIntervalSeconds = 0.2f;
 
         private float tickTimer;
