@@ -83,20 +83,13 @@ namespace UBOAT.Mods.RadioNavigation
             RefreshAll();
         }
 
-        // F15: apply persisted volume/feedback/zone/cursor so the radio reads
-        // as it was left. Called after handlers are found/subscribed so the
-        // restored values propagate through the normal pipeline.
         private void RestorePanelState()
         {
-            PanelStateStore.Load(out float vol, out float fb, out int zone, out float cursor);
-            if (volumeSpinner.IsNotNull())
-                volumeSpinner.SetAngle(vol);
-            if (feedbackSpinner.IsNotNull())
-                feedbackSpinner.SetAngle(fb);
-            if (zoneHandler.IsNotNull())
-                zoneHandler.SetZone(zone);
-            if (radioHandler.IsNotNull())
-                radioHandler.CursorAngle = cursor;
+            PanelState.Restore(
+                volumeSpinner.IsNotNull() ? (Action<float>)volumeSpinner.SetAngle : null,
+                feedbackSpinner.IsNotNull() ? (Action<float>)feedbackSpinner.SetAngle : null,
+                zoneHandler.IsNotNull() ? (Action<int>)zoneHandler.SetZone : null,
+                radioHandler.IsNotNull() ? (Action<float>)(v => radioHandler.CursorAngle = v) : null);
         }
 
         private void Update()
@@ -341,8 +334,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
-            // F15: persist the current operator state before the panel goes away.
-            PanelStateStore.Save(
+            PanelState.Save(
                 volumeSpinner.IsNotNull() ? volumeSpinner.Angle : 0f,
                 feedbackSpinner.IsNotNull() ? feedbackSpinner.Angle : 0f,
                 GetZoneIndex(),
