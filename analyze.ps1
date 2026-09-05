@@ -104,7 +104,10 @@ if ($IdeAudit) {
     # NOTE: semicolons in -p: values MUST be %3B-escaped — MSBuild splits a
     # bare -p:NoWarn="a;b" into junk properties (MSB1006) after PowerShell
     # strips the quotes, and the audit would report a vacuous clean.
-    $buildLines = & dotnet build $csproj -c Release -p:EnforceCodeStyleInBuild=true -p:NoWarn="CS8032%3BCS0162%3BCS0219%3BCS0649" 2>&1
+    # Rebuild (not incremental): IDE warnings only surface when Roslyn
+    # actually compiles; an up-to-date no-op build reports a vacuous clean
+    # (same trap as RnAudit).
+    $buildLines = & dotnet build $csproj -c Release -p:EnforceCodeStyleInBuild=true -p:NoWarn="CS8032%3BCS0162%3BCS0219%3BCS0649" -t:Rebuild 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Error "[RadioNavigation] IdeAudit build failed (exit $LASTEXITCODE) - refusing to report a clean audit on a broken compile"
         $buildLines | ForEach-Object { Write-Host $_ }
