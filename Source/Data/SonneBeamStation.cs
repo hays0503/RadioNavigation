@@ -57,7 +57,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (Dashes.Count == 0 || Dots.Count == 0 || double.IsNaN(angle) || double.IsInfinity(angle))
                 return false;
 
-            double normalizedAngle = NormalizeAngle(angle);
+            double normalizedAngle = AstroMath.NormalizeDegrees(angle);
             double dashDistance;
             double dotDistance;
             double dashAngle;
@@ -112,7 +112,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (count < 0 || count > SonneBeam.TotalElements)
                     throw new FormatException("signal count out of range at '" + entry.Key + "'");
 
-                target[NormalizeAngle(angle)] = count;
+                target[AstroMath.NormalizeDegrees(angle)] = count;
             }
         }
 
@@ -139,14 +139,6 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             return matchedCount >= 0;
-        }
-
-        private static double NormalizeAngle(double angle)
-        {
-            double normalized = angle % 360.0;
-            if (normalized < 0.0)
-                normalized += 360.0;
-            return normalized;
         }
 
         private static double AngularDistance(double first, double second)

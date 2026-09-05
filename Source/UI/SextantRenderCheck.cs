@@ -54,11 +54,12 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        /// <summary>Resets the probe for a fresh open (first check re-runs).</summary>
+        /// <summary>Resets the probe for a fresh open (both checks re-run).</summary>
         public void ResetForOpen()
         {
             done = false;
             secondPending = false;
+            secondDone = false;
             timer = 1.0f;
         }
 

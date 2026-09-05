@@ -52,6 +52,7 @@ namespace UBOAT.Mods.RadioNavigation
                 CameraResolver.ResetForReload();
                 RadioPowerBus.Reset();
                 GameTypeCache.Clear();
+                WarnOnce.Reset();
                 FixMapMarker.Clear();
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
             }
