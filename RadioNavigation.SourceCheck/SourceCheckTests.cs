@@ -1002,10 +1002,10 @@ namespace RadioNavigation.SourceCheck
         /// <summary>
         /// Station-gain gate (SRP): the selectivity curve and BFO beat clamp
         /// must live in StationGainModel as pure functions (tested in
-        /// StationGainModelTests), with SonneController.UpdateStationGains as
-        /// the array-management caller and ShieldTests calling production
-        /// instead of duplicating the formula. A re-inline (or a new local
-        /// copy) fails here.
+        /// StationGainModelTests), with StationManager.UpdateGains as the
+        /// array-management caller (SonneController delegates tuning) and
+        /// ShieldTests calling production instead of duplicating the
+        /// formula. A re-inline (or a new local copy) fails here.
         /// </summary>
         [Fact]
         public void StationGain_OwnedByModel()
@@ -1015,6 +1015,7 @@ namespace RadioNavigation.SourceCheck
             var problems = new List<string>();
             TypeDeclarationSyntax model = null;
             TypeDeclarationSyntax controller = null;
+            TypeDeclarationSyntax manager = null;
             TypeDeclarationSyntax shield = null;
             foreach (var path in ModCompiler.EnumerateSources())
             {
@@ -1026,6 +1027,8 @@ namespace RadioNavigation.SourceCheck
                         model = type;
                     if (type.Identifier.Text == "SonneController")
                         controller = type;
+                    if (type.Identifier.Text == "StationManager")
+                        manager = type;
                 }
             }
             foreach (var path in ModCompiler.EnumerateTests())
@@ -1063,16 +1066,25 @@ namespace RadioNavigation.SourceCheck
             {
                 problems.Add("type 'SonneController' not found in Source/");
             }
+            if (manager == null)
+            {
+                problems.Add("type 'StationManager' not found in Source/ — gain math regressed into the controller");
+            }
             else
             {
-                bool inlinesSqrt = controller.DescendantNodes()
-                    .OfType<InvocationExpressionSyntax>()
-                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax access
-                        && access.Name.Identifier.Text == "Sqrt");
-                if (inlinesSqrt)
-                    problems.Add("SonneController still contains a Sqrt gain formula — route it through StationGainModel.ComputeGain");
+                foreach (var type in new[] { controller, manager })
+                {
+                    if (type == null)
+                        continue;
+                    bool inlinesSqrt = type.DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Any(inv => inv.Expression is MemberAccessExpressionSyntax access
+                            && access.Name.Identifier.Text == "Sqrt");
+                    if (inlinesSqrt)
+                        problems.Add($"{type.Identifier.Text} still contains a Sqrt gain formula — route it through StationGainModel.ComputeGain");
+                }
 
-                bool invokesModel = controller.DescendantNodes()
+                bool invokesModel = manager.DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
                     .Any(inv => inv.Expression is MemberAccessExpressionSyntax qualified
                         && qualified.Expression is IdentifierNameSyntax recv
@@ -1080,7 +1092,7 @@ namespace RadioNavigation.SourceCheck
                         && qualified.Name is IdentifierNameSyntax qname
                         && qname.Identifier.Text == "ComputeGain");
                 if (!invokesModel)
-                    problems.Add("SonneController never invokes StationGainModel.ComputeGain — the tested pure function is bypassed");
+                    problems.Add("StationManager never invokes StationGainModel.ComputeGain — the tested pure function is bypassed");
             }
 
             if (shield == null)
@@ -1176,7 +1188,7 @@ namespace RadioNavigation.SourceCheck
         /// Bearing-diagnostics gate (SRP): the [RadioNav][BEARING] report
         /// lines must be built by BearingDiagnostics as pure strings
         /// (tested in BearingDiagnosticsTests), with
-        /// SonneController.LogBearingDiagnostics as the emit-once-per-
+        /// StationManager.LogBearingDiagnostics as the emit-once-per-
         /// position gate that only logs them. A re-inline of the format
         /// strings fails here.
         /// </summary>
@@ -1196,7 +1208,7 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (type.Identifier.Text == "BearingDiagnostics")
                         diagnostics = type;
-                    if (type.Identifier.Text == "SonneController")
+                    if (type.Identifier.Text == "StationManager")
                     {
                         log = type.Members.OfType<MethodDeclarationSyntax>()
                             .FirstOrDefault(m => m.Identifier.Text == "LogBearingDiagnostics");
@@ -1220,7 +1232,7 @@ namespace RadioNavigation.SourceCheck
 
             if (log == null)
             {
-                problems.Add("SonneController.LogBearingDiagnostics not found");
+                problems.Add("StationManager.LogBearingDiagnostics not found");
             }
             else
             {
@@ -1229,7 +1241,7 @@ namespace RadioNavigation.SourceCheck
                     .Any(lit => lit.Token.ValueText != null
                         && lit.Token.ValueText.Contains("[RadioNav][BEARING]"));
                 if (keepsFormat)
-                    problems.Add("SonneController.LogBearingDiagnostics still contains [BEARING] format strings — the report belongs to BearingDiagnostics");
+                    problems.Add("StationManager.LogBearingDiagnostics still contains [BEARING] format strings — the report belongs to BearingDiagnostics");
 
                 bool invokesDiagnostics = log.DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
@@ -1239,7 +1251,7 @@ namespace RadioNavigation.SourceCheck
                             && qualified.Name is IdentifierNameSyntax qname
                             && qname.Identifier.Text == "BuildLines"));
                 if (!invokesDiagnostics)
-                    problems.Add("SonneController.LogBearingDiagnostics never invokes BuildLines — the tested pure function is bypassed");
+                    problems.Add("StationManager.LogBearingDiagnostics never invokes BuildLines — the tested pure function is bypassed");
             }
 
             Assert.True(problems.Count == 0,
@@ -1252,7 +1264,7 @@ namespace RadioNavigation.SourceCheck
         /// (map bearings, in-beam/sector, bearing-change-gated table
         /// lookup, scheduler pattern feed) must live in StationNavigator
         /// (tested offline in StationNavigatorTests), with
-        /// SonneController.UpdateStationNavigation as the fleet loop.
+        /// StationManager.UpdateNavigation as the fleet loop.
         /// A re-inline of the table lookup fails here.
         /// </summary>
         [Fact]
@@ -1271,10 +1283,10 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (type.Identifier.Text == "StationNavigator")
                         navigator = type;
-                    if (type.Identifier.Text == "SonneController")
+                    if (type.Identifier.Text == "StationManager")
                     {
                         update = type.Members.OfType<MethodDeclarationSyntax>()
-                            .FirstOrDefault(m => m.Identifier.Text == "UpdateStationNavigation");
+                            .FirstOrDefault(m => m.Identifier.Text == "UpdateNavigation");
                     }
                 }
             }
@@ -1295,7 +1307,7 @@ namespace RadioNavigation.SourceCheck
 
             if (update == null)
             {
-                problems.Add("SonneController.UpdateStationNavigation not found");
+                problems.Add("StationManager.UpdateNavigation not found");
             }
             else
             {
@@ -1307,7 +1319,7 @@ namespace RadioNavigation.SourceCheck
                             && qualified.Name is IdentifierNameSyntax qname
                             && qname.Identifier.Text == "TryGetNavigationPattern"));
                 if (keepsLookup)
-                    problems.Add("SonneController.UpdateStationNavigation still calls TryGetNavigationPattern — the lookup belongs to StationNavigator");
+                    problems.Add("StationManager.UpdateNavigation still calls TryGetNavigationPattern — the lookup belongs to StationNavigator");
 
                 bool invokesNavigator = update.DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
@@ -1317,7 +1329,7 @@ namespace RadioNavigation.SourceCheck
                             && qualified.Name is IdentifierNameSyntax qname
                             && qname.Identifier.Text == "UpdateStation"));
                 if (!invokesNavigator)
-                    problems.Add("SonneController.UpdateStationNavigation never invokes StationNavigator.UpdateStation — the tested pure function is bypassed");
+                    problems.Add("StationManager.UpdateNavigation never invokes StationNavigator.UpdateStation — the tested pure function is bypassed");
             }
 
             Assert.True(problems.Count == 0,
@@ -1523,7 +1535,7 @@ namespace RadioNavigation.SourceCheck
         /// top-level type (not nested in the controller) and its assembly
         /// must live in StationDiagnosticsReport as a pure function (tested
         /// in StationDiagnosticsReportTests), with
-        /// SonneController.GetStationDiagnostics keeping only validation,
+        /// StationManager.GetStationDiagnostics keeping only validation,
         /// callsign resolve and the elapsed clock. A re-nesting or
         /// re-inline fails here.
         /// </summary>
@@ -1535,7 +1547,7 @@ namespace RadioNavigation.SourceCheck
             var problems = new List<string>();
             TypeDeclarationSyntax topLevel = null;
             TypeDeclarationSyntax report = null;
-            TypeDeclarationSyntax controller = null;
+            TypeDeclarationSyntax manager = null;
             MethodDeclarationSyntax getter = null;
             foreach (var path in ModCompiler.EnumerateSources())
             {
@@ -1548,9 +1560,9 @@ namespace RadioNavigation.SourceCheck
                         topLevel = type;
                     if (type.Identifier.Text == "StationDiagnosticsReport")
                         report = type;
-                    if (type.Identifier.Text == "SonneController")
+                    if (type.Identifier.Text == "StationManager")
                     {
-                        controller = type;
+                        manager = type;
                         getter = type.Members.OfType<MethodDeclarationSyntax>()
                             .FirstOrDefault(m => m.Identifier.Text == "GetStationDiagnostics");
                     }
@@ -1558,11 +1570,11 @@ namespace RadioNavigation.SourceCheck
             }
 
             if (topLevel == null)
-                problems.Add("top-level type 'StationDiagnostics' not found in Source/ — the snapshot is nested in the controller again");
-            if (controller != null
-                && controller.Members.OfType<TypeDeclarationSyntax>()
+                problems.Add("top-level type 'StationDiagnostics' not found in Source/ — the snapshot is nested in the manager again");
+            if (manager != null
+                && manager.Members.OfType<TypeDeclarationSyntax>()
                     .Any(t => t.Identifier.Text == "StationDiagnostics"))
-                problems.Add("SonneController still nests StationDiagnostics — keep the snapshot top-level");
+                problems.Add("StationManager still nests StationDiagnostics — keep the snapshot top-level");
 
             if (report == null)
             {
@@ -1580,7 +1592,7 @@ namespace RadioNavigation.SourceCheck
 
             if (getter == null)
             {
-                problems.Add("SonneController.GetStationDiagnostics not found");
+                problems.Add("StationManager.GetStationDiagnostics not found");
             }
             else
             {
@@ -1592,7 +1604,7 @@ namespace RadioNavigation.SourceCheck
                             && qualified.Name is IdentifierNameSyntax qname
                             && qname.Identifier.Text == "Build"));
                 if (!invokesReport)
-                    problems.Add("SonneController.GetStationDiagnostics never invokes StationDiagnosticsReport.Build — the tested pure function is bypassed");
+                    problems.Add("StationManager.GetStationDiagnostics never invokes StationDiagnosticsReport.Build — the tested pure function is bypassed");
             }
 
             Assert.True(problems.Count == 0,
@@ -1767,7 +1779,8 @@ namespace RadioNavigation.SourceCheck
         /// Pattern-line gate (SRP): the per-station card line + mm:ss
         /// duration must live in PatternLineFormatter as pure functions
         /// (tested in PatternLineFormatterTests, InvariantCulture like
-        /// BearingDiagnostics), with InformationPanelHandler delegating.
+        /// BearingDiagnostics), composed by PanelViewBinder (tested in
+        /// PanelViewBinderTests), with InformationPanelHandler delegating.
         /// A re-inline of the BFO/ToBoat format fails here.
         /// </summary>
         [Fact]
@@ -1777,7 +1790,8 @@ namespace RadioNavigation.SourceCheck
 
             var problems = new List<string>();
             TypeDeclarationSyntax formatter = null;
-            MethodDeclarationSyntax build = null;
+            MethodDeclarationSyntax buildRows = null;
+            MethodDeclarationSyntax buildStation = null;
             TypeDeclarationSyntax panel = null;
             foreach (var path in ModCompiler.EnumerateSources())
             {
@@ -1787,11 +1801,16 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (type.Identifier.Text == "PatternLineFormatter")
                         formatter = type;
+                    if (type.Identifier.Text == "PanelViewBinder")
+                    {
+                        buildRows = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "BuildPatternRows");
+                        buildStation = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "BuildStationText");
+                    }
                     if (type.Identifier.Text == "InformationPanelHandler")
                     {
                         panel = type;
-                        build = type.Members.OfType<MethodDeclarationSyntax>()
-                            .FirstOrDefault(m => m.Identifier.Text == "BuildPatternLine");
                     }
                 }
             }
@@ -1820,20 +1839,20 @@ namespace RadioNavigation.SourceCheck
                 if (!suffixes) problems.Add("PatternLineFormatter.StationSuffix public static method not found");
             }
 
-            if (build == null)
+            if (buildRows == null)
             {
-                problems.Add("InformationPanelHandler.BuildPatternLine not found");
+                problems.Add("PanelViewBinder.BuildPatternRows not found — row assembly regressed into the panel");
             }
             else
             {
-                foreach (var lit in build.DescendantNodes().OfType<LiteralExpressionSyntax>())
+                foreach (var lit in buildRows.DescendantNodes().OfType<LiteralExpressionSyntax>())
                 {
                     string token = lit.Token.Text;
                     if (token.Contains("BFO:") || token.Contains("ToBoat:"))
-                        problems.Add($"InformationPanelHandler.BuildPatternLine still contains {token} — the line format belongs to PatternLineFormatter");
+                        problems.Add($"PanelViewBinder.BuildPatternRows still contains {token} — the line format belongs to PatternLineFormatter");
                 }
 
-                bool invokes = build.DescendantNodes()
+                bool invokes = buildRows.DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
                     .Any(inv => (inv.Expression is IdentifierNameSyntax bare
                             && bare.Identifier.Text == "BuildLine")
@@ -1841,7 +1860,24 @@ namespace RadioNavigation.SourceCheck
                             && qualified.Name is IdentifierNameSyntax qname
                             && qname.Identifier.Text == "BuildLine"));
                 if (!invokes)
-                    problems.Add("InformationPanelHandler.BuildPatternLine never invokes BuildLine — the tested pure function is bypassed");
+                    problems.Add("PanelViewBinder.BuildPatternRows never invokes BuildLine — the tested pure function is bypassed");
+            }
+
+            if (buildStation == null)
+            {
+                problems.Add("PanelViewBinder.BuildStationText not found — station text regressed into the panel");
+            }
+            else
+            {
+                bool invokesSuffix = buildStation.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "StationSuffix")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "StationSuffix"));
+                if (!invokesSuffix)
+                    problems.Add("PanelViewBinder.BuildStationText never invokes StationSuffix — the tested pure function is bypassed");
             }
 
             if (panel != null
@@ -1857,15 +1893,15 @@ namespace RadioNavigation.SourceCheck
             }
             else
             {
-                bool invokesSuffix = stationText.DescendantNodes()
+                bool invokesBinder = stationText.DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
                     .Any(inv => (inv.Expression is IdentifierNameSyntax bare
-                            && bare.Identifier.Text == "StationSuffix")
+                            && bare.Identifier.Text == "BuildStationText")
                         || (inv.Expression is MemberAccessExpressionSyntax qualified
                             && qualified.Name is IdentifierNameSyntax qname
-                            && qname.Identifier.Text == "StationSuffix"));
-                if (!invokesSuffix)
-                    problems.Add("InformationPanelHandler.UpdateStationText never invokes StationSuffix — the tested pure function is bypassed");
+                            && qname.Identifier.Text == "BuildStationText"));
+                if (!invokesBinder)
+                    problems.Add("InformationPanelHandler.UpdateStationText never invokes BuildStationText — the tested binder is bypassed");
             }
 
             Assert.True(problems.Count == 0,
@@ -1876,7 +1912,7 @@ namespace RadioNavigation.SourceCheck
         /// <summary>
         /// Pattern-rows gate (SRP): the gain-gated row selection must live
         /// in PatternRowPacker as a pure function (tested in
-        /// PatternRowPackerTests), with
+        /// PatternRowPackerTests), composed by PanelViewBinder, with
         /// InformationPanelHandler.UpdatePatterns rendering only. A
         /// re-inline of the gain filter fails here.
         /// </summary>
@@ -1887,6 +1923,7 @@ namespace RadioNavigation.SourceCheck
 
             var problems = new List<string>();
             TypeDeclarationSyntax packer = null;
+            MethodDeclarationSyntax binderRows = null;
             MethodDeclarationSyntax patterns = null;
             foreach (var path in ModCompiler.EnumerateSources())
             {
@@ -1896,6 +1933,9 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (type.Identifier.Text == "PatternRowPacker")
                         packer = type;
+                    if (type.Identifier.Text == "PanelViewBinder")
+                        binderRows = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "BuildPatternRows");
                     if (type.Identifier.Text == "InformationPanelHandler")
                     {
                         patterns = type.Members.OfType<MethodDeclarationSyntax>()
@@ -1917,6 +1957,23 @@ namespace RadioNavigation.SourceCheck
                 if (!packs) problems.Add("PatternRowPacker.Pack public static entry point not found");
             }
 
+            if (binderRows == null)
+            {
+                problems.Add("PanelViewBinder.BuildPatternRows not found — row assembly regressed into the panel");
+            }
+            else
+            {
+                bool invokesPack = binderRows.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "Pack")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "Pack"));
+                if (!invokesPack)
+                    problems.Add("PanelViewBinder.BuildPatternRows never invokes Pack — the tested pure function is bypassed");
+            }
+
             if (patterns == null)
             {
                 problems.Add("InformationPanelHandler.UpdatePatterns not found");
@@ -1933,15 +1990,15 @@ namespace RadioNavigation.SourceCheck
                 if (keepsFilter)
                     problems.Add("InformationPanelHandler.UpdatePatterns still filters by IsNegligible — row selection belongs to PatternRowPacker");
 
-                bool invokesPack = patterns.DescendantNodes()
+                bool invokesBinder = patterns.DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
                     .Any(inv => (inv.Expression is IdentifierNameSyntax bare
-                            && bare.Identifier.Text == "Pack")
+                            && bare.Identifier.Text == "BuildPatternRows")
                         || (inv.Expression is MemberAccessExpressionSyntax qualified
                             && qualified.Name is IdentifierNameSyntax qname
-                            && qname.Identifier.Text == "Pack"));
-                if (!invokesPack)
-                    problems.Add("InformationPanelHandler.UpdatePatterns never invokes Pack — the tested pure function is bypassed");
+                            && qname.Identifier.Text == "BuildPatternRows"));
+                if (!invokesBinder)
+                    problems.Add("InformationPanelHandler.UpdatePatterns never invokes BuildPatternRows — the tested binder is bypassed");
             }
 
             Assert.True(problems.Count == 0,
@@ -2046,7 +2103,7 @@ namespace RadioNavigation.SourceCheck
         /// <summary>
         /// Signal-view gate (SRP): the signal-block state (text + dimmed
         /// flag) must live in SignalPanelView as a pure function (tested in
-        /// SignalPanelViewTests), with
+        /// SignalPanelViewTests), composed by PanelViewBinder, with
         /// InformationPanelHandler.UpdateSignalDisplay applying Text/color
         /// only. A re-inline of the placeholder fails here.
         /// </summary>
@@ -2057,6 +2114,7 @@ namespace RadioNavigation.SourceCheck
 
             var problems = new List<string>();
             TypeDeclarationSyntax view = null;
+            MethodDeclarationSyntax binderSignal = null;
             MethodDeclarationSyntax display = null;
             foreach (var path in ModCompiler.EnumerateSources())
             {
@@ -2066,6 +2124,9 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (type.Identifier.Text == "SignalPanelView")
                         view = type;
+                    if (type.Identifier.Text == "PanelViewBinder")
+                        binderSignal = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "BuildSignalView");
                     if (type.Identifier.Text == "InformationPanelHandler")
                     {
                         display = type.Members.OfType<MethodDeclarationSyntax>()
@@ -2087,6 +2148,23 @@ namespace RadioNavigation.SourceCheck
                 if (!resolves) problems.Add("SignalPanelView.Resolve public static entry point not found");
             }
 
+            if (binderSignal == null)
+            {
+                problems.Add("PanelViewBinder.BuildSignalView not found — block state regressed into the panel");
+            }
+            else
+            {
+                bool invokes = binderSignal.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "Resolve")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "Resolve"));
+                if (!invokes)
+                    problems.Add("PanelViewBinder.BuildSignalView never invokes Resolve — the tested pure function is bypassed");
+            }
+
             if (display == null)
             {
                 problems.Add("InformationPanelHandler.UpdateSignalDisplay not found");
@@ -2102,12 +2180,12 @@ namespace RadioNavigation.SourceCheck
                 bool invokes = display.DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
                     .Any(inv => (inv.Expression is IdentifierNameSyntax bare
-                            && bare.Identifier.Text == "Resolve")
+                            && bare.Identifier.Text == "BuildSignalView")
                         || (inv.Expression is MemberAccessExpressionSyntax qualified
                             && qualified.Name is IdentifierNameSyntax qname
-                            && qname.Identifier.Text == "Resolve"));
+                            && qname.Identifier.Text == "BuildSignalView"));
                 if (!invokes)
-                    problems.Add("InformationPanelHandler.UpdateSignalDisplay never invokes Resolve — the tested pure function is bypassed");
+                    problems.Add("InformationPanelHandler.UpdateSignalDisplay never invokes BuildSignalView — the tested binder is bypassed");
             }
 
             Assert.True(problems.Count == 0,
@@ -2347,8 +2425,9 @@ namespace RadioNavigation.SourceCheck
         /// <summary>
         /// Decoded-display gate (SRP): the decoded text selection + log-once
         /// latch must live in DecodedDisplayTracker (tested in
-        /// DecodedDisplayTrackerTests), with
-        /// InformationPanelHandler.UpdateSignalDisplay delegating. A
+        /// DecodedDisplayTrackerTests), composed by PanelViewBinder, with
+        /// InformationPanelHandler.UpdateSignalDisplay delegating text
+        /// selection and keeping only the log-once latch calls. A
         /// re-inline of the latch field fails here.
         /// </summary>
         [Fact]
@@ -2359,6 +2438,7 @@ namespace RadioNavigation.SourceCheck
             var problems = new List<string>();
             TypeDeclarationSyntax tracker = null;
             TypeDeclarationSyntax panel = null;
+            MethodDeclarationSyntax binderSignal = null;
             MethodDeclarationSyntax display = null;
             foreach (var path in ModCompiler.EnumerateSources())
             {
@@ -2368,6 +2448,9 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (type.Identifier.Text == "DecodedDisplayTracker")
                         tracker = type;
+                    if (type.Identifier.Text == "PanelViewBinder")
+                        binderSignal = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "BuildSignalView");
                     if (type.Identifier.Text == "InformationPanelHandler")
                     {
                         panel = type;
@@ -2408,13 +2491,30 @@ namespace RadioNavigation.SourceCheck
                 problems.Add("type 'InformationPanelHandler' not found in Source/");
             }
 
+            if (binderSignal == null)
+            {
+                problems.Add("PanelViewBinder.BuildSignalView not found — text selection regressed into the panel");
+            }
+            else
+            {
+                bool invokes = binderSignal.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "DisplayText")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "DisplayText"));
+                if (!invokes)
+                    problems.Add("PanelViewBinder.BuildSignalView never invokes DisplayText — the tested class is bypassed");
+            }
+
             if (display == null)
             {
                 problems.Add("InformationPanelHandler.UpdateSignalDisplay not found");
             }
             else
             {
-                foreach (var name in new[] { "DisplayText", "ShouldLog" })
+                foreach (var name in new[] { "BuildSignalView", "ShouldLog" })
                 {
                     bool invokes = display.DescendantNodes()
                         .OfType<InvocationExpressionSyntax>()
@@ -2436,7 +2536,8 @@ namespace RadioNavigation.SourceCheck
         /// <summary>
         /// Reload-lifecycle gate (risk register iter2): cross-scene static
         /// state must be reset on mod reload and DDOL roots Find-guarded.
-        /// CreateStarSky needs a GameObject.Find guard per root or every
+        /// SceneContentBuilder.EnsureSkyRoots needs an Exists guard per root
+        /// (backed by GameObject.Find in UnitySceneContentHost) or every
         /// Main Scene entry stacks another DontDestroyOnLoad duplicate with
         /// a zombie LateUpdate; the OnLoaded reload branch must reset the
         /// camera hook, power bus, type cache and fix pin; Reset must drop
@@ -2448,7 +2549,9 @@ namespace RadioNavigation.SourceCheck
             if (!ModCompiler.HasModSource) return;
 
             var problems = new List<string>();
-            MethodDeclarationSyntax createStarSky = null;
+            MethodDeclarationSyntax ensureSkyRoots = null;
+            MethodDeclarationSyntax hostExists = null;
+            int skyRootCount = 0;
             MethodDeclarationSyntax onLoaded = null;
             MethodDeclarationSyntax placerReset = null;
             foreach (var path in ModCompiler.EnumerateSources())
@@ -2459,10 +2562,29 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (type.Identifier.Text == "ModBootstrapper")
                     {
-                        createStarSky = type.Members.OfType<MethodDeclarationSyntax>()
-                            .FirstOrDefault(m => m.Identifier.Text == "CreateStarSky");
                         onLoaded = type.Members.OfType<MethodDeclarationSyntax>()
                             .FirstOrDefault(m => m.Identifier.Text == "OnLoaded");
+                    }
+                    if (type.Identifier.Text == "SceneContentBuilder")
+                    {
+                        ensureSkyRoots = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "EnsureSkyRoots");
+                        foreach (var field in type.Members.OfType<FieldDeclarationSyntax>())
+                        {
+                            foreach (var variable in field.Declaration.Variables)
+                            {
+                                if (variable.Identifier.Text == "SkyRoots"
+                                    && variable.Initializer != null
+                                    && variable.Initializer.Value is InitializerExpressionSyntax init)
+                                    skyRootCount = init.Expressions.Count;
+                            }
+                        }
+                        foreach (var nested in type.Members.OfType<TypeDeclarationSyntax>())
+                        {
+                            if (nested.Identifier.Text == "UnitySceneContentHost")
+                                hostExists = nested.Members.OfType<MethodDeclarationSyntax>()
+                                    .FirstOrDefault(m => m.Identifier.Text == "Exists");
+                        }
                     }
                     if (type.Identifier.Text == "LighthousePlacer")
                     {
@@ -2473,21 +2595,43 @@ namespace RadioNavigation.SourceCheck
                 }
             }
 
-            if (createStarSky == null)
+            if (skyRootCount < 4)
             {
-                problems.Add("ModBootstrapper.CreateStarSky not found");
+                problems.Add($"SceneContentBuilder.SkyRoots has {skyRootCount} entries, need 4 (StarSkyRoot + ConstellationRoot + PlanetRoot + SunDiscRoot) — a missing root is never created");
+            }
+
+            if (ensureSkyRoots == null)
+            {
+                problems.Add("SceneContentBuilder.EnsureSkyRoots not found");
             }
             else
             {
-                int findGuards = createStarSky.DescendantNodes()
+                bool guards = ensureSkyRoots.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                            && bare.Identifier.Text == "Exists")
+                        || (inv.Expression is MemberAccessExpressionSyntax qualified
+                            && qualified.Name is IdentifierNameSyntax qname
+                            && qname.Identifier.Text == "Exists"));
+                if (!guards)
+                    problems.Add("SceneContentBuilder.EnsureSkyRoots never calls Exists — unguarded DDOL creation stacks duplicates every scene entry");
+            }
+
+            if (hostExists == null)
+            {
+                problems.Add("SceneContentBuilder.UnitySceneContentHost.Exists not found");
+            }
+            else
+            {
+                int findGuards = hostExists.DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
                     .Count(inv => (inv.Expression is IdentifierNameSyntax bare
                             && bare.Identifier.Text == "Find")
                         || (inv.Expression is MemberAccessExpressionSyntax qualified
                             && qualified.Name is IdentifierNameSyntax qname
                             && qname.Identifier.Text == "Find"));
-                if (findGuards < 2)
-                    problems.Add($"ModBootstrapper.CreateStarSky has {findGuards} Find guard(s), need 2 (StarSkyRoot + ConstellationRoot) — unguarded DDOL creation stacks duplicates every scene entry");
+                if (findGuards < 1)
+                    problems.Add("UnitySceneContentHost.Exists has no Find call — the guard never queries the scene, DDOL duplicates stack every scene entry");
             }
 
             if (onLoaded == null)

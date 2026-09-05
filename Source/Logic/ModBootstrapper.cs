@@ -13,8 +13,10 @@ namespace UBOAT.Mods.RadioNavigation
     /// <summary>
     /// Owns the mod's bootstrap lifecycle (P5.5, extracted from Main.cs):
     /// Harmony patch installation, scene-event subscription, per-scene DI
-    /// injection, and Main-Scene radio-panel construction. Main is now a thin
-    /// IUserMod facade that delegates here.
+    /// injection, and Main-Scene radio-panel construction. Scene content
+    /// itself (map components, sky roots, runners) lives in
+    /// SceneContentBuilder. Main is now a thin IUserMod facade that
+    /// delegates here.
     /// </summary>
     [NonSerializedInGameState]
     public sealed class ModBootstrapper
@@ -111,21 +113,12 @@ namespace UBOAT.Mods.RadioNavigation
                 if (radio.IsNull())
                     return;
 
-                AddMapComponents(radio);
+                SceneContentBuilder.Build(radio);
 
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +
                     " radio=created handlers=" + hCount +
                     " visible=" + (RadioHandler.Instance.IsNotNull() ? RadioHandler.Instance.IsVisible.ToString() : "no-instance"));
-
-                CreateStarSky();
-                CreatePlanetRoot();
-                CreateSunDiscRoot();
-
-                LighthousePlacer.EnsureRunning();
-
-                // Phase0 probe (STAR_SKY_PLAN:10, ADR-020) — only when PlayerPrefs RadioNav.Phase0Probe=1
-                StarSkyPhase0Probe.EnsureRunning();
             }
             catch (Exception e)
             {
@@ -200,68 +193,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             RadioInstaller.Instantiate(radio, viewport);
             return radio;
-        }
-
-        private void AddMapComponents(GameObject radio)
-        {
-            if (radio.GetComponent<StationMapOverlay>().IsNull())
-                radio.AddComponent<StationMapOverlay>();
-            if (radio.GetComponent<LighthouseMapMarker>().IsNull())
-                radio.AddComponent<LighthouseMapMarker>();
-            if (radio.GetComponent<StationMapMarker>().IsNull())
-                radio.AddComponent<StationMapMarker>();
-            if (radio.GetComponent<FixMapMarker>().IsNull())
-                radio.AddComponent<FixMapMarker>(); // SEXTANT_PLAN v1.10
-            if (radio.GetComponent<SextantController>().IsNull())
-                radio.AddComponent<SextantController>(); // SEXTANT_PLAN §7.9
-        }
-
-        private void CreateStarSky()
-        {
-            // STAR_SKY: create star sky renderer (ADR-021). Find-guarded like
-            // Planet/Sun roots below: OnSceneStart fires on every Main Scene
-            // entry, and without the guard each entry would stack another
-            // DontDestroyOnLoad duplicate with its own zombie LateUpdate.
-            if (GameObject.Find("StarSkyRoot").IsNull())
-            {
-                GameObject starSkyRoot = new GameObject("StarSkyRoot");
-                starSkyRoot.AddComponent<StarsMesh>();
-                Object.DontDestroyOnLoad(starSkyRoot);
-                Debug.Log("[RadioNav][Main] StarSkyRoot created with StarsMesh component");
-            }
-
-            // STAR_SKY: create constellation lines renderer
-            if (GameObject.Find("ConstellationRoot").IsNull())
-            {
-                GameObject constellationRoot = new GameObject("ConstellationRoot");
-                constellationRoot.AddComponent<ConstellationMesh>();
-                Object.DontDestroyOnLoad(constellationRoot);
-                Debug.Log("[RadioNav][Main] ConstellationRoot created with ConstellationMesh component");
-            }
-        }
-
-        private void CreatePlanetRoot()
-        {
-            // STAR_SKY: create planetary billboard renderer once
-            if (GameObject.Find("PlanetRoot").IsNull())
-            {
-                GameObject planetRoot = new GameObject("PlanetRoot");
-                planetRoot.AddComponent<PlanetRenderer>();
-                Object.DontDestroyOnLoad(planetRoot);
-                Debug.Log("[RadioNav][Main] PlanetRoot created with PlanetRenderer component");
-            }
-        }
-
-        private void CreateSunDiscRoot()
-        {
-            // SEXTANT: real-size filtered sun disc (layer 7, PIP cameras only)
-            if (GameObject.Find("SunDiscRoot").IsNull())
-            {
-                GameObject sunDiscRoot = new GameObject("SunDiscRoot");
-                sunDiscRoot.AddComponent<SunDiscRenderer>();
-                Object.DontDestroyOnLoad(sunDiscRoot);
-                Debug.Log("[RadioNav][Main] SunDiscRoot created with SunDiscRenderer component");
-            }
         }
     }
 }

@@ -254,22 +254,29 @@ namespace UBOAT.Mods.RadioNavigation
             int count = sonneController.StationCount;
             var diags = new StationDiagnostics[count];
             for (int i = 0; i < count; i++)
-                diags[i] = sonneController.GetStationDiagnostics(i);
+                diags[i] = sonneController.StationManager.GetStationDiagnostics(i);
 
-            int displayIndex = 0;
-            foreach (int i in PatternRowPacker.Pack(diags, patternTexts.Length))
+            int recvDots = 0;
+            int recvDashes = 0;
+            if (domIdx >= 0)
             {
-                patternTexts[displayIndex].text = BuildPatternLine(diags[i], i, domIdx);
-
-                if (diags[i].InBeam)
-                    patternTexts[displayIndex].color = Color.green;
-                else
-                    patternTexts[displayIndex].color = new Color(0.6f, 0.6f, 0.6f);
-
-                displayIndex++;
+                recvDots = sonneController.GetReceivedNavigationDotCount();
+                recvDashes = sonneController.GetReceivedNavigationDashCount();
             }
 
-            ClearRemainingPatterns(displayIndex);
+            PanelViewBinder.PatternRow[] rows = PanelViewBinder.BuildPatternRows(
+                diags, domIdx, recvDots, recvDashes, patternTexts.Length);
+            for (int r = 0; r < rows.Length; r++)
+            {
+                patternTexts[r].text = rows[r].Text;
+
+                if (rows[r].InBeam)
+                    patternTexts[r].color = Color.green;
+                else
+                    patternTexts[r].color = new Color(0.6f, 0.6f, 0.6f);
+            }
+
+            ClearRemainingPatterns(rows.Length);
         }
 
         private void ClearPatterns()
@@ -285,37 +292,19 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (stationText.IsNull() || !sonneController.StationCount.IsPositive())
                 return;
-            // F101: no dominant station (-1) must not show the default
-            // diagnostics phase ("[Pause]") of a non-existent station.
-            if (domIdx < 0)
-            {
-                stationText.text = stationBaseText;
-                return;
-            }
-            var diag = sonneController.GetStationDiagnostics(domIdx);
-            stationText.text = PatternLineFormatter.StationSuffix(
-                stationBaseText, diag.SchedulerPhase, diag.NavigationElapsed);
+            StationDiagnostics domDiag = default(StationDiagnostics);
+            if (domIdx >= 0)
+                domDiag = sonneController.StationManager.GetStationDiagnostics(domIdx);
+            stationText.text = PanelViewBinder.BuildStationText(stationBaseText, domIdx, domDiag);
 
 #if DEBUG
             // F88: phase/diag are scoped to the else branch; the log
             // block used to live outside it and broke DEBUG builds.
             Debug.Log("[RadioNav][PANEL] domIdx=" + domIdx +
-                " phase=" + diag.SchedulerPhase.ToString() +
-                " navElapsed=" + diag.NavigationElapsed.ToString("F1") +
+                " phase=" + domDiag.SchedulerPhase.ToString() +
+                " navElapsed=" + domDiag.NavigationElapsed.ToString("F1") +
                 " stationText=[" + stationText.text + "]");
 #endif
-        }
-
-        private string BuildPatternLine(StationDiagnostics diag, int i, int domIdx)
-        {
-            int recvDots = 0;
-            int recvDashes = 0;
-            if (i == domIdx)
-            {
-                recvDots = sonneController.GetReceivedNavigationDotCount();
-                recvDashes = sonneController.GetReceivedNavigationDashCount();
-            }
-            return PatternLineFormatter.BuildLine(diag, i, domIdx, recvDots, recvDashes);
         }
 
         private void ClearRemainingPatterns(int displayIndex)
@@ -334,8 +323,7 @@ namespace UBOAT.Mods.RadioNavigation
             string rich = inZone ? sonneController.GetSignalRichText() : null;
             string decoded = inZone ? sonneController.GetDecodedText() : null;
 
-            SignalPanelView.State view = SignalPanelView.Resolve(
-                rich, DecodedDisplayTracker.DisplayText(decoded));
+            SignalPanelView.State view = PanelViewBinder.BuildSignalView(rich, decoded);
             signalText.text = view.SignalText;
             signalText.color = view.Dimmed ? Color.gray : Color.white;
 

@@ -44,11 +44,7 @@ namespace UBOAT.Mods.RadioNavigation
         // Unified perceptual model lives in LighthouseVisualModel (pure math,
         // unit-tested). Dot/streak layer constants and layout math live in
         // LighthouseDotLayout (P5.4 LBG-2); pixel sizes come from the model.
-        private const float BeamVisibleAngleDeg = 60f;
-        // Native flare is replaced by the screen-space dot beyond this range
-        // (mirrors LighthouseFlareDriver.FlareMaxDistanceM; kept here for
-        // the dot-takeover decision in FlareActiveByLogic).
-        private const float FlareMaxDistanceM = 1200f;
+        // Beam cone + flare-takeover gates live in LighthouseBeamGate.
         // The game hard-codes the periscope/binocular camera far clip to 11000
         // (Periscope.cs:1249). Lighthouses sit beyond it (12+ km), so the
         // device view culls them entirely. Raise the clip while a device
@@ -220,7 +216,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             // B_wide: the real rotating beam is fully bright while it points
-            // at the player and fades out past BeamVisibleAngleDeg.
+            // at the player and fades out past the visible angle (gate).
             float beamFactor = GetBeamVisibilityFactor(worldPosition);
             if (beamFactor <= 0.01f)
             {
@@ -260,9 +256,15 @@ namespace UBOAT.Mods.RadioNavigation
 
         private bool IsFlareTakingOver(Vector3 worldPosition, float distance)
         {
-            bool beyondFarClip = renderingCamera.IsNotNull() &&
-                distance > renderingCamera.farClipPlane * 0.9f;
-            return FlareActiveByLogic(worldPosition, distance) && !beyondFarClip;
+            return LighthouseBeamGate.FlareTakesOver(
+                flareDriver.HasFlare,
+                flareDriver.LensFlare.IsNotNull(),
+                spotLightDriver.IsNight,
+                renderingCamera.IsNotNull(),
+                IsDeviceCamera(renderingCamera),
+                distance,
+                renderingCamera.IsNotNull() ? renderingCamera.farClipPlane : 0f,
+                GetBeamVisibilityFactor(worldPosition));
         }
 
         private bool IsNightVisible()
@@ -277,7 +279,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private bool IsOnScreen(Vector3 screen)
         {
-            return screen.x >= 0f && screen.x <= Screen.width && screen.y >= 0f && screen.y <= Screen.height;
+            return LighthouseBeamGate.IsOnScreen(screen.x, screen.y, Screen.width, Screen.height);
         }
 
         private void LogDotModel(Vector3 worldPosition, float distance, float fogDot,
@@ -351,30 +353,6 @@ namespace UBOAT.Mods.RadioNavigation
         private bool DotWillLog(bool enabled)
         {
             return dotUi.Built && dotWasActive != enabled;
-        }
-
-        /// <summary>
-        /// Mirror of the flare driver's activation decision (night, camera,
-        /// distance cap, beam gate). Deterministic per frame — unlike
-        /// RenderingNow(), which depends on renderer.isVisible and
-        /// flickers while the bounds inflation is active.
-        /// </summary>
-        private bool FlareActiveByLogic(Vector3 worldPosition, float distance)
-        {
-            if (!flareDriver.HasFlare || !flareDriver.LensFlare.IsNotNull() || !spotLightDriver.IsNight || renderingCamera == null || rotator.IsNull())
-            {
-                return false;
-            }
-            // In the device view (periscope/binocular/UZO) the flare is the
-            // only working renderer — the game itself has no distance limit
-            // for its lighthouse flare (LighthouseLight.cs), and the
-            // screen-space dot cannot be positioned there. In FPP the dot
-            // takes over beyond FlareMaxDistanceM.
-            if (!IsDeviceCamera(renderingCamera) && distance > FlareMaxDistanceM)
-            {
-                return false;
-            }
-            return GetBeamVisibilityFactor(worldPosition) > 0.01f;
         }
 
         private void OnDestroy()
@@ -520,10 +498,9 @@ namespace UBOAT.Mods.RadioNavigation
 
 
         /// <summary>
-        /// Beam visibility factor: the lighthouse light is directed along
-        /// the horizon like a flashlight. Factor is 1 while the beam points
-        /// at the player and fades smoothly to 0 once the beam has rotated
-        /// more than BeamVisibleAngleDeg away around the Y axis.
+        /// Beam visibility factor via LighthouseBeamGate (extracted): the
+        /// directed beam is fully bright while it points at the player and
+        /// fades smoothly past the visible angle around the Y axis.
         /// </summary>
         private float GetBeamVisibilityFactor(Vector3 worldPosition)
         {
@@ -531,16 +508,9 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 return 1f;
             }
-            Vector3 toCamera = (renderingCamera.transform.position - worldPosition).normalized;
-            Vector3 flat = new Vector3(toCamera.x, 0f, toCamera.z);
-            if (flat.sqrMagnitude < 0.0001f)
-            {
-                return 1f;
-            }
-            flat.Normalize();
-            float angle = Mathf.Acos(Mathf.Clamp(Vector3.Dot(rotator.forward, flat), -1f, 1f)) * Mathf.Rad2Deg;
-            float t = Mathf.Clamp01(1f - angle / BeamVisibleAngleDeg);
-            return Mathf.SmoothStep(0f, 1f, t);
+            Vector3 toCamera = renderingCamera.transform.position - worldPosition;
+            return (float)LighthouseBeamGate.BeamFactor(
+                rotator.forward.x, rotator.forward.z, toCamera.x, toCamera.z);
         }
     }
 }

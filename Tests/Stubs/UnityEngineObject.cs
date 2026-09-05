@@ -11,6 +11,8 @@ namespace UnityEngine
 
         public void DestroySelf() { destroyed = true; }
 
+        public static void DontDestroyOnLoad(Object target) { }
+
         public static bool operator ==(Object a, Object b)
         {
             bool aNull = ReferenceEquals(a, null) || a.destroyed;

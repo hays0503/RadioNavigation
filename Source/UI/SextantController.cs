@@ -1,16 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Reflection;
 using System.Text;
 using DWS.Common.InjectionFramework;
 using DWS.Common.Resources;
-using PlayWay.Water;
 using UBOAT.Game.Core.Input;
 using UBOAT.Game.Scene.Camera;
 using UBOAT.Game.Scene.Environment;
 using UnityEngine;
-using UnityEngine.Rendering.PostProcessing;
 using UnityEngine.UI;
 
 namespace UBOAT.Mods.RadioNavigation
@@ -32,25 +28,13 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
 
-        // §13.3 overlay layout constants live in SextantOverlay (extracted);
-        // only the RT size stays here (PIP camera creation).
-        private const int RtWidth = 512;
-        private const int RtHeight = 512;
-
-        private const float RateDegPerSec = 2f;
-        private const float ShiftMultiplier = 5f;
-        // Fine adjustment (Ctrl+arrows): one micrometer-drum tick per step,
-        // 0.2' = 12" = exactly one display quantum (SextantArc.StepsPerDeg).
-        private const int FineStepQuant = 1;
-        private const float FineRepeatDelay = 0.3f;
-        private const float FineRepeatInterval = 0.15f;
+        // Arc input step math + fine-drum repeat live in SextantArcInput
+        // (extracted, P5.4 slice 4b); the controller keeps key polling.
+        private readonly SextantArcInput arcInput = new SextantArcInput();
         // Vector telemetry lives in SextantVectorLog (extracted).
         private readonly SextantVectorLog vectorLog = new SextantVectorLog();
-        // Zoom steps (divisor on the main camera's FOV): index 2 = default 3x.
-        // Smaller divisor = closer view. Buttons/keys shift the index.
-        private static readonly float[] ZoomSteps = { 6f, 4.5f, 3f, 2f, 1.5f, 1f };
-        private int zoomIndex = 2;
-        private float PipFovDivisor { get { return ZoomSteps[zoomIndex]; } }
+        // Ocular zoom steps live in SextantZoom (extracted, P5.4 slice 4a).
+        private readonly SextantZoom zoom = new SextantZoom();
         private const float PainOnGlare = 0.6f;
         private const float PainOffGlare = 0.5f;
 
@@ -61,9 +45,10 @@ namespace UBOAT.Mods.RadioNavigation
         internal double arcAngle;
         private int leftFilterCount;
         private int rightFilterCount;
-        private float fineRepeatTimer;
         private bool pain;
-        private double lastFormattedArc = double.MinValue;
+        // Reading-column text lives in SextantReadout (extracted, P5.4
+        // slice 4d); the controller applies Text/color.
+        private readonly SextantReadout readout = new SextantReadout();
         // RT pixel probe lives in SextantRenderCheck (extracted).
         private readonly SextantRenderCheck renderCheck = new SextantRenderCheck();
         // Star/sun identification cycle lives in SextantStarId (extracted).
@@ -77,26 +62,18 @@ namespace UBOAT.Mods.RadioNavigation
         // (extracted): TOD_Sky is read via cached reflection there.
         private readonly SextantGameSun gameSun = new SextantGameSun();
 
-        // Water + post stack wiring for the PIP cameras (SEXTANT_PLAN v1.6):
-        // the game's render pipeline renders water only for cameras listed on
-        // the main camera's UBOAT.Game.Scene.Rendering.AdditionalCameraData
-        // (periscope pattern, Periscope.cs:581), and without a
-        // PostProcessLayer the HDR sky/sea clip to pure white.
-        private Camera pipLeftCamera;
-        private Camera pipRightCamera;
-        private RenderTexture leftRt;
-        private RenderTexture rightRt;
+        // PIP camera lifecycle (creation/attach/teardown) lives in
+        // SextantPipFactory (extracted, P5.4 slice 4a); the controller keeps
+        // pose, input and readout. Water renders only for cameras listed on
+        // the main camera's AdditionalCameraData (periscope pattern).
+        private readonly SextantPipFactory pipFactory = new SextantPipFactory();
         private RawImage leftViewImage;
         private RawImage rightViewImage;
-        private UBOAT.Game.Scene.Rendering.AdditionalCameraData registeredWaterData;
-        private bool waterAttachWarned;
 
         // 1:1 mirror of the main camera's rendering stack lives in
-        // SextantEffectMirror (extracted); the controller keeps the live
-        // source references it feeds to the mirror each frame.
+        // SextantEffectMirror (extracted); mirror sources live in the PIP
+        // factory, refreshed from the pose each frame.
         private readonly SextantEffectMirror effectMirror = new SextantEffectMirror();
-        private Component sourceSsmsFog;
-        private Component sourceSsms;
 
         private GameObject canvasRoot;
         private Image filterDimLeftImage;
@@ -122,70 +99,16 @@ namespace UBOAT.Mods.RadioNavigation
         // (extracted): sights, card text, course/speed track sampler.
         private SextantWorksheet worksheet;
 
-        // SUNDRIFT calibration (v1.10): solved against the game sun on each
-        // open, persisted in PlayerPrefs, applied to all worksheet ephemeris.
-        private const string SunCalibrationPrefsKey = "RadioNav.SunCalibrationMinutes";
+        // SUNDRIFT calibration lifecycle lives in SunCalibrator
+        // (extracted, P5.4 slice 4c): solved on open, persisted, applied
+        // to all worksheet ephemeris.
+        private readonly SunCalibrator calibrator = new SunCalibrator();
 
         private void Awake()
         {
             worksheet = new SextantWorksheet(positionProvider);
             bodiesReadout = new SextantBodiesReadout(positionProvider);
-            float saved = PlayerPrefs.GetFloat(SunCalibrationPrefsKey, 0f);
-            if (Math.Abs(saved) > 1e-4)
-            {
-                SunEphemerisCalibration.SetDelta(saved);
-                Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} SUNDRIFT calibration loaded: {1:F2} min",
-                    LogPrefix, saved));
-            }
-        }
-
-        /// <summary>
-        /// Solves the ephemeris time shift against the game sun direction
-        /// (cheap: ~70 ephemeris evaluations once per open) and persists it.
-        /// Keeps the previous calibration when the game sun is unavailable
-        /// or the residual is too large to trust.
-        /// </summary>
-        private void SolveSunCalibration()
-        {
-            float latF, lonF;
-            if (!positionProvider.TryGetPosition(out latF, out lonF))
-                return;
-            Vector3 gameDir;
-            float gameAlt;
-            if (!TryGetGameSun(out gameDir, out gameAlt))
-                return;
-
-            // v1.13: never re-solve mid-series — observation 1 was recorded
-            // under the stored Δt, a new Δt would put the two sights on
-            // different ephemerides and skew the LOPs. Re-solving happens
-            // only when the next open starts with an empty series.
-            if (worksheet.SeriesActive)
-            {
-                Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} SUNDRIFT calibration kept: dt={1:F2} min (series active)",
-                    LogPrefix, SunEphemerisCalibration.DeltaMinutes));
-                return;
-            }
-
-            DateTime utc = GameTimeResolver.GetUtcNow();
-            double delta, residual;
-            if (SunEphemerisCalibration.SolveDelta(utc, latF, lonF,
-                    gameDir.x, gameDir.y, gameDir.z, out delta, out residual))
-            {
-                SunEphemerisCalibration.SetDelta(delta);
-                PlayerPrefs.SetFloat(SunCalibrationPrefsKey, (float)delta);
-                Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "{0} SUNDRIFT calibration solved: dt={1:F2} min residual={2:F3} deg",
-                    LogPrefix, delta, residual));
-            }
-            else
-            {
-                Debug.LogWarning(string.Format(CultureInfo.InvariantCulture,
-                    "{0} SUNDRIFT calibration rejected: residual={1:F3} deg - keeping previous",
-                    LogPrefix, residual));
-            }
-            worksheet.InvalidateCard(); // card shows the calibration line
+            calibrator.Load();
         }
 
         [Inject] private static ResourceManager resourceManager = null;
@@ -207,7 +130,7 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdatePipPose();
                 if (vectorLog.OnViewRotate(viewCamera))
                     LogVectorState("rotate");
-                renderCheck.Update(Time.unscaledDeltaTime, arcAngle, leftRt, rightRt);
+                renderCheck.Update(Time.unscaledDeltaTime, arcAngle, pipFactory.LeftRt, pipFactory.RightRt);
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
@@ -226,23 +149,11 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (IsOpen && gameInput != null)
                 gameInput.RemoveBlockade(this);
-            DetachWaterCameras();
+            pipFactory.Destroy();
             IsOpen = false;
 
             if (canvasRoot != null) Destroy(canvasRoot);
-            if (pipLeftCamera != null) Destroy(pipLeftCamera.gameObject);
-            if (pipRightCamera != null) Destroy(pipRightCamera.gameObject);
             bloomCut.Destroy();
-            if (leftRt != null)
-            {
-                leftRt.Release();
-                Destroy(leftRt);
-            }
-            if (rightRt != null)
-            {
-                rightRt.Release();
-                Destroy(rightRt);
-            }
             if (ringTexture != null) Destroy(ringTexture);
             if (circleMaskTexture != null) Destroy(circleMaskTexture);
             if (eyecupTexture != null) Destroy(eyecupTexture);
@@ -257,8 +168,9 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             EnsureOverlay();
-            EnsurePipCameras();
-            SolveSunCalibration();
+            pipFactory.Ensure(viewCamera, zoom.FovDivisor, leftViewImage, rightViewImage,
+                effectMirror, bloomCut, this);
+            calibrator.Solve(positionProvider, gameSun, worksheet);
 
             ResetReadingState();
 
@@ -301,7 +213,7 @@ namespace UBOAT.Mods.RadioNavigation
             rightFilterCount = 0;
             starId.Reset();
             pain = false;
-            lastFormattedArc = double.MinValue;
+            readout.Reset();
             worksheet.InvalidateCard();
             bodiesReadout.Invalidate();
             gameSun.ResetDriftTimer(); // force the first SUNDRIFT line on open
@@ -314,33 +226,24 @@ namespace UBOAT.Mods.RadioNavigation
         {
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
-            AttachWaterCameras();
+            pipFactory.AttachToMain();
             // Attached cameras are rendered via MainCamera's pass list;
             // keep enabled=false like periscope's small view. Standalone
             // cameras (not attached) need enabled=true.
-            if (pipLeftCamera != null)
-                pipLeftCamera.enabled = registeredWaterData == null;
+            if (pipFactory.LeftCamera != null)
+                pipFactory.LeftCamera.enabled = !pipFactory.WaterAttached;
             // The right camera must re-render with the updated pose: the
             // attached pass list does not refresh it, so keep it enabled.
-            if (pipRightCamera != null)
-                pipRightCamera.enabled = true;
-            int attachedCount = 0;
-            if (registeredWaterData != null)
-            {
-                try { attachedCount = registeredWaterData.AttachedCameras.Count; }
-                catch (Exception e)
-                {
-                    if (WarnOnce.ShouldLog("SextantController.AttachedCameras"))
-                        Debug.LogWarning("[RadioNav][Sextant] AttachedCameras read failed: " + e.Message);
-                }
-            }
+            if (pipFactory.RightCamera != null)
+                pipFactory.RightCamera.enabled = true;
+            int attachedCount = pipFactory.AttachedCount();
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} ATTACH water={1} attached={2} leftEn={3} rightEn={4} fov={5:F1} pipFov={6:F1}",
-                LogPrefix, registeredWaterData != null, attachedCount,
-                pipLeftCamera != null && pipLeftCamera.enabled,
-                pipRightCamera != null && pipRightCamera.enabled,
+                LogPrefix, pipFactory.WaterAttached, attachedCount,
+                pipFactory.LeftCamera != null && pipFactory.LeftCamera.enabled,
+                pipFactory.RightCamera != null && pipFactory.RightCamera.enabled,
                 viewCamera != null ? viewCamera.fieldOfView : 0f,
-                viewCamera != null ? viewCamera.fieldOfView / PipFovDivisor : 0f));
+                viewCamera != null ? viewCamera.fieldOfView / zoom.FovDivisor : 0f));
             UpdatePipPose();
             LogVectorState("open");
             IsOpen = true;
@@ -356,7 +259,7 @@ namespace UBOAT.Mods.RadioNavigation
             float ownAlt, ownAz, gameAlt;
             bool ownOk = TryGetOwnSun(out ownDir, out ownAlt, out ownAz);
             bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
-            vectorLog.Log(trigger, pipLeftCamera, pipRightCamera, viewCamera, arcAngle,
+            vectorLog.Log(trigger, pipFactory.LeftCamera, pipFactory.RightCamera, viewCamera, arcAngle,
                 ownOk, ownDir, ownAlt, ownAz, gameOk, gameDir, gameAlt);
         }
 
@@ -368,75 +271,17 @@ namespace UBOAT.Mods.RadioNavigation
             IsOpen = false;
             if (gameInput != null)
                 gameInput.RemoveBlockade(this);
-            DetachWaterCameras();
+            pipFactory.Detach();
             SunDiscRenderer.Active = false;
             SunDiscRenderer.ResetDirection();
             bloomCut.Hide();
-            if (pipLeftCamera != null)
-                pipLeftCamera.enabled = false;
-            if (pipRightCamera != null)
-                pipRightCamera.enabled = false;
+            if (pipFactory.LeftCamera != null)
+                pipFactory.LeftCamera.enabled = false;
+            if (pipFactory.RightCamera != null)
+                pipFactory.RightCamera.enabled = false;
             if (canvasRoot != null)
                 canvasRoot.SetActive(false);
             Debug.Log(LogPrefix + " closed");
-        }
-
-        // Water renders itself only for cameras listed on the main camera's
-        // AdditionalCameraData (periscope pattern, Periscope.cs:581).
-        // Must be MainCamera, not the transient viewCamera (device probe).
-        private void AttachWaterCameras()
-        {
-            if (pipLeftCamera == null && pipRightCamera == null)
-                return;
-            MainCamera main = MainCamera.Instance;
-            if (main == null)
-                main = FindObjectOfType<MainCamera>();
-            if (main == null)
-                return;
-
-            UBOAT.Game.Scene.Rendering.AdditionalCameraData data =
-                main.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
-            if (data == null)
-            {
-                if (!waterAttachWarned)
-                {
-                    waterAttachWarned = true;
-                    Debug.LogWarning(LogPrefix + " main camera lacks AdditionalCameraData - no water in PIP");
-                }
-                return;
-            }
-
-            registeredWaterData = data;
-            // The game's list itself can be null after an update — guard the
-            // deref, not just the component.
-            if (data.AttachedCameras == null)
-            {
-                if (WarnOnce.ShouldLog("SextantController.AttachedCamerasList"))
-                    Debug.LogWarning(LogPrefix + " AdditionalCameraData.AttachedCameras is null - no water in PIP");
-                return;
-            }
-            if (pipLeftCamera != null)
-            {
-                data.AttachedCameras.Remove(pipLeftCamera);
-                data.AttachedCameras.Add(pipLeftCamera);
-            }
-            if (pipRightCamera != null)
-            {
-                data.AttachedCameras.Remove(pipRightCamera);
-                data.AttachedCameras.Add(pipRightCamera);
-            }
-        }
-
-        private void DetachWaterCameras()
-        {
-            if (registeredWaterData != null && registeredWaterData.AttachedCameras != null)
-            {
-                if (pipLeftCamera != null)
-                    registeredWaterData.AttachedCameras.Remove(pipLeftCamera);
-                if (pipRightCamera != null)
-                    registeredWaterData.AttachedCameras.Remove(pipRightCamera);
-            }
-            registeredWaterData = null;
         }
 
         // §13.4 camera gate: sextant exists only in live deck views.
@@ -471,7 +316,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (Input.GetKey(KeyCode.DownArrow)) dir -= 1f;
             if (dir == 0f)
             {
-                fineRepeatTimer = 0f;
+                arcInput.ResetFineHold();
                 return;
             }
 
@@ -481,26 +326,14 @@ namespace UBOAT.Mods.RadioNavigation
                 // Fine adjustment: one drum tick (0.2' = 1 quantum) per press,
                 // hold repeats after a short delay - like turning the drum.
                 bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
-                if (pressed)
-                {
-                    fineRepeatTimer = FineRepeatDelay;
-                    StepArcFine(dir);
-                    return;
-                }
-                fineRepeatTimer -= dt;
-                if (fineRepeatTimer <= 0f)
-                {
-                    fineRepeatTimer = FineRepeatInterval;
-                    StepArcFine(dir);
-                }
+                if (arcInput.AdvanceFineHold(dt, pressed))
+                    arcAngle = SextantArcInput.StepFine(arcAngle, dir);
                 return;
             }
 
             LogArcInputVector(dt);
 
-            bool fast = ShiftHeld();
-            float rate = RateDegPerSec * (fast ? ShiftMultiplier : 1f);
-            arcAngle = SextantArc.Quantize(arcAngle + dir * rate * dt);
+            arcAngle = SextantArcInput.StepCoarse(arcAngle, dir, dt, ShiftHeld());
         }
 
         /// <summary>Hold/press vector telemetry on plain (non-Ctrl) input.</summary>
@@ -514,12 +347,6 @@ namespace UBOAT.Mods.RadioNavigation
                 vectorLog.OnArcPressed();
             if (pressed || holdDue)
                 LogVectorState(pressed ? "press" : "hold");
-        }
-
-        /// <summary>One fine-adjustment step (0.2' drum tick), always on-grid.</summary>
-        private void StepArcFine(float dir)
-        {
-            arcAngle = SextantArc.Quantize(arcAngle + dir * FineStepQuant / SextantArc.StepsPerDeg);
         }
 
         // Rotate telemetry lives in SextantVectorLog.OnViewRotate (Update
@@ -569,26 +396,22 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void ZoomIn()
         {
-            if (zoomIndex <= 0)
-                return;
-            zoomIndex--;
-            LogZoom();
+            if (zoom.ZoomIn())
+                LogZoom();
         }
 
         private void ZoomOut()
         {
-            if (zoomIndex >= ZoomSteps.Length - 1)
-                return;
-            zoomIndex++;
-            LogZoom();
+            if (zoom.ZoomOut())
+                LogZoom();
         }
 
         private void LogZoom()
         {
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} ZOOM div={1:F1} fov={2:F1}",
-                LogPrefix, PipFovDivisor,
-                viewCamera != null ? viewCamera.fieldOfView / PipFovDivisor : 0f));
+                LogPrefix, zoom.FovDivisor,
+                viewCamera != null ? viewCamera.fieldOfView / zoom.FovDivisor : 0f));
         }
 
         private void SetFilters(int count, bool leftSide)
@@ -610,7 +433,7 @@ namespace UBOAT.Mods.RadioNavigation
             SunDiscRenderer.Active = IsOpen && rightFilterCount > 0;
 
             bloomCut.Update(IsOpen, leftFilterCount, rightFilterCount);
-            bloomCut.LogAppliedOnce(pipLeftCamera, pipRightCamera, viewCamera, leftFilterCount, rightFilterCount);
+            bloomCut.LogAppliedOnce(pipFactory.LeftCamera, pipFactory.RightCamera, viewCamera, leftFilterCount, rightFilterCount);
         }
 
         private void UpdateFilterDim()
@@ -620,242 +443,23 @@ namespace UBOAT.Mods.RadioNavigation
             if (filterDimLeftImage != null)
             {
                 Color c = filterDimLeftImage.color;
-                c.a = 0.30f * leftFilterCount;
+                c.a = SextantReadout.FilterDimAlpha(leftFilterCount);
                 filterDimLeftImage.color = c;
             }
             if (filterDimRightImage != null)
             {
                 Color c = filterDimRightImage.color;
-                c.a = 0.30f * rightFilterCount;
+                c.a = SextantReadout.FilterDimAlpha(rightFilterCount);
                 filterDimRightImage.color = c;
             }
         }
 
-        // ---- PIP cameras ------------------------------------------------------
-
-        private void EnsurePipCameras()
-        {
-            if (pipLeftCamera != null && pipRightCamera != null)
-                return;
-
-            leftRt = new RenderTexture(RtWidth, RtHeight, 32, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
-            leftRt.name = "RadioNavSextantLeftRT";
-            rightRt = new RenderTexture(RtWidth, RtHeight, 32, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
-            rightRt.name = "RadioNavSextantRightRT";
-
-            pipLeftCamera = ConfigurePipCamera("RadioNavSextantLeftCamera", leftRt, false);
-            pipRightCamera = ConfigurePipCamera("RadioNavSextantRightCamera", rightRt, true);
-
-            if (leftViewImage != null) leftViewImage.texture = leftRt;
-            if (rightViewImage != null) rightViewImage.texture = rightRt;
-
-            Debug.Log(LogPrefix + " PIP cameras created, RT=" + RtWidth + "x" + RtHeight);
-        }
-
-        private Camera ConfigurePipCamera(string name, RenderTexture target, bool rightSide)
-        {
-            GameObject go = new GameObject(name);
-            if (viewCamera == null)
-            {
-                if (WarnOnce.ShouldLog("SextantController.ConfigurePipCamera"))
-                    Debug.LogWarning(LogPrefix + " viewCamera is null, cannot configure " + name);
-                UnityEngine.Object.Destroy(go);
-                return null;
-            }
-            Camera cam = go.AddComponent<Camera>();
-            cam.CopyFrom(viewCamera);
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = Color.black;
-            cam.targetTexture = target;
-            cam.fieldOfView = viewCamera.fieldOfView / PipFovDivisor;
-            cam.enabled = false;
-            // Sun disc layer (7): rendered only by the PIP cameras; the bit
-            // is absent from every stock camera mask, so the main view
-            // never sees the disc.
-            cam.cullingMask |= SunDiscRenderer.SunDiscLayerMask;
-
-            // The game's render pipeline renders water only for cameras
-            // registered on the main camera's AdditionalCameraData
-            // (periscope pattern, Periscope.cs:581).
-            UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd =
-                go.AddComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
-            pipAdd.RenderScene = true;
-            SextantRenderPasses.Setup(pipAdd,
-                viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>(),
-                cam.cullingMask);
-            try
-            {
-                var mainAdd = viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
-                if (mainAdd != null)
-                    pipAdd.ShadowDistance = mainAdd.ShadowDistance;
-            }
-            catch (Exception e)
-            {
-                if (WarnOnce.ShouldLog("SextantController.ShadowDistance"))
-                    Debug.LogWarning("[RadioNav][Sextant] ShadowDistance mirror failed: " + e.Message);
-            }
-
-            // 1:1 mirror of the main camera's rendering stack: PPv2
-            // PostProcessLayer + legacy PostProcessingBehaviour + SSMSGlobalFog
-            // + SSMS, copied in the exact component order of the FPP camera,
-            // so the SRP renders the PIP views with the same fog/post look.
-            ResolveMirrorSources();
-            effectMirror.AddMirroredEffectComponents(viewCamera, go);
-
-            // PlayWay renders the sea only for cameras carrying a WaterCamera
-            // (waterCamerasCache registry; HullEffectsRenderer.GetWaterCamera
-            // null-check skips water otherwise). Pattern: EntitySelectionCamera
-            // (disabled camera, manual Render(), WaterCamera in prefab).
-            try
-            {
-                WaterCamera waterCam = go.AddComponent<WaterCamera>();
-                Debug.Log(LogPrefix + " WATERCAM added to " + name + ": " + (waterCam != null));
-
-                // A raw WaterCamera is empty: PlayWay needs the config the
-                // main camera's component carries (Water reference, custom
-                // water render list, enable flags). Mirror it 1:1 so the sea
-                // is drawn for the PIP camera as well.
-                if (waterCam != null)
-                {
-                    WaterCamera mainWater = viewCamera.GetComponent<WaterCamera>();
-                    if (mainWater != null)
-                    {
-                        effectMirror.MirrorComponent(mainWater, waterCam);
-                        Debug.Log(LogPrefix + " WATERCAM copied to " + name + " from main camera");
-                    }
-                    else
-                    {
-                        Debug.LogWarning(LogPrefix + " WATERCAM mirror source missing, raw component on " + name);
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning(LogPrefix + " WATERCAM add failed: " + e.Message);
-            }
-
-            cam.depthTextureMode = viewCamera.depthTextureMode;
-
-            // Bloom-cut: PPv2 volume on a PIP-only layer. While a filter is
-            // installed the sun's glow is disabled inside that half's lens;
-            // the main camera's PostProcessLayer never consumes this layer,
-            // so the FPP view keeps its normal bloom.
-            bloomCut.EnsureVolume(go, rightSide);
-
-            SextantCameraProbe probe = go.AddComponent<SextantCameraProbe>();
-            probe.tracked = cam;
-            probe.owner = this;
-
-            return cam;
-        }
-
-        private void ResolveMirrorSources()
-        {
-            if (sourceSsmsFog != null || viewCamera == null)
-                return;
-            sourceSsmsFog = FindComponent(viewCamera, "SSMSGlobalFog");
-            sourceSsms = FindComponent(viewCamera, "SSMS");
-        }
-
-        private static Component FindComponent(Camera cam, string typeName)
-        {
-            MonoBehaviour[] comps = cam.GetComponents<MonoBehaviour>();
-            for (int i = 0; i < comps.Length; i++)
-            {
-                if (comps[i] != null && comps[i].GetType().Name == typeName)
-                    return comps[i];
-            }
-            return null;
-        }
-
-
-        private void RefreshMirroredState()
-        {
-            effectMirror.RefreshSsms(sourceSsmsFog, sourceSsms);
-        }
-
+        // Per-frame pose lives in SextantPipPose (extracted, P5.4 slice
+        // 4b); the manual-render telemetry closure stays here.
         private void UpdatePipPose()
         {
-            if (pipLeftCamera == null || pipRightCamera == null)
-                return;
-            if (!CameraResolver.TryResolve(out viewCamera) || viewCamera == null)
-                return;
-
-            Transform mt = viewCamera.transform;
-            Vector3 mainEuler = mt.eulerAngles;
-            pipLeftCamera.transform.position = mt.position;
-            pipLeftCamera.transform.rotation = Quaternion.Euler(0f, mainEuler.y, 0f);
-            pipRightCamera.transform.position = mt.position;
-            // Positive Euler X pitches DOWN in Unity; the alidade looks UP.
-            pipRightCamera.transform.rotation = Quaternion.Euler(-(float)arcAngle, mainEuler.y, 0f);
-
-            SyncCameraState(pipLeftCamera, viewCamera);
-            SyncCameraState(pipRightCamera, viewCamera);
-            RefreshMirroredState();
-
-            // The game's SRP renders attached cameras once and never
-            // refreshes them with the updated pose; force the render so the
-            // right RT follows the alidade.
-            if (SextantVectorLog.Enabled)
-                vectorLog.OnManualRender(arcAngle);
-            try
-            {
-                pipLeftCamera.Render();
-                pipRightCamera.Render();
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning(LogPrefix + " MANUALRENDER failed: " + e.Message);
-            }
-        }
-
-        private void SyncCameraState(Camera cam, Camera source)
-        {
-            cam.fieldOfView = source.fieldOfView / PipFovDivisor;
-            cam.cullingMask = source.cullingMask | SunDiscRenderer.SunDiscLayerMask;
-            // Keep the SRP pass mask in sync with the live cullingMask
-            try
-            {
-                var pipAdd = cam.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
-                if (pipAdd != null)
-                {
-                    Array passes = pipAdd.Passes as Array;
-                    if (passes != null)
-                    {
-                        foreach (object p in passes)
-                        {
-                            var prop = p.GetType().GetProperty("CullingMask");
-                            if (prop != null && prop.CanWrite)
-                                prop.SetValue(p, cam.cullingMask);
-                            else
-                            {
-                                FieldInfo f = p.GetType().GetField("cullingMask", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-                                if (f != null) f.SetValue(p, cam.cullingMask);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                // Culling/sun-layer divergence must surface once instead of
-                // silently rendering a wrong PIP stack every pose update.
-                if (WarnOnce.ShouldLog("SextantController.SyncCameraState"))
-                    Debug.LogWarning("[RadioNav][Sextant] SyncCameraState failed: " + e.Message);
-            }
-        }
-
-        private Vector3 GetPipForward()
-        {
-            if (pipRightCamera != null)
-                return pipRightCamera.transform.forward;
-            float yaw = 0f;
-            if (viewCamera != null)
-                yaw = viewCamera.transform.eulerAngles.y;
-            else if (gameMainCamera != null)
-                yaw = gameMainCamera.transform.eulerAngles.y;
-            Quaternion rot = Quaternion.Euler(-(float)arcAngle, yaw, 0f);
-            return rot * Vector3.forward;
+            SextantPipPose.Update(pipFactory, arcAngle, zoom.FovDivisor,
+                ref viewCamera, () => vectorLog.OnManualRender(arcAngle));
         }
 
         // ---- glare -----------------------------------------------------------
@@ -891,10 +495,10 @@ namespace UBOAT.Mods.RadioNavigation
             Vector3 sunDir;
             float sunAlt;
             float sunAz;
-            if (pipRightCamera != null && TryGetOwnSun(out sunDir, out sunAlt, out sunAz))
+            if (pipFactory.RightCamera != null && TryGetOwnSun(out sunDir, out sunAlt, out sunAz))
             {
-                float angle = Vector3.Angle(pipRightCamera.transform.forward, sunDir);
-                g = (float)SextantGlare.Glare(angle, sunAlt, rightFilterCount, pipRightCamera.fieldOfView);
+                float angle = Vector3.Angle(pipFactory.RightCamera.transform.forward, sunDir);
+                g = (float)SextantGlare.Glare(angle, sunAlt, rightFilterCount, pipFactory.RightCamera.fieldOfView);
                 // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6°),
                 // so position it on the game direction when available.
                 Vector3 gameDir;
@@ -955,8 +559,8 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Own Meeus ephemeris: sun RA/Dec > the same ENU>world mapping the
-        /// star sky uses, so axis conventions are already game-proven.
+        /// Own sun direction via the SunEphemeris domain (extracted);
+        /// adapts the position provider and game clock to explicit inputs.
         /// Needs a valid sandbox position (lat/lon), like star identification.
         /// </summary>
         private bool TryGetOwnSun(out Vector3 dirWorld, out float altDeg, out float azDeg)
@@ -969,22 +573,13 @@ namespace UBOAT.Mods.RadioNavigation
             if (!positionProvider.TryGetPosition(out lat, out lon))
                 return false;
 
-            DateTime utc = GameTimeResolver.GetUtcNow();
-            double jd = SunEphemerisCalibration.CalibratedJd(utc);
-            double lstDeg = AstroMath.LstDeg(jd, lon);
-
-            double raRad, decRad;
-            AstroMath.SunRaDec(jd, out raRad, out decRad);
-            double altRad, azRad, e, n, u;
-            AstroMath.RaDecToEnu(raRad, decRad, lstDeg, lat, out altRad, out azRad, out e, out n, out u);
-
-            double len = Math.Sqrt(e * e + n * n + u * u);
-            if (len < 1e-9)
+            SunEphemeris.SunFix fix = SunEphemeris.Compute(lat, lon, GameTimeResolver.GetUtcNow());
+            if (!fix.Ok)
                 return false;
 
-            dirWorld = new Vector3((float)(e / len), (float)(u / len), (float)(n / len));
-            altDeg = (float)(altRad * Mathf.Rad2Deg);
-            azDeg = (float)(azRad * Mathf.Rad2Deg);
+            dirWorld = new Vector3((float)fix.DirX, (float)fix.DirY, (float)fix.DirZ);
+            altDeg = fix.AltDeg;
+            azDeg = fix.AzDeg;
             return true;
         }
 
@@ -1015,7 +610,7 @@ namespace UBOAT.Mods.RadioNavigation
             bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
             float lat, lon;
             bool posOk = positionProvider.TryGetPosition(out lat, out lon);
-            starId.Update(dt, pain, GetPipForward(),
+            starId.Update(dt, pain, SextantPipPose.Forward(pipFactory, viewCamera, gameMainCamera, arcAngle),
                 ownOk, ownDir, ownAlt, gameOk, gameDir, posOk, lat, lon,
                 nameText, arcAngle);
         }
@@ -1027,29 +622,16 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (angleText == null)
                 return;
-            double q = SextantArc.Quantize(arcAngle);
-            if (force || Math.Abs(q - lastFormattedArc) > 1e-9)
-            {
-                angleText.text = SextantArc.Format(q);
-                lastFormattedArc = q;
-            }
+            string text;
+            if (readout.TryUpdateArc(arcAngle, force, out text))
+                angleText.text = text;
         }
 
         private void UpdateFilterLabel()
         {
             if (filterText == null)
                 return;
-            if (leftFilterCount <= 0 && rightFilterCount <= 0)
-            {
-                filterText.text = "";
-                return;
-            }
-            System.Text.StringBuilder sb = new System.Text.StringBuilder("\u0424\u0418\u041B\u042C\u0422\u0420 ");
-            if (leftFilterCount > 0)
-                sb.Append("\u041B").Append(leftFilterCount).Append(" ");
-            if (rightFilterCount > 0)
-                sb.Append("\u041F").Append(rightFilterCount);
-            filterText.text = sb.ToString().TrimEnd();
+            filterText.text = SextantReadout.FormatFilters(leftFilterCount, rightFilterCount);
         }
 
         // ---- overlay construction (§13.3) lives in SextantOverlay (extracted) ----
@@ -1059,7 +641,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (canvasRoot != null)
                 return;
 
-            var ui = SextantOverlay.Build(leftRt, rightRt, resourceManager, this);
+            var ui = SextantOverlay.Build(pipFactory.LeftRt, pipFactory.RightRt, resourceManager, this);
             canvasRoot = ui.CanvasRoot;
             leftViewImage = ui.LeftViewImage;
             rightViewImage = ui.RightViewImage;
@@ -1083,29 +665,5 @@ namespace UBOAT.Mods.RadioNavigation
 
         // Procedural sprites live in SextantSprites; SRP render-pass
         // cloning lives in SextantRenderPasses (both extracted).
-    }
-
-    /// <summary>
-    /// Render probe: OnPreRender fires only when the camera actually renders,
-    /// so these logs prove whether the SRP re-renders the PIP cameras every
-    /// frame and with which pose (frozen forward = cached matrices).
-    /// </summary>
-    internal sealed class SextantCameraProbe : MonoBehaviour
-    {
-        public Camera tracked;
-        public SextantController owner;
-
-        private void OnPreRender()
-        {
-            if (tracked == null || owner == null)
-                return;
-            if (Time.frameCount < 10 || Time.frameCount % 60 == 0)
-            {
-                Vector3 f = tracked.transform.forward;
-                Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "[RadioNav][Sextant] PRERENDER {0} frame={1} fwd=({2:F2},{3:F2},{4:F2}) arc={5:F2}",
-                    tracked.name, Time.frameCount, f.x, f.y, f.z, owner.arcAngle));
-            }
-        }
     }
 }

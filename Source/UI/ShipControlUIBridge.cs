@@ -4,6 +4,7 @@ using UBOAT.Game.Core.Input;
 using UBOAT.Game.UI;
 using UnityEngine;
 using UnityEngine.UI;
+using Object = UnityEngine.Object;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -51,6 +52,47 @@ namespace UBOAT.Mods.RadioNavigation
             if (ui.IsNull())
                 return null;
             return ButtonField == null ? null : ButtonField.GetValue(ui) as Toggle;
+        }
+
+        /// <summary>
+        /// Scene-wide fallback for the native ShipControlUI (moved from
+        /// ChronometerOverlayHandler). The caller throttles via
+        /// FrameThrottle — this never runs per-frame unguarded.
+        /// </summary>
+        public static ShipControlUI FindInScene()
+        {
+            ShipControlUI active = Object.FindObjectOfType<ShipControlUI>();
+            if (active.IsNotNull())
+                return active;
+
+            ShipControlUI[] all = Resources.FindObjectsOfTypeAll<ShipControlUI>();
+            for (int i = 0; i < all.Length; i++)
+            {
+                ShipControlUI candidate = all[i];
+                if (candidate.IsNotNull()
+                    && candidate.gameObject.scene.IsValid()
+                    && candidate.hideFlags == HideFlags.None)
+                {
+                    return candidate;
+                }
+            }
+
+            return all.Length > 0 ? all[0] : null;
+        }
+
+        /// <summary>
+        /// Ensures the native chronometer toggle, warning once (via onWarn)
+        /// while it is not ready. Pure wiring over HasButton/GetButton.
+        /// </summary>
+        public static Toggle EnsureButton(ShipControlUI ui, Toggle current, Action<string> onWarn)
+        {
+            if (current.IsNotNull() || !HasButton)
+                return current;
+
+            Toggle button = GetButton(ui);
+            if (button.IsNull() && onWarn != null)
+                onWarn("native chronometer toggle is not ready");
+            return button;
         }
 
         public static Vector2? GetDefaultPosition(ShipControlUI ui)

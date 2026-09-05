@@ -25,6 +25,8 @@
     <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />
     <Compile Include="Stubs\UnityEngineTransform.cs" />
     <Compile Include="Stubs\UnityEngineTexture.cs" />
+    <Compile Include="Stubs\UnityEngineGameObject.cs" />
+    <Compile Include="Stubs\UnityEngineTime.cs" />
     <Compile Include="Stubs\GameStubs.cs" />
     <Compile Include="Stubs\SceneStubs.cs" />
     <Compile Include="StoryDecisionGatewayTests.cs" />
@@ -45,6 +47,8 @@
     <Compile Include="ChronometerCursorPolicyTests.cs" />
     <Compile Include="ChronometerCursorArtTests.cs" />
     <Compile Include="ChronometerMapDragMathTests.cs" />
+    <Compile Include="ChronometerOpenTrackerTests.cs" />
+    <Compile Include="ChronometerHoverStateTests.cs" />
     <Compile Include="Helpers\KeyingEnvelope.cs" />
     <Compile Include="Helpers\WavWriter.cs" />
     <Compile Include="PlayerPositionProviderTests.cs" />
@@ -61,6 +65,7 @@
     <Compile Include="StarCatalogTests.cs" />
     <Compile Include="LighthouseVisualModelTests.cs" />
     <Compile Include="LighthouseDotLayoutTests.cs" />
+    <Compile Include="LighthouseBeamGateTests.cs" />
     <Compile Include="StationMatchFormatterTests.cs" />
     <Compile Include="StationCallsignResolverTests.cs" />
     <Compile Include="LighthouseMarkerSizingTests.cs" />
@@ -71,9 +76,16 @@
     <Compile Include="ConstellationTogglePrefsTests.cs" />
     <Compile Include="SextantArcTests.cs" />
     <Compile Include="SextantGlareTests.cs" />
+    <Compile Include="SextantZoomTests.cs" />
+    <Compile Include="SextantArcInputTests.cs" />
+    <Compile Include="SextantReadoutTests.cs" />
     <Compile Include="SextantRunningFixTests.cs" />
     <Compile Include="SunEphemerisCalibrationTests.cs" />
+    <Compile Include="SunEphemerisTests.cs" />
     <Compile Include="PrefabValidatorTests.cs" />
+    <Compile Include="RadioLocaleTests.cs" />
+    <Compile Include="SceneContentBuilderTests.cs" />
+    <Compile Include="PanelViewBinderTests.cs" />
     <Compile Include="SextantOverlayLayoutTests.cs" />
     <Compile Include="MarkerArtPixelsTests.cs" />
     <Compile Include="RadioPowerBusTests.cs" />
@@ -86,7 +98,9 @@
     <Compile Include="BearingDiagnosticsTests.cs" />
     <Compile Include="StationNavigatorTests.cs" />
     <Compile Include="SignalTranscriptTests.cs" />
+    <Compile Include="SignalDecoderTests.cs" />
     <Compile Include="StationFleetTests.cs" />
+    <Compile Include="StationManagerTests.cs" />
     <Compile Include="StationDiagnosticsReportTests.cs" />
     <Compile Include="SpinnerScaleTests.cs" />
     <Compile Include="PositionFeedTests.cs" />
@@ -127,6 +141,8 @@
     <Compile Include="..\Source\UI\PanelStateStore.cs" Link="Source\UI\PanelStateStore.cs" />
     <Compile Include="..\Source\UI\ChronometerCursorPolicy.cs" Link="Source\UI\ChronometerCursorPolicy.cs" />
     <Compile Include="..\Source\UI\ChronometerCursorArt.cs" Link="Source\UI\ChronometerCursorArt.cs" />
+    <Compile Include="..\Source\UI\ChronometerOpenTracker.cs" Link="Source\UI\ChronometerOpenTracker.cs" />
+    <Compile Include="..\Source\UI\ChronometerHoverState.cs" Link="Source\UI\ChronometerHoverState.cs" />
     <Compile Include="..\Source\UI\ChronometerMapDragMath.cs" Link="Source\UI\ChronometerMapDragMath.cs" />
     <Compile Include="..\Source\Data\LighthouseProfile.cs" Link="Source\Data\LighthouseProfile.cs" />
     <Compile Include="..\Source\Data\LighthouseProfiles.cs" Link="Source\Data\LighthouseProfiles.cs" />
@@ -135,6 +151,7 @@
     <Compile Include="..\Source\Logic\StoryDecisionGateway.cs" Link="Source\Logic\StoryDecisionGateway.cs" />
     <Compile Include="..\Source\Logic\LighthouseVisualModel.cs" Link="Source\Logic\LighthouseVisualModel.cs" />
     <Compile Include="..\Source\Logic\LighthouseDotLayout.cs" Link="Source\Logic\LighthouseDotLayout.cs" />
+    <Compile Include="..\Source\Logic\LighthouseBeamGate.cs" Link="Source\Logic\LighthouseBeamGate.cs" />
     <Compile Include="..\Source\Logic\StationMatchFormatter.cs" Link="Source\Logic\StationMatchFormatter.cs" />
     <Compile Include="..\Source\Logic\StationCallsignResolver.cs" Link="Source\Logic\StationCallsignResolver.cs" />
     <Compile Include="..\Source\Logic\LighthouseMarkerSizing.cs" Link="Source\Logic\LighthouseMarkerSizing.cs" />
@@ -147,8 +164,12 @@
     <Compile Include="..\Source\Logic\SextantGlare.cs" Link="Source\Logic\SextantGlare.cs" />
     <Compile Include="..\Source\Logic\SextantRunningFix.cs" Link="Source\Logic\SextantRunningFix.cs" />
     <Compile Include="..\Source\Logic\SunEphemerisCalibration.cs" Link="Source\Logic\SunEphemerisCalibration.cs" />
+    <Compile Include="..\Source\Logic\SunEphemeris.cs" Link="Source\Logic\SunEphemeris.cs" />
     <Compile Include="..\Source\UI\PrefabNames.cs" Link="Source\UI\PrefabNames.cs" />
     <Compile Include="..\Source\Logic\PrefabValidator.cs" Link="Source\Logic\PrefabValidator.cs" />
+    <Compile Include="..\Source\Logic\RadioLocale.cs" Link="Source\Logic\RadioLocale.cs" />
+    <Compile Include="..\Source\Logic\SceneContentBuilder.cs" Link="Source\Logic\SceneContentBuilder.cs" />
+    <Compile Include="..\Source\Logic\PanelViewBinder.cs" Link="Source\Logic\PanelViewBinder.cs" />
     <Compile Include="..\Source\UI\MarkerArtPixels.cs" Link="Source\UI\MarkerArtPixels.cs" />
     <Compile Include="..\Source\UI\SextantOverlayLayout.cs" Link="Source\UI\SextantOverlayLayout.cs" />
     <Compile Include="..\Source\Logic\RadioPowerBus.cs" Link="Source\Logic\RadioPowerBus.cs" />
@@ -161,7 +182,9 @@
     <Compile Include="..\Source\Logic\BearingDiagnostics.cs" Link="Source\Logic\BearingDiagnostics.cs" />
     <Compile Include="..\Source\Logic\StationNavigator.cs" Link="Source\Logic\StationNavigator.cs" />
     <Compile Include="..\Source\Logic\SignalTranscript.cs" Link="Source\Logic\SignalTranscript.cs" />
+    <Compile Include="..\Source\Logic\SignalDecoder.cs" Link="Source\Logic\SignalDecoder.cs" />
     <Compile Include="..\Source\Logic\StationFleet.cs" Link="Source\Logic\StationFleet.cs" />
+    <Compile Include="..\Source\Logic\StationManager.cs" Link="Source\Logic\StationManager.cs" />
     <Compile Include="..\Source\Data\StationDiagnostics.cs" Link="Source\Data\StationDiagnostics.cs" />
     <Compile Include="..\Source\Logic\StationDiagnosticsReport.cs" Link="Source\Logic\StationDiagnosticsReport.cs" />
     <Compile Include="..\Source\Logic\SpinnerScale.cs" Link="Source\Logic\SpinnerScale.cs" />
@@ -175,6 +198,9 @@
     <Compile Include="..\Source\Logic\EntityTypeRowValues.cs" Link="Source\Logic\EntityTypeRowValues.cs" />
     <Compile Include="..\Source\UI\FixCardComposer.cs" Link="Source\UI\FixCardComposer.cs" />
     <Compile Include="..\Source\UI\SextantDmFormat.cs" Link="Source\UI\SextantDmFormat.cs" />
+    <Compile Include="..\Source\UI\SextantZoom.cs" Link="Source\UI\SextantZoom.cs" />
+    <Compile Include="..\Source\UI\SextantArcInput.cs" Link="Source\UI\SextantArcInput.cs" />
+    <Compile Include="..\Source\UI\SextantReadout.cs" Link="Source\UI\SextantReadout.cs" />
   </ItemGroup>
 
 </Project>

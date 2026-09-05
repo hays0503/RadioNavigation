@@ -33,15 +33,13 @@ namespace UBOAT.Mods.RadioNavigation
         private bool resolveWarningLogged;
         private bool previousOpenState;
         private bool hasPreviousOpenState;
-        private bool nativeChangedThisFrame;
+        // Hover-request flags live in ChronometerHoverState (extracted);
+        // the drag guards and the backend/forward sinks stay here.
+        private readonly ChronometerHoverState hoverState = new ChronometerHoverState();
         // Expand/scale subsystem lives in ChronometerScaleSubsystem (extracted);
         // drag mechanics live in ChronometerDragProtocol (extracted).
         private readonly ChronometerScaleSubsystem scaleSubsystem = new ChronometerScaleSubsystem();
         private ChronometerDragProtocol dragProtocol;
-        private bool reqScaleHover;
-        private bool reqMoveValid;
-        private bool reqMoveHover;
-        private bool chronoPointerInsideCached;
         // Expensive scene-wide fallback (Resources.FindObjectsOfTypeAll)
         // runs at most once per interval while the bridge is unresolved —
         // not every LateUpdate.
@@ -57,24 +55,19 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateDefaultPositionForRadioParent);
         }
 
-        private void Update()
+        private void LateUpdate()
         {
             if (dragProtocol != null && dragProtocol.LocalDragActive)
                 CancelNativeDrag();
-        }
 
-        private void LateUpdate()
-        {
             if (!TryResolveChronometer())
                 return;
 
             bool isOpen = shipControlUI.IsChronometerOpen;
-            if (hasPreviousOpenState && isOpen != previousOpenState)
-                nativeChangedThisFrame = true;
-
-            if (Input.GetKeyDown(KeyCode.F7)
-                && !nativeChangedThisFrame
-                && chronometerButton.IsNotNull())
+            ChronometerOpenTracker.Frame frame = ChronometerOpenTracker.Track(
+                hasPreviousOpenState, previousOpenState, isOpen,
+                Input.GetKeyDown(KeyCode.F7), chronometerButton.IsNotNull());
+            if (frame.ToggledByFallback)
             {
                 chronometerButton.isOn = !chronometerButton.isOn;
                 isOpen = chronometerButton.isOn;
@@ -88,7 +81,6 @@ namespace UBOAT.Mods.RadioNavigation
             // map the raise state is false and it would kill the hint.
             previousOpenState = isOpen;
             hasPreviousOpenState = true;
-            nativeChangedThisFrame = false;
         }
 
         private void SyncChronometerLayer(bool isOpen)
@@ -117,7 +109,7 @@ namespace UBOAT.Mods.RadioNavigation
                     && FrameThrottle.ShouldRetry(lastFindFrame, Time.frameCount, FindRetryFrames))
                 {
                     lastFindFrame = Time.frameCount;
-                    shipControlUI = FindShipControlUI();
+                    shipControlUI = ShipControlUIBridge.FindInScene();
                 }
             }
 
@@ -158,35 +150,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         private bool IsRadioVisible => radioHandler.IsNull() || radioHandler.IsVisible;
 
-        private static ShipControlUI FindShipControlUI()
-        {
-            ShipControlUI active = FindObjectOfType<ShipControlUI>();
-            if (active.IsNotNull())
-                return active;
-
-            ShipControlUI[] all = Resources.FindObjectsOfTypeAll<ShipControlUI>();
-            for (int i = 0; i < all.Length; i++)
-            {
-                ShipControlUI candidate = all[i];
-                if (candidate.IsNotNull()
-                    && candidate.gameObject.scene.IsValid()
-                    && candidate.hideFlags == HideFlags.None)
-                {
-                    return candidate;
-                }
-            }
-
-            return all.Length > 0 ? all[0] : null;
-        }
-
         private void ResolveChronometerButton()
         {
-            if (chronometerButton.IsNotNull() || !ShipControlUIBridge.HasButton)
-                return;
-
-            chronometerButton = ShipControlUIBridge.GetButton(shipControlUI);
-            if (chronometerButton.IsNull())
-                LogResolveWarning("native chronometer toggle is not ready");
+            chronometerButton = ShipControlUIBridge.EnsureButton(
+                shipControlUI, chronometerButton, LogResolveWarning);
         }
 
         // Raise/restore snapshot lives in ChronometerRaiseState (extracted);
@@ -241,7 +208,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (dragProtocol != null && dragProtocol.LocalDragActive)
                 return;
-            reqScaleHover = value;
+            hoverState.SetScaleHover(value);
             RefreshCursor();
             ForwardChronometerPointerInside();
         }
@@ -250,8 +217,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (dragProtocol != null && dragProtocol.LocalDragActive)
                 return;
-            reqMoveHover = moveHovered;
-            reqMoveValid = true;
+            hoverState.SetMoveHover(moveHovered);
             RefreshCursor();
             ForwardChronometerPointerInside();
         }
@@ -260,10 +226,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             // PanelDragHandler must not paint its own move cursor while the
             // pointer is over any chronometer zone - the zone cursors win.
-            bool inside = reqMoveValid && reqMoveHover;
-            if (inside == chronoPointerInsideCached)
+            bool inside;
+            if (!hoverState.TryConsumeForward(out inside))
                 return;
-            chronoPointerInsideCached = inside;
             if (panelDragHandler.IsNotNull())
                 panelDragHandler.SetChronometerPointerInside(inside);
         }
@@ -272,7 +237,7 @@ namespace UBOAT.Mods.RadioNavigation
         // the request flags and the pointer-forward stay here.
         private void RefreshCursor()
         {
-            cursorBackend.Apply(reqScaleHover, reqMoveHover, scaleSubsystem.Expanded,
+            cursorBackend.Apply(hoverState.ScaleHover, hoverState.MoveHover, scaleSubsystem.Expanded,
                 cursorManager, panelDragHandler);
         }
 
