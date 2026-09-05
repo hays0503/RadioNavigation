@@ -254,7 +254,9 @@ namespace RadioNavigation.SourceCheck
         /// Cyclomatic-complexity gate: flags "super-methods" — methods whose McCabe
         /// complexity exceeds a threshold (default 15). A method that does too much is
         /// a refactoring candidate; blocking keeps the mod maintainable. Complexity is
-        /// computed over the mod's own Source\**\*.cs (not game code).
+        /// computed over the mod's own Source\**\*.cs (not game code), covering methods,
+        /// constructors, operators, conversions and property/event accessors — bodies
+        /// outside plain methods hide logic the same way.
         /// </summary>
         [Fact]
         public void MethodComplexity_NoSuperMethods()
@@ -266,14 +268,16 @@ namespace RadioNavigation.SourceCheck
             foreach (var path in ModCompiler.EnumerateSources())
             {
                 var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path).GetRoot();
-                foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
+                foreach (var node in root.DescendantNodes())
                 {
-                    int c = ComputeCyclomaticComplexity(method);
+                    string name = MethodLikeName(node);
+                    if (name == null)
+                        continue;
+                    int c = ComputeCyclomaticComplexity(node);
                     if (c > threshold)
                     {
-                        var name = method.Identifier.Text;
-                        var loc = method.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
-                        over.Add(($"{Path.GetFileName(path)}:{loc} {name}()", c));
+                        var loc = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+                        over.Add(($"{Path.GetFileName(path)}:{loc} {name}", c));
                     }
                 }
             }
@@ -283,6 +287,26 @@ namespace RadioNavigation.SourceCheck
                 + "(super-methods, refactor candidates):\n"
                 + string.Join("\n", over.OrderByDescending(o => o.Complexity)
                     .Select(o => $"  {o.Complexity}  {o.Method}")));
+        }
+
+        /// <summary>
+        /// Names any method-like body for the complexity report: methods and
+        /// constructors by identifier, operators by token, accessors by keyword.
+        /// Returns null for non-method-like nodes.
+        /// </summary>
+        private static string MethodLikeName(SyntaxNode node)
+        {
+            if (node is MethodDeclarationSyntax method)
+                return method.Identifier.Text + "()";
+            if (node is ConstructorDeclarationSyntax ctor)
+                return ctor.Identifier.Text + ".ctor";
+            if (node is OperatorDeclarationSyntax op)
+                return "operator " + op.OperatorToken.Text;
+            if (node is ConversionOperatorDeclarationSyntax conv)
+                return "convert to " + conv.Type.ToString();
+            if (node is AccessorDeclarationSyntax access)
+                return access.Keyword.Text + " accessor";
+            return null;
         }
 
         /// <summary>
@@ -3315,7 +3339,7 @@ namespace RadioNavigation.SourceCheck
         /// functions are counted as separate methods (their bodies are not attributed to
         /// the enclosing method).
         /// </summary>
-        private static int ComputeCyclomaticComplexity(MethodDeclarationSyntax method)
+        private static int ComputeCyclomaticComplexity(SyntaxNode method)
         {
             int complexity = 1;
             foreach (var node in method.DescendantNodes())
