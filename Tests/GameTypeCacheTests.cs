@@ -1,4 +1,6 @@
 using System;
+using System.Reflection;
+using System.Reflection.Emit;
 using Xunit;
 
 namespace UBOAT.Mods.RadioNavigation.Tests
@@ -88,6 +90,36 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Type type = GameTypeCache.Resolve("System.String");
 
             Assert.Null(type);
+        }
+
+        [Fact]
+        public void Resolve_MissThenLateLoad_DoesNotStick()
+        {
+            GameTypeCache.Clear();
+            const string assemblyName = "PoisonProbeDynamic";
+            const string typeName = "PoisonProbeDynamic.Marker";
+
+            Assert.Null(GameTypeCache.Resolve(typeName, assemblyName));
+
+            AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
+                new AssemblyName(assemblyName), AssemblyBuilderAccess.Run);
+            ModuleBuilder module = assembly.DefineDynamicModule(assemblyName);
+            Type emitted = module.DefineType(
+                typeName, TypeAttributes.Public | TypeAttributes.Class).CreateType();
+
+            // In-memory assemblies are invisible to Type.GetType by name;
+            // the hook models a game assembly loading after the first miss.
+            ResolveEventHandler loader = (s, e) =>
+                new AssemblyName(e.Name).Name == assemblyName ? assembly : null;
+            AppDomain.CurrentDomain.AssemblyResolve += loader;
+            try
+            {
+                Assert.Same(emitted, GameTypeCache.Resolve(typeName, assemblyName));
+            }
+            finally
+            {
+                AppDomain.CurrentDomain.AssemblyResolve -= loader;
+            }
         }
     }
 }

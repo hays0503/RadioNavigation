@@ -33,6 +33,7 @@
     <Compile Include="SkipTestException.cs" />
     <Compile Include="GameContractTests.cs" />
     <Compile Include="GeoMathTests.cs" />
+    <Compile Include="GeoPositionConverterTests.cs" />
     <Compile Include="PanelStateStoreTests.cs" />
     <Compile Include="PanelStateTests.cs" />
     <Compile Include="MorseAlphabetTests.cs" />
@@ -43,6 +44,8 @@
     <Compile Include="DialConfigTests.cs" />
     <Compile Include="SonneSignalGeneratorTests.cs" />
     <Compile Include="SonneBeamTests.cs" />
+    <Compile Include="SonneBeamStationTests.cs" />
+    <Compile Include="MiniJsonTests.cs" />
     <Compile Include="AudioSynthesisEngineTests.cs" />
     <Compile Include="AudioRenderPauseTests.cs" />
     <Compile Include="ChronometerCursorPolicyTests.cs" />
@@ -64,6 +67,8 @@
     <Compile Include="ShieldTests.cs" />
     <Compile Include="AstroMathTests.cs" />
     <Compile Include="StarCatalogTests.cs" />
+    <Compile Include="NavStarNamesTests.cs" />
+    <Compile Include="SextantDmFormatTests.cs" />
     <Compile Include="LighthouseVisualModelTests.cs" />
     <Compile Include="LighthouseDotLayoutTests.cs" />
     <Compile Include="LighthouseBeamGateTests.cs" />
@@ -150,6 +155,7 @@
     <Compile Include="..\Source\Data\LighthouseProfiles.cs" Link="Source\Data\LighthouseProfiles.cs" />
     <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />
     <Compile Include="..\Source\Data\StarCatalog.cs" Link="Source\Data\StarCatalog.cs" />
+    <Compile Include="..\Source\Data\NavStarNames.cs" Link="Source\Data\NavStarNames.cs" />
     <Compile Include="..\Source\Logic\StoryDecisionGateway.cs" Link="Source\Logic\StoryDecisionGateway.cs" />
     <Compile Include="..\Source\Logic\LighthouseVisualModel.cs" Link="Source\Logic\LighthouseVisualModel.cs" />
     <Compile Include="..\Source\Logic\LighthouseDotLayout.cs" Link="Source\Logic\LighthouseDotLayout.cs" />

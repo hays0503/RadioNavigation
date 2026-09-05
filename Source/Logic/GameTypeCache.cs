@@ -9,8 +9,9 @@ namespace UBOAT.Mods.RadioNavigation
     /// SkyVisibilityResolver.typeCache (cached, single assembly, on the
     /// per-frame IsPlayerOutside path — P5.1). Pure BCL, unit-tested offline
     /// in GameTypeCacheTests. Type objects are assembly-level and survive
-    /// scene loads; Clear exists for domain-reload hygiene.
-    /// </summary>
+    /// scene loads; Clear exists for domain-reload hygiene. Misses are NOT
+    /// cached: game assemblies load lazily, so a miss now may hit later and
+    /// a cached null would stick forever.
     public static class GameTypeCache
     {
         private static readonly string[] GameAssemblies = { "com.uboat.game", "Assembly-CSharp" };
@@ -34,7 +35,8 @@ namespace UBOAT.Mods.RadioNavigation
                     if (type != null)
                         break;
                 }
-                cache[key] = type;
+                if (type != null)
+                    cache[key] = type;
             }
             return type;
         }
