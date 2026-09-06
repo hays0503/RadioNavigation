@@ -11,6 +11,10 @@ pvs-report.txt
 pvs-report.json
 pvs-report.sarif
 
+# Coverage reports (regenerable)
+coverage.cobertura.xml
+*.cobertura.xml
+
 # Analysis
 graphify-out/
 

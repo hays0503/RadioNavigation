@@ -126,8 +126,7 @@ namespace UBOAT.Mods.RadioNavigation
             // Rebuild mesh only if camera/position/LST changed significantly
             bool needsRebuild = MeshRebuildPolicy.NeedsRebuild(
                 cam.transform.position, lastCamPos,
-                cam.transform.rotation, default(Quaternion),
-                lstDeg, lastLstDeg, lat, lastLat, false);
+                lstDeg, lastLstDeg, lat, lastLat);
 
             if (!needsRebuild && meshFilter.mesh != null && meshFilter.mesh.vertexCount > 0)
                 return;

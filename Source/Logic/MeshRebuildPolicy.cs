@@ -24,6 +24,21 @@ namespace UBOAT.Mods.RadioNavigation
                 return true;
             if (checkRotation && Quaternion.Angle(camRot, lastCamRot) > MaxCameraRotationDeg)
                 return true;
+            return LstLatDrifted(lstDeg, lastLstDeg, lat, lastLat);
+        }
+
+        /// <summary>Position/LST/latitude drift without the rotation check
+        /// (constellation lines do not track camera roll).</summary>
+        public static bool NeedsRebuild(Vector3 camPos, Vector3 lastCamPos,
+            double lstDeg, double lastLstDeg, float lat, float lastLat)
+        {
+            if (Vector3.Distance(camPos, lastCamPos) > MaxCameraMoveM)
+                return true;
+            return LstLatDrifted(lstDeg, lastLstDeg, lat, lastLat);
+        }
+
+        private static bool LstLatDrifted(double lstDeg, double lastLstDeg, float lat, float lastLat)
+        {
             if (System.Math.Abs(lstDeg - lastLstDeg) > MaxLstDriftDeg)
                 return true;
             return System.Math.Abs(lat - lastLat) > MaxLatitudeDriftDeg;
