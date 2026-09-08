@@ -18,6 +18,12 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly StringBuilder morseBuffer = new StringBuilder();
         private readonly StringBuilder decoded = new StringBuilder();
 
+        // Probe diagnostics (see DecodeBuffer): decode attempt counters.
+        public static int DecodeAttempts;
+        public static int DecodeSuccess;
+        public static int LastBufferLen = -1;
+        public static int LastExpectedLen = -1;
+
         public string RichText
         {
             get { return SignalRichTextFormatter.FormatRichText(entries); }
@@ -75,6 +81,11 @@ namespace UBOAT.Mods.RadioNavigation
             return CountByType(SignalCharType.Dash);
         }
 
+        public int CountCallsignChars()
+        {
+            return CountByType(SignalCharType.Callsign);
+        }
+
         private int CountByType(SignalCharType type)
         {
             int count = 0;
@@ -88,6 +99,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void DecodeBuffer(BeaconStation station)
         {
+            // Probe diagnostics: every decode attempt with buffer vs expected
+            // lengths — a persistent mismatch means the callsign window is
+            // being truncated/split before the full callsign arrives.
+            DecodeAttempts++;
+            LastBufferLen = morseBuffer.Length;
+
             if (morseBuffer.Length.IsZero())
                 return;
 
@@ -100,7 +117,8 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            if (morseBuffer.Length != MorseDecoder.ExpectedLength(callsign))
+            LastExpectedLen = MorseDecoder.ExpectedLength(callsign);
+            if (morseBuffer.Length != LastExpectedLen)
             {
                 morseBuffer.Clear();
                 return;
@@ -108,6 +126,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             // Keep only the latest completed callsign. Appending every cycle
             // made the panel grow until trimming.
+            DecodeSuccess++;
             decoded.Clear();
             decoded.Append(MorseDecoder.Decode(callsign, morseBuffer));
 

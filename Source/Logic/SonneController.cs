@@ -140,6 +140,12 @@ namespace UBOAT.Mods.RadioNavigation
             return decoder.DecodedText;
         }
 
+        // Probe diagnostic: callsign-typed char count in the transcript.
+        public int DecoderCallsignChars()
+        {
+            return decoder.CountCallsignChars();
+        }
+
         /// <summary>
         /// Counts dots in the current emission window (at most 20 characters).
         /// This is not the CAP observer count from the 60-character cycle.

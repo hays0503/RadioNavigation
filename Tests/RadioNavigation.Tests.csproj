@@ -77,6 +77,7 @@
     <Compile Include="StationCallsignResolverTests.cs" />
     <Compile Include="LighthouseMarkerSizingTests.cs" />
     <Compile Include="RadioNavDiagnosticsTests.cs" />
+    <Compile Include="RadioNavProbeTests.cs" />
     <Compile Include="TransformHelpersTests.cs" />
     <Compile Include="StationTooltipTextTests.cs" />
     <Compile Include="NavMarkerGateTests.cs" />
@@ -166,6 +167,7 @@
     <Compile Include="..\Source\Logic\StationCallsignResolver.cs" Link="Source\Logic\StationCallsignResolver.cs" />
     <Compile Include="..\Source\Logic\LighthouseMarkerSizing.cs" Link="Source\Logic\LighthouseMarkerSizing.cs" />
     <Compile Include="..\Source\Logic\RadioNavDiagnostics.cs" Link="Source\Logic\RadioNavDiagnostics.cs" />
+    <Compile Include="..\Source\Logic\RadioNavProbeJson.cs" Link="Source\Logic\RadioNavProbeJson.cs" />
     <Compile Include="..\Source\Logic\TransformHelpers.cs" Link="Source\Logic\TransformHelpers.cs" />
     <Compile Include="..\Source\Logic\StationTooltipText.cs" Link="Source\Logic\StationTooltipText.cs" />
     <Compile Include="..\Source\Logic\NavMarkerGate.cs" Link="Source\Logic\NavMarkerGate.cs" />

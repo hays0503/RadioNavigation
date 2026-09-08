@@ -30,6 +30,15 @@ namespace UBOAT.Mods.RadioNavigation
         public bool IsActive => isActive;
         public bool IsTone => state == State.Tone;
         public bool CurrentElementIsDash => currentIsDash;
+
+        // Probe diagnostic: elements completed while IsCallsignElement was
+        // true. Zero growth during live Callsign phases localizes the flag
+        // loss to the keyer/scheduler side rather than the decoder gate.
+        public static int CallsignFlaggedElements;
+
+        public bool HasSequence => sequence.IsNotNull();
+        public int ElementIndex => elementIndex;
+
         public bool IsCallsignElement =>
             sequence.IsNotNull()
             && scheduler.IsNotNull()
@@ -105,7 +114,10 @@ namespace UBOAT.Mods.RadioNavigation
                     if (ticksInState >= GetCurrentSoundTicks())
                     {
                         NavigationElementType elemType = GetCurrentElementType();
-                        OnElementCompleted?.Invoke(elemType, IsCallsignElement);
+                        bool isCallsign = IsCallsignElement;
+                        if (isCallsign)
+                            CallsignFlaggedElements++;
+                        OnElementCompleted?.Invoke(elemType, isCallsign);
 
                         if (elemType == NavigationElementType.Equisignal)
                             AdvanceElement();
