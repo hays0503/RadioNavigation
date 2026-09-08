@@ -60,13 +60,19 @@ namespace UBOAT.Mods.RadioNavigation
     public struct CallsignPattern : IKeySequence
     {
         private readonly NavigationPattern inner;
+        private readonly int markCount;
 
-        public int ElementCount => inner.ElementCount;
+        // ElementCount is the MARK count (e.g. MWN = 7), not the padded
+        // group length: the keyer stops after the last mark, so group
+        // padding is never keyed and the transcript morse buffer receives
+        // exactly ExpectedLength(callsign) appends per cycle.
+        public int ElementCount => markCount;
         public string Description => "CALL";
 
         public CallsignPattern(string callsign)
         {
-            inner = MorseAlphabet.TextToPattern(callsign);
+            inner = MorseAlphabet.TextToMarksPattern(callsign);
+            markCount = MorseAlphabet.CountMarks(callsign);
         }
 
         public bool GetElement(int index)
