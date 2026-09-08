@@ -26,6 +26,13 @@ namespace UBOAT.Mods.RadioNavigation
         private VolumeSpinnerHandler volumeSpinner;
         private FeedbackSpinnerHandler feedbackSpinner;
         private RadioHandler radioHandler;
+
+        // Last-known operator state, refreshed in Update while components
+        // are alive; OnDestroy saves from this cache (teardown-order safe).
+        private float cachedVolumeAngle = -1f;
+        private float cachedFeedbackAngle = -1f;
+        private int cachedZoneIndex = -1;
+        private float cachedCursorAngle = -1f;
         private SonneController sonneController;
 
         private string stationBaseText = "";
@@ -94,6 +101,19 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
+            // Live cache for the OnDestroy save: scene teardown may destroy
+            // RadioHandler/ZoneHandler BEFORE this component's OnDestroy, and
+            // reading a destroyed component yields fake-null -> zeros written
+            // to PlayerPrefs (persisted cursorAngle came back as ~0).
+            if (volumeSpinner.IsNotNull())
+                cachedVolumeAngle = volumeSpinner.Angle;
+            if (feedbackSpinner.IsNotNull())
+                cachedFeedbackAngle = feedbackSpinner.Angle;
+            if (zoneHandler.IsNotNull())
+                cachedZoneIndex = zoneHandler.CurrentIndex;
+            if (radioHandler.IsNotNull())
+                cachedCursorAngle = radioHandler.CursorAngle;
+
             patternUpdateTimer += Time.deltaTime;
             if (patternUpdateTimer >= PatternUpdateInterval)
             {
@@ -107,6 +127,19 @@ namespace UBOAT.Mods.RadioNavigation
                 signalUpdateTimer = 0f;
                 UpdateSignalDisplay();
             }
+        }
+
+        private void SaveCachedState()
+        {
+            PanelState.Save(
+                cachedVolumeAngle >= 0f ? cachedVolumeAngle :
+                    (volumeSpinner.IsNotNull() ? volumeSpinner.Angle : 0f),
+                cachedFeedbackAngle >= 0f ? cachedFeedbackAngle :
+                    (feedbackSpinner.IsNotNull() ? feedbackSpinner.Angle : 0f),
+                cachedZoneIndex >= 0 ? cachedZoneIndex :
+                    (zoneHandler.IsNotNull() ? zoneHandler.CurrentIndex : 0),
+                cachedCursorAngle >= 0f ? cachedCursorAngle :
+                    (radioHandler.IsNotNull() ? radioHandler.CursorAngle : 0f));
         }
 
         private void FindHandlers()
@@ -334,11 +367,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
-            PanelState.Save(
-                volumeSpinner.IsNotNull() ? volumeSpinner.Angle : 0f,
-                feedbackSpinner.IsNotNull() ? feedbackSpinner.Angle : 0f,
-                GetZoneIndex(),
-                radioHandler.IsNotNull() ? radioHandler.CursorAngle : 0f);
+            SaveCachedState();
             Unsubscribe();
         }
     }
