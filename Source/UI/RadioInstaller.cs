@@ -13,6 +13,31 @@ namespace UBOAT.Mods.RadioNavigation
             return comp;
         }
 
+        private static void InstallGroundHandler(Transform ground)
+        {
+            Transform groundBg = ground?.Find(PrefabNames.Background);
+            Transform groundCm = groundBg?.Find(PrefabNames.GroundCheckmark);
+            if (ground.IsNull())
+                Debug.LogError("[RadioNav][Main] Ground child not found — ground mode is dead");
+            else if (groundBg.IsNull() || groundCm.IsNull())
+                Debug.LogWarning("[RadioNav][Main] Ground hierarchy incomplete — checkmark may not render");
+#if DEBUG
+            Image cmImg = groundCm?.GetComponent<Image>();
+            Debug.Log("[RadioNav][Main] Ground exists=" + (ground.IsNotNull())
+                + " Background exists=" + (groundBg.IsNotNull())
+                + " Checkmark exists=" + (groundCm.IsNotNull())
+                + " [Ground] pos=" + (ground.IsNotNull() ? ground.localPosition.ToString() : "null")
+                + " [Background] pos=" + (groundBg.IsNotNull() ? groundBg.localPosition.ToString() : "null")
+                + " img=" + (groundBg.IsNotNull() && groundBg.GetComponent<Image>().IsNotNull())
+                + " [Checkmark] pos=" + (groundCm.IsNotNull() ? groundCm.localPosition.ToString() : "null")
+                + " sprite=" + (cmImg.IsNotNull() && cmImg.sprite.IsNotNull() ? cmImg.sprite.name : "no-sprite")
+                + " imgEnabled=" + (cmImg.IsNotNull() ? cmImg.enabled.ToString() : "no-img")
+                + " imgAlpha=" + (cmImg.IsNotNull() ? cmImg.color.a.ToString("F2") : "-"));
+#endif
+            if (ground.IsNotNull())
+                EnsureComponent<GroundHandler>(ground.gameObject);
+        }
+
         internal static GameObject Instantiate(GameObject radio, Transform viewport)
         {
             if (radio.IsNull()) return null;
@@ -35,23 +60,7 @@ namespace UBOAT.Mods.RadioNavigation
                 EnsureComponent<ToggleHandler>(toggle.gameObject);
 
             Transform ground = radio.transform.Find(PrefabNames.Ground);
-            Transform groundBg = ground?.Find(PrefabNames.Background);
-            Transform groundCm = groundBg?.Find(PrefabNames.GroundCheckmark);
-#if DEBUG
-            Image cmImg = groundCm?.GetComponent<Image>();
-            Debug.Log("[RadioNav][Main] Ground exists=" + (ground.IsNotNull())
-                + " Background exists=" + (groundBg.IsNotNull())
-                + " Checkmark exists=" + (groundCm.IsNotNull())
-                + " [Ground] pos=" + (ground.IsNotNull() ? ground.localPosition.ToString() : "null")
-                + " [Background] pos=" + (groundBg.IsNotNull() ? groundBg.localPosition.ToString() : "null")
-                + " img=" + (groundBg.IsNotNull() && groundBg.GetComponent<Image>().IsNotNull())
-                + " [Checkmark] pos=" + (groundCm.IsNotNull() ? groundCm.localPosition.ToString() : "null")
-                + " sprite=" + (cmImg.IsNotNull() && cmImg.sprite.IsNotNull() ? cmImg.sprite.name : "no-sprite")
-                + " imgEnabled=" + (cmImg.IsNotNull() ? cmImg.enabled.ToString() : "no-img")
-                + " imgAlpha=" + (cmImg.IsNotNull() ? cmImg.color.a.ToString("F2") : "-"));
-#endif
-            if (ground.IsNotNull())
-                EnsureComponent<GroundHandler>(ground.gameObject);
+            InstallGroundHandler(ground);
 
             Transform expander = radio.transform.Find(PrefabNames.Expander);
             if (expander.IsNotNull())

@@ -368,18 +368,7 @@ namespace UBOAT.Mods.RadioNavigation
             var texture = new Texture2D(BackdropTextureSize, BackdropTextureSize, TextureFormat.RGBA32, false);
             texture.name = "RadioNavMarkerBackdrop";
             texture.hideFlags = HideFlags.DontSave;
-            float half = BackdropTextureSize * 0.5f;
-            for (int y = 0; y < BackdropTextureSize; y++)
-            {
-                for (int x = 0; x < BackdropTextureSize; x++)
-                {
-                    float dx = (x + 0.5f - half) / half;
-                    float dy = (y + 0.5f - half) / half;
-                    float r = Mathf.Sqrt(dx * dx + dy * dy);
-                    float falloff = r >= 1f ? 0f : (1f - r) * (1f - r);
-                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, falloff));
-                }
-            }
+            texture.SetPixels32(MarkerArtPixels.RenderBackdropPixels(BackdropTextureSize));
             texture.Apply();
             backdropSprite = Sprite.Create(texture,
                 new Rect(0f, 0f, texture.width, texture.height),

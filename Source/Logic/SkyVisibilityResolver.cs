@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UBOAT.Game.Scene.Environment;
+using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -11,8 +12,8 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private static readonly Dictionary<string, MemberInfo> memberCache = new Dictionary<string, MemberInfo>();
         // P5.1: Type.GetType with assembly-qualified name is a string parse +
-        // assembly scan per call; IsPlayerOutside hits it every frame.
-        private static readonly Dictionary<string, Type> typeCache = new Dictionary<string, Type>();
+        // assembly scan per call; IsPlayerOutside hits it every frame — type
+        // resolution is cached centrally in GameTypeCache.
 
         [Inject] private static Weather weather;
 
@@ -32,9 +33,13 @@ namespace UBOAT.Mods.RadioNavigation
                 float fogginess = ReadFloat(atmosphere, "Fogginess");
                 return Math.Max(0f, Math.Min(1f, fogginess));
             }
-            catch
+            catch (Exception e)
             {
-                // A scene transition can temporarily invalidate injected Unity references.
+                // Scene transitions can temporarily invalidate injected Unity
+                // references; log once per session so a permanent failure
+                // (game rename) is visible instead of silently wrong.
+                if (WarnOnce.ShouldLog("SkyVisibilityResolver.GetFogginess"))
+                    Debug.LogWarning("[RadioNav][Sky] GetFogginess failed: " + e.Message);
                 return 0f;
             }
         }
@@ -56,9 +61,10 @@ namespace UBOAT.Mods.RadioNavigation
                 float visibility = (1f - fogginess) * (1f - lerpValue);
                 return Math.Max(0f, Math.Min(1f, visibility));
             }
-            catch
+            catch (Exception e)
             {
-                // A scene transition can temporarily invalidate injected Unity references.
+                if (WarnOnce.ShouldLog("SkyVisibilityResolver.GetVisibility"))
+                    Debug.LogWarning("[RadioNav][Sky] GetVisibility failed: " + e.Message);
                 return 1f;
             }
         }
@@ -87,19 +93,17 @@ namespace UBOAT.Mods.RadioNavigation
 
                 return true;
             }
-            catch
+            catch (Exception e)
             {
+                if (WarnOnce.ShouldLog("SkyVisibilityResolver.IsPlayerOutside"))
+                    Debug.LogWarning("[RadioNav][Sky] IsPlayerOutside failed: " + e.Message);
                 return false;
             }
         }
 
         private static object ReadStatic(string typeName, string memberName)
         {
-            if (!typeCache.TryGetValue(typeName, out Type type))
-            {
-                type = Type.GetType(typeName + ", com.uboat.game");
-                typeCache[typeName] = type;
-            }
+            Type type = GameTypeCache.Resolve(typeName);
             if (type == null)
                 return null;
 
@@ -108,6 +112,8 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 cached = (MemberInfo)type.GetProperty(memberName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
                     ?? type.GetField(memberName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (cached.IsNull() && WarnOnce.ShouldLog("SkyVisibilityResolver." + cacheKey))
+                    Debug.LogWarning("[RadioNav][Sky] static member not found: " + cacheKey);
                 memberCache[cacheKey] = cached;
             }
 
@@ -144,6 +150,8 @@ namespace UBOAT.Mods.RadioNavigation
                 Type type = target.GetType();
                 cached = (MemberInfo)type.GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance)
                     ?? type.GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
+                if (cached.IsNull() && WarnOnce.ShouldLog("SkyVisibilityResolver." + cacheKey))
+                    Debug.LogWarning("[RadioNav][Sky] member not found: " + cacheKey);
                 memberCache[cacheKey] = cached;
             }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,13 +17,13 @@ namespace UBOAT.Mods.RadioNavigation
         public const string LighthouseGlowVerboseKey = "RadioNav.LighthouseGlowVerbose";
         public const string LighthouseMapMarkerPositionKey = "RadioNav.LighthouseMapMarkerPosition";
 
-        private const float CacheSeconds = 0.25f;
-        // Stopwatch instead of Time.unscaledTime: this class compiles into
-        // the test assembly too, where UnityEngine.Time has no stub.
-        private static readonly System.Diagnostics.Stopwatch cacheClock =
-            System.Diagnostics.Stopwatch.StartNew();
+        private const int CacheMs = 250;
+        // Environment.TickCount instead of Stopwatch: System.Diagnostics is
+        // denied by the game's mod sandbox (whole mod fails load on it).
+        // mscorlib member, works in tests too (they sleep real time).
         private static readonly Dictionary<string, bool> cachedValue = new Dictionary<string, bool>();
-        private static float cacheRefreshedAt = -1f;
+        private static int cacheRefreshedAt;
+        private static bool cacheInitialized;
 
         /// <summary>
         /// True when the PlayerPrefs int under key is non-zero, or when the
@@ -41,14 +42,15 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public static bool IsEnabledCached(string key, bool defaultValue)
         {
-            float now = (float)cacheClock.Elapsed.TotalSeconds;
-            if (now - cacheRefreshedAt >= CacheSeconds)
+            int now = Environment.TickCount;
+            if (!cacheInitialized || unchecked(now - cacheRefreshedAt) >= CacheMs)
             {
                 cachedValue[LighthouseGlowVerboseKey] =
                     IsEnabled(LighthouseGlowVerboseKey, true);
                 cachedValue[LighthouseMapMarkerPositionKey] =
                     IsEnabled(LighthouseMapMarkerPositionKey, true);
                 cacheRefreshedAt = now;
+                cacheInitialized = true;
             }
             return cachedValue.TryGetValue(key, out bool value) ? value : IsEnabled(key, defaultValue);
         }

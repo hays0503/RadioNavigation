@@ -105,9 +105,11 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     state.Intensity = ((float)s.FlareIntensityProperty.GetValue(s.LensFlare, null)).ToString("F3");
                 }
-                catch
+                catch (Exception e)
                 {
                     state.Intensity = "read-failed";
+                    if (WarnOnce.ShouldLog("LighthouseDiagnostics.FlareIntensity"))
+                        Debug.LogWarning("[RadioNav][Lighthouse] flare intensity read failed: " + e.Message);
                 }
             }
             return state;
@@ -197,7 +199,11 @@ namespace UBOAT.Mods.RadioNavigation
                     m.HotSpot = LighthouseVisualModel.BeamIntensityFactor(hotAlignDbg);
                 }
             }
-            catch { }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("LighthouseDiagnostics.HotSpot"))
+                    Debug.LogWarning("[RadioNav][Lighthouse] hotspot compute failed: " + e.Message);
+            }
             return m;
         }
 
@@ -239,7 +245,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// and returns its enabled state as a string. Shared by the glow diag
         /// and the screenPt diag in LighthouseBeamGlow.
         /// </summary>
-        public static string GetInteriorCameraEnabled(MainCamera mc)
+        internal static string GetInteriorCameraEnabled(MainCamera mc)
         {
             try
             {

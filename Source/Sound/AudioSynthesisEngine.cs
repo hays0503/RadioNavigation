@@ -17,7 +17,9 @@ namespace UBOAT.Mods.RadioNavigation
         // F94: double accumulator — float drift over hours of gameplay could
         // shift the 50 ms tick tempo.
         private double tickAccumulator;
-        private float outputVolume = 1f;
+        // Main-thread writes (volume knob), audio-thread reads (ProcessAudio
+        // multiplies every sample) — volatile.
+        private volatile float outputVolume = 1f;
 
         public float OutputVolume
         {
@@ -28,6 +30,12 @@ namespace UBOAT.Mods.RadioNavigation
         // F115: clear accumulated DSP state (QSB phase, AGC gain, filter
         // state) when the controller is destroyed; a recreated engine must
         // start from a clean state.
+        // Accepted race (audited 2026-09-04): Reset runs on the main thread
+        // while the audio thread may be inside Atmosphere.Apply. rng itself
+        // is only touched from Apply (audio thread, single caller — grep
+        // verified), so the generator is race-free; the worst interleaving
+        // is one Gaussian sample recomputed after hasCachedGaussian flips —
+        // inaudible. Locking the audio path would cost more than the bug.
         public void Reset()
         {
             atmosphere.Reset();
@@ -35,8 +43,17 @@ namespace UBOAT.Mods.RadioNavigation
             tickAccumulator = 0.0;
         }
 
-        public float QualityFactor { get; set; } = Constants.QualityFactorBase;
-        public float Feedback { get; private set; }
+        // Main-thread write (ApplyFeedback), audio-thread read (UpdateCarrierPitch
+        // runs main-thread, but QualityFactor feeds gains read by ProcessAudio) — volatile.
+        private volatile float qualityFactor = Constants.QualityFactorBase;
+        private float feedback;
+
+        public float QualityFactor
+        {
+            get => qualityFactor;
+            private set => qualityFactor = value;
+        }
+        public float Feedback { get => feedback; private set => feedback = value; }
         public Atmosphere Atmosphere => atmosphere;
         public ReceiverDsp Dsp => dsp;
 
@@ -48,10 +65,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void ApplyFeedback(float angle)
         {
-            Feedback = Mathf.Clamp01(angle / 140f);
+            Feedback = SpinnerScale.ToUnit(angle);
 
             QualityFactor = Constants.QualityFactorBase + Feedback * Feedback * Constants.QualityFactorFeedbackPerUnit;
-
             atmosphere.NoiseFloor = Mathf.Lerp(0.004f, 0.0005f, Feedback);
             atmosphere.ImpulseProbability = Mathf.Lerp(0.002f, 0.0002f, Feedback);
 
@@ -69,11 +85,12 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             tickAccumulator += deltaSeconds;
+            int fleet = SimulationFleetCount(stations, schedulers, keyers, carriers);
             while (tickAccumulator >= TickIntervalSeconds)
             {
                 tickAccumulator -= TickIntervalSeconds;
 
-                for (int s = 0; s < stations.Length; s++)
+                for (int s = 0; s < fleet; s++)
                 {
                     if (stations[s].Gain.IsNegligible(0.001f))
                         continue;
@@ -148,25 +165,50 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         // Audio thread: read-only. Only volatile MorseKeyer flags are sampled;
-        // no scheduler/keyer mutations, no UnityEngine API.
+        // no scheduler/keyer mutations, no UnityEngine API. Entry guards: any
+        // throw here kills the whole audio graph, so null/ragged inputs bail
+        // out silently instead (one Math.Min outside the loop, zero allocs).
+        // Usable fleet length: null arrays count as empty, ragged arrays
+        // (partial teardown) clamp to the shortest so the loop can never
+        // index out of range.
+        private static int SilencedFleetCount(StationState[] stations, MorseKeyer[] keyers, CarrierGenerator[] carriers)
+        {
+            if (stations.IsNull() || keyers.IsNull() || carriers.IsNull())
+                return 0;
+            return Math.Min(stations.Length, Math.Min(keyers.Length, carriers.Length));
+        }
+
+        // Same clamp for the main-thread simulation (schedulers included).
+        private static int SimulationFleetCount(StationState[] stations, StationScheduler[] schedulers, MorseKeyer[] keyers, CarrierGenerator[] carriers)
+        {
+            if (stations.IsNull() || schedulers.IsNull() || keyers.IsNull() || carriers.IsNull())
+                return 0;
+            return Math.Min(stations.Length, Math.Min(schedulers.Length, Math.Min(keyers.Length, carriers.Length)));
+        }
+
         public void ProcessAudio(float[] data, int channels, StationState[] stations, MorseKeyer[] keyers, CarrierGenerator[] carriers, bool radioOn, int currentZoneIndex, int sonneZoneIndex)
         {
-            if (currentZoneIndex != sonneZoneIndex)
+            if (data.IsNull() || data.Length.IsZero() || channels.IsNonPositive())
+                return;
+
+            // An empty fleet means teardown — silence, not a DSP-processed
+            // noise floor on a zero sample
+            // (verified by ProcessAudio_RaggedFleet_ClampsToShortest).
+            int count = SilencedFleetCount(stations, keyers, carriers);
+            if (count.IsZero() || currentZoneIndex != sonneZoneIndex || !radioOn)
             {
                 Array.Clear(data, 0, data.Length);
                 return;
             }
 
-            if (!radioOn)
-            {
-                Array.Clear(data, 0, data.Length);
-                return;
-            }
-
-            for (int i = 0; i < data.Length; i += channels)
+            // A ragged tail (Length % channels != 0) has no full frame —
+            // stop before it instead of indexing out of range on the audio
+            // thread, where a throw kills the whole graph.
+            int frames = data.Length - data.Length % channels;
+            for (int i = 0; i < frames; i += channels)
             {
                 float sample = 0f;
-                for (int s = 0; s < stations.Length; s++)
+                for (int s = 0; s < count; s++)
                 {
                     if (stations[s].Gain.IsNegligible(0.001f))
                         continue;

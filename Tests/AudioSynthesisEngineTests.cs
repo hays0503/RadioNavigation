@@ -154,6 +154,54 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(data.Any(sample => sample != 0f), "keyed signal must not be silent");
         }
 
+        // F71: time compression (x2/x32) suppresses audio even while the keyer
+        // is mid-element — OnAudioFilterRead passes radioOn=false in that state,
+        // so an actively keyed tone must still render as a zeroed buffer.
+        [Fact]
+        public void ProcessAudio_TimeCompressionSuppressesActiveTone()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var schedulers = new[] { new StationScheduler("TEST") };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            // Drive into an actively keyed element (same as
+            // ProcessAudio_KeyOn_ProducesSignal).
+            engine.UpdateStations(0.1f, 1f, stations, schedulers, keyers, carriers, true);
+            Assert.True(keyers[0].KeyOn, "precondition: keyer must be mid-element");
+
+            var data = Enumerable.Repeat(0.5f, 1024).ToArray();
+            engine.ProcessAudio(data, 1, stations, keyers, carriers, false, 0, 0);
+
+            Assert.All(data, sample => Assert.Equal(0f, sample));
+        }
+
+        // F71: pause (timeScale == 0) delivers zero delta time, so the scheduler
+        // and keyer state machine must not advance — the current tone freezes
+        // instead of running away or skipping elements.
+        [Fact]
+        public void UpdateStations_ZeroDelta_FreezesStateMachine()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var schedulers = new[] { new StationScheduler("TEST") };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            // Establish a known state: one tick moves Pause -> Callsign.
+            engine.UpdateStations(0.05f, 1f, stations, schedulers, keyers, carriers, true);
+            Assert.Equal(StationScheduler.Phase.Callsign, schedulers[0].CurrentPhase);
+            bool keyOnBefore = keyers[0].KeyOn;
+
+            // Simulate many paused frames: delta 0 must not advance anything.
+            for (int i = 0; i < 100; i++)
+                engine.UpdateStations(0f, 1f, stations, schedulers, keyers, carriers, true);
+
+            Assert.Equal(StationScheduler.Phase.Callsign, schedulers[0].CurrentPhase);
+            Assert.Equal(keyOnBefore, keyers[0].KeyOn);
+        }
+
         // Pitch-split: with a BeatFrequency set, the carrier target must move
         // above the beat for dots and below it for dashes; equisignal and
         // silence stay on the beat. Stations without BeatFrequency are not
@@ -196,6 +244,115 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(sawDotPitch, "dot element must key the carrier above the beat");
             Assert.True(sawBeatDuringSilence, "silence must return the carrier to the beat");
             Assert.True(sawDashPitch, "dash element must key the carrier below the beat");
+        }
+
+        [Fact]
+        public void OutputVolume_ClampsToUnit()
+        {
+            var engine = CreateEngine();
+            engine.OutputVolume = 2f;
+            Assert.Equal(1f, engine.OutputVolume);
+            engine.OutputVolume = -0.5f;
+            Assert.Equal(0f, engine.OutputVolume);
+            engine.OutputVolume = 0.7f;
+            Assert.Equal(0.7f, engine.OutputVolume);
+        }
+
+        [Fact]
+        public void ProcessAudio_NullInputs_NoThrow()
+        {
+            var engine = CreateEngine();
+            engine.ProcessAudio(null, 2, null, null, null, true, 1, 1);
+            engine.ProcessAudio(new float[8], 0, null, null, null, true, 1, 1);
+        }
+
+        [Fact]
+        public void ProcessAudio_RaggedTail_StopsBeforePartialFrame()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+            float[] data = { 9f, 9f, 9f, 9f, 9f, 9f, 9f };
+
+            engine.ProcessAudio(data, 2, stations, keyers, carriers, true, 1, 1);
+
+            Assert.Equal(9f, data[6]);
+        }
+
+        [Fact]
+        public void UpdateStations_RaggedArrays_NoThrow()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            engine.UpdateStations(0.05f, 0f, stations, new StationScheduler[0], keyers, carriers, true);
+            engine.UpdateStations(0.05f, 0f, null, null, null, null, true);
+        }
+
+        [Fact]
+        public void ProcessAudio_RaggedFleet_ClampsToShortest()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var keyers = new MorseKeyer[1];
+            var carriers = new CarrierGenerator[0]; // ragged: zero carriers
+
+            float[] data = new float[8];
+            engine.ProcessAudio(data, 1, stations, keyers, carriers, true, 1, 1);
+
+            // Zero-length carriers => zero stations processed => silence.
+            Assert.All(data, s => Assert.Equal(0f, s));
+        }
+
+        [Fact]
+        public void Reset_ClearsAccumulatedState()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var schedulers = new[] { CreateSchedulerInPreNavPause() };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+            engine.UpdateStations(1f, 1f, stations, schedulers, keyers, carriers, true);
+
+            engine.Reset();
+
+            Assert.Equal(1f, engine.OutputVolume);
+        }
+
+        [Fact]
+        public void ApplyFeedback_MapsAngle()
+        {
+            var engine = CreateEngine();
+            engine.ApplyFeedback(70f);
+            Assert.Equal(0.5f, engine.Feedback);
+            Assert.Equal(20f + 0.25f * 180f, engine.QualityFactor);
+
+            engine.ApplyFeedback(140f);
+            Assert.Equal(1f, engine.Feedback);
+            Assert.Equal(200f, engine.QualityFactor);
+        }
+
+        [Fact]
+        public void UpdateStations_EmptyNavigationSequence_SkipsToPostNav()
+        {
+            var engine = CreateEngine();
+            var stations = CreateStation(1f);
+            var scheduler = CreateSchedulerInPreNavPause();
+            for (int i = 0; i < 60; i++)
+                scheduler.Tick();
+            Assert.Equal(StationScheduler.Phase.Navigation, scheduler.CurrentPhase);
+            scheduler.Navigation = new NavigationPattern(new Group[0], 8);
+            scheduler.CurrentConsolPattern = null;
+            var schedulers = new[] { scheduler };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            engine.UpdateStations(0.05f, 1f, stations, schedulers, keyers, carriers, true);
+
+            Assert.Equal(StationScheduler.Phase.PostNavSilence, scheduler.CurrentPhase);
         }
     }
 }

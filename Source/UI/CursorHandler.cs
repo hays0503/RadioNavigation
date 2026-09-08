@@ -47,7 +47,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (eventData.button != PointerEventData.InputButton.Left)
                 return;
-            if (!ToggleHandler.IsInteractable) return;
+            if (!RadioPowerBus.IsInteractable) return;
             if (cursorRect.IsNull())
             {
                 Debug.LogError("[RadioNav][CursorHandler] cursorRect not initialized");
@@ -64,7 +64,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (!IsActiveDrag(eventData))
                 return;
-            if (!ToggleHandler.IsInteractable) return;
+            if (!RadioPowerBus.IsInteractable) return;
 
             Vector2 dir = eventData.position - (Vector2)cursorRect.position;
             if (dir.y.IsNegative()) dir.y = 0;
@@ -95,7 +95,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnScroll(PointerEventData eventData)
         {
-            if (!ToggleHandler.IsInteractable) return;
+            if (!RadioPowerBus.IsInteractable) return;
             if (cursorRect.IsNull()) return;
 
             float delta = eventData.scrollDelta.y;
@@ -123,7 +123,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
-            if (!isHovering || !ToggleHandler.IsInteractable) return;
+            if (!isHovering || !RadioPowerBus.IsInteractable) return;
 
             float scrollY = Input.mouseScrollDelta.y;
             if (Mathf.Abs(scrollY).IsNegligible(0.01f)) return;

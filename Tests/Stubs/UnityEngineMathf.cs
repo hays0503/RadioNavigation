@@ -4,7 +4,11 @@ namespace UnityEngine
 {
     public static class Mathf
     {
+        public const float Rad2Deg = 57.29578f;
+
         public static int RoundToInt(float f) => (int)Math.Round(f);
+
+        public static float Sqrt(float f) => (float)Math.Sqrt(f);
 
         public static float Clamp(float value, float min, float max)
         {

@@ -10,32 +10,9 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public event Action<bool> OnValueChanged;
 
-        private static volatile bool isRadioOn;
-        private static bool isInteractable;
-        private static bool groundActive;
-
-        public static bool IsRadioOn
-        {
-            get { return isRadioOn; }
-            private set { isRadioOn = value; }
-        }
-
-        public static bool IsInteractable
-        {
-            get { return isInteractable; }
-            private set { isInteractable = value; }
-        }
-
-        public static void SetGroundActive(bool active)
-        {
-            groundActive = active;
-            IsInteractable = IsRadioOn && active;
-        }
-
         private Toggle toggleComp;
         private GameObject onImage;
         private GameObject offImage;
-        private RectTransform toggleRect;
         private Image dialImage;
         private Color originalDialColor;
 
@@ -52,14 +29,8 @@ namespace UBOAT.Mods.RadioNavigation
             }
             toggleComp.graphic = null;
 
-            toggleRect = GetComponent<RectTransform>();
-            if (toggleRect.IsNull())
-            {
-                Debug.LogError("[RadioNav][ToggleHandler] RectTransform not found, disabling");
-                enabled = false;
-                return;
-            }
-
+            // NOTE: no RectTransform guard — a GameObject carrying Toggle
+            // (a Graphic) always has one; Unity adds it automatically.
             Transform bg = transform.Find(PrefabNames.Background);
             if (bg.IsNotNull())
             {
@@ -99,8 +70,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnToggleChanged(bool isOn)
         {
-            IsRadioOn = isOn;
-            IsInteractable = isOn && groundActive;
+            RadioPowerBus.SetRadioOn(isOn);
 
             if (onImage.IsNotNull())
             {
@@ -124,9 +94,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void OnDestroy()
         {
             // F61: static UI state must not leak into the next scene load.
-            isRadioOn = false;
-            isInteractable = false;
-            groundActive = false;
+            RadioPowerBus.Reset();
 
             if (toggleComp.IsNotNull())
                 toggleComp.onValueChanged.RemoveListener(OnToggleChanged);

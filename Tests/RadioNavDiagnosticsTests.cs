@@ -51,5 +51,49 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             PlayerPrefs.DeleteKey(Key);
             Assert.True(RadioNavDiagnostics.IsEnabled(Key, true));
         }
+
+        [Fact]
+        public void Cached_UnknownKey_FallsBackLive()
+        {
+            PlayerPrefs.DeleteKey(Key);
+            Assert.True(RadioNavDiagnostics.IsEnabledCached(Key, true));
+            Assert.False(RadioNavDiagnostics.IsEnabledCached(Key, false));
+            PlayerPrefs.DeleteKey(Key);
+        }
+
+        [Fact]
+        public void Cached_KnownKey_CachesWithinWindow()
+        {
+            const string glowKey = RadioNavDiagnostics.LighthouseGlowVerboseKey;
+            const string markerKey = RadioNavDiagnostics.LighthouseMapMarkerPositionKey;
+            PlayerPrefs.DeleteKey(glowKey);
+            PlayerPrefs.DeleteKey(markerKey);
+
+            Assert.True(RadioNavDiagnostics.IsEnabledCached(glowKey, true));
+
+            PlayerPrefs.SetInt(glowKey, 0);
+            Assert.True(RadioNavDiagnostics.IsEnabledCached(glowKey, true));
+
+            PlayerPrefs.DeleteKey(glowKey);
+            PlayerPrefs.DeleteKey(markerKey);
+        }
+
+        [Fact]
+        public void Cached_KnownKey_RefreshesAfterWindow()
+        {
+            const string glowKey = RadioNavDiagnostics.LighthouseGlowVerboseKey;
+            const string markerKey = RadioNavDiagnostics.LighthouseMapMarkerPositionKey;
+            PlayerPrefs.DeleteKey(glowKey);
+            PlayerPrefs.DeleteKey(markerKey);
+
+            Assert.True(RadioNavDiagnostics.IsEnabledCached(glowKey, true));
+
+            PlayerPrefs.SetInt(glowKey, 0);
+            System.Threading.Thread.Sleep(300);
+            Assert.False(RadioNavDiagnostics.IsEnabledCached(glowKey, true));
+
+            PlayerPrefs.DeleteKey(glowKey);
+            PlayerPrefs.DeleteKey(markerKey);
+        }
     }
 }

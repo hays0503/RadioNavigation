@@ -40,6 +40,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static SunDiscRenderer instance;
 
         private MeshRenderer meshRenderer;
+        private MeshFilter meshFilter;
         private Material material;
         private Texture2D discTexture;
         private readonly System.Random rng = new System.Random();
@@ -69,7 +70,7 @@ namespace UBOAT.Mods.RadioNavigation
             instance = this;
             gameObject.layer = SunDiscLayer;
 
-            MeshFilter meshFilter = gameObject.AddComponent<MeshFilter>();
+            meshFilter = gameObject.AddComponent<MeshFilter>();
             meshRenderer = gameObject.AddComponent<MeshRenderer>();
             meshRenderer.enabled = false;
 
@@ -104,6 +105,11 @@ namespace UBOAT.Mods.RadioNavigation
                 Destroy(discTexture);
             if (material != null)
                 Destroy(material);
+            // BuildQuad assigns our own mesh (named) to sharedMesh — free it;
+            // a foreign mesh (game reassigned) must survive.
+            if (meshFilter != null && meshFilter.sharedMesh != null
+                && meshFilter.sharedMesh.name == "RadioNavSunDiscQuad")
+                Destroy(meshFilter.sharedMesh);
         }
 
         private static void BuildQuad(MeshFilter meshFilter)

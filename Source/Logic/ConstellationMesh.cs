@@ -12,7 +12,8 @@ namespace UBOAT.Mods.RadioNavigation
     [RequireComponent(typeof(MeshRenderer))]
     public sealed class ConstellationMesh : MonoBehaviour
     {
-        private const float WorldRadiusM = 3900f;
+        // NOTE: no local WorldRadiusM — the single source of truth lives in
+        // CameraResolver (SafeRadius); the dead duplicate was removed (iter6).
         private const float LineWidthArcMin = 2f; // angular width in arcminutes
         private static readonly Color LineColor = new Color(0.55f, 0.22f, 0.15f, 0.4f); // reddish-brown
 
@@ -29,15 +30,15 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<Vector3> vertices = new List<Vector3>();
         private readonly List<int> triangles = new List<int>();
         private readonly List<Color> colors = new List<Color>();
+        // RebuildMesh scratch: one polyline at a time, reused across
+        // rebuilds — no per-polyline List alloc (class contract above).
+        private readonly List<Vector3> worldPointsScratch = new List<Vector3>(64);
 
         /// <summary>Base key of the constellation toggle combo; effective binding is Shift+Z (SEXTANT_PLAN v1.2 — plain Z opens the sextant). Game occupies F4-F10/F11; Z verified free (source grep + 80-axis dump).</summary>
         private const KeyCode ToggleKey = KeyCode.Z;
 
         /// <summary>Current layer state, persisted via ConstellationTogglePrefs. Default ON.</summary>
         public static bool Enabled { get; private set; } = ConstellationTogglePrefs.Load();
-
-        /// <summary>Raised after the layer state flips; carries the new value.</summary>
-        public static event Action<bool> EnabledChanged;
 
         public static void SetEnabled(bool value)
         {
@@ -47,7 +48,6 @@ namespace UBOAT.Mods.RadioNavigation
             Enabled = value;
             ConstellationTogglePrefs.Save(value);
             Debug.Log("[RadioNav][ConstellationMesh] constellations " + (value ? "ON" : "OFF"));
-            EnabledChanged?.Invoke(value);
         }
 
         private void Update()
@@ -124,9 +124,9 @@ namespace UBOAT.Mods.RadioNavigation
             double lstDeg = AstroMath.LstDeg(jd, lon);
 
             // Rebuild mesh only if camera/position/LST changed significantly
-            bool needsRebuild = Vector3.Distance(cam.transform.position, lastCamPos) > 10f
-                             || Math.Abs(lstDeg - lastLstDeg) > 0.1
-                             || Math.Abs(lat - lastLat) > 0.01f;
+            bool needsRebuild = MeshRebuildPolicy.NeedsRebuild(
+                cam.transform.position, lastCamPos,
+                lstDeg, lastLstDeg, lat, lastLat);
 
             if (!needsRebuild && meshFilter.mesh != null && meshFilter.mesh.vertexCount > 0)
                 return;
@@ -153,7 +153,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (polyline.Length < 2) continue;
 
                 // Convert all points to world positions
-                List<Vector3> worldPoints = new List<Vector3>();
+                worldPointsScratch.Clear();
                 for (int i = 0; i < polyline.Length; i++)
                 {
                     int starIdx = polyline[i];
@@ -170,14 +170,14 @@ namespace UBOAT.Mods.RadioNavigation
 
                     Vector3 dir = new Vector3((float)e, (float)u, (float)n).normalized;
                     Vector3 worldPos = cam.transform.position + dir * safeRadius;
-                    worldPoints.Add(worldPos);
+                    worldPointsScratch.Add(worldPos);
                 }
 
                 // Draw segments between consecutive visible points
-                for (int i = 0; i < worldPoints.Count - 1; i++)
+                for (int i = 0; i < worldPointsScratch.Count - 1; i++)
                 {
-                    Vector3 p0 = worldPoints[i];
-                    Vector3 p1 = worldPoints[i + 1];
+                    Vector3 p0 = worldPointsScratch[i];
+                    Vector3 p1 = worldPointsScratch[i + 1];
                     AddLineSegment(p0, p1, lineWidthRad * safeRadius);
                     visibleSegments++;
                 }

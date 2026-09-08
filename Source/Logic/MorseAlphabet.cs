@@ -71,6 +71,33 @@
         // timing lives in MorseTiming, not in the pattern; removed.
         public static NavigationPattern TextToPattern(string text)
         {
+            return BuildPattern(text, true);
+        }
+
+        // Marks-only packing for callsign keying: no inter-character/word
+        // pause elements. The keyer's own per-element silence provides the
+        // gaps, so the sequence length equals the morse mark count and the
+        // transcript buffer decodes against ExpectedLength. Pause-bearing
+        // TextToPattern stays for legacy keyer-timing tests.
+        public static NavigationPattern TextToMarksPattern(string text)
+        {
+            return BuildPattern(text, false);
+        }
+
+        // Total morse marks of a text (letters only; spaces/unknown = 0).
+        // Single source shared with SonneSignalGenerator.GetCallsignElementCount.
+        public static int CountMarks(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return 0;
+            int count = 0;
+            foreach (char ch in text.ToUpperInvariant())
+                count += GetMorse(ch).Length;
+            return count;
+        }
+
+        private static NavigationPattern BuildPattern(string text, bool includePauses)
+        {
             if (string.IsNullOrEmpty(text))
                 return new NavigationPattern(new Group[0], 1);
 
@@ -78,10 +105,10 @@
 
             for (int i = 0; i < text.Length; i++)
             {
-                // F129: mirror GetElementCount — 7-element inter-word pause
+                // F129: mirror GetElementCount - 7-element inter-word pause
                 // after a space, 3-element inter-character pause otherwise;
                 // a space itself contributes only silence.
-                if (i.IsPositive() && text[i] != ' ')
+                if (includePauses && i.IsPositive() && text[i] != ' ')
                 {
                     int pause = text[i - 1] == ' ' ? 7 : 3;
                     for (int g = 0; g < pause; g++)

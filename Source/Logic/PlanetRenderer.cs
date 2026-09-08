@@ -93,10 +93,10 @@ namespace UBOAT.Mods.RadioNavigation
             double jd = AstroMath.ToJulianDay(GameTimeResolver.GetUtcNow());
             double lstDeg = AstroMath.LstDeg(jd, longitude);
             bool needsRebuild = !meshRenderer.enabled
-                || Vector3.Distance(cam.transform.position, lastCameraPosition) > 10f
-                || Quaternion.Angle(cam.transform.rotation, lastCameraRotation) > 5f
-                || Math.Abs(lstDeg - lastLstDeg) > 0.1
-                || Math.Abs(latitude - lastLatitude) > 0.01f;
+                || MeshRebuildPolicy.NeedsRebuild(
+                    cam.transform.position, lastCameraPosition,
+                    cam.transform.rotation, lastCameraRotation,
+                    lstDeg, lastLstDeg, latitude, lastLatitude, true);
 
             if (!needsRebuild)
                 return;
@@ -136,7 +136,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Color color = PlanetColors[planetId];
                 if (planetId == 4)
                     color.a *= (float)AstroMath.MoonIllumination(jd);
-                AddBillboardQuad(center, direction, SizeForPlanet(planetId), color);
+                BillboardQuadBuilder.AddQuad(vertices, triangles, colors, uvs, center, direction, SizeForPlanet(planetId), color);
             }
 
             Mesh mesh = meshFilter.mesh;
@@ -161,33 +161,5 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private void AddBillboardQuad(Vector3 center, Vector3 forward, float size, Color color)
-        {
-            Vector3 right = Vector3.Cross(forward, Vector3.up).normalized;
-            if (right.sqrMagnitude < 0.001f)
-                right = Vector3.right;
-            Vector3 up = Vector3.Cross(right, forward).normalized;
-            float halfSize = size * 0.5f;
-            int baseIndex = vertices.Count;
-
-            vertices.Add(center - right * halfSize - up * halfSize);
-            vertices.Add(center + right * halfSize - up * halfSize);
-            vertices.Add(center + right * halfSize + up * halfSize);
-            vertices.Add(center - right * halfSize + up * halfSize);
-            triangles.Add(baseIndex);
-            triangles.Add(baseIndex + 1);
-            triangles.Add(baseIndex + 2);
-            triangles.Add(baseIndex);
-            triangles.Add(baseIndex + 2);
-            triangles.Add(baseIndex + 3);
-            colors.Add(color);
-            colors.Add(color);
-            colors.Add(color);
-            colors.Add(color);
-            uvs.Add(new Vector2(0, 0));
-            uvs.Add(new Vector2(1, 0));
-            uvs.Add(new Vector2(1, 1));
-            uvs.Add(new Vector2(0, 1));
-        }
     }
 }

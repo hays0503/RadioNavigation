@@ -13,8 +13,10 @@ namespace UBOAT.Mods.RadioNavigation
     /// <summary>
     /// Owns the mod's bootstrap lifecycle (P5.5, extracted from Main.cs):
     /// Harmony patch installation, scene-event subscription, per-scene DI
-    /// injection, and Main-Scene radio-panel construction. Main is now a thin
-    /// IUserMod facade that delegates here.
+    /// injection, and Main-Scene radio-panel construction. Scene content
+    /// itself (map components, sky roots, runners) lives in
+    /// SceneContentBuilder. Main is now a thin IUserMod facade that
+    /// delegates here.
     /// </summary>
     [NonSerializedInGameState]
     public sealed class ModBootstrapper
@@ -23,10 +25,9 @@ namespace UBOAT.Mods.RadioNavigation
         private const string MainSceneViewportPath = "/GUI/Viewport";
         private const string RadioRootName = "RadioNavigationPanel";
 
-        private readonly ResourceManager resourceManager;
+        private ResourceManager resourceManager;
         private Harmony harmony;
         private bool loaded;
-
         public ModBootstrapper(ResourceManager resourceManager)
         {
             this.resourceManager = resourceManager;
@@ -43,6 +44,15 @@ namespace UBOAT.Mods.RadioNavigation
                 LighthousePlacer.Reset();
                 LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
                 GameTimeResolver.Reset();
+                // Lifecycle sweep (risk register iter2): stale cross-scene
+                // state that the four resets above do not cover — camera hook
+                // + cached cameras, radio power latch, type/member caches
+                // (game update may rename), stale fix pin.
+                CameraResolver.ResetForReload();
+                RadioPowerBus.Reset();
+                GameTypeCache.Clear();
+                WarnOnce.Reset();
+                FixMapMarker.Clear();
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
             }
 
@@ -82,6 +92,36 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        /// Self-recovery for a missing/evicted DI registration of the
+        /// ResourceManager singleton: DI only registers SO singletons from
+        /// "uboat"-filtered assemblies at framework init and never
+        /// re-registers after UnloadUnusedAssets destroys the instance.
+        /// LoadSingleton is the game's own resolution path (public API).
+        private bool EnsureResourceManager()
+        {
+            if (resourceManager.IsNotNull())
+                return true;
+            if (InjectionFramework.Instance.IsNotNull())
+            {
+                ResourceManager viaDi = InjectionFramework.Instance.GetInstance<ResourceManager>();
+                if (viaDi.IsNotNull())
+                {
+                    resourceManager = viaDi;
+                    return true;
+                }
+            }
+            ResourceManager direct = ScriptableObjectSingleton.LoadSingleton<ResourceManager>();
+            if (direct.IsNotNull())
+            {
+                resourceManager = direct;
+                if (InjectionFramework.Instance.IsNotNull())
+                    InjectionFramework.Instance.AddInjectableInstance(direct);
+                Debug.LogWarning("[RadioNav][Main] ResourceManager resolved via LoadSingleton fallback (DI registration missing)");
+                return true;
+            }
+            return false;
+        }
+
         private void SceneEventsListener_OnSceneStart(Scene scene)
         {
             try
@@ -90,7 +130,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (viewport.IsNull())
                     return;
 
-                if (resourceManager.IsNull())
+                if (!EnsureResourceManager())
                 {
                     Debug.LogError("[RadioNav][Main] ResourceManager not injected \u2014 DI failed");
                     return;
@@ -103,21 +143,12 @@ namespace UBOAT.Mods.RadioNavigation
                 if (radio.IsNull())
                     return;
 
-                AddMapComponents(radio);
+                SceneContentBuilder.Build(radio);
 
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +
                     " radio=created handlers=" + hCount +
                     " visible=" + (RadioHandler.Instance.IsNotNull() ? RadioHandler.Instance.IsVisible.ToString() : "no-instance"));
-
-                CreateStarSky();
-                CreatePlanetRoot();
-                CreateSunDiscRoot();
-
-                LighthousePlacer.EnsureRunning();
-
-                // Phase0 probe (STAR_SKY_PLAN:10, ADR-020) — only when PlayerPrefs RadioNav.Phase0Probe=1
-                StarSkyPhase0Probe.EnsureRunning();
             }
             catch (Exception e)
             {
@@ -192,61 +223,6 @@ namespace UBOAT.Mods.RadioNavigation
 
             RadioInstaller.Instantiate(radio, viewport);
             return radio;
-        }
-
-        private void AddMapComponents(GameObject radio)
-        {
-            if (radio.GetComponent<StationMapOverlay>().IsNull())
-                radio.AddComponent<StationMapOverlay>();
-            if (radio.GetComponent<LighthouseMapMarker>().IsNull())
-                radio.AddComponent<LighthouseMapMarker>();
-            if (radio.GetComponent<StationMapMarker>().IsNull())
-                radio.AddComponent<StationMapMarker>();
-            if (radio.GetComponent<FixMapMarker>().IsNull())
-                radio.AddComponent<FixMapMarker>(); // SEXTANT_PLAN v1.10
-            if (radio.GetComponent<ConstellationToggleButton>().IsNull())
-                radio.AddComponent<ConstellationToggleButton>();
-            if (radio.GetComponent<SextantController>().IsNull())
-                radio.AddComponent<SextantController>(); // SEXTANT_PLAN §7.9
-        }
-
-        private void CreateStarSky()
-        {
-            // STAR_SKY: create star sky renderer (ADR-021)
-            GameObject starSkyRoot = new GameObject("StarSkyRoot");
-            starSkyRoot.AddComponent<StarsMesh>();
-            Object.DontDestroyOnLoad(starSkyRoot);
-            Debug.Log("[RadioNav][Main] StarSkyRoot created with StarsMesh component");
-
-            // STAR_SKY: create constellation lines renderer
-            GameObject constellationRoot = new GameObject("ConstellationRoot");
-            constellationRoot.AddComponent<ConstellationMesh>();
-            Object.DontDestroyOnLoad(constellationRoot);
-            Debug.Log("[RadioNav][Main] ConstellationRoot created with ConstellationMesh component");
-        }
-
-        private void CreatePlanetRoot()
-        {
-            // STAR_SKY: create planetary billboard renderer once
-            if (GameObject.Find("PlanetRoot").IsNull())
-            {
-                GameObject planetRoot = new GameObject("PlanetRoot");
-                planetRoot.AddComponent<PlanetRenderer>();
-                Object.DontDestroyOnLoad(planetRoot);
-                Debug.Log("[RadioNav][Main] PlanetRoot created with PlanetRenderer component");
-            }
-        }
-
-        private void CreateSunDiscRoot()
-        {
-            // SEXTANT: real-size filtered sun disc (layer 7, PIP cameras only)
-            if (GameObject.Find("SunDiscRoot").IsNull())
-            {
-                GameObject sunDiscRoot = new GameObject("SunDiscRoot");
-                sunDiscRoot.AddComponent<SunDiscRenderer>();
-                Object.DontDestroyOnLoad(sunDiscRoot);
-                Debug.Log("[RadioNav][Main] SunDiscRoot created with SunDiscRenderer component");
-            }
         }
     }
 }

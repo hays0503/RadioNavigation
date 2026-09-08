@@ -58,7 +58,7 @@ namespace UBOAT.Mods.RadioNavigation
                 radioToggle.isOn = false;
                 radioToggle.interactable = false;
             }
-            ToggleHandler.SetGroundActive(false);
+            RadioPowerBus.SetGroundActive(false);
         }
 
         // F160: exposed so InformationPanelHandler reads the handler state
@@ -97,7 +97,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (radioToggle.IsNotNull())
                 radioToggle.interactable = !isActive;
 
-            ToggleHandler.SetGroundActive(!isActive);
+            RadioPowerBus.SetGroundActive(!isActive);
 
             OnValueChanged?.Invoke(!isActive);
         }

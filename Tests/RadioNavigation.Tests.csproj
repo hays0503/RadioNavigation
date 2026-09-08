@@ -19,18 +19,24 @@
 
   <ItemGroup>
     <Compile Include="Stubs\UnityEngineMathf.cs" />
+    <Compile Include="Stubs\UnityEngineObject.cs" />
     <Compile Include="Stubs\UnityEngineVector2.cs" />
     <Compile Include="Stubs\UnityEngineDebug.cs" />
     <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />
     <Compile Include="Stubs\UnityEngineTransform.cs" />
     <Compile Include="Stubs\UnityEngineTexture.cs" />
+    <Compile Include="Stubs\UnityEngineGameObject.cs" />
+    <Compile Include="Stubs\UnityEngineTime.cs" />
     <Compile Include="Stubs\GameStubs.cs" />
     <Compile Include="Stubs\SceneStubs.cs" />
     <Compile Include="StoryDecisionGatewayTests.cs" />
     <Compile Include="SkipTestException.cs" />
     <Compile Include="GameContractTests.cs" />
     <Compile Include="GeoMathTests.cs" />
+    <Compile Include="GeoPositionConverterTests.cs" />
     <Compile Include="PanelStateStoreTests.cs" />
+    <Compile Include="PanelStateTests.cs" />
+    <Compile Include="PanelPersistenceLogicTests.cs" />
     <Compile Include="MorseAlphabetTests.cs" />
     <Compile Include="MorseDecoderTests.cs" />
     <Compile Include="MorseKeyerTests.cs" />
@@ -39,11 +45,15 @@
     <Compile Include="DialConfigTests.cs" />
     <Compile Include="SonneSignalGeneratorTests.cs" />
     <Compile Include="SonneBeamTests.cs" />
+    <Compile Include="SonneBeamStationTests.cs" />
+    <Compile Include="MiniJsonTests.cs" />
     <Compile Include="AudioSynthesisEngineTests.cs" />
     <Compile Include="AudioRenderPauseTests.cs" />
     <Compile Include="ChronometerCursorPolicyTests.cs" />
     <Compile Include="ChronometerCursorArtTests.cs" />
     <Compile Include="ChronometerMapDragMathTests.cs" />
+    <Compile Include="ChronometerOpenTrackerTests.cs" />
+    <Compile Include="ChronometerHoverStateTests.cs" />
     <Compile Include="Helpers\KeyingEnvelope.cs" />
     <Compile Include="Helpers\WavWriter.cs" />
     <Compile Include="PlayerPositionProviderTests.cs" />
@@ -58,21 +68,58 @@
     <Compile Include="ShieldTests.cs" />
     <Compile Include="AstroMathTests.cs" />
     <Compile Include="StarCatalogTests.cs" />
+    <Compile Include="NavStarNamesTests.cs" />
+    <Compile Include="SextantDmFormatTests.cs" />
     <Compile Include="LighthouseVisualModelTests.cs" />
     <Compile Include="LighthouseDotLayoutTests.cs" />
+    <Compile Include="LighthouseBeamGateTests.cs" />
     <Compile Include="StationMatchFormatterTests.cs" />
     <Compile Include="StationCallsignResolverTests.cs" />
     <Compile Include="LighthouseMarkerSizingTests.cs" />
     <Compile Include="RadioNavDiagnosticsTests.cs" />
+    <Compile Include="RadioNavProbeTests.cs" />
     <Compile Include="TransformHelpersTests.cs" />
     <Compile Include="StationTooltipTextTests.cs" />
     <Compile Include="NavMarkerGateTests.cs" />
     <Compile Include="ConstellationTogglePrefsTests.cs" />
     <Compile Include="SextantArcTests.cs" />
     <Compile Include="SextantGlareTests.cs" />
+    <Compile Include="SextantZoomTests.cs" />
+    <Compile Include="SextantArcInputTests.cs" />
+    <Compile Include="SextantReadoutTests.cs" />
     <Compile Include="SextantRunningFixTests.cs" />
     <Compile Include="SunEphemerisCalibrationTests.cs" />
+    <Compile Include="SunEphemerisTests.cs" />
     <Compile Include="PrefabValidatorTests.cs" />
+    <Compile Include="RadioLocaleTests.cs" />
+    <Compile Include="SceneContentBuilderTests.cs" />
+    <Compile Include="PanelViewBinderTests.cs" />
+    <Compile Include="SextantOverlayLayoutTests.cs" />
+    <Compile Include="MarkerArtPixelsTests.cs" />
+    <Compile Include="RadioPowerBusTests.cs" />
+    <Compile Include="GameTypeCacheTests.cs" />
+    <Compile Include="CourseSamplerTests.cs" />
+    <Compile Include="WarnOnceTests.cs" />
+    <Compile Include="FrameThrottleTests.cs" />
+    <Compile Include="StationGainModelTests.cs" />
+    <Compile Include="SignalTranscriberTests.cs" />
+    <Compile Include="BearingDiagnosticsTests.cs" />
+    <Compile Include="StationNavigatorTests.cs" />
+    <Compile Include="SignalTranscriptTests.cs" />
+    <Compile Include="SignalDecoderTests.cs" />
+    <Compile Include="StationFleetTests.cs" />
+    <Compile Include="StationManagerTests.cs" />
+    <Compile Include="StationDiagnosticsReportTests.cs" />
+    <Compile Include="SpinnerScaleTests.cs" />
+    <Compile Include="PositionFeedTests.cs" />
+    <Compile Include="PatternLineFormatterTests.cs" />
+    <Compile Include="FrequencyPanelTextTests.cs" />
+    <Compile Include="DecodedDisplayTrackerTests.cs" />
+    <Compile Include="PatternRowPackerTests.cs" />
+    <Compile Include="StatusLineTextTests.cs" />
+    <Compile Include="SignalPanelViewTests.cs" />
+    <Compile Include="EntityTypeRowValuesTests.cs" />
+    <Compile Include="FixCardComposerTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -93,25 +140,34 @@
     <Compile Include="..\Source\Logic\NavigationPattern.cs" Link="Source\Logic\NavigationPattern.cs" />
     <Compile Include="..\Source\Logic\SonneSignalGenerator.cs" Link="Source\Logic\SonneSignalGenerator.cs" />
     <Compile Include="..\Source\Data\SonneBeam.cs" Link="Source\Data\SonneBeam.cs" />
+    <Compile Include="..\Source\Data\SonneBeamStation.cs" Link="Source\Data\SonneBeamStation.cs" />
+    <Compile Include="..\Source\Data\MiniJson.cs" Link="Source\Data\MiniJson.cs" />
     <Compile Include="..\Source\Logic\StationScheduler.cs" Link="Source\Logic\StationScheduler.cs" />
     <Compile Include="..\Source\Logic\GeoPositionConverter.cs" Link="Source\Logic\GeoPositionConverter.cs" />
     <Compile Include="..\Source\Sound\AudioSynthesisEngine.cs" Link="Source\Sound\AudioSynthesisEngine.cs" />
     <Compile Include="..\Source\Sound\DspPipeline.cs" Link="Source\Sound\DspPipeline.cs" />
     <Compile Include="..\Source\UI\PanelStateStore.cs" Link="Source\UI\PanelStateStore.cs" />
+    <Compile Include="..\Source\UI\PanelState.cs" Link="Source\UI\PanelState.cs" />
+    <Compile Include="..\Source\UI\PanelPersistenceLogic.cs" Link="Source\UI\PanelPersistenceLogic.cs" />
     <Compile Include="..\Source\UI\ChronometerCursorPolicy.cs" Link="Source\UI\ChronometerCursorPolicy.cs" />
     <Compile Include="..\Source\UI\ChronometerCursorArt.cs" Link="Source\UI\ChronometerCursorArt.cs" />
+    <Compile Include="..\Source\UI\ChronometerOpenTracker.cs" Link="Source\UI\ChronometerOpenTracker.cs" />
+    <Compile Include="..\Source\UI\ChronometerHoverState.cs" Link="Source\UI\ChronometerHoverState.cs" />
     <Compile Include="..\Source\UI\ChronometerMapDragMath.cs" Link="Source\UI\ChronometerMapDragMath.cs" />
     <Compile Include="..\Source\Data\LighthouseProfile.cs" Link="Source\Data\LighthouseProfile.cs" />
     <Compile Include="..\Source\Data\LighthouseProfiles.cs" Link="Source\Data\LighthouseProfiles.cs" />
     <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />
     <Compile Include="..\Source\Data\StarCatalog.cs" Link="Source\Data\StarCatalog.cs" />
+    <Compile Include="..\Source\Data\NavStarNames.cs" Link="Source\Data\NavStarNames.cs" />
     <Compile Include="..\Source\Logic\StoryDecisionGateway.cs" Link="Source\Logic\StoryDecisionGateway.cs" />
     <Compile Include="..\Source\Logic\LighthouseVisualModel.cs" Link="Source\Logic\LighthouseVisualModel.cs" />
     <Compile Include="..\Source\Logic\LighthouseDotLayout.cs" Link="Source\Logic\LighthouseDotLayout.cs" />
+    <Compile Include="..\Source\Logic\LighthouseBeamGate.cs" Link="Source\Logic\LighthouseBeamGate.cs" />
     <Compile Include="..\Source\Logic\StationMatchFormatter.cs" Link="Source\Logic\StationMatchFormatter.cs" />
     <Compile Include="..\Source\Logic\StationCallsignResolver.cs" Link="Source\Logic\StationCallsignResolver.cs" />
     <Compile Include="..\Source\Logic\LighthouseMarkerSizing.cs" Link="Source\Logic\LighthouseMarkerSizing.cs" />
     <Compile Include="..\Source\Logic\RadioNavDiagnostics.cs" Link="Source\Logic\RadioNavDiagnostics.cs" />
+    <Compile Include="..\Source\Logic\RadioNavProbeJson.cs" Link="Source\Logic\RadioNavProbeJson.cs" />
     <Compile Include="..\Source\Logic\TransformHelpers.cs" Link="Source\Logic\TransformHelpers.cs" />
     <Compile Include="..\Source\Logic\StationTooltipText.cs" Link="Source\Logic\StationTooltipText.cs" />
     <Compile Include="..\Source\Logic\NavMarkerGate.cs" Link="Source\Logic\NavMarkerGate.cs" />
@@ -120,8 +176,43 @@
     <Compile Include="..\Source\Logic\SextantGlare.cs" Link="Source\Logic\SextantGlare.cs" />
     <Compile Include="..\Source\Logic\SextantRunningFix.cs" Link="Source\Logic\SextantRunningFix.cs" />
     <Compile Include="..\Source\Logic\SunEphemerisCalibration.cs" Link="Source\Logic\SunEphemerisCalibration.cs" />
+    <Compile Include="..\Source\Logic\SunEphemeris.cs" Link="Source\Logic\SunEphemeris.cs" />
     <Compile Include="..\Source\UI\PrefabNames.cs" Link="Source\UI\PrefabNames.cs" />
     <Compile Include="..\Source\Logic\PrefabValidator.cs" Link="Source\Logic\PrefabValidator.cs" />
+    <Compile Include="..\Source\Logic\RadioLocale.cs" Link="Source\Logic\RadioLocale.cs" />
+    <Compile Include="..\Source\Logic\SceneContentBuilder.cs" Link="Source\Logic\SceneContentBuilder.cs" />
+    <Compile Include="..\Source\Logic\PanelViewBinder.cs" Link="Source\Logic\PanelViewBinder.cs" />
+    <Compile Include="..\Source\UI\MarkerArtPixels.cs" Link="Source\UI\MarkerArtPixels.cs" />
+    <Compile Include="..\Source\UI\SextantOverlayLayout.cs" Link="Source\UI\SextantOverlayLayout.cs" />
+    <Compile Include="..\Source\Logic\RadioPowerBus.cs" Link="Source\Logic\RadioPowerBus.cs" />
+    <Compile Include="..\Source\Logic\GameTypeCache.cs" Link="Source\Logic\GameTypeCache.cs" />
+    <Compile Include="..\Source\Logic\WarnOnce.cs" Link="Source\Logic\WarnOnce.cs" />
+    <Compile Include="..\Source\Logic\FrameThrottle.cs" Link="Source\Logic\FrameThrottle.cs" />
+    <Compile Include="..\Source\Logic\CourseSampler.cs" Link="Source\Logic\CourseSampler.cs" />
+    <Compile Include="..\Source\Logic\StationGainModel.cs" Link="Source\Logic\StationGainModel.cs" />
+    <Compile Include="..\Source\Logic\SignalTranscriber.cs" Link="Source\Logic\SignalTranscriber.cs" />
+    <Compile Include="..\Source\Logic\BearingDiagnostics.cs" Link="Source\Logic\BearingDiagnostics.cs" />
+    <Compile Include="..\Source\Logic\StationNavigator.cs" Link="Source\Logic\StationNavigator.cs" />
+    <Compile Include="..\Source\Logic\SignalTranscript.cs" Link="Source\Logic\SignalTranscript.cs" />
+    <Compile Include="..\Source\Logic\SignalDecoder.cs" Link="Source\Logic\SignalDecoder.cs" />
+    <Compile Include="..\Source\Logic\StationFleet.cs" Link="Source\Logic\StationFleet.cs" />
+    <Compile Include="..\Source\Logic\StationManager.cs" Link="Source\Logic\StationManager.cs" />
+    <Compile Include="..\Source\Data\StationDiagnostics.cs" Link="Source\Data\StationDiagnostics.cs" />
+    <Compile Include="..\Source\Logic\StationDiagnosticsReport.cs" Link="Source\Logic\StationDiagnosticsReport.cs" />
+    <Compile Include="..\Source\Logic\SpinnerScale.cs" Link="Source\Logic\SpinnerScale.cs" />
+    <Compile Include="..\Source\Logic\PositionFeed.cs" Link="Source\Logic\PositionFeed.cs" />
+    <Compile Include="..\Source\Logic\PatternLineFormatter.cs" Link="Source\Logic\PatternLineFormatter.cs" />
+    <Compile Include="..\Source\Logic\FrequencyPanelText.cs" Link="Source\Logic\FrequencyPanelText.cs" />
+    <Compile Include="..\Source\Logic\DecodedDisplayTracker.cs" Link="Source\Logic\DecodedDisplayTracker.cs" />
+    <Compile Include="..\Source\Logic\PatternRowPacker.cs" Link="Source\Logic\PatternRowPacker.cs" />
+    <Compile Include="..\Source\Logic\StatusLineText.cs" Link="Source\Logic\StatusLineText.cs" />
+    <Compile Include="..\Source\Logic\SignalPanelView.cs" Link="Source\Logic\SignalPanelView.cs" />
+    <Compile Include="..\Source\Logic\EntityTypeRowValues.cs" Link="Source\Logic\EntityTypeRowValues.cs" />
+    <Compile Include="..\Source\UI\FixCardComposer.cs" Link="Source\UI\FixCardComposer.cs" />
+    <Compile Include="..\Source\UI\SextantDmFormat.cs" Link="Source\UI\SextantDmFormat.cs" />
+    <Compile Include="..\Source\UI\SextantZoom.cs" Link="Source\UI\SextantZoom.cs" />
+    <Compile Include="..\Source\UI\SextantArcInput.cs" Link="Source\UI\SextantArcInput.cs" />
+    <Compile Include="..\Source\UI\SextantReadout.cs" Link="Source\UI\SextantReadout.cs" />
   </ItemGroup>
 
 </Project>

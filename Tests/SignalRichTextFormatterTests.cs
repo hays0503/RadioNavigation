@@ -99,5 +99,45 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(equisignal > dash);
             Assert.True(dot > equisignal);
         }
+
+        [Fact]
+        public void FormatRichText_Callsign_RendersGreen()
+        {
+            var entries = new List<SignalEntry>
+            {
+                new SignalEntry('-', SignalCharType.Callsign),
+                new SignalEntry('.', SignalCharType.Callsign)
+            };
+
+            string rich = SignalRichTextFormatter.FormatRichText(entries);
+
+            Assert.Contains("#00FF00", rich);
+            Assert.Contains("\u25AC", rich);
+            Assert.Contains("\u25CF", rich);
+        }
+
+        [Fact]
+        public void FormatRichText_Separator_RendersSpace()
+        {
+            var entries = new List<SignalEntry>
+            {
+                new SignalEntry(' ', SignalCharType.Separator)
+            };
+
+            string rich = SignalRichTextFormatter.FormatRichText(entries);
+
+            Assert.Contains("> </color>", rich);
+        }
+
+        [Fact]
+        public void TrimDecodedText_LongText_TrimsToMax()
+        {
+            var sb = new System.Text.StringBuilder("0123456789ABCDEFGHIJ0123456789ABCDE");
+
+            SignalRichTextFormatter.TrimDecodedText(sb);
+
+            Assert.Equal(30, sb.Length);
+            Assert.Equal("56789ABCDE", sb.ToString().Substring(20));
+        }
     }
 }

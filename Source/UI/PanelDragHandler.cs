@@ -93,11 +93,10 @@ namespace UBOAT.Mods.RadioNavigation
             tex.SetPixels32(pixels);
             tex.Apply();
 
-            Application.quitting += () =>
-            {
-                if (tex.IsNotNull())
-                    Object.Destroy(tex);
-            };
+            // No Application.quitting subscription: Destroy on quit has no
+            // observable effect (the process tears down all resources), while
+            // a static-event closure accumulates if this static ever re-runs
+            // after a static-field reset (hot reload / editor sessions).
 
             return tex;
         }
@@ -109,7 +108,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             // F198: match CursorHandler/SpinnerHandlerBase/ExpanderHandler —
             // no panel movement while the radio is off or ground is inactive.
-            if (!ToggleHandler.IsInteractable)
+            if (!RadioPowerBus.IsInteractable)
                 return;
 
             // F207: child controls without their own IBeginDragHandler

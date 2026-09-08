@@ -252,7 +252,7 @@ namespace UBOAT.Mods.RadioNavigation
             v = 2 * Math.Atan2(Math.Sqrt(1 + e) * Math.Sin(E / 2), Math.Sqrt(1 - e) * Math.Cos(E / 2));
         }
 
-        private static double NormalizeDegrees(double degrees)
+        internal static double NormalizeDegrees(double degrees)
         {
             degrees %= 360.0;
             return degrees < 0 ? degrees + 360.0 : degrees;

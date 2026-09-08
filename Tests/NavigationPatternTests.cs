@@ -60,6 +60,25 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.False(c.GetElement(1));
         }
 
+        // Live-decode contract: ElementCount is the mark count, so the keyer
+        // never keys group padding and the morse buffer length matches
+        // MorseDecoder.ExpectedLength (regression: bufLen 16 vs expLen 7).
+        [Fact]
+        public void CallsignPattern_MWN_ElementCountIsMarkCount()
+        {
+            var c = new CallsignPattern("MWN");
+            Assert.Equal(7, c.ElementCount);
+            Assert.Equal(7, MorseAlphabet.CountMarks("MWN"));
+            // M(--)=TT, W(.--)=F T T, N(-.)=T F — marks-only packing.
+            Assert.True(c.GetElement(0));
+            Assert.True(c.GetElement(1));
+            Assert.False(c.GetElement(2));
+            Assert.True(c.GetElement(3));
+            Assert.True(c.GetElement(4));
+            Assert.True(c.GetElement(5));
+            Assert.False(c.GetElement(6));
+        }
+
         [Fact]
         public void Group_GetElement_Bitwise()
         {

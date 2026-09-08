@@ -26,10 +26,17 @@ namespace UBOAT.Mods.RadioNavigation
         private VolumeSpinnerHandler volumeSpinner;
         private FeedbackSpinnerHandler feedbackSpinner;
         private RadioHandler radioHandler;
+
+        // Last-known operator state, refreshed in Update while components
+        // are alive; OnDestroy saves from this cache (teardown-order safe).
+        private float cachedVolumeAngle = -1f;
+        private float cachedFeedbackAngle = -1f;
+        private int cachedZoneIndex = -1;
+        private float cachedCursorAngle = -1f;
         private SonneController sonneController;
 
         private string stationBaseText = "";
-        private string lastLoggedDecoded = "";
+        private readonly DecodedDisplayTracker decodedTracker = new DecodedDisplayTracker();
         private float patternUpdateTimer;
         private const float PatternUpdateInterval = 0.5f;
         private const float PatternLabelHeight = 60f;
@@ -83,24 +90,30 @@ namespace UBOAT.Mods.RadioNavigation
             RefreshAll();
         }
 
-        // F15: apply persisted volume/feedback/zone/cursor so the radio reads
-        // as it was left. Called after handlers are found/subscribed so the
-        // restored values propagate through the normal pipeline.
         private void RestorePanelState()
         {
-            PanelStateStore.Load(out float vol, out float fb, out int zone, out float cursor);
-            if (volumeSpinner.IsNotNull())
-                volumeSpinner.SetAngle(vol);
-            if (feedbackSpinner.IsNotNull())
-                feedbackSpinner.SetAngle(fb);
-            if (zoneHandler.IsNotNull())
-                zoneHandler.SetZone(zone);
-            if (radioHandler.IsNotNull())
-                radioHandler.CursorAngle = cursor;
+            PanelState.Restore(
+                volumeSpinner.IsNotNull() ? (Action<float>)volumeSpinner.SetAngle : null,
+                feedbackSpinner.IsNotNull() ? (Action<float>)feedbackSpinner.SetAngle : null,
+                zoneHandler.IsNotNull() ? (Action<int>)zoneHandler.SetZone : null,
+                radioHandler.IsNotNull() ? (Action<float>)(v => radioHandler.CursorAngle = v) : null);
         }
 
         private void Update()
         {
+            // Live cache for the OnDestroy save: scene teardown may destroy
+            // RadioHandler/ZoneHandler BEFORE this component's OnDestroy, and
+            // reading a destroyed component yields fake-null -> zeros written
+            // to PlayerPrefs (persisted cursorAngle came back as ~0).
+            if (volumeSpinner.IsNotNull())
+                cachedVolumeAngle = volumeSpinner.Angle;
+            if (feedbackSpinner.IsNotNull())
+                cachedFeedbackAngle = feedbackSpinner.Angle;
+            if (zoneHandler.IsNotNull())
+                cachedZoneIndex = zoneHandler.CurrentIndex;
+            if (radioHandler.IsNotNull())
+                cachedCursorAngle = radioHandler.CursorAngle;
+
             patternUpdateTimer += Time.deltaTime;
             if (patternUpdateTimer >= PatternUpdateInterval)
             {
@@ -114,6 +127,19 @@ namespace UBOAT.Mods.RadioNavigation
                 signalUpdateTimer = 0f;
                 UpdateSignalDisplay();
             }
+        }
+
+        private void SaveCachedState()
+        {
+            PanelState.Save(
+                cachedVolumeAngle >= 0f ? cachedVolumeAngle :
+                    (volumeSpinner.IsNotNull() ? volumeSpinner.Angle : 0f),
+                cachedFeedbackAngle >= 0f ? cachedFeedbackAngle :
+                    (feedbackSpinner.IsNotNull() ? feedbackSpinner.Angle : 0f),
+                cachedZoneIndex >= 0 ? cachedZoneIndex :
+                    (zoneHandler.IsNotNull() ? zoneHandler.CurrentIndex : 0),
+                cachedCursorAngle >= 0f ? cachedCursorAngle :
+                    (radioHandler.IsNotNull() ? radioHandler.CursorAngle : 0f));
         }
 
         private void FindHandlers()
@@ -196,47 +222,43 @@ namespace UBOAT.Mods.RadioNavigation
         private void OnToggleChanged(bool isOn)
         {
             if (toggleText.IsNotNull())
-                toggleText.text = "Toggle: " + (isOn ? "ON" : "OFF");
+                toggleText.text = StatusLineText.Toggle(isOn);
         }
 
         private void OnGroundChanged(bool active)
         {
             if (groundText.IsNotNull())
-                groundText.text = "Ground: " + (active ? "Active" : "Dimmed");
+                groundText.text = StatusLineText.Ground(active);
         }
 
         private void OnZoneChanged(int index)
         {
             if (zoneText.IsNotNull())
-                zoneText.text = "Zone: " + (index + 1);
+                zoneText.text = StatusLineText.Zone(index);
         }
 
         private void OnVolumeChanged(float angle)
         {
             if (volumeText.IsNotNull())
-                volumeText.text = "Volume: " + Mathf.RoundToInt(angle / 140f * 100f) + "%";
+                volumeText.text = "Volume: " + SpinnerScale.ToPercent(angle) + "%";
         }
 
         private void OnFeedbackChanged(float angle)
         {
             if (feedbackText.IsNotNull())
-                feedbackText.text = "Feedback: " + Mathf.RoundToInt(angle / 140f * 100f) + "%";
+                feedbackText.text = "Feedback: " + SpinnerScale.ToPercent(angle) + "%";
         }
 
         private void OnFrequencyChanged(float freqKHz, int zoneIndex)
         {
-            lastLoggedDecoded = "";
+            decodedTracker.Reset();
 
-            string formatted = DialConfig.FormatFrequency(freqKHz, zoneIndex);
-            string bandId = zoneIndex.IsNonNegative() && zoneIndex < DialConfig.Bands.Length
-                ? DialConfig.Bands[zoneIndex].Id : "?";
             if (frequencyText.IsNotNull())
-                frequencyText.text = "Freq: " + formatted + " (Band " + bandId + ")";
+                frequencyText.text = FrequencyPanelText.FreqLine(freqKHz, zoneIndex);
 
-            string stationName = StationMatchFormatter.Format(freqKHz, zoneIndex);
-            stationBaseText = stationName;
+            stationBaseText = FrequencyPanelText.StationName(freqKHz, zoneIndex);
             if (stationText.IsNotNull())
-                stationText.text = stationName;
+                stationText.text = stationBaseText;
 
             UpdatePatterns();
         }
@@ -255,25 +277,32 @@ namespace UBOAT.Mods.RadioNavigation
             int domIdx = sonneController.DominantStationIndex;
             UpdateStationText(domIdx);
 
-            int displayIndex = 0;
-            for (int i = 0; i < sonneController.StationCount && displayIndex < patternTexts.Length; i++)
+            int count = sonneController.StationCount;
+            var diags = new StationDiagnostics[count];
+            for (int i = 0; i < count; i++)
+                diags[i] = sonneController.StationManager.GetStationDiagnostics(i);
+
+            int recvDots = 0;
+            int recvDashes = 0;
+            if (domIdx >= 0)
             {
-                var diag = sonneController.GetStationDiagnostics(i);
-                if (diag.Gain.IsNegligible(0.001f))
-                    continue;
-
-                string line = BuildPatternLine(diag, i, domIdx);
-                patternTexts[displayIndex].text = line;
-
-                if (diag.InBeam)
-                    patternTexts[displayIndex].color = Color.green;
-                else
-                    patternTexts[displayIndex].color = new Color(0.6f, 0.6f, 0.6f);
-
-                displayIndex++;
+                recvDots = sonneController.GetReceivedNavigationDotCount();
+                recvDashes = sonneController.GetReceivedNavigationDashCount();
             }
 
-            ClearRemainingPatterns(displayIndex);
+            PanelViewBinder.PatternRow[] rows = PanelViewBinder.BuildPatternRows(
+                diags, domIdx, recvDots, recvDashes, patternTexts.Length);
+            for (int r = 0; r < rows.Length; r++)
+            {
+                patternTexts[r].text = rows[r].Text;
+
+                if (rows[r].InBeam)
+                    patternTexts[r].color = Color.green;
+                else
+                    patternTexts[r].color = new Color(0.6f, 0.6f, 0.6f);
+            }
+
+            ClearRemainingPatterns(rows.Length);
         }
 
         private void ClearPatterns()
@@ -289,54 +318,19 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (stationText.IsNull() || !sonneController.StationCount.IsPositive())
                 return;
-            // F101: no dominant station (-1) must not show the default
-            // diagnostics phase ("[Pause]") of a non-existent station.
-            if (domIdx < 0)
-            {
-                stationText.text = stationBaseText;
-                return;
-            }
-            var diag = sonneController.GetStationDiagnostics(domIdx);
-            string phase = diag.SchedulerPhase.ToString();
-            string suffix = " [" + phase + "]";
-            if (diag.NavigationElapsed.IsPositive())
-                suffix += " " + FormatTime(diag.NavigationElapsed);
-            stationText.text = stationBaseText + suffix;
+            StationDiagnostics domDiag = default(StationDiagnostics);
+            if (domIdx >= 0)
+                domDiag = sonneController.StationManager.GetStationDiagnostics(domIdx);
+            stationText.text = PanelViewBinder.BuildStationText(stationBaseText, domIdx, domDiag);
 
 #if DEBUG
             // F88: phase/diag are scoped to the else branch; the log
             // block used to live outside it and broke DEBUG builds.
             Debug.Log("[RadioNav][PANEL] domIdx=" + domIdx +
-                " phase=" + phase +
-                " navElapsed=" + diag.NavigationElapsed.ToString("F1") +
+                " phase=" + domDiag.SchedulerPhase.ToString() +
+                " navElapsed=" + domDiag.NavigationElapsed.ToString("F1") +
                 " stationText=[" + stationText.text + "]");
 #endif
-        }
-
-        private string BuildPatternLine(SonneController.StationDiagnostics diag, int i, int domIdx)
-        {
-            string callsign = diag.Callsign ?? "?";
-            string beam = diag.InBeam ? "IN BEAM" : "OUTSIDE";
-            string bfo = diag.BeatFrequency.ToString("F0") + "Hz";
-            string gain = Mathf.RoundToInt(diag.Gain * 100f) + "%";
-            string phase = diag.SchedulerPhase.ToString();
-
-            string line = callsign + " [" + beam + "] " + gain + " BFO:" + bfo
-                + " " + phase + " ToBoat:" + diag.BearingToBoat.ToString("F1") + "\u00B0";
-            if (diag.NavigationElapsed.IsPositive())
-                line += " " + FormatTime(diag.NavigationElapsed);
-            line += "\n  Zone:S" + diag.SectorNumber
-                + (diag.IsDashSector ? "(DASH)" : "(DOT)")
-                + " EQ@" + diag.EqSignIndex + "/" + (diag.DotCount + diag.DashCount)
-                + " Dots:" + diag.DotCount
-                + " Dashes:" + diag.DashCount
-                + " Bearing:" + diag.CurrentBearing.ToString("F1") + "\u00B0";
-            if (i == domIdx)
-            {
-                line += "\n  Recv: " + sonneController.GetReceivedNavigationDotCount()
-                    + "\u2022 " + sonneController.GetReceivedNavigationDashCount() + "\u25AC";
-            }
-            return line;
         }
 
         private void ClearRemainingPatterns(int displayIndex)
@@ -351,57 +345,29 @@ namespace UBOAT.Mods.RadioNavigation
             if (sonneController.IsNull() || signalText.IsNull())
                 return;
 
-            if (!sonneController.IsInSonneZone)
-            {
-                signalText.text = "--- Signal: ";
-                signalText.color = Color.gray;
-                if (decodedText.IsNotNull())
-                    decodedText.text = "Decoded: ";
-                return;
-            }
+            bool inZone = sonneController.IsInSonneZone;
+            string rich = inZone ? sonneController.GetSignalRichText() : null;
+            string decoded = inZone ? sonneController.GetDecodedText() : null;
 
-            string rich = sonneController.GetSignalRichText();
-            if (string.IsNullOrEmpty(rich))
-            {
-                signalText.text = "--- Signal: ";
-                signalText.color = Color.gray;
-                if (decodedText.IsNotNull())
-                    decodedText.text = "Decoded: ";
-                return;
-            }
-
-            signalText.text = "--- Signal: " + rich;
-            signalText.color = Color.white;
+            SignalPanelView.State view = PanelViewBinder.BuildSignalView(rich, decoded);
+            signalText.text = view.SignalText;
+            signalText.color = view.Dimmed ? Color.gray : Color.white;
 
             if (decodedText.IsNotNull())
             {
-                string decoded = sonneController.GetDecodedText();
-                decodedText.text = string.IsNullOrEmpty(decoded) ? "Decoded: " : "Decoded: " + decoded;
+                decodedText.text = view.DecodedText;
 
-                if (!string.IsNullOrEmpty(decoded) && decoded != lastLoggedDecoded)
+                if (decodedTracker.ShouldLog(decoded))
                 {
                     Debug.Log("[RadioNav][PANEL] decoded=[" + decoded + "]");
-                    lastLoggedDecoded = decoded;
+                    decodedTracker.MarkLogged(decoded);
                 }
             }
         }
 
-        private string FormatTime(float seconds)
-        {
-            int s = Mathf.RoundToInt(seconds);
-            int min = s / 60;
-            int sec = s % 60;
-            return min.ToString("D2") + ":" + sec.ToString("D2");
-        }
-
         private void OnDestroy()
         {
-            // F15: persist the current operator state before the panel goes away.
-            PanelStateStore.Save(
-                volumeSpinner.IsNotNull() ? volumeSpinner.Angle : 0f,
-                feedbackSpinner.IsNotNull() ? feedbackSpinner.Angle : 0f,
-                GetZoneIndex(),
-                radioHandler.IsNotNull() ? radioHandler.CursorAngle : 0f);
+            SaveCachedState();
             Unsubscribe();
         }
     }

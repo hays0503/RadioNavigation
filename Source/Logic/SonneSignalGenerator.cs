@@ -14,16 +14,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static int GetCallsignElementCount(string callsign)
         {
-            if (string.IsNullOrEmpty(callsign))
-                return 0;
-
-            int count = 0;
-            foreach (char c in callsign.ToUpperInvariant())
-            {
-                string mc = MorseAlphabet.GetMorse(c);
-                count += mc.Length;
-            }
-            return count;
+            // Single source: MorseAlphabet.CountMarks (same marks-only sum).
+            return MorseAlphabet.CountMarks(callsign);
         }
 
         // F79: true when the bearing is inside the station's navigation sector

@@ -12,7 +12,8 @@ namespace UBOAT.Mods.RadioNavigation
     [RequireComponent(typeof(MeshRenderer))]
     public sealed class StarsMesh : MonoBehaviour
     {
-        private const float WorldRadiusM = 3900f;
+        // NOTE: no local WorldRadiusM — the single source of truth lives in
+        // CameraResolver (SafeRadius); the dead duplicate was removed (iter6).
         private const float MinStarSizePx = 2f;
         private const float MaxStarSizePx = 20f;
         private const float NavStarMultiplier = 1.9f;
@@ -94,10 +95,10 @@ namespace UBOAT.Mods.RadioNavigation
             double lstDeg = AstroMath.LstDeg(jd, lon);
 
             // Rebuild mesh only if camera/position/LST changed significantly
-            bool needsRebuild = Vector3.Distance(cam.transform.position, lastCamPos) > 10f
-                             || Quaternion.Angle(cam.transform.rotation, lastCamRot) > 5f
-                             || Math.Abs(lstDeg - lastLstDeg) > 0.1
-                             || Math.Abs(lat - lastLat) > 0.01f;
+            bool needsRebuild = MeshRebuildPolicy.NeedsRebuild(
+                cam.transform.position, lastCamPos,
+                cam.transform.rotation, lastCamRot,
+                lstDeg, lastLstDeg, lat, lastLat, true);
 
             if (!needsRebuild && meshFilter.mesh != null && meshFilter.mesh.vertexCount > 0)
                 return;
@@ -145,7 +146,7 @@ namespace UBOAT.Mods.RadioNavigation
                     color.a = Mathf.Clamp01(color.a * NavStarAlphaMultiplier);
 
                 // Billboard quad (4 vertices, 2 triangles)
-                AddBillboardQuad(worldPos, dir, size, color);
+                BillboardQuadBuilder.AddQuad(vertices, triangles, colors, uvs, worldPos, dir, size, color);
                 visibleCount++;
             }
 
@@ -166,44 +167,6 @@ namespace UBOAT.Mods.RadioNavigation
                 lastLogTime = Time.time;
                 Debug.Log($"[RadioNav][StarsMesh] Rendered {visibleCount}/{StarCatalog.Stars.Length} stars");
             }
-        }
-
-        private void AddBillboardQuad(Vector3 center, Vector3 forward, float size, Color color)
-        {
-            // Simple quad facing camera (not true billboard, but good enough for distant stars)
-            Vector3 right = Vector3.Cross(forward, Vector3.up).normalized;
-            if (right.sqrMagnitude < 0.001f)
-                right = Vector3.right;
-            Vector3 up = Vector3.Cross(right, forward).normalized;
-
-            float halfSize = size * 0.5f;
-            Vector3 v0 = center - right * halfSize - up * halfSize;
-            Vector3 v1 = center + right * halfSize - up * halfSize;
-            Vector3 v2 = center + right * halfSize + up * halfSize;
-            Vector3 v3 = center - right * halfSize + up * halfSize;
-
-            int baseIdx = vertices.Count;
-            vertices.Add(v0);
-            vertices.Add(v1);
-            vertices.Add(v2);
-            vertices.Add(v3);
-
-            triangles.Add(baseIdx);
-            triangles.Add(baseIdx + 1);
-            triangles.Add(baseIdx + 2);
-            triangles.Add(baseIdx);
-            triangles.Add(baseIdx + 2);
-            triangles.Add(baseIdx + 3);
-
-            colors.Add(color);
-            colors.Add(color);
-            colors.Add(color);
-            colors.Add(color);
-
-            uvs.Add(new Vector2(0, 0));
-            uvs.Add(new Vector2(1, 0));
-            uvs.Add(new Vector2(1, 1));
-            uvs.Add(new Vector2(0, 1));
         }
 
         private float SizeFromMagnitude(float vmag, bool isNav)

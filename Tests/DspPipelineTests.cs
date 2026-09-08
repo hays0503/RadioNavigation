@@ -31,6 +31,28 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(0f, c.Frequency);
         }
 
+        [Fact]
+        public void CarrierGenerator_Reset_RestartsPhase()
+        {
+            var c = new CarrierGenerator(44100f);
+            c.Frequency = 440f;
+            for (int i = 0; i < 100; i++)
+                c.NextSample();
+
+            c.Reset();
+
+            Assert.Equal(0f, c.NextSample());
+        }
+
+        [Fact]
+        public void ReceiverDsp_FilterCutoff_RoundTrips()
+        {
+            var d = new ReceiverDsp(44100f);
+            Assert.Equal(800f, d.FilterCutoff);
+            d.FilterCutoff = 400f;
+            Assert.Equal(400f, d.FilterCutoff);
+        }
+
         // F142: whistle added on top of tanh saturation must not leave [-1, 1].
         [Fact]
         public void ReceiverDsp_Whistle_OutputClamped()

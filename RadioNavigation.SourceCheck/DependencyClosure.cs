@@ -42,7 +42,7 @@ namespace RadioNavigation.SourceCheck
                 return ImmutableArray<(string, int)>.Empty;
 
             var trees = ModCompiler.EnumerateSources()
-                .Select(p => CSharpSyntaxTree.ParseText(File.ReadAllText(p), path: p))
+                .Select(p => CSharpSyntaxTree.ParseText(File.ReadAllText(p), options: ModCompiler.GameParityParseOptions, path: p))
                 .ToList();
 
             var seeds = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -137,7 +137,7 @@ namespace RadioNavigation.SourceCheck
             }
 
             var trees = ModCompiler.EnumerateSources()
-                .Select(p => CSharpSyntaxTree.ParseText(File.ReadAllText(p), path: p))
+                .Select(p => CSharpSyntaxTree.ParseText(File.ReadAllText(p), options: ModCompiler.GameParityParseOptions, path: p))
                 .ToList();
             var compilation = ModCompiler.CreateCompilation(trees, refs);
 

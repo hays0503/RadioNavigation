@@ -172,7 +172,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         public void Callsign_Exposed()
         {
             var s = new StationScheduler("TEST");
-            Assert.Equal(16, s.Callsign.ElementCount);
+            // Marks-only contract: T(1)+E(1)+S(3)+T(1) = 6 marks; the padded
+            // group length (8) is never keyed (live-decode regression pin).
+            Assert.Equal(6, s.Callsign.ElementCount);
         }
 
         // F135: unexpected phase (Pause) must be ignored, not crash.

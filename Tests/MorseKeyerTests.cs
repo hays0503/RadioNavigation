@@ -58,6 +58,42 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void ConsolEquisignal_SkipsSilence()
+        {
+            var keyer = new MorseKeyer();
+            keyer.LoadConsol(
+                new[] { NavigationElementType.Equisignal }, null, ConsolCycleConfig.Cycle120s);
+            var completed = new System.Collections.Generic.List<NavigationElementType>();
+            keyer.OnElementCompleted += (type, isCallsign) => completed.Add(type);
+            keyer.OnSequenceFinished += () => completed.Add(NavigationElementType.Dot);
+
+            int toneTicks = MorseTiming.GetToneTicks(ConsolCycleConfig.Cycle120s);
+            for (int i = 0; i < toneTicks + 5; i++)
+                keyer.Advance();
+
+            Assert.Contains(NavigationElementType.Equisignal, completed);
+            Assert.False(keyer.IsActive);
+        }
+
+        [Fact]
+        public void SequenceWithoutScheduler_LoopsElements()
+        {
+            var keyer = new MorseKeyer();
+            keyer.Load(MorseAlphabet.TextToPattern("E"), null, ConsolCycleConfig.Cycle120s);
+            int completed = 0;
+            keyer.OnElementCompleted += (type, isCallsign) => completed++;
+
+            // TextToPattern pads a single letter to a group of 8: more than
+            // 8 completions prove the sequence wrapped (elementIndex reset)
+            // instead of stalling at exhaustion.
+            for (int i = 0; i < 2000; i++)
+                keyer.Advance();
+
+            Assert.True(completed > 8, "completed=" + completed);
+            Assert.True(keyer.IsActive);
+        }
+
+        [Fact]
         public void LoadCallsign_MarksElementsAsCallsign()
         {
             var scheduler = new StationScheduler("ES");
