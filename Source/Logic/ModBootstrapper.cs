@@ -25,10 +25,9 @@ namespace UBOAT.Mods.RadioNavigation
         private const string MainSceneViewportPath = "/GUI/Viewport";
         private const string RadioRootName = "RadioNavigationPanel";
 
-        private readonly ResourceManager resourceManager;
+        private ResourceManager resourceManager;
         private Harmony harmony;
         private bool loaded;
-
         public ModBootstrapper(ResourceManager resourceManager)
         {
             this.resourceManager = resourceManager;
@@ -93,6 +92,36 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        /// Self-recovery for a missing/evicted DI registration of the
+        /// ResourceManager singleton: DI only registers SO singletons from
+        /// "uboat"-filtered assemblies at framework init and never
+        /// re-registers after UnloadUnusedAssets destroys the instance.
+        /// LoadSingleton is the game's own resolution path (public API).
+        private bool EnsureResourceManager()
+        {
+            if (resourceManager.IsNotNull())
+                return true;
+            if (InjectionFramework.Instance.IsNotNull())
+            {
+                ResourceManager viaDi = InjectionFramework.Instance.GetInstance<ResourceManager>();
+                if (viaDi.IsNotNull())
+                {
+                    resourceManager = viaDi;
+                    return true;
+                }
+            }
+            ResourceManager direct = ScriptableObjectSingleton.LoadSingleton<ResourceManager>();
+            if (direct.IsNotNull())
+            {
+                resourceManager = direct;
+                if (InjectionFramework.Instance.IsNotNull())
+                    InjectionFramework.Instance.AddInjectableInstance(direct);
+                Debug.LogWarning("[RadioNav][Main] ResourceManager resolved via LoadSingleton fallback (DI registration missing)");
+                return true;
+            }
+            return false;
+        }
+
         private void SceneEventsListener_OnSceneStart(Scene scene)
         {
             try
@@ -101,7 +130,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (viewport.IsNull())
                     return;
 
-                if (resourceManager.IsNull())
+                if (!EnsureResourceManager())
                 {
                     Debug.LogError("[RadioNav][Main] ResourceManager not injected \u2014 DI failed");
                     return;
