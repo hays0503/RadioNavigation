@@ -59,6 +59,42 @@ namespace UBOAT.Mods.RadioNavigation
             harmony = new Harmony("UBOAT.Mods.RadioNavigation");
             HarmonyPatchInstaller.Apply(harmony);
 
+            // Dev-console diagnostics (calibration probe: rn_lighthouse_height)
+            LighthouseHeightProbe.EnsureRegistered();
+
+            // Dev-console diagnostic (land/water sweep: rn_lighthouse_landprobe)
+            LighthouseLandSweep.EnsureRegistered();
+
+            // Leuchtfeuer fleet registry (map markers for all, 3D gated by
+            // LighthousePlacer). Same data directory as the Sonne tables.
+            // Dedupe only against ENABLED curated profiles — a disabled
+            // curated entry must not shadow its own DB twin.
+            var enabledCurated = new System.Collections.Generic.List<LighthouseProfile>();
+            for (int i = 0; i < LighthouseProfiles.All.Length; i++)
+            {
+                if (LighthouseProfiles.All[i].Enabled)
+                {
+                    enabledCurated.Add(LighthouseProfiles.All[i]);
+                }
+            }
+
+            string lighthouseDataDirectory = System.IO.Path.Combine(
+                Application.persistentDataPath,
+                "Mods",
+                "RadioNavigation",
+                "Source",
+                "Data");
+            if (!LeuchtfeuerRegistry.Initialize(lighthouseDataDirectory, enabledCurated))
+            {
+                Debug.LogError("[RadioNav][Lighthouse] Leuchtfeuer registry failed: " +
+                    LeuchtfeuerRegistry.LastLoadError + " — continuing with curated profiles only");
+            }
+            else
+            {
+                Debug.Log("[RadioNav][Lighthouse] Leuchtfeuer registry loaded: " +
+                    LeuchtfeuerRegistry.Profiles.Count + " theater profiles");
+            }
+
             SceneEventsListener.OnSceneStart -= SceneEventsListener_OnSceneStart;
             SceneEventsListener.OnSceneAwake -= SceneEventsListener_OnSceneAwake;
             SceneEventsListener.OnSceneStart += SceneEventsListener_OnSceneStart;

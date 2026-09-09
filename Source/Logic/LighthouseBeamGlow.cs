@@ -217,24 +217,19 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            // B_wide: the real rotating beam is fully bright while it points
-            // at the player and fades out past the visible angle (gate).
+            // The steady lamp-glow floor keeps the dot visible from any
+            // bearing; the flash shaping (wide/hot) rides on top through
+            // VisualIntensity.
             float beamFactor = GetBeamVisibilityFactor(worldPosition);
-            if (beamFactor <= 0.01f)
-            {
-                SetDotEnabled(false, DotWillLog(false)
-                    ? "beam factor " + beamFactor.ToString("F2")
-                    : null);
-                return;
-            }
-
             Vector3 toCamera = (renderingCamera.transform.position - worldPosition).normalized;
             float hotAlign = rotator.IsNotNull() ? Mathf.Abs(Vector3.Dot(toCamera, rotator.forward)) : 1f;
             float fogDot = SkyVisibilityResolver.GetFogginess();
             double attenDot = LighthouseVisualModel.DistanceAttenuation(distance);
             double transDot = LighthouseVisualModel.Transmittance(distance, fogDot);
             double hotDot = LighthouseVisualModel.BeamIntensityFactor(hotAlign);
-            float iVisual = (float)LighthouseVisualModel.VisualIntensity(distance, fogDot, beamFactor, hotAlign);
+            float iVisual = (float)Math.Max(
+                LighthouseVisualModel.VisualIntensity(distance, fogDot, beamFactor, hotAlign),
+                LighthouseVisualModel.GlowIntensity(distance, fogDot));
             lastIVisual = iVisual;
 
             // Verbose per-dot model dump (once per diag interval, not per frame)
@@ -265,8 +260,7 @@ namespace UBOAT.Mods.RadioNavigation
                 renderingCamera.IsNotNull(),
                 IsDeviceCamera(renderingCamera),
                 distance,
-                renderingCamera.IsNotNull() ? renderingCamera.farClipPlane : 0f,
-                GetBeamVisibilityFactor(worldPosition));
+                renderingCamera.IsNotNull() ? renderingCamera.farClipPlane : 0f);
         }
 
         private bool IsNightVisible()

@@ -2659,13 +2659,20 @@ namespace RadioNavigation.SourceCheck
             }
             else
             {
-                bool dropsEntity = placerReset.DescendantNodes()
-                    .OfType<AssignmentExpressionSyntax>()
-                    .Any(a => a.Left is IdentifierNameSyntax left
-                        && left.Identifier.Text == "LighthouseEntity"
-                        && IsNullLiteral(a.Right));
-                if (!dropsEntity)
-                    problems.Add("LighthousePlacer.Reset never nulls LighthouseEntity — scene-bound entity reference survives teardown");
+                // The distance-gated placer (Leuchtfeuer fleet) holds no
+                // static LighthouseEntity any more — per-group state lives in
+                // the placements list, destroyed together with the holder GO.
+                // Pin instead that Reset destroys the whole holder GameObject
+                // so no per-frame loop survives a reload.
+                bool destroysHolder = placerReset.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax member
+                        && member.Name is IdentifierNameSyntax name
+                        && name.Identifier.Text == "Destroy"
+                        && inv.ArgumentList.Arguments.Count == 1
+                        && inv.ArgumentList.Arguments[0].Expression.ToString().Contains("gameObject"));
+                if (!destroysHolder)
+                    problems.Add("LighthousePlacer.Reset never destroys the holder gameObject — stale Update loop survives reload");
             }
 
             Assert.True(problems.Count == 0,

@@ -105,5 +105,31 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
         }
+
+        /// <summary>
+        /// The full placed fleet: curated active profiles first (stable
+        /// order, Wangerooge keeps its historical group name), then the
+        /// LeuchtfeuerRegistry theater subset when it loaded. Consumers:
+        /// LighthousePlacer (3D, distance-gated) and LighthouseMapMarker
+        /// (map markers for every entry).
+        /// </summary>
+        public static IEnumerable<LighthouseProfile> EnabledFleet()
+        {
+            for (int i = 0; i < All.Length; i++)
+            {
+                if (All[i].Enabled)
+                {
+                    yield return All[i];
+                }
+            }
+
+            if (LeuchtfeuerRegistry.Loaded)
+            {
+                for (int i = 0; i < LeuchtfeuerRegistry.Profiles.Count; i++)
+                {
+                    yield return LeuchtfeuerRegistry.Profiles[i];
+                }
+            }
+        }
     }
 }

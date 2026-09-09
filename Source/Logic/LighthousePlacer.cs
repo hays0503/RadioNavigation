@@ -14,12 +14,13 @@ using UnityEngine;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Places the mod's "lighthouse" 3D prefab for every enabled
-    /// LighthouseProfile as a decorative sandbox entity (no map marker of its
-    /// own — the map shows a charting point with a label from
-    /// StationMapOverlay instead) and attaches a LighthouseRotator to the
-    /// spawned prefab's rotator child when the profile defines a rotation
-    /// speed.
+    /// Places the mod's "lighthouse" 3D prefab for the enabled lighthouse
+    /// fleet (curated profiles + LeuchtfeuerRegistry theater subset) as
+    /// decorative sandbox entities, with a distance gate: the map marker
+    /// layer always draws every profile, but the expensive 3D model +
+    /// rotator + glow only exist while the lighthouse is within
+    /// LighthouseDistanceGate.SpawnRadiusKm of the submarine (despawn past
+    /// the hysteresis radius, capped at MaxConcurrent3D nearest instances).
     ///
     /// Uses the runtime group/entity pattern proven by the "Expanded Ice"
     /// workshop mod: SandboxGroup.Create + SandboxEntity.Create with an
@@ -29,13 +30,16 @@ namespace UBOAT.Mods.RadioNavigation
     /// group's SceneSpawnContainer keeps the model glued to its map position
     /// when the game shifts the floating scene origin.
     ///
-    /// The spawned instance appears asynchronously (terrain wait, then
-    /// InstantiatePrefab), so each placement is a two-phase poll: resolve
-    /// (or reuse) the sandbox group, then wait for the rotator child to
-    /// appear under the group's SceneSpawnContainer and attach the rotation
-    /// component. Reusing an existing group also covers save/load: the game
-    /// respawns the prefab without the runtime-attached component, so the
-    /// placer re-attaches the rotator on every Main Scene start.
+    /// Each instance is uniformly scaled so its lamp pivot lands at the
+    /// profile's real fire height (LighthouseScale, H0 measured by
+    /// rn_lighthouse_height). The scale is re-applied on every (re)spawn
+    /// because save/load respawns the prefab unscaled.
+    ///
+    /// Spawning is asynchronous (terrain wait, then InstantiatePrefab), so
+    /// each placement is a two-phase poll: resolve (or reuse) the sandbox
+    /// group, then wait for the rotator child to appear under the group's
+    /// SceneSpawnContainer and attach the rotation component. Reusing an
+    /// existing group also covers save/load.
     /// </summary>
     [NonSerializedInGameState]
     public sealed class LighthousePlacer : MonoBehaviour
@@ -44,38 +48,81 @@ namespace UBOAT.Mods.RadioNavigation
         private const int MaxAttemptsPerProfile = 3600;
         private const int RotatorGracePeriodFrames = 600;
 
+        /// <summary>
+        /// Alignment corrections beyond this are treated as a pathological
+        /// frame state and skipped (the next tick re-measures). Time-compressed
+        /// travel legitimately drifts static groups by tens of kilometers
+        /// (observed in-game), so the clamp only guards against nonsense.
+        /// </summary>
+        private const float MaxAlignmentShiftM = 100000f;
+
+        /// <summary>Global log throttle for repeated alignment shifts.</summary>
+        private const float MinAlignLogIntervalSeconds = 5f;
+
+        private static float lastAlignLogTime = -60f;
+
+        /// <summary>
+        /// Safety valve for harbor clusters: never more than this many 3D
+        /// lighthouses alive at once (the nearest win). The German Bight DB
+        /// density can exceed this within the 30 km radius.
+        /// </summary>
+        public const int MaxConcurrent3D = 64;
+
+        /// <summary>Distance-gate maintenance cadence (seconds).</summary>
+        private const float GateIntervalSeconds = 0.5f;
+
         [Inject] private static ResourceManager resourceManager = null;
         [Inject] private static GameState gameState = null;
 
         private static LighthousePlacer instance;
 
-        /// <summary>
-        /// The most recently placed lighthouse sandbox entity. The mod's own
-        /// map marker (LighthouseMapMarker) uses it for positioning.
-        /// </summary>
-        public static SandboxEntity LighthouseEntity;
-
         private sealed class Placement
         {
             public readonly LighthouseProfile Profile;
             public readonly string GroupName;
+            public readonly Vector2 EncounterKm;
             public SandboxGroup Group;
+            public GameObject GlowHolder;
+            public Transform Rotator;
             public string ResolvedPrefab;
+            public bool WantsSpawn;
             public bool Done;
             public bool Fatal;
             public int Attempts;
             public int RotatorWaitAttempts;
 
-            public Placement(LighthouseProfile profile)
+            public Placement(LighthouseProfile profile, string groupName)
             {
                 Profile = profile;
-                GroupName = "Lighthouse " + profile.Name;
+                GroupName = groupName;
+                EncounterKm = Coordinates.ToWorldPosition(profile.Latitude, profile.Longitude);
+            }
+
+            public bool Spawned
+            {
+                get { return Group != null; }
             }
         }
 
         private readonly List<Placement> placements = new List<Placement>();
+        private readonly List<Placement> gateScratch = new List<Placement>();
+        private readonly Dictionary<string, Placement> byGroupName =
+            new Dictionary<string, Placement>(StringComparer.Ordinal);
+        private readonly HashSet<string> fleetGroupNames = new HashSet<string>(StringComparer.Ordinal);
+        private float gateTimer;
+        private float staleCleanupTimer;
+        private int staleCleanupPassesLeft;
+        private bool staleCleanupArmed;
         private int gameplayWaitAttempts;
         private bool dumpedStatics;
+
+        /// <summary>
+        /// Stale-group cleanup schedule: first pass on the first gate tick
+        /// after Gameplay, then a few more (save restore and the game's own
+        /// LoadStaticGroups can lag the transition), then stop.
+        /// </summary>
+        private const float StaleCleanupIntervalSeconds = 10f;
+        private const int StaleCleanupPasses = 6;
 
         public static void EnsureRunning()
         {
@@ -86,10 +133,21 @@ namespace UBOAT.Mods.RadioNavigation
 
             var holder = new GameObject("Lighthouse Placer");
             instance = holder.AddComponent<LighthousePlacer>();
-            foreach (LighthouseProfile profile in LighthouseProfiles.Active())
+            instance.BuildFleet();
+        }
+
+        /// <summary>Sandbox entity of a placed lighthouse by group name.</summary>
+        public static SandboxEntity GetEntity(string groupName)
+        {
+            Placement placement;
+            if (instance == null || !instance.byGroupName.TryGetValue(groupName, out placement))
             {
-                instance.placements.Add(new Placement(profile));
+                return null;
             }
+
+            return placement.Group != null && placement.Group.Entities.Count > 0
+                ? placement.Group.Entities[0]
+                : null;
         }
 
         public static void Reset()
@@ -100,10 +158,46 @@ namespace UBOAT.Mods.RadioNavigation
             if (instance.IsNotNull())
                 UnityEngine.Object.Destroy(instance.gameObject);
             instance = null;
-            // The entity belongs to the destroyed scene: drop the static so
-            // LighthouseMapMarker re-resolves instead of reading a dead ref
-            // (IsNull now reports destroyed objects as null).
-            LighthouseEntity = null;
+        }
+
+        private void BuildFleet()
+        {
+            placements.Clear();
+            byGroupName.Clear();
+            fleetGroupNames.Clear();
+            var usedNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (LighthouseProfile profile in LighthouseProfiles.EnabledFleet())
+            {
+                string groupName = GroupNameFor(profile);
+                int suffix = 2;
+                string unique = groupName;
+                while (!usedNames.Add(unique))
+                {
+                    unique = groupName + "_" + suffix++;
+                }
+
+                var placement = new Placement(profile, unique);
+                placements.Add(placement);
+                byGroupName[unique] = placement;
+                fleetGroupNames.Add(unique);
+            }
+
+            Debug.Log(LogPrefix + " fleet built: " + placements.Count + " profiles (3D gated at " +
+                LighthouseDistanceGate.SpawnRadiusKm.ToString("F0", CultureInfo.InvariantCulture) +
+                " km, cap " + MaxConcurrent3D + ")");
+        }
+
+        private static string GroupNameFor(LighthouseProfile profile)
+        {
+            // Curated MOD-* codes keep the historical name-only group (old
+            // saves hold "Lighthouse Wangerooge"); registry entries use the
+            // unique B-number because names repeat across harbors.
+            if (string.IsNullOrEmpty(profile.Code) || profile.Code.StartsWith("MOD-"))
+            {
+                return "Lighthouse " + profile.Name;
+            }
+
+            return "Lighthouse " + profile.Code + " " + profile.Name;
         }
 
         private void Update()
@@ -115,29 +209,32 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
 
-                foreach (Placement placement in placements)
+                RunGate();
+
+                for (int i = 0; i < placements.Count; i++)
                 {
-                    if (placement.Done || placement.Fatal)
+                    Placement placement = placements[i];
+                    if (!placement.WantsSpawn || placement.Fatal || placement.Done)
                     {
                         continue;
                     }
 
-                    if (++placement.Attempts > MaxAttemptsPerProfile)
+                    if (placement.Group == null)
                     {
-                        Debug.LogError(LogPrefix + " '" + placement.GroupName + "' giving up after " +
-                            MaxAttemptsPerProfile + " attempts; check prefab/bundle availability");
-                        placement.Fatal = true;
-                        continue;
+                        TryResolveGroup(placement);
                     }
-
-                    Advance(placement);
+                    else
+                    {
+                        TryAttachRotator(placement);
+                    }
                 }
 
-                if (AllFinished())
+                if (!staleCleanupArmed)
                 {
-                    Debug.Log(LogPrefix + " placement finished");
-                    Destroy(gameObject);
-                    instance = null;
+                    // Arm on the first tick after Gameplay: save restore and
+                    // the game's own LoadStaticGroups have run by then.
+                    staleCleanupArmed = true;
+                    staleCleanupPassesLeft = StaleCleanupPasses;
                 }
             }
             catch (Exception e)
@@ -147,26 +244,255 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private bool AllFinished()
+        /// <summary>
+        /// Distance-gate maintenance: spawn near profiles (nearest first,
+        /// capped), despawn far ones. Runs on the GateIntervalSeconds timer,
+        /// not per frame.
+        /// </summary>
+        private void RunGate()
         {
-            foreach (Placement placement in placements)
-            {
-                if (!placement.Done && !placement.Fatal)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private void Advance(Placement placement)
-        {
-            if (placement.Group.IsNull() && !TryResolveGroup(placement))
+            gateTimer += Time.unscaledDeltaTime;
+            if (gateTimer < GateIntervalSeconds)
             {
                 return;
             }
 
-            TryAttachRotator(placement);
+            gateTimer = 0f;
+
+            float lat;
+            float lon;
+            if (!TryGetPlayerLatLon(out lat, out lon))
+            {
+                return;
+            }
+
+            Vector2 playerKm = Coordinates.ToWorldPosition(lat, lon);
+
+            gateScratch.Clear();
+            int spawnedCount = 0;
+            for (int i = 0; i < placements.Count; i++)
+            {
+                Placement placement = placements[i];
+                double distanceKm = LighthouseDistanceGate.DistanceKm(
+                    placement.EncounterKm.x, placement.EncounterKm.y, playerKm.x, playerKm.y);
+                LighthouseGateAction action = LighthouseDistanceGate.Decide(
+                    placement.Spawned || placement.WantsSpawn, distanceKm);
+
+                if (action == LighthouseGateAction.Despawn)
+                {
+                    Teardown(placement, distanceKm);
+                }
+                else if (action == LighthouseGateAction.Spawn)
+                {
+                    gateScratch.Add(placement);
+                }
+                else if (placement.Spawned)
+                {
+                    spawnedCount++;
+                }
+            }
+
+            // Nearest-first grant under the concurrency cap.
+            if (gateScratch.Count > 0)
+            {
+                Vector2 playerRef = playerKm;
+                gateScratch.Sort(delegate(Placement a, Placement b)
+                {
+                    double da = LighthouseDistanceGate.DistanceKm(
+                        a.EncounterKm.x, a.EncounterKm.y, playerRef.x, playerRef.y);
+                    double db = LighthouseDistanceGate.DistanceKm(
+                        b.EncounterKm.x, b.EncounterKm.y, playerRef.x, playerRef.y);
+                    int byDistance = da.CompareTo(db);
+                    // Deterministic tie-break for co-distant lights.
+                    return byDistance != 0 ? byDistance : a.GroupName.CompareTo(b.GroupName);
+                });
+
+                for (int i = 0; i < gateScratch.Count; i++)
+                {
+                    Placement placement = gateScratch[i];
+                    if (placement.WantsSpawn)
+                    {
+                        continue; // already granted
+                    }
+
+                    if (spawnedCount >= MaxConcurrent3D)
+                    {
+                        break;
+                    }
+
+                    placement.WantsSpawn = true;
+                    spawnedCount++;
+                    Debug.Log(LogPrefix + " '" + placement.GroupName + "' entering 3D range (" +
+                        LighthouseDistanceGate.DistanceKm(
+                            placement.EncounterKm.x, placement.EncounterKm.y, playerRef.x, playerRef.y)
+                            .ToString("F1", CultureInfo.InvariantCulture) + " km)");
+                }
+            }
+
+            RealignSpawned();
+            RunStaleGroupCleanup();
+        }
+
+        /// <summary>
+        /// Removes sandbox groups left behind by old saves for beacons that
+        /// are no longer in the fleet (excluded from Leuchtfeuer.json by
+        /// land curation). Groups are DontDestroyIfEmpty, so without this
+        /// the 3D model of an excluded beacon would survive every load.
+        /// Runs on a short schedule after Gameplay: save restore and the
+        /// game's own LoadStaticGroups can lag the state transition.
+        /// </summary>
+        private void RunStaleGroupCleanup()
+        {
+            if (staleCleanupPassesLeft <= 0)
+            {
+                return;
+            }
+
+            staleCleanupTimer += Time.unscaledDeltaTime;
+            if (staleCleanupTimer < StaleCleanupIntervalSeconds)
+            {
+                return;
+            }
+
+            staleCleanupTimer = 0f;
+            staleCleanupPassesLeft--;
+            if (CleanupStaleGroups())
+            {
+                // A pass that found and removed something is followed by one
+                // more pass to confirm the sandbox is clean.
+                staleCleanupPassesLeft = Math.Max(staleCleanupPassesLeft, 1);
+            }
+        }
+
+        /// <summary>True when at least one stale group was destroyed.</summary>
+        private bool CleanupStaleGroups()
+        {
+            Sandbox sandbox = Sandbox.Instance;
+            if (sandbox == null)
+            {
+                return false;
+            }
+
+            List<SandboxGroup> groups = sandbox.GetGroupsDirect();
+            if (groups == null || groups.Count == 0)
+            {
+                return false;
+            }
+
+            // Snapshot first: DestroyGroup mutates the sandbox collection.
+            List<SandboxGroup> doomed = null;
+            for (int i = 0; i < groups.Count; i++)
+            {
+                SandboxGroup group = groups[i];
+                if (group == null)
+                {
+                    continue;
+                }
+
+                if (LighthouseStaleGroupPolicy.ShouldDestroy(group.name, fleetGroupNames))
+                {
+                    if (doomed == null)
+                    {
+                        doomed = new List<SandboxGroup>();
+                    }
+
+                    doomed.Add(group);
+                }
+            }
+
+            if (doomed == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < doomed.Count; i++)
+            {
+                string groupName = doomed[i].name;
+                try
+                {
+                    doomed[i].DestroyGroup();
+                    Debug.Log(LogPrefix + " removed stale group '" + groupName +
+                        "' (beacon excluded from the fleet by data curation)");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError(LogPrefix + " stale group '" + groupName + "' removal failed: " + e.Message);
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Re-anchors every spawned light to the current floating-origin frame
+        /// on each gate tick. Teleports and time skips rebase the world without
+        /// moving our mid-session-spawned static groups (observed in-game: the
+        /// lamp stays kilometers behind the ship while the distance gate keeps
+        /// reporting chart proximity). AlignToWorldFrame is idempotent with a
+        /// ~1 m dead zone, so the steady state costs two transform reads per
+        /// light per tick.
+        /// </summary>
+        private void RealignSpawned()
+        {
+            for (int i = 0; i < placements.Count; i++)
+            {
+                Placement placement = placements[i];
+                if (!placement.Spawned || !placement.Done || placement.Rotator.IsNull())
+                {
+                    continue;
+                }
+
+                SceneSpawnContainer container = placement.Group.SceneSpawnContainer;
+                if (container.IsNull())
+                {
+                    continue;
+                }
+
+                AlignToWorldFrame(placement, container.transform, placement.Rotator);
+            }
+        }
+
+        private bool TryGetPlayerLatLon(out float lat, out float lon)
+        {
+            lat = 0f;
+            lon = 0f;
+            var provider = new GamePlayerPositionProvider();
+            return provider.TryGetPosition(out lat, out lon);
+        }
+
+        /// <summary>Removes the 3D presence of a placement (group + glow).</summary>
+        private void Teardown(Placement placement, double distanceKm)
+        {
+            bool had = placement.Spawned || placement.GlowHolder != null;
+            placement.WantsSpawn = false;
+            placement.Done = false;
+            placement.Attempts = 0;
+            placement.RotatorWaitAttempts = 0;
+            if (placement.GlowHolder != null)
+            {
+                UnityEngine.Object.Destroy(placement.GlowHolder);
+                placement.GlowHolder = null;
+            }
+
+            if (placement.Group != null)
+            {
+                try
+                {
+                    placement.Group.DestroyGroup();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError(LogPrefix + " '" + placement.GroupName + "' despawn failed: " + e.Message);
+                }
+
+                placement.Group = null;
+            }
+
+            if (had)
+            {
+                Debug.Log(LogPrefix + " '" + placement.GroupName + "' left 3D range (" +
+                    distanceKm.ToString("F1", CultureInfo.InvariantCulture) + " km) — despawned");
+            }
         }
 
         /// <summary>
@@ -178,6 +504,14 @@ namespace UBOAT.Mods.RadioNavigation
             Sandbox sandbox = Sandbox.Instance;
             if (sandbox.IsNull() || resourceManager.IsNull())
             {
+                return false;
+            }
+
+            if (++placement.Attempts > MaxAttemptsPerProfile)
+            {
+                Debug.LogError(LogPrefix + " '" + placement.GroupName + "' giving up after " +
+                    MaxAttemptsPerProfile + " attempts; check prefab/bundle availability");
+                placement.Fatal = true;
                 return false;
             }
 
@@ -197,9 +531,10 @@ namespace UBOAT.Mods.RadioNavigation
                     HealGroup(placement);
                     return false;
                 }
+
                 placement.Group = existing;
+                placement.ResolvedPrefab = null;
                 placement.RotatorWaitAttempts = 0;
-                LighthouseEntity = existing.Entities[0];
                 // Old saves may carry the entity with DisplayInUI/IsPublic
                 // true — reset so the game stops creating its own marker.
                 for (int i = 0; i < existing.Entities.Count; i++)
@@ -207,15 +542,14 @@ namespace UBOAT.Mods.RadioNavigation
                     existing.Entities[i].DisplayInUI = false;
                     existing.Entities[i].IsPublic = false;
                 }
-                Debug.Log(LogPrefix + " '" + placement.GroupName +
-                    "': group already exists; reusing (entities=" + existing.Entities.Count + ")");
+
                 return true;
             }
 
-            if (placement.ResolvedPrefab.IsNull())
+            if (placement.ResolvedPrefab == null)
             {
                 placement.ResolvedPrefab = ResolvePrefabPath(placement.Profile.PrefabPath);
-                if (placement.ResolvedPrefab.IsNull())
+                if (placement.ResolvedPrefab == null)
                 {
                     Debug.LogError(LogPrefix + " '" + placement.GroupName + "': prefab not found: '" +
                         placement.Profile.PrefabPath + "'");
@@ -224,7 +558,7 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
 
-            Vector2 position = Coordinates.ToWorldPosition(placement.Profile.Latitude, placement.Profile.Longitude);
+            Vector2 position = placement.EncounterKm;
 
             try
             {
@@ -237,6 +571,7 @@ namespace UBOAT.Mods.RadioNavigation
                     LogThrottled(placement, "waiting for countries");
                     return false;
                 }
+
                 EntityBlueprint blueprint = entityType.GetCountryBlueprint(country);
 
                 SandboxGroup group = SandboxGroup.Create<SandboxStaticGroup>(placement.GroupName, "Location", position, country);
@@ -250,7 +585,6 @@ namespace UBOAT.Mods.RadioNavigation
                 entity.DisplayInUI = false;
                 entity.IsPublic = false;
                 entity.RandomizeSpawnPosition = false;
-                LighthouseEntity = entity;
 
                 group.AddEntity(entity);
                 entity.Position = position;
@@ -275,6 +609,7 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     LogThrottled(placement, "placement not ready yet: " + e.Message);
                 }
+
                 return false;
             }
 
@@ -290,8 +625,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>
         /// Phase 2: wait for the spawned prefab's rotator child to appear
-        /// under the group's SceneSpawnContainer and attach a
-        /// LighthouseRotator when the profile defines a rotation speed.
+        /// under the group's SceneSpawnContainer, apply the per-lighthouse
+        /// height scale, then attach the rotation component and the glow
+        /// controller.
         /// </summary>
         private void TryAttachRotator(Placement placement)
         {
@@ -307,6 +643,7 @@ namespace UBOAT.Mods.RadioNavigation
                         " frames — recreating group");
                     HealGroup(placement);
                 }
+
                 return;
             }
 
@@ -321,6 +658,7 @@ namespace UBOAT.Mods.RadioNavigation
                         " container=" + DescribeContainer(container) +
                         " (attempt " + placement.RotatorWaitAttempts + ")");
                 }
+
                 // The entity can legitimately take a while to spawn (terrain
                 // wait, async prefab load), but a save-restored group whose
                 // entity never respawns would block forever. After the grace
@@ -332,8 +670,11 @@ namespace UBOAT.Mods.RadioNavigation
                         " frames — entity did not respawn; recreating group");
                     HealGroup(placement);
                 }
+
                 return;
             }
+
+            ApplyHeightScale(placement, container.transform);
 
             if (placement.Profile.RotationDegreesPerSecond <= 0f)
             {
@@ -358,15 +699,106 @@ namespace UBOAT.Mods.RadioNavigation
             // it keeps running when the game LOD-deactivates the prefab and
             // survives save/load respawns. Re-point it to the current
             // container/rotator on every (re)attach.
-            LighthouseBeamGlow glow = EnsureGlowController("RadioNavLighthouseGlow_" + placement.GroupName);
+            LighthouseBeamGlow glow = EnsureGlowController(placement);
             glow.Initialize(
                 container.transform,
                 container.transform.InverseTransformPoint(rotator.position),
                 rotator,
                 placement.GroupName);
+
+            AlignToWorldFrame(placement, container.transform, rotator);
+
             Debug.Log(LogPrefix + " '" + placement.GroupName + "': glow controller ready");
 
             placement.Done = true;
+        }
+
+        /// <summary>
+        /// Re-anchors the spawned hierarchy so the lamp pivot sits at the
+        /// entity's charted encounter position in the CURRENT floating-origin
+        /// frame, using the game's own authoritative conversion
+        /// (Sandbox.EncounterToSceneSpace). Time-compressed travel advances
+        /// the scene origin via AddOffsetAlt, which does NOT translate static
+        /// groups' scene content (no OffsetAdded subscribers), so spawned
+        /// lighthouses go stale by up to tens of kilometers; this restores
+        /// them. Runs on every attach and on every gate tick — idempotent.
+        /// See LighthouseAlignment for the equivalent ship-anchored math.
+        /// </summary>
+        private void AlignToWorldFrame(Placement placement, Transform container, Transform rotator)
+        {
+            placement.Rotator = rotator;
+
+            Sandbox sandbox = Sandbox.Instance;
+            SandboxEntity entity = placement.Group != null && placement.Group.Entities.Count > 0
+                ? placement.Group.Entities[0]
+                : null;
+            if (sandbox.IsNull() || entity == null)
+            {
+                Debug.LogWarning(LogPrefix + " '" + placement.GroupName +
+                    "': alignment skipped (no sandbox/entity)");
+                return;
+            }
+
+            Vector3 target = sandbox.EncounterToSceneSpace(entity.Position);
+            float shiftX = target.x - rotator.position.x;
+            float shiftZ = target.z - rotator.position.z;
+
+            float shiftSq = shiftX * shiftX + shiftZ * shiftZ;
+            if (shiftSq < 1f)
+            {
+                return; // already within ~1 m of the charted position
+            }
+
+            if (shiftSq > MaxAlignmentShiftM * MaxAlignmentShiftM)
+            {
+                // A correction this large means the frame state is pathological
+                // (mid-transition teleport); applying it would fling the model.
+                // Skip and let the next tick re-measure.
+                Debug.LogWarning(LogPrefix + " '" + placement.GroupName + "' alignment shift (" +
+                    shiftX.ToString("F0", CultureInfo.InvariantCulture) + ", " +
+                    shiftZ.ToString("F0", CultureInfo.InvariantCulture) +
+                    ") m exceeds sanity clamp — skipped");
+                return;
+            }
+
+            container.position += new Vector3(shiftX, 0f, shiftZ);
+            if (Time.unscaledTime - lastAlignLogTime < MinAlignLogIntervalSeconds)
+            {
+                return;
+            }
+
+            lastAlignLogTime = Time.unscaledTime;
+            Debug.Log(LogPrefix + " '" + placement.GroupName + "' aligned: shift=(" +
+                shiftX.ToString("F1", CultureInfo.InvariantCulture) + ", " +
+                shiftZ.ToString("F1", CultureInfo.InvariantCulture) +
+                ") m, lamp scene=(" +
+                rotator.position.x.ToString("F1", CultureInfo.InvariantCulture) + ", " +
+                rotator.position.z.ToString("F1", CultureInfo.InvariantCulture) + ") m");
+        }
+
+        /// <summary>
+        /// Uniformly scales the spawned prefab so the lamp pivot sits at the
+        /// profile's real fire height. Save/load respawns the prefab at
+        /// scale 1, so this re-applies on every attach (idempotent).
+        /// </summary>
+        private static void ApplyHeightScale(Placement placement, Transform container)
+        {
+            float lampHeight = PlayerPrefs.GetFloat(
+                LighthouseHeightProbe.PlayerPrefsKey, LighthouseScale.DefaultLampHeightM);
+            float scale = LighthouseScale.Compute(placement.Profile.FireHeightM, lampHeight);
+            Vector3 current = container.localScale;
+            if (Math.Abs(current.x - scale) < 0.001f
+                && Math.Abs(current.y - scale) < 0.001f
+                && Math.Abs(current.z - scale) < 0.001f)
+            {
+                return;
+            }
+
+            container.localScale = new Vector3(scale, scale, scale);
+            Debug.Log(LogPrefix + " '" + placement.GroupName + "' scaled x" +
+                scale.ToString("F3", CultureInfo.InvariantCulture) +
+                " (fireHeight " + placement.Profile.FireHeightM.ToString("F0", CultureInfo.InvariantCulture) +
+                " m / lamp " + lampHeight.ToString("F2", CultureInfo.InvariantCulture) + " m)");
         }
 
         /// <summary>
@@ -377,10 +809,11 @@ namespace UBOAT.Mods.RadioNavigation
         private bool HealGroup(Placement placement)
         {
             SandboxGroup group = placement.Group;
-            if (group.IsNull())
+            if (group == null)
             {
                 return false;
             }
+
             try
             {
                 group.DestroyGroup();
@@ -391,6 +824,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Debug.LogException(e);
                 return false;
             }
+
             placement.Group = null;
             placement.RotatorWaitAttempts = 0;
             return true;
@@ -402,11 +836,13 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 return "null";
             }
+
             string result = container.transform.childCount + " children";
             if (container.transform.childCount == 0)
             {
                 return result;
             }
+
             result += ": ";
             for (int i = 0; i < container.transform.childCount && i < 8; i++)
             {
@@ -414,29 +850,43 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     result += ", ";
                 }
+
                 result += "'" + container.transform.GetChild(i).name + "'";
             }
+
             if (container.transform.childCount > 8)
             {
                 result += ", ...";
             }
+
             return result;
         }
 
-        private static LighthouseBeamGlow EnsureGlowController(string controllerName)
+        private LighthouseBeamGlow EnsureGlowController(Placement placement)
         {
-            GameObject existing = GameObject.Find(controllerName);
-            if (existing.IsNotNull())
+            if (placement.GlowHolder != null)
             {
-                LighthouseBeamGlow existingComponent = existing.GetComponent<LighthouseBeamGlow>();
-                if (existingComponent.IsNotNull())
+                LighthouseBeamGlow existingComponent = placement.GlowHolder.GetComponent<LighthouseBeamGlow>();
+                if (existingComponent != null)
                 {
                     return existingComponent;
                 }
-                return existing.AddComponent<LighthouseBeamGlow>();
+
+                return placement.GlowHolder.AddComponent<LighthouseBeamGlow>();
             }
 
-            var holder = new GameObject(controllerName);
+            // A glow holder may survive from a previous session of this
+            // group name (scene reload) — reuse instead of stacking.
+            GameObject existing = GameObject.Find("RadioNavLighthouseGlow_" + placement.GroupName);
+            if (existing.IsNotNull())
+            {
+                placement.GlowHolder = existing;
+                LighthouseBeamGlow component = existing.GetComponent<LighthouseBeamGlow>();
+                return component != null ? component : existing.AddComponent<LighthouseBeamGlow>();
+            }
+
+            var holder = new GameObject("RadioNavLighthouseGlow_" + placement.GroupName);
+            placement.GlowHolder = holder;
             return holder.AddComponent<LighthouseBeamGlow>();
         }
 
@@ -451,8 +901,10 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     Debug.Log(LogPrefix + " waiting for gameplay state (attempt " + gameplayWaitAttempts + ")");
                 }
+
                 return false;
             }
+
             return true;
         }
 
@@ -475,9 +927,9 @@ namespace UBOAT.Mods.RadioNavigation
             resource.Free();
             if (valid)
             {
-                Debug.Log(LogPrefix + " prefab resolved: '" + prefabName + "'");
                 return prefabName;
             }
+
             return null;
         }
 

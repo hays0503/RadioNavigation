@@ -19,6 +19,12 @@ namespace UBOAT.Mods.RadioNavigation
     /// sizing via LighthouseMarkerSizing, visibility gated by
     /// NavMarkerGate.IsMapOpen.
     ///
+    /// Screen-space decluttering (ADR-032): subclasses that override
+    /// DeclutterEnabled get greedy min-gap suppression per frame
+    /// (MarkerDeclutter) — overlapping markers collapse onto the highest
+    /// Priority(index) survivor; pinned and hovered views are never
+    /// suppressed so their tooltip can never dangle on a hidden root.
+    ///
     /// Subclasses provide the marker set and content:
     /// - MarkerCount / MarkerRootName / GetEncounterPosition / HasContent —
     ///   what to draw and where (encounter-space km; the base adds the
@@ -34,7 +40,10 @@ namespace UBOAT.Mods.RadioNavigation
     public abstract class NavMapMarkerBase : MonoBehaviour
     {
         protected const string LogPrefix = "[RadioNav][Map]";
-        protected const float HitboxSize = 96f;
+        // 76 = 1.19× the 64-unit icon: small enough that two hitboxes can
+        // never overlap under the 1.3× declutter gap (96 was 1.5× — hover
+        // targets overlapped and the raycast picked an arbitrary marker).
+        protected const float HitboxSize = 76f;
         protected const float BackdropSize = 80f;
         protected const int BackdropTextureSize = 64;
         protected const float SpriteLiftY = 100f;
@@ -66,8 +75,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         private readonly System.Collections.Generic.List<MarkerView> views =
             new System.Collections.Generic.List<MarkerView>();
+        private readonly System.Collections.Generic.List<MarkerDeclutter.Item> declutterItems =
+            new System.Collections.Generic.List<MarkerDeclutter.Item>();
+        private bool[] shownBuffer = new bool[0];
         private bool built;
         private float maintenanceTimer;
+        private float declutterLogTimer;
+        private int hoveredIndex = -1;
 
         protected abstract int MarkerCount { get; }
         protected abstract string MarkerRootName(int index);
@@ -76,6 +90,13 @@ namespace UBOAT.Mods.RadioNavigation
         protected abstract bool HasContent(int index);
         protected abstract Vector2 GetEncounterPosition(int index);
         protected abstract Sprite LoadIconSprite();
+
+        /// <summary>Declutter hooks (ADR-032). Default: off — markers draw
+        /// every frame exactly as before. Overriding DeclutterEnabled turns
+        /// on greedy min-gap suppression; Priority ranks who survives an
+        /// overlap (higher wins; the lighthouse marker uses fire height).</summary>
+        protected virtual bool DeclutterEnabled => false;
+        protected virtual float Priority(int index) => 0f;
 
         protected virtual void OnBeforeBuildViews() { }
         protected virtual void OnHoverEnter(int index) { }
@@ -121,7 +142,7 @@ namespace UBOAT.Mods.RadioNavigation
             float parentLossy = markersManager.transform.lossyScale.x;
             float scale = (float)LighthouseMarkerSizing.MarkerScale(iconPx, unitsPerPixel, parentLossy);
 
-            UpdateViewPositions(elevation, scale, iconPx);
+            UpdateViewPositions(elevation, scale, iconPx, unitsPerPixel);
         }
 
         private bool EnsureDependencies()
@@ -163,18 +184,30 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private void UpdateViewPositions(float elevation, float scale, float iconPx)
+        /// <summary>
+        /// Positions every content view, collects declutter candidates and
+        /// applies the final visibility in one pass. Active states are set
+        /// only after the declutter selection (and only on change), so a
+        /// suppressed view never flickers through a frame.
+        /// </summary>
+        private void UpdateViewPositions(float elevation, float scale, float iconPx, double unitsPerPixel)
         {
+            bool declutter = DeclutterEnabled && unitsPerPixel > 0.0;
+            declutterItems.Clear();
+            if (declutter && shownBuffer.Length < views.Count)
+            {
+                shownBuffer = new bool[views.Count];
+            }
+
             for (int i = 0; i < views.Count; i++)
             {
                 MarkerView view = views[i];
                 if (!HasContent(view.Index))
                 {
-                    view.Root.SetActive(false);
+                    SetActive(view, false);
                     continue;
                 }
 
-                view.Root.SetActive(true);
                 Vector3 position = sandbox.EncounterToSceneSpace(GetEncounterPosition(view.Index));
                 // Same lift formula as MapPointUI.UpdatePoints plus the
                 // marker lift: the flat canvas plane at y=0 clips the icon.
@@ -186,7 +219,82 @@ namespace UBOAT.Mods.RadioNavigation
                 // +Z (default forward) to face straight up.
                 view.Root.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
                 OnMarkerPositioned(view.Index, position, scale, iconPx);
+
+                if (!declutter)
+                {
+                    SetActive(view, true);
+                    continue;
+                }
+
+                declutterItems.Add(new MarkerDeclutter.Item
+                {
+                    ViewIndex = view.Index,
+                    X = position.x,
+                    Y = position.z,
+                    Priority = Priority(view.Index),
+                    // Pinned/hovered never suppress: a deactivated root
+                    // receives no PointerExit, so its tooltip would dangle.
+                    Forced = view.Pinned || view.Index == hoveredIndex
+                });
             }
+
+            if (declutter)
+            {
+                ApplyDeclutter(iconPx, unitsPerPixel);
+            }
+        }
+
+        /// <summary>
+        /// Runs the greedy selection over the collected candidates and
+        /// applies shown/hidden to the roots. The gap is world units:
+        /// screen px target × scene units per screen px.
+        /// </summary>
+        private void ApplyDeclutter(float iconPx, double unitsPerPixel)
+        {
+            double gap = MarkerDeclutter.DefaultGapFactor * iconPx * unitsPerPixel;
+            int shownCount = MarkerDeclutter.Select(declutterItems, gap, shownBuffer);
+            for (int i = 0; i < views.Count; i++)
+            {
+                MarkerView view = views[i];
+                if (!HasContent(view.Index))
+                {
+                    continue; // hidden during the position pass
+                }
+
+                SetActive(view, shownBuffer[view.Index]);
+            }
+
+            LogDeclutterStats(shownCount, iconPx);
+        }
+
+        /// <summary>Sets the root active state, skipping redundant calls.</summary>
+        private void SetActive(MarkerView view, bool active)
+        {
+            if (view.Root == null || view.Root.activeSelf == active)
+            {
+                return;
+            }
+
+            view.Root.SetActive(active);
+        }
+
+        /// <summary>Throttled shown/hidden counter behind a diagnostics key.</summary>
+        private void LogDeclutterStats(int shownCount, float iconPx)
+        {
+            if (!RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseDeclutterStatsKey, false))
+            {
+                return;
+            }
+
+            declutterLogTimer += Time.unscaledDeltaTime;
+            if (declutterLogTimer < 2f)
+            {
+                return;
+            }
+
+            declutterLogTimer = 0f;
+            Debug.Log(LogPrefix + " declutter: shown=" + shownCount + "/" + views.Count +
+                " iconPx=" + iconPx.ToString("F0"));
         }
 
         private void BuildAll()
@@ -234,7 +342,9 @@ namespace UBOAT.Mods.RadioNavigation
             backdropGo.transform.SetParent(view.Root.transform, false);
             var backdropImage = backdropGo.AddComponent<Image>();
             backdropImage.sprite = GetBackdropSprite();
-            backdropImage.color = new Color(0.95f, 0.92f, 0.85f, 0.9f);
+            // ADR-032: 0.9 was tuned for 5 station markers; at lighthouse
+            // density the cream backdrop washed out the map underneath.
+            backdropImage.color = new Color(0.95f, 0.92f, 0.85f, 0.5f);
             backdropImage.raycastTarget = false;
             var backdropRect = backdropGo.GetComponent<RectTransform>();
             backdropRect.sizeDelta = new Vector2(BackdropSize, BackdropSize);
@@ -314,6 +424,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnHoverEnterInternal(MarkerView view)
         {
+            hoveredIndex = view.Index;
             RefreshTooltipText(view);
             view.Tooltip.SetActive(true);
             OnHoverEnter(view.Index);
@@ -321,6 +432,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnHoverExitInternal(MarkerView view)
         {
+            if (hoveredIndex == view.Index)
+            {
+                hoveredIndex = -1;
+            }
+
             if (!view.Pinned)
                 view.Tooltip.SetActive(false);
             OnHoverExit(view.Index);

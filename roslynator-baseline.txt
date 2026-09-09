@@ -6,12 +6,23 @@
   Source\Logic\ConstellationMesh.cs : warning RCS1146: 
   Source\Logic\ConstellationMesh.cs : warning RCS1198: 
   Source\Logic\ConstellationMesh.cs : warning RCS1213: 
+  Source\Logic\LighthouseBeamGlow.cs : warning RCS1163: 
   Source\Logic\LighthouseBeamGlow.cs : warning RCS1213: 
+  Source\Logic\LighthouseCoastProbe.cs : warning RCS1129: 
+  Source\Logic\LighthouseCoastProbe.cs : warning RCS1169: 
   Source\Logic\LighthouseDiagnostics.cs : warning RCS1146: 
+  Source\Logic\LighthouseDistanceGate.cs : warning RCS1161: 
   Source\Logic\LighthouseDotUi.cs : warning RCS1146: 
   Source\Logic\LighthouseFlareDriver.cs : warning RCS1146: 
+  Source\Logic\LighthouseHeightProbe.cs : warning RCS1129: 
+  Source\Logic\LighthouseHeightProbe.cs : warning RCS1146: 
+  Source\Logic\LighthouseHeightProbe.cs : warning RCS1169: 
+  Source\Logic\LighthouseLandSweep.cs : warning RCS1129: 
+  Source\Logic\LighthouseLandSweep.cs : warning RCS1169: 
   Source\Logic\LighthousePlacer.cs : warning RCS1129: 
+  Source\Logic\LighthousePlacer.cs : warning RCS1146: 
   Source\Logic\LighthousePlacer.cs : warning RCS1169: 
+  Source\Logic\LighthousePlacer.cs : warning RCS1173: 
   Source\Logic\LighthousePlacer.cs : warning RCS1213: 
   Source\Logic\LighthouseRotator.cs : warning RCS1213: 
   Source\Logic\LighthouseScreenProjection.cs : warning RCS1146: 
@@ -25,7 +36,6 @@
   Source\Logic\PlanetRenderer.cs : warning RCS1146: 
   Source\Logic\PlanetRenderer.cs : warning RCS1213: 
   Source\Logic\RadioStoryIntegration.cs : warning RCS1163: 
-  Source\Logic\RadioStoryIntegration.cs : warning RCS1213: 
   Source\Logic\SkyVisibilityResolver.cs : warning RCS1146: 
   Source\Logic\SkyVisibilityResolver.cs : warning RCS1169: 
   Source\Logic\SonneController.cs : warning RCS1169: 
@@ -56,12 +66,12 @@
   Source\UI\FixMapMarker.cs : warning RCS1146: 
   Source\UI\GroundHandler.cs : warning RCS1213: 
   Source\UI\InformationPanelHandler.cs : warning RCS1213: 
+  Source\UI\InformationPanelHandler.cs : warning RCS1238: 
   Source\UI\LighthouseMapMarker.cs : warning RCS1146: 
   Source\UI\NavMapMarkerBase.cs : warning RCS1129: 
   Source\UI\NavMapMarkerBase.cs : warning RCS1146: 
   Source\UI\NavMapMarkerBase.cs : warning RCS1213: 
   Source\UI\PanelDragHandler.cs : warning RCS1213: 
-  Source\UI\PanelStateStore.cs : warning RCS1238: 
   Source\UI\RadioHandler.cs : warning RCS1213: 
   Source\UI\SextantBloomCut.cs : warning RCS1146: 
   Source\UI\SextantCameraProbe.cs : warning RCS1213: 

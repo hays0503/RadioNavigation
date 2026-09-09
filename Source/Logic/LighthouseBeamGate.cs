@@ -15,10 +15,11 @@ namespace UBOAT.Mods.RadioNavigation
         // past this angle (moved from LighthouseBeamGlow).
         public const float VisibleAngleDeg = 60f;
 
-        // Native flare is replaced by the screen-space dot beyond this range
-        // in FPP (moved from LighthouseBeamGlow; mirrors
-        // LighthouseFlareDriver.FlareMaxDistanceM kept there).
-        public const float FlareTakeoverDistanceM = 1200f;
+        // Native flare renders to the 3D spawn radius in FPP (moved from
+        // LighthouseBeamGlow; mirrors LighthouseFlareDriver.FlareMaxDistanceM
+        // kept there). The steady lamp-glow floor makes the flare valid
+        // off-beam too, so there is no beam-alignment condition here.
+        public const float FlareTakeoverDistanceM = 30000f;
 
         /// <summary>
         /// Beam visibility factor from flat (XZ) beam-forward vs to-camera.
@@ -48,13 +49,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>
         /// Mirror of the flare driver's activation decision (night, camera,
-        /// distance cap, beam gate) plus far-clip culling: deterministic
-        /// per frame, unlike renderer.isVisible which flickers while the
-        /// bounds inflation is active.
+        /// distance cap) plus far-clip culling: deterministic per frame,
+        /// unlike renderer.isVisible which flickers while the bounds
+        /// inflation is active. No beam-alignment condition: the steady
+        /// lamp-glow floor keeps the flare valid off-beam.
         /// </summary>
         public static bool FlareTakesOver(bool hasFlare, bool lensReady, bool isNight,
-            bool cameraReady, bool deviceView, double distanceM, double farClipM,
-            double beamFactor)
+            bool cameraReady, bool deviceView, double distanceM, double farClipM)
         {
             if (!hasFlare || !lensReady || !isNight || !cameraReady)
                 return false;
@@ -62,8 +63,6 @@ namespace UBOAT.Mods.RadioNavigation
             // distance limit, like the game's own lighthouse flare). In FPP
             // the dot takes over beyond FlareTakeoverDistanceM.
             if (!deviceView && distanceM > FlareTakeoverDistanceM)
-                return false;
-            if (beamFactor <= 0.01)
                 return false;
             // Beyond the far clip the world-space flare may be culled, so
             // the screen-space dot takes over instead (cameraReady held

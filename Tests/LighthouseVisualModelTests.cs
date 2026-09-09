@@ -152,5 +152,46 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 prev = w;
             }
         }
+
+        [Fact]
+        public void GlowIntensity_ReferencePoints_SteadyLampFloor()
+        {
+            // Near: (1·1·0.06)^0.45 ≈ 0.282 — a clear steady point.
+            Assert.InRange(LighthouseVisualModel.GlowIntensity(100, 0.0), 0.275, 0.290);
+            // 1.75 km clear (Harlesiel regression): A=0.301·T=0.966 → ≈0.162.
+            Assert.InRange(LighthouseVisualModel.GlowIntensity(1753, 0.0), 0.155, 0.170);
+            // 25 km clear: still faintly visible (flareI ≈ 2·0.025).
+            Assert.InRange(LighthouseVisualModel.GlowIntensity(25000, 0.0), 0.020, 0.032);
+        }
+
+        [Fact]
+        public void GlowIntensity_MonotonicDecreasingWithDistance()
+        {
+            double prev = double.MaxValue;
+            foreach (double d in new[] { 100.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 25000.0 })
+            {
+                double g = LighthouseVisualModel.GlowIntensity(d, 0.0);
+                Assert.True(g < prev, "glow not decreasing at " + d + "m");
+                prev = g;
+            }
+        }
+
+        [Fact]
+        public void GlowIntensity_DenseFog_SuppressesFarGlow()
+        {
+            double clear = LighthouseVisualModel.GlowIntensity(10000, 0.0);
+            double fog = LighthouseVisualModel.GlowIntensity(10000, 1.0);
+            Assert.True(fog < clear * 0.05, "dense fog should suppress far glow");
+        }
+
+        [Fact]
+        public void GlowIntensity_BelowFlashBetweenBeams()
+        {
+            // The floor must not exceed a mid-strength flash so the beam
+            // sweep stays the dominant signal.
+            double flash = LighthouseVisualModel.VisualIntensity(1753, 0.0, 1.0, 1.0);
+            double glow = LighthouseVisualModel.GlowIntensity(1753, 0.0);
+            Assert.True(glow < flash, "glow floor must stay below the beam flash");
+        }
     }
 }

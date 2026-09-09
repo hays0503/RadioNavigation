@@ -17,9 +17,10 @@ namespace UBOAT.Mods.RadioNavigation
     internal sealed class LighthouseFlareDriver
     {
         private const string FlareComponentTypeName = "HDRPLensFlare";
-        // Native flare is replaced by the screen-space dot beyond this range:
-        // the dot path obeys the model's exact pixel caps (≤10px / ≤13px).
-        private const float FlareMaxDistanceM = 1200f;
+        // The flare renders out to the 3D spawn radius (the native game has
+        // no distance limit for its lighthouse flare either); the steady
+        // lamp-glow floor keeps it visible between beam flashes.
+        private const float FlareMaxDistanceM = 30000f;
         private const float FlareIntensityScale = 2f;
         // User preference: the flare reads too small through the binoculars,
         // especially up close. Base sizes were the far pixel caps from the
@@ -129,17 +130,11 @@ namespace UBOAT.Mods.RadioNavigation
                     " cam='" + frame.renderingCamera.name + "')");
             }
 
-            // B_wide: same 60° loom window as the screen-space dot.
-            if (frame.wideGate <= 0.01f)
-            {
-                Disable(flareObject, WillLog(flareObject, false)
-                    ? "beam not aligned (wide=" + frame.wideGate.ToString("F2") + ")"
-                    : null, frame.renderingCamera, frame.worldPositionProvider);
-                return;
-            }
-
+            // The steady lamp-glow floor (GlowIntensity) keeps the flare
+            // visible from any bearing; the flash shaping (wide/hot) rides
+            // on top through VisualIntensity.
             SetFlareActive(flareObject, true, WillLog(flareObject, true)
-                ? "aligned wide=" + frame.wideGate.ToString("F2")
+                ? "night, in range"
                 : null, frame.renderingCamera, frame.worldPositionProvider);
             ApplyIntensity(flareObject, frame.renderingCamera, frame.rotator, distance, frame.wideGate, frame.verbose, frame.nextDiagTime);
         }
@@ -227,8 +222,10 @@ namespace UBOAT.Mods.RadioNavigation
             double attenFlare = LighthouseVisualModel.DistanceAttenuation(distance);
             double transFlare = LighthouseVisualModel.Transmittance(distance, fogFlare);
             double hotFlare = LighthouseVisualModel.BeamIntensityFactor(hotAlign);
-            float iVisual = (float)LighthouseVisualModel.VisualIntensity(distance, fogFlare, wideGate, hotAlign);
-            float flareIntensityValue = FlareIntensityScale * iVisual;
+            double iVisual = Math.Max(
+                LighthouseVisualModel.VisualIntensity(distance, fogFlare, wideGate, hotAlign),
+                LighthouseVisualModel.GlowIntensity(distance, fogFlare));
+            float flareIntensityValue = FlareIntensityScale * (float)iVisual;
             if (verbose && Time.unscaledTime >= nextDiagTime)
             {
                 Debug.Log("[RadioNav][Lighthouse] flare model: dist=" + distance.ToString("F0") +

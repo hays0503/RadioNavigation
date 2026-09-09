@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DWS.Common.Resources;
 using UBOAT.Game.Sandbox;
 using UBOAT.Game.Scene;
@@ -9,45 +10,71 @@ using UnityEngine;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// The mod's own map marker for the lighthouse (ADR-027), now a thin
-    /// subclass of the shared <see cref="NavMapMarkerBase"/> skeleton (the
-    /// station markers reuse the same base). Own content: the lighthouse
-    /// sandbox entity placed by LighthousePlacer, the profile name and light
-    /// characteristic, stale game-marker cleanup for old saves, and the
-    /// gated position diagnostics log.
+    /// The mod's own map markers for the lighthouse fleet (ADR-027 pattern,
+    /// thin subclass of <see cref="NavMapMarkerBase"/>). One marker per
+    /// enabled fleet profile — curated plus the LeuchtfeuerRegistry theater
+    /// subset (210 total after the 2026-09-09 land curation, ADR-030, and
+    /// fire-height curation, ADR-031: only lights with fireHeight >= 15 m
+    /// stay in the fleet; declutter keeps them readable at far zoom).
+    /// Positions come straight from the profile
+    /// lat/lon (encounter km), so a marker exists whether or not the
+    /// distance-gated 3D model is currently spawned.
     ///
-    /// The sandbox entity stays DisplayInUI=false / IsPublic=false, so the
-    /// game never creates its own (Unknown-icon) marker for it.
+    /// The sandbox entities stay DisplayInUI=false / IsPublic=false, so the
+    /// game never creates its own (Unknown-icon) markers for them; stale
+    /// game markers from old saves are still cleaned up.
     /// </summary>
     public sealed class LighthouseMapMarker : NavMapMarkerBase
     {
         private const string IconAssetName = "IconLighthouse";
         private const float PositionLogIntervalSeconds = 2f;
 
-        private string lighthouseName = "Lighthouse";
-        private string lighthouseCharacteristic = "";
+        private readonly List<LighthouseProfile> fleet = new List<LighthouseProfile>();
         private float positionLogTimer;
 
-        protected override int MarkerCount => 1;
+        protected override int MarkerCount => fleet.Count;
 
-        protected override string MarkerRootName(int index) => "RadioNavLighthouseMapMarker";
+        /// <summary>ADR-032: overlapping markers collapse onto the tallest
+        /// light (fire height drives both the priority here and the actual
+        /// 3D model scale, so the survivor is also the biggest landmark).</summary>
+        protected override bool DeclutterEnabled => true;
 
-        protected override string HoverText(int index) => lighthouseName;
+        protected override float Priority(int index)
+        {
+            return index < fleet.Count ? fleet[index].FireHeightM : 0f;
+        }
 
-        protected override string PinnedText(int index) =>
-            string.IsNullOrEmpty(lighthouseCharacteristic)
-                ? lighthouseName
-                : lighthouseName + " · " + lighthouseCharacteristic;
+        protected override string MarkerRootName(int index) =>
+            "RadioNavLighthouseMapMarker" + index;
 
-        protected override bool HasContent(int index) =>
-            LighthousePlacer.LighthouseEntity != null;
+        protected override string HoverText(int index) => Name(index);
 
-        protected override Vector2 GetEncounterPosition(int index) =>
-            LighthousePlacer.LighthouseEntity.Position;
+        protected override string PinnedText(int index)
+        {
+            string characteristic = index < fleet.Count ? fleet[index].Characteristic : null;
+            return string.IsNullOrEmpty(characteristic)
+                ? Name(index)
+                : Name(index) + " · " + characteristic;
+        }
+
+        protected override bool HasContent(int index) => index < fleet.Count;
+
+        protected override Vector2 GetEncounterPosition(int index)
+        {
+            LighthouseProfile profile = fleet[index];
+            return Coordinates.ToWorldPosition(profile.Latitude, profile.Longitude);
+        }
 
         protected override float MaintenanceIntervalSeconds => 1f;
 
-        protected override void OnBeforeBuildViews() => ResolveProfileInfo();
+        protected override void OnBeforeBuildViews()
+        {
+            fleet.Clear();
+            foreach (LighthouseProfile profile in LighthouseProfiles.EnabledFleet())
+            {
+                fleet.Add(profile);
+            }
+        }
 
         protected override Sprite LoadIconSprite()
         {
@@ -67,6 +94,7 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     return image.sprite;
                 }
+
                 var spriteRenderer = prefab.Asset.GetComponent<SpriteRenderer>();
                 if (spriteRenderer != null && spriteRenderer.sprite != null)
                 {
@@ -79,6 +107,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 return direct.Asset;
             }
+
             Debug.LogWarning(LogPrefix + " lighthouse icon '" + IconAssetName +
                 "' not found in bundle (prefab Image/SpriteRenderer or Sprite); marker icon will be blank");
             return null;
@@ -88,7 +117,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected override void OnMarkerPositioned(int index, Vector3 worldPosition, float scale, float iconPx)
         {
-            if (!RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseMapMarkerPositionKey, true))
+            if (index != 0 || !RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseMapMarkerPositionKey, true))
             {
                 return;
             }
@@ -100,29 +129,21 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             positionLogTimer = 0f;
-            Vector2 entityPos = LighthousePlacer.LighthouseEntity.Position;
-            Debug.Log(LogPrefix + " lighthouse icon: entityPos=" +
-                entityPos.x.ToString("F2") + "," + entityPos.y.ToString("F2") +
-                " worldPos=" + worldPosition.ToString("F2") +
+            Debug.Log(LogPrefix + " lighthouse[0] icon: worldPos=" + worldPosition.ToString("F2") +
                 " elevation=" + mainCamera.MapController.CameraElevation.ToString("F0") +
                 " scale=" + scale.ToString("F4") +
                 " px=" + iconPx.ToString("F0") + "x" + iconPx.ToString("F0"));
         }
 
-        private void ResolveProfileInfo()
+        private string Name(int index)
         {
-            foreach (LighthouseProfile profile in LighthouseProfiles.Active())
-            {
-                lighthouseName = profile.Name;
-                lighthouseCharacteristic = profile.Characteristic;
-                return;
-            }
+            return index < fleet.Count ? fleet[index].Name : "Lighthouse";
         }
 
         /// <summary>
-        /// Old saves contain the lighthouse entity with DisplayInUI/IsPublic
+        /// Old saves contain lighthouse entities with DisplayInUI/IsPublic
         /// true, for which the game already created an EntityMarkerUI with
-        /// the Unknown icon. Remove those so only our own marker remains.
+        /// the Unknown icon. Remove those so only our own markers remain.
         /// </summary>
         private void DestroyStaleGameMarkers()
         {
@@ -134,6 +155,7 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     continue;
                 }
+
                 if (marker.Entity.Name.StartsWith("Lighthouse "))
                 {
                     Debug.Log(LogPrefix + " removed stale game marker for '" + marker.Entity.Name + "'");

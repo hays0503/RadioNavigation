@@ -1,0 +1,847 @@
+﻿code;name;type;lat;lon;distanceKm;verdict;terrainHeightM;source
+MOD-WANGEROOGE;Wangerooge;Lighthouse;53.519970;8.127701;-0.154;borderline;;curated
+B1054;Leuchtturm Norderney;Breakwater light;53.709220;7.229633;-0.351;land;;curated
+B0983;Leuchtturm Campen - Leitfeuer;Breakwater light;53.405670;7.015500;0.910;water;-22.6;curated
+B1309;Obereversand;Breakwater light;53.739170;8.508333;0.066;borderline;;curated
+B1318;Vorhafen Molenfeuer Ost Knie;Breakwater light;54.171930;7.899250;1.267;water;;curated
+B0075;Pier West;Breakwater light;51.156970;2.718033;-1.366;land;;registry
+B0076;Pier Ost;Breakwater light;51.155880;2.716567;-1.404;land;;registry
+B0077.x;8 Dalben Hafeneinfahrt Ost;Breakwater light;51.152320;2.725017;-2.146;land;;registry
+B0078.x;8 Dalben Hafeneinfahrt West;Breakwater light;51.152000;2.724483;-2.159;land;;registry
+B0094;West Pier;Breakwater light;51.238570;2.917200;-0.591;land;;registry
+B0096;Ostmole Kopf;Breakwater light;51.241830;2.919667;-0.345;land;;registry
+B0098;Ostufer (ehem. Ost Pier);Breakwater light;51.237570;2.924267;-0.969;land;;registry
+B0103.2;Basin Montgomery Entrance S Side Head;Breakwater light;51.233670;2.923833;-1.359;land;;registry
+B0104;Zeewezendok;Breakwater light;51.232170;2.929500;-1.737;land;;registry
+B0113;Unterfeuer Blankenberge;Breakwater light;51.311670;3.113667;-1.405;land;;registry
+B0113.1;Oberfeuer Blankenberge;Breakwater light;51.311170;3.114500;-1.492;land;;registry
+B0113.4;West Pier;Breakwater light;51.314830;3.107333;-0.809;land;;registry
+B0114;Ost Pier;Breakwater light;51.315170;3.109333;-0.861;land;;registry
+B0116;Promenade Pier Head;Breakwater light;51.321700;3.136200;-1.145;land;;registry
+B0122;Leopold II Dam Mole Head;Breakwater light;51.347670;3.203000;0.214;borderline;;registry
+B0122.5;E Inner Breakwater Head;Breakwater light;51.359330;3.204667;1.451;water;;registry
+B0123;E Outer Breakwater Head;Breakwater light;51.363000;3.197833;2.001;water;;registry
+B0123.2;W Outer Breakwater Head;Breakwater light;51.362300;3.186300;2.179;water;;registry
+B0123.5;W Inner Breakwater Head;Breakwater light;51.360170;3.187500;1.920;water;;registry
+B0123.6;Ldg Lts Front;Shore light;51.345330;3.217833;-0.367;land;;registry
+B0123.61;Ldg Lts Rear;Rear light;51.345000;3.218000;-0.408;land;;registry
+B0124.16;Wielingendok W Breakwater Ldg Lts Front;Shore light;51.358330;3.179000;1.908;water;;registry
+B0124.17;Wielingendok W Breakwater Ldg Lts Rear;Rear light;51.358330;3.178833;1.911;water;;registry
+B0124.18;Wielingendok Jetty Ldg Lts Front;Front light;51.355400;3.177933;1.611;water;;registry
+B0124.19;Wielingendok Jetty Ldg Lts Rear;Rear light;51.352850;3.173450;1.432;water;;registry
+B0124.2;Wielingendok S Corner;Warning light;51.356770;3.183483;1.638;water;;registry
+B0124.5;Albert II Dok Ldg Lts Front;Breakwater light;51.343350;3.178000;0.295;borderline;;registry
+B0124.51;Albert II Dok Ldg Lts Rear;Breakwater light;51.341800;3.174917;0.194;borderline;;registry
+B0125;Outer Harbor Range Front;Front light;51.338830;3.215000;-1.014;land;;registry
+B0125.1;Port Administration Tower;Rear light;51.334670;3.218333;-1.542;land;;registry
+B0125.2;Pierre Vandamme NE Side;Warning light;51.336750;3.215200;-1.246;land;;registry
+B0125.35;Pierre Vandamme NW Side;Warning light;51.336330;3.213167;-1.247;land;;registry
+B0125.36;Pierre Vandamme NW Side;Breakwater light;51.336330;3.213000;-1.243;land;;registry
+B0126.3;Brittanniadok Entrance;Breakwater light;51.342070;3.218283;-0.734;land;;registry
+B0126.35;Brittanniadok Entrance;Warning light;51.342450;3.217850;-0.683;land;;registry
+B0126.4;Brittanniadok Entrance Underwater wall;Warning light;51.344330;3.217833;-0.477;land;;registry
+B0126.41;Brittanniadok Entrance Underwater wall;Warning light;51.343670;3.216333;-0.516;land;;registry
+B0126.42;Brittanniadok Entrance;Breakwater light;51.344170;3.215833;-0.451;land;;registry
+B0126.43;Brittanniadok Entrance Underwater wall;Warning light;51.343500;3.215667;-0.520;land;;registry
+B0126.44;Brittanniadok Entrance Underwater wall;Warning light;51.343830;3.215000;-0.469;land;;registry
+B0126.45;Brittanniadok Entrance Underwater wall;Warning light;51.344500;3.214333;-0.381;land;;registry
+B0126.8;Ldg Lts Front;Front light;51.344500;3.215833;-0.414;land;;registry
+B0126.81;Ldg Lts Rear;Rear light;51.344000;3.216000;-0.472;land;;registry
+B0127;LNG Dock Dam S end;Breakwater light;51.350170;3.211500;0.300;borderline;;registry
+B0127.4;Ldg Lts Front;Shore light;51.354500;3.211667;0.769;water;;registry
+B0127.41;Ldg Lts Rear;Rear light;51.355000;3.211500;0.827;water;;registry
+B0128;Ldg Lts Front;Front light;51.339670;3.194500;-0.471;land;;registry
+B0128.1;Ldg Lts Rear;Rear light;51.338280;3.192567;-0.579;land;;registry
+B0131;Leopold II Dam;Breakwater light;51.344130;3.194400;0.018;borderline;;registry
+B0131.5;Westhoofd NE Corner Extension;Warning light;51.339780;3.195733;-0.486;land;;registry
+B0132;Westhoofd NE corner;Breakwater light;51.339770;3.195700;-0.487;land;;registry
+B0132.2;Westhoofd NW Corner;Breakwater light;51.340500;3.193000;-0.347;land;;registry
+B0133;Ldg Lts Front;Breakwater light;51.329970;3.193650;-1.510;land;;registry
+B0133.1;Ldg Lts Rear;Breakwater light;51.328330;3.193000;-1.674;land;;registry
+B0134.1;Militair Tijdok 1 Entrance;Breakwater light;51.339170;3.201833;-0.687;land;;registry
+B0134.2;Militair Tijdok 1 Entrance;Breakwater light;51.340330;3.203333;-0.593;land;;registry
+B0134.3;Zweedse Kaai;Breakwater light;51.341170;3.204333;-0.524;land;;registry
+C0204;Fornæs Fyr;Direction light;56.443420;10.957310;-0.552;land;;registry
+C0792;Østre Molearm Head;Direction light;56.161070;10.231420;0.261;borderline;;registry
+C0793;Vestre Mole Head;Direction light;56.161750;10.229070;-0.003;borderline;;registry
+C0793.5;Nord Mole Head;Direction light;56.158400;10.244930;1.707;water;;registry
+C0795;Østhavn Østre Bølgebryder Head;Direction light;56.148980;10.231000;0.907;water;;registry
+C0969;Aarø Fyr;Direction light;55.258330;9.726028;1.910;water;;registry
+C0970;Aarøsund Fyr;Direction light;55.266670;9.716667;1.115;water;;registry
+C1030;Nordborg Fyr;Direction light;55.083330;9.716667;0.109;borderline;;registry
+C1032;Tranerodde Fyr;Direction light;55.050000;9.850000;0.759;water;;registry
+C1034;Taksensand;Direction light;55.000000;9.966667;-0.979;land;;registry
+C1042;Mommark (Mole Ost);Direction light;54.933330;10.050000;0.839;water;;registry
+C1044;Mommark (Mole West);Direction light;54.933330;10.050000;0.839;water;;registry
+C1066;Ballebro Fyr;Direction light;55.000000;9.666667;-0.901;land;;registry
+C1100;Gammel Pøl;Direction light;54.881370;10.069420;0.594;water;;registry
+C1104;Kegnæs Fyr;Orientation light;54.850000;9.983333;1.590;water;;registry
+C1140;Unterfeuer Lågemade;Direction light;54.901640;9.614556;-0.273;borderline;;registry
+C1166;Unterfeuer Rinkenaes;Direction light;54.900000;9.583333;1.424;water;;registry
+C1706;Keldsnor Fyr;Direction light;54.731000;10.721500;0.630;water;;registry
+C1815;Vordingborg Tower - Wasserturm;Direction light;55.011140;11.921610;-0.329;land;;registry
+C1856;Stubbekøbing;Direction light;54.892310;12.026110;-0.541;land;;registry
+C1857;Stubbekøbing Ldg Lts Front W Mole Head;Front light;54.892530;12.045220;-0.167;borderline;;registry
+C1876;Hornbæk Havn Breakwater Head;Breakwater light;56.096180;12.458530;-0.375;land;;registry
+C1877;Hornbæk Havn E Breakwater Head;Breakwater light;56.096170;12.459170;-0.377;land;;registry
+C1881;Ellekilde Hage Lts in line Front;Front light;56.090670;12.499830;-0.476;land;;registry
+C1881.1;Ellekilde Hage Lts in line Rear;Rear light;56.089970;12.498080;-0.611;land;;registry
+C1908;Kronborg;Orientation light;56.039350;12.621200;0.341;water;;registry
+C1912;Helsingør Havn S Pier Head;Breakwater light;56.034400;12.619950;0.599;water;;registry
+C1914;Helsingør Havn N Mole Head;Breakwater light;56.035000;12.619330;0.504;water;;registry
+C1978;Trekroner Fyr;Direction light;55.703330;12.614500;1.403;water;;registry
+C2140;Stavreby Ldg Lts Front;Front light;55.079250;12.145450;0.555;water;;registry
+C2140.1;Stavreby Ldg Lts Rear;Rear light;55.079950;12.145270;0.475;water;;registry
+C2142;Møn Fyr;Orientation light;54.935550;12.534720;1.653;water;;registry
+C2146;Klintholm Havn N Mole Head;Breakwater light;54.951970;12.464080;0.106;borderline;;registry
+C2148;Klintholm Havn S Mole Head;Breakwater light;54.951330;12.463320;0.186;borderline;;registry
+C2150;Klintholm Havn Outer Breakwater;Breakwater light;54.951330;12.462500;0.197;borderline;;registry
+C2152;Hestehoved Fyr Grønsund;Direction light;54.833610;12.166670;0.365;water;;registry
+C2166;Grønsund;Direction light;54.883640;12.120280;0.123;borderline;;registry
+C2186;Gedser Odde;Direction light;54.552500;11.952500;1.797;water;;registry
+C2188;Rødsand Rende S end;Direction light;54.545670;11.936170;2.873;water;;registry
+C2192;Rødsand Rende N end;Direction light;54.563830;11.930830;1.611;water;;registry
+C2196;Gedser Hafen Ansteuerung Unterfeuer;Direction light;54.571330;11.927670;1.174;water;;registry
+C2196.1;Gedser Hafen Ansteuerung Oberfeuer;Direction light;54.575170;11.927830;0.828;water;;registry
+C2202;Gedser Hafen Westmole;Direction light;54.571170;11.925830;1.315;water;;registry
+C2203;Gedser Hafen Ostmole;Direction light;54.571500;11.927170;1.194;water;;registry
+C2483;Rønne Havn Ldg Lts Front;Direction light;55.098170;14.696330;-0.620;land;;registry
+C2483.1;Rønne Havn Ldg Lts Rear;Direction light;55.099000;14.699670;-0.933;land;;registry
+C2484;Rønne Havn S Jetty Head;Direction light;55.093470;14.681480;0.862;water;;registry
+C2484.2;Rønne Havn N Jetty Head;Direction light;55.094600;14.681020;0.800;water;;registry
+C2485.1;Rønne Havn Mole Head;Breakwater light;55.089000;14.684330;1.028;water;;registry
+C2486;Rønne Havn S Breakwater W end;Direction light;55.095000;14.686500;0.366;water;;registry
+C2489;Kongen - Molenfeuer;Direction light;55.097610;14.691250;-0.201;borderline;;registry
+C2489.5;Nørrekås S Pier Head;Direction light;55.105500;14.694500;-0.819;land;;registry
+C2490;Nørrekås N Pier Head;Direction light;55.105670;14.695000;-0.858;land;;registry
+C2490.5;Nørrekås Outer Breakwater Head;Breakwater light;55.106500;14.694330;-0.747;land;;registry
+C2491;Nørrekås;Leading light;55.107000;14.699500;-1.218;land;;registry
+C2492;Rønne Refuse Incinerator;Direction light;55.117850;14.732380;-4.079;land;;registry
+C2494;Hasle Havn Ldg Lts Front;Direction light;55.188730;14.703830;-0.125;borderline;;registry
+C2494.1;Hasle Havn Ldg Lts Rear;Direction light;55.188970;14.704100;-0.152;borderline;;registry
+C2495;Hasle Havn W Mole Head;Breakwater light;55.189000;14.698670;0.451;water;;registry
+C2496;Hasle Havn N Mole Head;Breakwater light;55.188800;14.699950;0.307;water;;registry
+C2496.4;Hasle Havn Inside Mole Head;Breakwater light;55.187400;14.702600;0.001;borderline;;registry
+C2503;Ldg Lts Front N Breakwater Head;Direction light;55.248670;14.735830;-1.417;land;;registry
+C2503.1;Ldg Lts Rear;Direction light;55.247970;14.736330;-1.511;land;;registry
+C2504;Hammerhavnen E of harbour;Leading light;55.277900;14.757750;-1.597;land;;registry
+C2505;Hammerhavnen N Mole Head;Breakwater light;55.277600;14.754820;-1.309;land;;registry
+C2508;Hammerodde Fyr;Direction light;55.298110;14.773720;-0.506;land;;registry
+C2510;Sandvig Havn Ldg Lts Front;Direction light;55.289030;14.782250;-0.691;land;;registry
+C2510.1;Sandvig Havn Ldg Lts Rear;Direction light;55.288520;14.782780;-0.698;land;;registry
+C2512;Allinge;Direction light;55.278270;14.802080;-0.226;borderline;;registry
+C2512.1;Allinge Lts Rear;Direction light;55.277770;14.801930;-0.280;borderline;;registry
+C2516;Tejn Havn E Jetty Head;Breakwater light;55.250600;14.835630;-0.639;land;;registry
+C2516.5;Tejn Havn W Shelter Mole Head;Leading light;55.249580;14.834570;-0.797;land;;registry
+C2517;Tejn Havn Ldg Lts Front;Direction light;55.248670;14.837830;-0.696;land;;registry
+C2517.1;Tejn Havn Ldg Lts Rear;Direction light;55.248270;14.838080;-0.720;land;;registry
+C2522;Gudhjem Havn S approach Ldg Lts Front;Direction light;55.212330;14.971500;-0.374;land;;registry
+C2522.1;Gudhjem Havn S approach Ldg Lts Rear;Direction light;55.211670;14.971330;-0.435;land;;registry
+C2524;Melsted Havn Ldg Lts Front;Direction light;55.204400;14.981420;-0.036;borderline;;registry
+C2524.1;Melsted Havn Ldg Lts Rear;Direction light;55.204320;14.980950;-0.083;borderline;;registry
+C2532;Svaneke;Leading light;55.134000;15.145330;-0.259;borderline;;registry
+C2534;Svaneke Havn Breakwater Outer end;Breakwater light;55.135980;15.146350;-0.011;borderline;;registry
+C2539;Svaneke Havn;Warning light;55.136830;15.145500;0.021;borderline;;registry
+C2540;Årsdale Havn Ldg Lts Front;Direction light;55.108200;15.143470;0.078;borderline;;registry
+C2540.1;Årsdale Havn Ldg Lts Rear;Direction light;55.108000;15.142670;-0.012;borderline;;registry
+C2541;Nexø Havn Detached Breakwater N end;Breakwater light;55.064830;15.141170;1.440;water;;registry
+C2542;Nexø Havn S Mole NE Head;Breakwater light;55.064630;15.140580;1.411;water;;registry
+C2544;Nexø Havn Entrance W Side;Breakwater light;55.064720;15.136680;1.100;water;;registry
+C2546;Nexø Havn Ldg Lts Front;Direction light;55.062500;15.135330;1.172;water;;registry
+C2546.1;Nexø Havn Ldg Lts Rear;Direction light;55.062000;15.134170;1.121;water;;registry
+C2548;Snogebæk Havn Ldg Lts Front;Direction light;55.025280;15.121700;1.153;water;;registry
+C2548.1;Snogebæk Havn Ldg Lts Rear;Direction light;55.025480;15.121020;1.083;water;;registry
+C2555.5;Rønne;Warning light;55.069500;14.748830;-0.363;land;;registry
+C2556;Christiansø Fyr;Direction light;55.320640;15.186940;20.462;water;;registry
+B0983;Leuchtturm Campen - Leitfeuer;Breakwater light;53.405670;7.015500;0.910;water;-22.6;registry
+B1011;Knock Pegelmesser;Breakwater light;53.327170;7.030650;2.087;water;-29.9;registry
+B1014;Logum Unterfeuer;Breakwater light;53.335330;7.132667;0.040;borderline;-6.4;registry
+B1014.1;Logum Oberfeuer;Breakwater light;53.336830;7.142167;-0.149;borderline;5.3;registry
+B1026;Hafen Emden Westmole;Breakwater light;53.334380;7.175050;0.048;borderline;-12.0;registry
+B1027;Große Seeschleuse (Vorhafen NordWest);Breakwater light;53.336940;7.186389;-0.264;borderline;1.0;registry
+B1027.2;Große Seeschleuse (Vorhafen SüdWest);Breakwater light;53.336390;7.186944;-0.203;borderline;;registry
+B1027.3;Große Seeschleuse (Vorhafen NordOst);Breakwater light;53.337780;7.190278;-0.365;land;;registry
+B1027.4;Große Seeschleuse (Vorhafen SüdOst);Breakwater light;53.337500;7.190833;-0.336;land;;registry
+B1054;Leuchtturm Norderney;Breakwater light;53.709220;7.229633;-0.351;land;;registry
+B1074;Hafen Norderney Südmole;Breakwater light;53.698000;7.164333;0.526;water;;registry
+B1074.5;Norderney Pegelmesser;Breakwater light;53.696500;7.157833;0.808;water;;registry
+B1075;Norderney Pegelmesser Riffgat;Breakwater light;53.686330;7.139500;2.253;water;;registry
+B1077.3;Norddeich Pegelmesser;Breakwater light;53.643500;7.148000;2.158;water;;registry
+B1078;Norddeich Leitdamm West;Breakwater light;53.643670;7.148667;2.132;water;;registry
+B1080;Norddeich Leitdamm Ost;Breakwater light;53.645870;7.148267;2.361;water;;registry
+B1082;Norddeich Einfahrt Unterfeuer;Breakwater light;53.638610;7.156389;1.188;water;;registry
+B1082.1;Norddeich Einfahrt Oberfeuer;Breakwater light;53.637500;7.157778;0.999;water;;registry
+B1084;Norddeich Nord Unterfeuer;Breakwater light;53.642500;7.153333;1.737;water;;registry
+B1084.1;Norddeich Nord Oberfeuer;Breakwater light;53.643380;7.153200;1.827;water;;registry
+B1086;Norddeich Hafen Unterfeuer Molenkopf;Breakwater light;53.626330;7.158167;-0.061;borderline;3.3;registry
+B1086.1;Norddeich Hafen Oberfeuer;Breakwater light;53.622330;7.159333;-0.503;land;34.0;registry
+B1088;Flughafen Norden-Norddeich;Breakwater light;53.632080;7.192133;-1.243;land;;registry
+B1096;Bensersiel Molenkopf West;Breakwater light;53.677500;7.572500;-0.966;land;;registry
+B1096.2;Bensersiel Molenkopf Ost;Breakwater light;53.677550;7.573000;-0.967;land;;registry
+B1108;Carolinensieler Balje Harlesiel N Mole Head;Breakwater light;53.709850;7.810567;0.076;borderline;;registry
+B1137;Hooksiel Hafen;Breakwater light;53.643170;8.086500;2.953;water;;registry
+B1158;Neuer Vorhafen W Mole Head;Breakwater light;53.541400;8.168150;0.041;borderline;;registry
+B1159;Neuer Vorhafen E Mole Head;Breakwater light;53.540530;8.170883;0.356;water;;registry
+B1163;Fluthafen N Mole Head;Leading light;53.514320;8.155367;1.849;water;;registry
+B1164;Fluthafen Flutmole Head;Breakwater light;53.513330;8.152917;1.993;water;;registry
+B1166;Alter Vorhafen N Mole Head;Breakwater light;53.513500;8.146667;1.485;water;;registry
+B1168;Alter Vorhafen S Mole Head;Breakwater light;53.513000;8.145667;1.371;water;;registry
+B1258;Nordschleuse Ostfeuer;Breakwater light;53.563000;8.549667;0.335;water;;registry
+B1258;Nordschleuse Westfeuer;Breakwater light;53.565330;8.547667;0.373;water;;registry
+B1266;Pier Head - Kardinalfeuer;Breakwater light;53.550500;8.562117;-0.009;borderline;;registry
+B1266.5;Pontoon SE end;Breakwater light;53.545670;8.567667;-0.241;borderline;;registry
+B1267;Pegel Bremerhafen - Warnfeuer;Breakwater light;53.542830;8.560500;0.425;water;;registry
+B1268;Neuer Hafen S Mole Unterfeuer;Breakwater light;53.544420;8.569800;-0.509;land;;registry
+B1268.1;Simon Loschen Turm - Bremerhaven Oberfeuer;Breakwater light;53.546280;8.570083;-0.502;land;;registry
+B1274;Geeste Vorhafen Nordmole;Breakwater light;53.535880;8.574900;-1.337;land;;registry
+B1275;Geeste Vorhafen Südmole;Breakwater light;53.535000;8.575000;-1.377;land;;registry
+B1277;Fischereihafen II Unterfeuer;Breakwater light;53.497070;8.580567;-3.530;land;;registry
+B1277.1;Fischereihafen II Oberfeuer;Breakwater light;53.496770;8.580667;-3.560;land;;registry
+B1309;Obereversand;Breakwater light;53.739170;8.508333;0.066;borderline;;registry
+B1318;Vorhafen Molenfeuer Ost Knie;Breakwater light;54.171930;7.899250;1.267;water;;registry
+B1326;Düne Ldg Lts Front;Front light;54.181330;7.913500;0.807;water;;registry
+B1326.1;Düne Ldg Lts Rear;Rear light;54.182300;7.914067;0.684;water;;registry
+B1327;Dünenhafen Detached Breakwater NW end;Breakwater light;54.182330;7.903000;0.628;water;;registry
+B1328;Dünenhafen West Mole Head;Breakwater light;54.182680;7.902700;0.588;water;;registry
+B1349.8;North-Westward G(23);Navigation beacon 'G';53.913830;8.668333;2.456;water;;registry
+B1363;Fährhafen Molenfeuer Nord;Breakwater light;53.878330;8.702867;0.220;borderline;;registry
+B1363.2;Fährhafen Molenfeuer Süd;Breakwater light;53.877220;8.704200;0.201;borderline;;registry
+B1363.4;Yachthafen Einfahrt Süd;Breakwater light;53.873770;8.708417;0.147;borderline;;registry
+B1363.6;Yachthafen Einfahrt Nord;Breakwater light;53.874000;8.708000;0.142;borderline;;registry
+B1368;Vorhafen Molenfeuer West;Breakwater light;53.871170;8.712500;0.129;borderline;;registry
+B1370;Vorhafen Molenfeuer Ost;Breakwater light;53.870620;8.713333;0.114;borderline;;registry
+B1396.2;Otterndorf NW Pegel;Warning light;53.834250;8.868950;0.414;water;;registry
+B1404;Ostesperrwerk NordWest;Breakwater light;53.820780;9.039350;-3.220;land;;registry
+B1404.001;Ostesperrwerk NordOst;Breakwater light;53.820870;9.039733;-3.236;land;;registry
+B1405.001;Ostesperrwerk SüdOst;Breakwater light;53.819730;9.040550;-3.392;land;;registry
+B1418.01;Große Schleusen - Binnenhafen Westseite;Breakwater light;53.896100;9.147867;0.624;water;;registry
+B1418.02;Große Schleusen - Binnenhafen Mitte;Breakwater light;53.895880;9.148933;0.575;water;;registry
+B1418.03;Große Schleusen - Binnenhafen Ostseite;Breakwater light;53.895350;9.149367;0.519;water;;registry
+B1418.13;Große Schleusen - Neuer Vorhafen Westseite;Breakwater light;53.892380;9.140900;0.729;water;;registry
+B1418.14;Große Schleusen - Neuer Vorhafen Mitte;Breakwater light;53.891750;9.141100;0.803;water;;registry
+B1418.15;Große Schleusen - Neuer Vorhafen Ostseite;Breakwater light;53.891270;9.141550;0.872;water;;registry
+B1418.22;Alte Schleusen - Nordende Mitte;Breakwater light;53.893270;9.149200;0.565;water;;registry
+B1418.23;Alte Schleusen - Nordende Ostseite;Breakwater light;53.893020;9.149567;0.537;water;;registry
+B1418.33;Alte Schleusen - Südende Westseite;Breakwater light;53.891500;9.146000;0.969;water;;registry
+B1418.34;Alte Schleusen - Südende Mitte;Breakwater light;53.891300;9.146467;0.931;water;;registry
+B1418.35;Alte Schleusen - Südende Ostseite;Breakwater light;53.891270;9.147067;0.872;water;;registry
+B1421.1;Nordostreede Brunsbüttel S;Warning light;53.888170;9.152333;0.680;water;;registry
+B1431.5;Elbehaven W Pier Head Traffic Signals;Warning light;53.888000;9.167500;0.424;water;;registry
+B1444;Old outer harbour Mole 1;Breakwater light;53.887830;9.142833;1.279;water;;registry
+B1444.5;Nordostreede Pier W Arm Head;Warning light;53.888000;9.147000;1.095;water;;registry
+B1444.6;Nordostreede Pier E Arm Head;Warning light;53.888000;9.147500;1.054;water;;registry
+B1464;Stör Entrance Ldg Lts Front;Front light;53.820800;9.397300;-0.145;borderline;;registry
+B1478;Glückstadt Nord-Mole;Breakwater light;53.784950;9.408383;0.095;borderline;;registry
+B1478.1;Glückstadt Süd-Mole;Breakwater light;53.784420;9.408667;0.093;borderline;;registry
+B1571;Rüschkanal Einfahrt Ost;Breakwater light;53.542680;9.856417;-2.781;land;;registry
+B1571.4;Rüschkanal Einfahrt West;Breakwater light;53.542670;9.855000;-2.624;land;;registry
+B1574;Finkenwerder Unterfeuer;Breakwater light;53.542680;9.856433;-2.783;land;;registry
+B1574.1;Finkenwerder Oberfeuer;Breakwater light;53.543130;9.841767;-1.150;land;;registry
+B1578;Seemannshöft Köhlfleet Ost;Breakwater light;53.540000;9.878500;-5.254;land;;registry
+B1578.5;Seemannshöft Spundwand Mitte;Breakwater light;53.541330;9.870833;-4.392;land;;registry
+B1578.55;Seemannshöft Spundwand SE end;Breakwater light;53.540670;9.871633;-4.486;land;;registry
+B1578.6;Köhlfleethafen Oberfeuer;Breakwater light;53.538830;9.884167;-5.894;land;;registry
+B1580;Köhlfleet Hafen;Breakwater light;53.538670;9.878833;-5.305;land;;registry
+B1581.7;Bubendey-Ufer Unterfeuer;Breakwater light;53.539750;9.886117;-6.102;land;;registry
+B1581.71;Bubendey-Ufer Oberfeuer;Breakwater light;53.537120;9.900733;-7.748;land;;registry
+B1582;Parkhafen Eingang West - Bubendey-Ufer;Breakwater light;53.539580;9.896400;-7.245;land;;registry
+B1583;Parkhafen Eingang Ost - Athabaskahöft;Breakwater light;53.539350;9.905267;-8.232;land;;registry
+B1592;Neumühlen-Landungsbrücke West;Breakwater light;53.543470;9.913133;-9.092;land;;registry
+B1592.2;Neumühlen-Landungsbrücke Ost;Breakwater light;53.543480;9.915983;-9.409;land;;registry
+B1592.4;Neumühlen-Schlepperstation West;Breakwater light;53.543100;9.917833;-9.616;land;;registry
+B1592.6;Neumühlen-Schlepperstation Ost;Breakwater light;53.543120;9.923933;-10.295;land;;registry
+B1593;Altona-Fischereihafen;Breakwater light;53.543270;9.926783;-10.612;land;;registry
+B1593.5;Altona-Anleger West;Breakwater light;53.543830;9.951500;-13.363;land;;registry
+B1593.55;Altona-Anleger Ost;Breakwater light;53.545070;9.958717;-14.167;land;;registry
+B1593.6;St.-Pauli-Landungsbrücke Ost;Breakwater light;53.544230;9.973183;-15.777;land;;registry
+B1593.8;St.-Pauli-Landungsbrücke West;Breakwater light;53.545170;9.960933;-14.414;land;;registry
+B1593.81;Dock Elbe 17;Breakwater light;53.542920;9.966283;-15.009;land;;registry
+B1593.815;Überseebrücke West;Breakwater light;53.543670;9.973667;-15.831;land;;registry
+B1593.816;Überseebrücke Ost;Breakwater light;53.541930;9.979067;-16.433;land;;registry
+B1593.818;Brandenburger Hafen Einfahrtsfeuer Süd;Breakwater light;53.541970;9.980083;-16.546;land;;registry
+B1593.819;Brandenburger Hafen Einfahrtsfeuer Nord;Breakwater light;53.542280;9.980400;-16.581;land;;registry
+B1593.822;Nördlicher Reiherstieg Einfahrt Nord-West;Breakwater light;53.539130;9.978000;-16.321;land;;registry
+B1593.824;Nördlicher Reiherstieg Einfahrt Nord-Ost;Breakwater light;53.539020;9.979483;-16.487;land;;registry
+B1593.826;Kaiserhöft;Breakwater light;53.541430;9.982733;-16.842;land;;registry
+B1593.827;Strandhöft;Breakwater light;53.540000;9.987500;-17.376;land;;registry
+B1593.828;Steinwerder Hafen Einfahrt West;Breakwater light;53.537170;9.985300;-17.142;land;;registry
+B1593.829;Steinwerder Hafen Einfahrt Ost;Breakwater light;53.536930;9.987167;-17.351;land;;registry
+B1593.83;Steinwerder Hafen RoRo;Breakwater light;53.535400;9.985517;-17.175;land;;registry
+B1593.831;Südwesthafen Einfahrt Nord-West;Breakwater light;53.536230;9.988483;-17.501;land;;registry
+B1593.832;Südwesthafen Afrikahöft West;Breakwater light;53.534080;9.990050;-17.688;land;;registry
+B1593.833;Südwesthafen Afrikahöft Ost;Breakwater light;53.534470;9.990500;-17.735;land;;registry
+B1593.834;Amerikahöft West;Breakwater light;53.534770;9.992917;-18.002;land;;registry
+B1593.835;Amerikahöft Ost;Breakwater light;53.535530;9.994367;-18.158;land;;registry
+B1593.836;Krahnhöft;Breakwater light;53.535500;9.997083;-18.461;land;;registry
+B1593.843;Norder Elbe West;Breakwater light;53.536650;10.003000;-19.113;land;;registry
+B1593.92;Werfthafen S side Kuhwerder Höft;Breakwater light;53.538920;9.952600;-13.497;land;;registry
+B1593.93;Kuhwerder Hafen Gravenhofkai NW end;Harbour light;53.535430;9.956633;-13.966;land;;registry
+B1593.94;Auguste-Viktoria-Kai Kaiser-Wilhelm Höft;Harbour light;53.534580;9.955383;-13.834;land;;registry
+B1593.97;Ellerholzhafen Mönckebergkai NW side;Harbour light;53.529750;9.955800;-13.930;land;;registry
+B1593.98;Ellerholzhafen Oderhöft;Harbour light;53.525000;9.971000;-15.675;land;;registry
+B1606;Büsum;Leading and orientation light;54.126950;8.858333;0.063;borderline;;registry
+B1609;Molenfeuer West;Breakwater light;55.125000;8.858333;-21.158;land;;registry
+B1610;Molenfeuer Ost;Breakwater light;55.119450;8.860556;-21.626;land;;registry
+B1612;Unterfeuer Hafen Büsum;Breakwater light;54.124720;8.858333;0.237;borderline;;registry
+B1612.1;Oberfeuer Hafen Büsum;Breakwater light;55.125830;8.858333;-21.125;land;;registry
+B1624;Sankt Peter-Böhl;Cross bearing light;54.287320;8.652083;-1.276;land;;registry
+B1642;Tönning W Mole Head;Breakwater light;54.314830;8.950267;0.096;borderline;;registry
+B1644;Tönning Quay;Breakwater light;54.315100;8.950683;0.073;borderline;;registry
+B1652;Westerheversand;Leading, cross bearing & orientation light;54.373330;8.639722;-0.384;land;;registry
+B1681;Fuhle Schlot Strucklahnungshörn W Breakwater Head;Breakwater light;54.498830;8.806333;0.829;water;;registry
+West;Husumer Au (West);Light beacon;54.480050;8.975850;2.806;water;;registry
+Nord;Husumer Au (Nord);Light beacon;54.480330;8.984333;2.529;water;;registry
+Ost;Husumer Au (Ost);Light beacon;54.479780;8.989117;2.246;water;;registry
+B1683;Husum Inner Ldg Lts Front;Front light;54.479250;9.003500;0.843;water;;registry
+B1683.1;Husum Inner Ldg Lts Rear;Rear light;54.479230;9.004267;0.763;water;;registry
+C1108;Falshöft;Breakwater light;54.766670;9.966667;0.113;borderline;;registry
+C1175;Fahrensodde Ost-Mole;Breakwater light;54.823890;9.472778;0.892;water;;registry
+C1175.5;Fahrensodde West-Mole;Breakwater light;54.823550;9.472250;0.872;water;;registry
+C1176;Kielseng;Breakwater light;54.805080;9.446567;-0.517;land;;registry
+C1180;Richtfeuer Flensburg Unterfeuer;Breakwater light;54.803830;9.434333;-0.700;land;;registry
+C1180.1;Richtfeuer Flensburg Oberfeuer;Breakwater light;54.803330;9.433500;-0.787;land;;registry
+C1186;Schleimünde Nordmole;Breakwater light;54.671450;10.036250;0.086;borderline;;registry
+C1190.1;Grimsnis Oberfeuer;Breakwater light;54.675670;9.932833;0.259;borderline;;registry
+C1197;Olpenitz Nordmole;Breakwater light;54.659720;10.042780;0.649;water;;registry
+C1198;Olpenitz Südmole;Breakwater light;54.658890;10.041670;0.582;water;;registry
+C1206ex;Eckernförde Hafen (alt);Breakwater light;54.474170;9.840833;-0.069;borderline;;registry
+C1216;Bülk;Breakwater light;54.455170;10.197330;0.134;borderline;;registry
+C1220;Strander Bucht Schilksee Yacht Hafen Mole;Breakwater light;54.432650;10.171230;-1.589;land;;registry
+C1222;Leitfeuer Laboe Fähranleger Nordmole;Breakwater light;54.403470;10.216050;0.070;borderline;;registry
+C1223;Molenfeuer Yachthafen Laboe Nord;Breakwater light;54.402380;10.214430;0.194;borderline;;registry
+C1223.5;Molenfeuer Yachthafen Laboe Süd;Breakwater light;54.402120;10.213520;0.279;borderline;;registry
+C1226;Jägersberg Unterfeuer;Breakwater light;54.393170;10.206000;0.701;water;;registry
+C1226.1;Jägersberg Oberfeuer;Breakwater light;54.396020;10.209880;0.412;water;;registry
+C1237;Tirpitzhafen Scheermole;Breakwater light;54.354530;10.150920;-0.763;land;;registry
+C1238;Tirpitzhafen Tirpitzmole;Breakwater light;54.353750;10.148700;-1.023;land;;registry
+C1241;Norwegenkai;Breakwater light;54.317100;10.139080;-1.529;land;;registry
+C1242.1;Große Schleusen - Schleuseninsel West;Breakwater light;54.366500;10.137070;-0.362;land;;registry
+C1242.2;Große Schleusen - Nordkammer West;Breakwater light;54.367000;10.137730;-0.323;land;;registry
+C1242.4;Kleine Schleusen - Schleuseninsel West;Breakwater light;54.368060;10.138610;-0.236;borderline;;registry
+C1243;Große Schleusen - Mittelmauer Ost;Breakwater light;54.365070;10.147030;-0.783;land;;registry
+C1243.1;Große Schleusen - Nordkammer Ost;Breakwater light;54.365730;10.146580;-0.704;land;;registry
+C1243.3;Kleine Schleusen - Schleuseninsel Ost;Breakwater light;54.368330;10.145280;-0.403;land;;registry
+C1243.4;Kleine Schleusen - Nordkammer Ost;Breakwater light;54.368610;10.145280;-0.373;land;;registry
+C1243.x;Große Schleusen - Südkammer Ost;Breakwater light;54.363890;10.148890;-0.947;land;;registry
+C1246;Holtenau Nord;Breakwater light;54.369170;10.153890;-0.326;land;;registry
+C1251;Levensauer Hochbrücke Nord;Breakwater light;54.367830;10.076000;-0.202;borderline;;registry
+C1251.1;Levensauer Hochbrücke Süd;Breakwater light;54.367780;10.075770;-0.196;borderline;;registry
+C1276;Warnfeuer Leuchtturm Neuland;Breakwater light;54.360620;10.600900;-0.513;land;;registry
+C1280;Leuchturm Westermarkelsdorf;Breakwater light;54.527500;11.058060;0.435;water;;registry
+C1281;Puttgarden Hafen Unterfeuer;Breakwater light;54.503060;11.228890;0.012;borderline;;registry
+C1281.1;Puttgarden Hafen Oberfeuer;Breakwater light;54.500280;11.226390;-0.391;land;;registry
+C1282;Molenfeuer West;Breakwater light;54.507220;11.229170;0.437;water;;registry
+C1282.2;Molenfeuer Ost;Breakwater light;54.505550;11.233890;0.520;water;;registry
+C1286;Leuchtturm Staberhuk;Breakwater light;54.402500;11.310830;1.318;water;;registry
+C1288.1;Leuchtturm Flügge;Breakwater light;54.441110;11.017500;1.774;water;;registry
+C1316;Leitfeuer Burger See;Breakwater light;54.411950;11.190830;1.328;water;;registry
+C1322;Burgstaaken Unterfeuer;Breakwater light;54.421670;11.190000;0.502;water;;registry
+C1324;Burgstaaken Oberfeuer;Breakwater light;54.423330;11.190000;0.317;water;;registry
+C1326;Mole Burgstaaken;Breakwater light;54.406390;11.199720;2.090;water;;registry
+C1328;Leitfeuer Heiligenhafen;Breakwater light;54.367330;11.021430;-0.573;land;;registry
+C1329;Richtfeuer Heiligenhafen-Warder Unterfeuer;Breakwater light;54.375250;10.983000;-0.110;borderline;;registry
+C1329.1;Richtfeuer Heiligenhafen-Warder Oberfeuer;Breakwater light;54.375500;10.980500;-0.151;borderline;;registry
+C1336;Richtfeuer Heiligenhafen Unterfeuer;Breakwater light;54.372830;10.991750;-0.135;borderline;;registry
+C1338;Richtfeuer Heiligenhafen Oberfeuer;Breakwater light;54.372830;10.987000;-0.263;borderline;;registry
+C1342;Dahmeshöved;Orientation light;54.201750;11.090230;0.443;water;;registry
+C1346;Pelzerhaken;Orientation light;54.085520;10.866970;1.205;water;;registry
+C1348.4;Neustadt-Wiek Unterfeuer;Front light;54.098050;10.799070;-0.715;land;;registry
+C1348.41;Neustadt-Wiek Oberfeuer;Rear light;54.098350;10.798300;-0.791;land;;registry
+C1363;Lotsenbrücke;Shore light;53.960280;10.883620;-0.533;land;;registry
+C1363.1;Uferfeuer;Shore light;53.959020;10.883770;-0.613;land;;registry
+C1363.2;Uferfeuer;Front light;53.959770;10.880520;-0.862;land;;registry
+C1363.5;Überseebrücke;Shore light;53.959330;10.877830;-1.157;land;;registry
+C1363.7;Uferfeuer;Shore light;53.957220;10.876300;-1.409;land;;registry
+C1363.8;Uferfeuer;Shore light;53.956530;10.874250;-1.647;land;;registry
+C1363.9;Uferfeuer;Shore light;53.957830;10.871670;-1.860;land;;registry
+C1364;Kohlenhofkai;Front light;53.955670;10.872330;-1.881;land;;registry
+C1364.1;Uferfeuer;Shore light;53.956220;10.869300;-2.168;land;;registry
+C1364.2;Fähranleger Priwall;Shore light;53.954950;10.870180;-2.132;land;;registry
+C1364.3;Fähranleger Travemünde;Shore light;53.955500;10.867670;-2.366;land;;registry
+C1364.4;Rosenhof Yachthafen;Breakwater light;53.953520;10.867520;-2.468;land;;registry
+C1364.5;Uferfeuer;Shore light;53.954180;10.864730;-2.724;land;;registry
+C1364.6;Uferfeuer;Shore light;53.953000;10.862230;-3.031;land;;registry
+C1364.7;Siechenbucht Unterfeuer;Front light;53.953830;10.856330;-3.622;land;;registry
+C1364.71;Siechenbucht Oberfeuer;Rear light;53.955870;10.855100;-3.688;land;;registry
+C1364.8;Uferfeuer;Shore light;53.952280;10.866050;-2.675;land;;registry
+C1364.9;Uferfeuer;Shore light;53.951230;10.864730;-2.859;land;;registry
+C1365;Uferfeuer;Shore light;53.950100;10.863750;-3.014;land;;registry
+C1365.1;Uferfeuer;Shore light;53.948830;10.863170;-3.140;land;;registry
+C1365.2;Uferfeuer;Shore light;53.947620;10.862950;-3.231;land;;registry
+C1365.3;Uferfeuer;Shore light;53.946200;10.863280;-3.287;land;;registry
+C1365.4;Uferfeuer;Shore light;53.944780;10.863880;-3.326;land;;registry
+C1386;Leit- und Ouermarkenfeuer Timmendorf;Breakwater light;54.000000;11.383330;0.379;water;;registry
+C1387.8;Walfisch Ldg Lts Front;Front light;53.944300;11.418350;1.836;water;;registry
+C1387.9;Walfisch Ldg Lts Rear;Rear light;53.931750;11.449930;1.825;water;;registry
+C1388.6;Wendorf Ldg Lts Front;Front light;53.917930;11.429730;0.216;borderline;;registry
+C1388.7;Wendorf Ldg Lts Rear;Rear light;53.907430;11.436370;-0.292;borderline;;registry
+C1389;Wendorf W side;Lighted beacon;53.912270;11.436120;0.126;borderline;;registry
+C1389.1;Wendorf E side;Lighted beacon;53.912980;11.438230;0.330;water;;registry
+C1400;Orientierungs- und Warnfeuer Buk;Breakwater light;54.133330;11.700000;-2.673;land;;registry
+C1401.3;Kühlungsborn;Warning light;54.157500;11.768830;0.350;water;;registry
+C1404;Warnemünde;Breakwater light;54.181420;12.085830;-0.524;land;;registry
+C1406.1;Jachthafen Hohe Düne S Mole Head;Breakwater light;54.184270;12.097080;0.767;water;;registry
+C1407.4;Jachthafen W side Jachthafen Mole Head;Breakwater light;54.183330;12.087670;-0.282;borderline;;registry
+C1424.6;Schmarl N Ldg Lts Front;Direction light;54.140350;12.086430;-0.485;land;;registry
+C1424.61;Schmarl N Ldg Lts Rear;Direction light;54.138500;12.084830;-0.638;land;;registry
+C1436ex;Wustrow;Orientation light;54.333890;12.368330;0.085;borderline;;registry
+C1439;Barth Ldg Lts Front;Front light;54.370770;12.727720;-1.041;land;;registry
+C1439.1;Barth Ldg Lts Rear;Rear light;54.370430;12.727530;-1.083;land;;registry
+C1439.5;Barth Hafeneinfahrt -West No 9;Breakwater light;54.374100;12.729550;-0.624;land;;registry
+C1439.7;Barth Hafeneinfahrt -Ost No 10;Breakwater light;54.373950;12.730200;-0.617;land;;registry
+C1440;Darßer Ort;Orientation light, warning light;54.467780;12.500560;-0.103;borderline;;registry
+C2575.9;Bock Unterfeuer;Breakwater light;54.450000;13.033330;1.750;water;;registry
+C2576.1;Zarrenzin Oberfeuer;Breakwater light;54.426420;13.014560;-0.886;land;;registry
+C2583;Barhöft Unterfeuer;Breakwater light;54.433330;13.030830;-0.125;borderline;;registry
+C2583.1;Barhöft Oberfeuer;Breakwater light;54.433060;13.030560;-0.161;borderline;;registry
+C2585;Bessiner Haken Unterfeuer;Breakwater light;54.369330;13.129000;0.784;water;;registry
+C2585.1;Bessiner Haken Oberfeuer;Breakwater light;54.351940;13.151940;-2.358;land;;registry
+C2585.6;Sektorenfeuer Range;Breakwater light;54.306670;13.108610;-0.229;borderline;;registry
+C2586;Quermarkenfeuer Gellen;Breakwater light;54.508140;13.074440;-0.021;borderline;;registry
+C2588;Dornbusch;Breakwater light;54.599140;13.119390;-0.657;land;;registry
+C2589;Hafen Neuendorf Ldg Lts Front;Breakwater light;54.524320;13.092670;-0.129;borderline;;registry
+C2589.4;Poggenhof Unterfeuer;Breakwater light;54.544830;13.159000;-0.259;borderline;;registry
+C2589.41;Poggenhof Oberfeuer;Breakwater light;54.541000;13.159170;-0.004;borderline;;registry
+C2592;Kap Arkona;Breakwater light;54.679530;13.432640;-0.465;land;;registry
+C2592.4;Glowe Südmole;Breakwater light;54.575330;13.466000;-0.231;borderline;;registry
+C2592.5;Glowe Nordmole;Breakwater light;54.575750;13.466170;-0.187;borderline;;registry
+C2593;Lohme Ostmole;Breakwater light;54.585330;13.606670;-0.482;land;;registry
+C2593.5;Lohme Westmole;Breakwater light;54.585330;13.606000;-0.492;land;;registry
+C2602;Sassnitz Ost - Ostmolenfeuer;Breakwater light;54.506000;13.637330;0.510;water;;registry
+C2606;Hafenfeuer Marina Nordsteg;Breakwater light;54.511520;13.643000;0.163;borderline;;registry
+C2606.2;Hafenfeuer Marina Südsteg;Breakwater light;54.510950;13.643130;0.227;borderline;;registry
+C2607.5;Hafenfeuer SW Ende Yachthafen Ostmole;Breakwater light;54.510880;13.645000;0.308;water;;registry
+C2607.6;Hafenfeuer NO Ende Yachthafen Ostmole;Breakwater light;54.512300;13.646670;0.227;borderline;;registry
+C2608;Hafenfeuer Fischerei Pier;Breakwater light;54.513200;13.647080;0.150;borderline;;registry
+C2609;Hafenfeuer Pier Fischereigenossenschaft;Breakwater light;54.513680;13.649300;0.188;borderline;;registry
+C2618;Tauchgondel Seebrücke;Breakwater light;54.385330;13.701830;-0.210;borderline;;registry
+C2626;Maltzien Unterfeuer;Breakwater light;54.233330;13.350000;0.404;water;;registry
+C2626.1;Maltzien Oberfeuer;Breakwater light;54.240000;13.348330;-0.281;borderline;;registry
+C2628;Palmer Ort Unterfeuer;Breakwater light;54.227150;13.388100;0.328;water;;registry
+C2628.1;Palmer Ort Oberfeuer;Breakwater light;54.226500;13.394880;0.349;water;;registry
+UF;Andershof N Unterfeuer, Leitfeuer;Breakwater light;54.271940;13.124440;-0.479;land;;registry
+C2644.1;Andershof NW Oberfeuer;Breakwater light;54.270560;13.117500;-0.867;land;;registry
+C2652.2;Molenfeuer West Yachthafen;Breakwater light;54.340280;13.507780;0.680;water;;registry
+C2652.25;Molenfeuer Ost Yachthafen;Breakwater light;54.340830;13.508060;0.620;water;;registry
+C2653.03;Einfahrt West;Starboard breakwater light;54.155100;13.643670;0.356;water;;registry
+C2653.04;Marina Einfahrtsfeuer West;Orientation light;54.153320;13.646820;0.042;borderline;;registry
+C2653.045;Marina Einfahrtsfeuer Ost;Orientation light;54.152830;13.647500;-0.037;borderline;;registry
+C2653.048;Einfahrt Ost;Port breakwater light;54.155830;13.645000;0.377;water;;registry
+C2653.9;Leitfeuer Ladebow;Breakwater light;54.103330;13.446500;-0.878;land;;registry
+C2655.2;Leitfeuer Eldena;Breakwater light;54.086220;13.458500;-1.553;land;;registry
+C2659.03;Tonnenbank;Warning light 1000m point;54.172970;13.750000;1.627;water;;registry
+C2659.05;Tonnenbankrinne Unterfeuer;Front light;54.139830;13.726500;-0.517;land;;registry
+C2659.06;Tonnenbankrinne Oberfeuer;Rear light;54.134580;13.722070;-1.215;land;;registry
+C2659.1;Knaakrücken Rinne Unterfeuer;Breakwater light;54.148600;13.761420;-0.266;borderline;;registry
+C2659.11;Knaakrücken Rinne Oberfeuer;Breakwater light;54.139970;13.768750;-0.038;borderline;;registry
+C2659.14;Peenemünde Unterfeuer;Breakwater light;54.143980;13.755270;0.576;water;;registry
+C2659.15;Peenemünde Oberfeuer;Breakwater light;54.142830;13.756500;0.577;water;;registry
+C2659.24;Freest Unterfeuer;Front light;54.135830;13.728670;-0.825;land;;registry
+C2659.25;Freest Oberfeuer;Rear light;54.135450;13.727750;-0.909;land;;registry
+C2659.3;Kröslin Nord Unterfeuer;Front light;54.118780;13.759320;-0.995;land;;registry
+C2659.31;Kröslin Nord Oberfeuer;Rear light;54.115950;13.760330;-1.226;land;;registry
+C2659.62;Mahlzow Leitfeuer;Breakwater light;54.071390;13.802780;0.389;water;;registry
+C2659.65;Wolgaster Brücke NO;Breakwater light;54.056390;13.786390;0.499;water;;registry
+C2659.655;Wolgaster Brücke SO;Breakwater light;54.053890;13.786390;0.573;water;;registry
+C2659.66;Wolgaster Brücke NW;Breakwater light;54.055970;13.786020;0.493;water;;registry
+C2659.665;Wolgaster Brücke SW;Breakwater light;54.053650;13.786650;0.534;water;;registry
+C2659.77;Hohendorf Süd Unterfeuer;Front light;54.019580;13.751400;-1.424;land;;registry
+C2659.78;Hohendorf Süd Oberfeuer;Rear light;54.022170;13.736670;-1.886;land;;registry
+C2659.97;Richtfeuer Zecherin Unterfeuer;Breakwater light;53.870830;13.842170;-0.030;borderline;;registry
+C2659.98;Richtfeuer Zecherin Oberfeuer;Breakwater light;53.865500;13.832170;-0.177;borderline;;registry
+C2660.07;Jahnkenort Unterfeuer;Breakwater light;53.850830;13.812220;-0.664;land;;registry
+C2660.08;Jahnkenort Oberfeuer;Breakwater light;53.849720;13.811110;-0.838;land;;registry
+C2662;Greifswalder Oie;Leading light;54.249070;13.924020;15.698;water;;registry
+C2864;Berndshofer Hafenfeuer Ostmole;Breakwater light;53.742780;14.098060;-0.241;borderline;;registry
+Grenzdalben;Dolphin No 7 (Grenzdalben);Breakwater light;53.737830;14.273000;0.659;water;;registry
+A1114;Phare de Dunkerque;Breakwater light;51.048830;2.364333;-0.811;land;;registry
+A1114.9;Lts in line Front E;Breakwater light;51.052020;2.351783;-0.556;land;;registry
+A1115;Lts in line Common Rear Mole No 5;Breakwater light;51.046150;2.350750;-1.216;land;;registry
+A1115.1;Lts in line Front W;Breakwater light;51.052000;2.350833;-0.566;land;;registry
+A1116;Jetée Est Head;Breakwater light;51.059780;2.353367;0.318;water;;registry
+A1118;Feu de Saint-Pol (Jetée Ouest Head);Breakwater light;51.060500;2.349333;0.366;water;;registry
+A1120;Ldg Lts Front Hafeneinfahrt;Breakwater light;51.049630;2.367567;-0.697;land;;registry
+A1120.1;Ldg Lts Rear Hafeneinfahrt;Breakwater light;51.048830;2.368667;-0.777;land;;registry
+A1121;Old W Jetty;Breakwater light;51.055480;2.357300;-0.128;borderline;;registry
+A1122;Écluse Watier Jetée Head;Breakwater light;51.054130;2.353350;-0.309;land;;registry
+A1123;Écluse Charles de Gaulle Lead-in Jetée;Breakwater light;51.056000;2.346500;-0.156;borderline;;registry
+A1124;Bassin Maritime Ldg Lts Front;Breakwater light;51.055030;2.328233;-0.407;land;;registry
+A1124.1;Bassin Maritime Ldg Lts Rear;Breakwater light;51.055500;2.326167;-0.371;land;;registry
+A1125.3;Port Ouest LNG Terminal W Pier PB;Warning light;51.037500;2.180167;0.967;water;;registry
+A1125.5;Port Ouest LNG Terminal Ldg Lt Front;Front light;51.038730;2.193100;0.808;water;;registry
+A1125.51;Port Ouest LNG Terminal Ldg Lts Rear;Rear light;51.039080;2.195150;0.799;water;;registry
+A1126;Port Ouest Ldg Lts Front;Breakwater light;51.027830;2.198667;-0.507;land;;registry
+A1126.1;Port Ouest Ldg Lts Rear;Breakwater light;51.025080;2.206050;-0.974;land;;registry
+A1127;Port Ouest Jetée Du Dyck Head;Breakwater light;51.037670;2.163167;1.371;water;;registry
+A1127.4;Port Ouest Jetée Du Clipon Head;Breakwater light;51.044000;2.163167;2.061;water;;registry
+A1127.6;Port Ouest Bassin de L'Atlantique DFDS Ferry Terminal;Breakwater light;51.019300;2.186900;-1.169;land;;registry
+A1127.7;Port Ouest Bassin de L'Atlantique Ldg Lts Front;Breakwater light;50.996830;2.184333;-3.559;land;;registry
+A1127.71;Port Ouest Bassin de L'Atlantique Ldg Lts Rear;Rear light;50.992830;2.186000;-4.033;land;;registry
+A1129;Port Ouest Bassin de L'Atlantique E Side;Breakwater light;51.022980;2.174700;-0.491;land;;registry
+A1129.2;Port Ouest Bassin de L'Atlantique W side;Breakwater light;51.022080;2.169500;-0.471;land;;registry
+A1131;Port Ouest W Side;Warning light;51.022350;2.152433;-0.055;borderline;;registry
+A1132;Gravelines Outer Channel W Jetty;Breakwater light;51.015620;2.091517;-0.029;borderline;;registry
+A1132.2;Gravelines Outer Channel E Jetty;Breakwater light;51.015500;2.094067;-0.063;borderline;;registry
+A1135;Gravelines Outer Ch. Semi submerged Jetty Head E;Breakwater light;51.016620;2.093033;0.070;borderline;;registry
+A1144;Phare de Calais;Breakwater light;50.961330;1.853667;-1.757;land;;registry
+A1145.5;Jetée Est Root;Breakwater light;50.970900;1.853267;-0.719;land;;registry
+A1146;Jetée Est Head;Breakwater light;50.973170;1.841000;-0.112;borderline;;registry
+A1148;Jetée Ouest Head;Breakwater light;50.970670;1.840000;-0.349;land;;registry
+A1157;Quai de marée;Breakwater light;50.967500;1.847000;-0.898;land;;registry
+A1160;Sangatte;Breakwater light;50.953170;1.775000;-0.294;borderline;;registry
+A1228;Jetée Est Head;Breakwater light;49.936150;1.084450;-0.634;land;;registry
+A1230;Jetée Ouest Head;Breakwater light;49.937680;1.082783;-0.429;land;;registry
+A1232.1;Falaise du Pollet;Orientation light;49.932000;1.088333;-1.173;land;;registry
+A1233;La Morgue Quai de la Marne Head;Breakwater light;49.932220;1.086150;-1.101;land;;registry
+A1260;Ldg Lts Front Quai Roger Meunier;Breakwater light;49.481950;0.108250;0.987;water;;registry
+A1290;Falaise des Fonds;Breakwater light;49.433330;0.214167;1.206;water;;registry
+A1294;Phare de Honfleur (Jetée de l´Est);Breakwater light;49.422780;0.235278;-0.304;land;;registry
+A1377;Phare de Ouistreham - Main Light;Breakwater light;49.280560;-0.247778;-1.062;land;;registry
+A1381;Ldg Lts Front Jetée Est Head;Breakwater light;49.285080;0.246600;-17.778;land;;registry
+A1470;Passe de L'est Fort d'Île Pelée;Breakwater light;49.670080;-1.584783;1.002;water;;registry
+A1476;Fort de l'Est;Breakwater light;49.671370;-1.598733;1.942;water;;registry
+A1478;Fort Central;Warning light;49.674300;-1.619267;1.224;water;;registry
+A1480;Passe de L'Ouest Fort de L'Ouest;Breakwater light;49.674330;-1.647833;0.846;water;;registry
+A1482;Passe de L'Ouest Digue de Querqueville Head;Breakwater light;49.671670;-1.663333;0.195;borderline;;registry
+A1484.1;Passe de L'Ouest Lts in line Rear Gare Maritime;Rear light;49.646330;-1.616667;-0.739;land;;registry
+A1486;Lts in line Front Jetée du Homet Head;Breakwater light;49.658000;-1.616167;-0.014;borderline;;registry
+A1491.3;Port Militaire Avant Port Terre-plein de l'atelier coque NE corner;Breakwater light;49.652670;-1.628000;-1.184;land;;registry
+A1493.5;Port Militaire Darse du Béton Spur Head;Breakwater light;49.649330;-1.626667;-1.435;land;;registry
+A1493.8;Port Militaire Épi Caiman Head;Breakwater light;49.649830;-1.625167;-1.264;land;;registry
+A1495;Darse Transatlantique Quai Est Head;Breakwater light;49.650920;-1.613550;-0.125;borderline;;registry
+A1495.2;Darse Transatlantique Pier Head;Breakwater light;49.644630;-1.613267;-0.787;land;;registry
+A1496;Darse Transatlantique Gare Maritime NW corner;Breakwater light;49.648500;-1.618000;-0.662;land;;registry
+A1498;Darse Transatlantique Gare Maritime NE corner;Breakwater light;49.648830;-1.616667;-0.523;land;;registry
+A1498.5;Darse Transatlantique Gare Maritime Quai Ouest Head;Breakwater light;49.646500;-1.618667;-0.863;land;;registry
+A1499;Marina Môle Head;Breakwater light;49.647930;-1.619183;-0.806;land;;registry
+A1499.5;Marina Wavescreen Pontoon Head;Breakwater light;49.645770;-1.619500;-0.986;land;;registry
+A1504;Darse des Mielles Car Ferry Mole;Breakwater light;49.649000;-1.609283;-0.196;borderline;;registry
+A1512;Phare de la Hague;Orientation light;49.721830;-1.954333;1.878;water;;registry
+A1516;Goury Ldg Lts Front;Front light;49.714530;-1.945050;0.735;water;;registry
+A1516.1;Goury Ldg Lts Rear;Rear light;49.714950;-1.943667;0.577;water;;registry
+A0496;Anvil Point;Orientation light;50.591880;-1.959983;1.386;water;;registry
+A0498;Swanage Pier Head;Breakwater light;50.609380;-1.949233;1.902;water;;registry
+A0501.4;Groyne S end;Warning light;50.682580;-1.945350;1.036;water;;registry
+A0503;Ferry landing Ramp E side;Breakwater light;50.683050;-1.948600;0.824;water;;registry
+A0503.1;Ferry landing Ramp W side;Breakwater light;50.683170;-1.948833;0.821;water;;registry
+A0504;South Haven Point Ferry landing E side;Breakwater light;50.680130;-1.949833;0.483;water;;registry
+A0504.1;South Haven Point Ferry landing W side;Breakwater light;50.680120;-1.950150;0.459;water;;registry
+A0528;Needles Outer Needle Rock;Orientation light;50.662350;-1.591350;2.406;water;;registry
+A0538.1;Hurst Point;Leading & orientation light;50.708000;1.550333;1.677;water;;registry
+A0577;Off Stansore Point Outfall;Warning light;50.804370;-1.313817;0.291;borderline;;registry
+A0580.6;Calshot RNLI Jetty Head;Breakwater light;50.820780;-1.308383;1.098;water;;registry
+Esso;Fawley Marine Terminal (Esso) Off NW end;Breakwater light;50.844280;-1.336633;0.828;water;;registry
+A0626;Lower Swinging Ground Lts in line Front Town Quay;Front light;50.892500;-1.405500;0.429;water;;registry
+A0626.1;Lower Swinging Ground Lts in line Rear Middle of Pier;Rear light;50.895680;-1.408583;0.208;borderline;;registry
+A0632.2;Marchwood Sea Mounting Centre Falkland Wharf Jetty Head;Breakwater light;50.894500;-1.419083;-0.070;borderline;;registry
+A0632.3;Marchwood Sea Mounting Centre Gun Wharf Jetty Head;Breakwater light;50.892880;-1.420233;-0.291;borderline;;registry
+A0633.4;Marchwood Basin S End;Warning light;50.900930;-1.433117;-0.042;borderline;;registry
+A0633.41;Marchwood Basin N End;Warning light;50.903320;-1.436083;0.184;borderline;;registry
+A0640;Container Berths Berth SCT5 SW Corner;Breakwater light;50.903830;-1.447033;-0.136;borderline;;registry
+A0664;Wootton Creek Wootton Beacon;Warning light;50.742330;-1.202167;-0.706;land;;registry
+A0664.5;Royal Victoria YC Starting platform;Warning light;50.742570;-1.211750;-0.953;land;;registry
+A0665;Wootton Creek No 1;Orientation light;50.739950;-1.205967;-1.071;land;;registry
+A0665.2;Wootton Creek No 2;Orientation light;50.737530;-1.207933;-1.387;land;;registry
+A0665.25;Wootton Creek No 3;Orientation light;50.738030;-1.208883;-1.360;land;;registry
+A0665.3;Wootton Creek No 4;Orientation light;50.736420;-1.209683;-1.557;land;;registry
+A0665.35;Wootton Creek No 5;Orientation light;50.736900;-1.210533;-1.528;land;;registry
+A0665.4;Wootton Creek No 7;Orientation light;50.735830;-1.212217;-1.691;land;;registry
+A0665.8;Wootton Creek;Leading light;50.734000;-1.214167;-1.944;land;;registry
+A0668.2;Ryde Pier NW corner;Breakwater light;50.739030;-1.161867;0.081;borderline;;registry
+A0668.4;Ryde Pier N corner;Breakwater light;50.739520;-1.160233;0.179;borderline;;registry
+A0686.5;Spit Sand South 1;Warning light;50.767330;-1.098667;1.986;water;;registry
+A0687;Spit Sand South 2;Warning light;50.767330;-1.099000;1.999;water;;registry
+A0687.5;Spit Sand South 3;Warning light;50.767170;-1.099333;2.029;water;;registry
+A0688;Spit Sand Fort N side;Orientation light;50.770520;-1.099150;1.671;water;;registry
+A0689;Spit Sand North 1;Warning light;50.774330;-1.103000;1.414;water;;registry
+A0689.2;Spit Sand North 2;Warning light;50.774500;-1.102667;1.384;water;;registry
+A0689.4;Spit Sand North 3;Warning light;50.774500;-1.102500;1.378;water;;registry
+A0690.8;Southsea South Castle Pile;Leading & orientation light;50.777670;-1.094167;0.734;water;;registry
+A0692.5;Fort Blockhouse Dir Lt;Leading & orientation light;50.789650;-1.112033;0.286;borderline;;registry
+A0692.55;Fort Blockhouse;Breakwater light;50.789620;-1.112050;0.282;borderline;;registry
+A0694;Clarence Pier S end;Breakwater light;50.785080;-1.100917;0.243;borderline;;registry
+A0696;Victoria Pier Head;Breakwater light;50.789170;-1.107000;0.300;water;;registry
+A0698;Victoria Pile;Warning light;50.789170;-1.108000;0.408;water;;registry
+A0700;The Point;Warning light;50.792820;-1.109167;0.479;water;;registry
+A0701;The Point Car Ferry Terminal;Breakwater light;50.793000;-1.107500;0.303;water;;registry
+A0752;No Man's Land Fort;Warning light;50.740000;-1.094833;1.411;water;;registry
+A0774;Saint Catherine's Point;Orientation light;50.575670;-1.298000;1.157;water;;registry
+A0830;Newhaven Harbour Breakwater Head;Breakwater light;50.775830;0.058500;0.489;water;;registry
+A0831;Newhaven Harbour W Pier S end;Breakwater light;50.781870;0.057233;-0.174;borderline;;registry
+A0831.4;Newhaven Harbour W Pier Inner end;Breakwater light;50.783570;0.056333;-0.357;land;;registry
+A0833;Newhaven Harbour E Pier Inner end;Breakwater light;50.782620;0.057850;-0.261;borderline;;registry
+A0833.4;Newhaven Harbour E Quay S end;Breakwater light;50.783670;0.057333;-0.375;land;;registry
+A0833.5;Newhaven Harbour Rampion Quay S End;Breakwater light;50.791000;0.057417;-1.190;land;;registry
+A0833.6;Newhaven Harbour Rampion Quay N End;Breakwater light;50.784830;0.057000;-0.502;land;;registry
+A0833.8;Newhaven Marina Visitors Pontoon N end;Breakwater light;50.786030;0.054717;-0.622;land;;registry
+A0834;Newhaven Marina B Jetty;Breakwater light;50.786870;0.054100;-0.711;land;;registry
+A0834.2;Newhaven Marina A Jetty;Breakwater light;50.787220;0.054050;-0.750;land;;registry
+A0834.4;RNLI Lifeboat Station;Breakwater light;50.788470;0.053950;-0.888;land;;registry
+A0836;Railway Quay S end;Breakwater light;50.788400;0.055133;-0.887;land;;registry
+A0836.3;Railway Quay No 2 RoRo Berth SW corner;Breakwater light;50.789500;0.054333;-1.005;land;;registry
+A0836.4;Railway Quay No 2 RoRo Berth NW corner;Breakwater light;50.789830;0.054167;-1.041;land;;registry
+A0840;Beachy Head;Orientation light;50.733750;0.241467;1.528;water;;registry
+A0892;Lighthouse Breakwater Head;Breakwater light;51.076000;1.194833;0.776;water;;registry
+A0896;Outer Harbour E Pier Head;Breakwater light;51.079350;1.189567;0.270;borderline;;registry
+A0896.5;Outer Harbour S Quay Head;Breakwater light;51.079020;1.189883;0.313;water;;registry
+A0897;Outer Harbour S Quay Abnormal Load Berth;Breakwater light;51.078870;1.187983;0.286;borderline;;registry
+A0898;Shakespeare Cliff E end;Breakwater light;51.105800;1.281400;0.651;water;;registry
+A0898.2;Shakespeare Cliff W end;Breakwater light;51.101850;1.267733;0.385;water;;registry
+A0900;Admiralty Pier Extension Head;Breakwater light;51.111400;1.327683;1.474;water;;registry
+A0902;Prince of Wales Pier Head;Breakwater light;51.114080;1.322933;1.066;water;;registry
+A0903.4;Admiralty Pier Extension Cruise Terminal 2;Breakwater light;51.111920;1.324000;1.327;water;;registry
+A0906;Dunkirk Jetty Head;Breakwater light;51.114670;1.316333;0.840;water;;registry
+A0913;N Pier Extension;Breakwater light;51.115330;1.317050;0.785;water;;registry
+A0913.5;N Pier 2;Breakwater light;51.116000;1.315167;0.666;water;;registry
+A0914;N Pier 3;Breakwater light;51.116330;1.314333;0.610;water;;registry
+A0915;N Pier Spur;Breakwater light;51.117000;1.313000;0.504;water;;registry
+A0915.5;Tidal Harbour S side Clarence Quay Pier;Breakwater light;51.116830;1.312167;0.502;water;;registry
+A0916.3;Tidal Harbour Marina Pontoon Head;Breakwater light;51.118000;1.311333;0.355;water;;registry
+A0917;Tidal Harbour Crosswall Quay;Breakwater light;51.118170;1.310833;0.324;water;;registry
+A0924;S Breakwater W Head;Breakwater light;51.113170;1.330000;1.340;water;;registry
+A0926;S Breakwater Knuckle;Breakwater light;51.117500;1.341500;1.153;water;;registry
+A0928;S Breakwater N Head;Breakwater light;51.120000;1.343500;0.930;water;;registry
+A0929;S Breakwater E Arm Head;Breakwater light;51.121750;1.343333;0.736;water;;registry
+A0935;Pier A W Jetty Head;Breakwater light;51.125330;1.339183;0.246;borderline;;registry
+A0936;Pier B Head;Breakwater light;51.124920;1.337933;0.260;borderline;;registry
+A0936.4;Pier C;Breakwater light;51.124350;1.337100;0.301;water;;registry
+A0936.6;Pier D/E;Breakwater light;51.123730;1.336133;0.344;water;;registry
+A0950;Deal Pier Head;Breakwater light;51.223780;1.408950;-0.362;land;;registry
+A0952;Deal Outfall;Breakwater light;51.241670;1.407950;-0.076;borderline;;registry
+A0957.1;Royal Harbour Old Cudd Channel West Pier Head;Breakwater light;51.327670;1.421500;0.441;water;;registry
+A0957.2;Royal Harbour East Pier;Breakwater light;51.327420;1.422639;0.523;water;;registry
+A0958;New Port Western Ferry Terminal Ldg Lts Front;Breakwater light;51.325150;1.414200;0.591;water;;registry
+A0958.1;New Port Western Ferry Terminal Ldg Lts Rear;Breakwater light;51.325170;1.407167;0.590;water;;registry
+A0959;New Port West Ferry Terminal N Breakwater Head;Breakwater light;51.326000;1.424667;0.765;water;;registry
+A0959.5;New Port West Ferry Terminal S Breakwater Head;Breakwater light;51.324330;1.423500;0.873;water;;registry
+A0960;Ferry Terminal RoRo Berth No2 & No3 Outer Dolphin;Breakwater light;51.326000;1.416833;0.497;water;;registry
+A0962;Royal Harbour Commercial Jetty E corner;Breakwater light;51.329030;1.420100;0.235;borderline;;registry
+A0962.3;Royal Harbour Old Ferry Terminal;Breakwater light;51.329670;1.419500;0.143;borderline;;registry
+A0962.4;Royal Harbour E Marina;Breakwater light;51.329330;1.420833;0.242;borderline;;registry
+A0962.5;Royal Harbour E Marina Entrance S;Breakwater light;51.329630;1.420800;0.211;borderline;;registry
+A0962.6;Royal Harbour E Marina Entrance N;Breakwater light;51.329830;1.420500;0.176;borderline;;registry
+A0962.7;Royal Harbour W Marina Breakwater SE Entrance;Breakwater light;51.328120;1.421450;0.394;water;;registry
+A0962.8;Royal Harbour W Marina Breakwater NE Entrance;Breakwater light;51.328830;1.420417;0.271;borderline;;registry
+A0963;Ramsgate Winterstoke Outfall;Breakwater light;51.334330;1.434167;0.577;water;;registry
+A0964;Broadstairs Pier SE end;Breakwater light;51.358350;1.445533;0.520;water;;registry
+A0966;North Foreland;Breakwater light;51.374830;1.445000;-0.023;borderline;;registry
+A1971;Margate Tide Gauge;Breakwater light;51.394950;1.379100;0.519;water;;registry
+A1973;Foreness Point Outfall;Breakwater light;51.398720;1.428283;0.774;water;;registry
+A1976;Herne Bay;Breakwater light;51.381830;1.115000;0.826;water;;registry
+A1976.1;Herne Bay Outfall;Breakwater light;51.379000;1.144000;0.318;water;;registry
+A1976.2;Herne Bay Breakwater Head;Breakwater light;51.373980;1.120950;-0.086;borderline;;registry
+A1976.4;Herne Bay Pier Head;Breakwater light;51.373580;1.119972;-0.124;borderline;;registry
+A1979;Whitstable Harbour W Quay Off Head;Breakwater light;51.364150;1.024233;0.610;water;;registry
+A1979.2;Whitstable Harbour W Quay N Corner;Breakwater light;51.363930;1.024783;0.575;water;;registry
+A1979.3;Whitstable Harbour E Quay N End;Breakwater light;51.364500;1.025139;0.628;water;;registry
+A1979.4;Whitstable Harbour E Quay;Breakwater light;51.364470;1.025083;0.626;water;;registry
+A2155;Tower Bridge N Pier;Breakwater light;51.505800;-0.074950;0.383;water;;registry
+A2700;Mouth Tyne River North Pier;Breakwater light;55.014500;-1.402900;1.781;water;;registry
+A2702;Mouth Tyne River South Pier;Breakwater light;55.011320;-1.401050;1.613;water;;registry
+A2702.5;Herd Groyne Head;Leading light;55.008000;-1.424000;-0.594;land;;registry
+A2708;North Shields No 1 Groyne Near Head;Breakwater light;55.009170;-1.430667;-1.216;land;;registry
+A2714;North Market Ferry Landing N end;Breakwater light;55.003930;-1.443850;-2.792;land;;registry
+A2716;Royal Quays Marina entrance lock Waiting Pontoon E end;Breakwater light;54.996230;-1.449083;-3.665;land;;registry
+A2717;Car Ferry Berth SE corner;Breakwater light;54.992100;-1.449417;-3.932;land;;registry
+A2878;Fisherrow East Pier Head;Breakwater light;55.946620;-3.068383;-0.103;borderline;;registry
+A2883;Deepwater Channel Dir Lt;Breakwater light;55.988180;-3.181367;1.764;water;;registry
+A2887;Lead-in Jetty Off Head;Breakwater light;55.991150;-3.183367;2.085;water;;registry
+A288x;Newhaven Jetty Head;Breakwater light;55.982140;-3.195889;1.021;water;;registry
+A2912;Inchkeith Summit;Breakwater light;56.033550;-3.136217;4.526;water;;registry
+A2925.9;Hawes Pier North Pier;Breakwater light;55.993000;-3.386900;0.327;water;;registry
+A2934;Port Edgar W Breakwater Head;Breakwater light;55.997500;-3.413000;0.689;water;;registry
+A2935;Beamer Rock West;Breakwater light;56.005170;-3.412833;1.535;water;;registry
+A2936;Beamer Rock East;Breakwater light;56.004500;-3.412167;1.473;water;;registry
+A3139;Tayport Harbour Port hand entrance;Breakwater light;56.451670;-2.880667;-0.554;land;;registry
+A3139.1;Tayport Harbour Starboard hand entrance;Breakwater light;56.451530;-2.881283;-0.591;land;;registry
+A3140ex;Tayport Pile Light;Breakwater light;56.453000;-2.872472;-0.104;borderline;;registry
+A3141ex;Tayport Low Lighthouse;Breakwater light;56.452890;-2.892389;-0.532;land;;registry
+A3142;Tayport High Lighthouse Dir Lt;Breakwater light;56.452870;-2.899067;-0.462;land;;registry
+A3440;Chanonry Lighthouse;Breakwater light;57.574000;-4.092667;1.567;water;;registry
+A3441;Fort George Firing Range NW;Breakwater light;57.585780;-4.067967;-0.025;borderline;;registry
+A3447.6;River Ness Outer Beacon;Breakwater light;57.497300;-4.232017;0.220;borderline;;registry
+A3447.7;River Ness Inner Beacon;Breakwater light;57.495430;-4.235033;-0.039;borderline;;registry
+A3448;River Ness Embankment Head Carnarc Point;Breakwater light;57.495330;-4.237333;-0.091;borderline;;registry
+A3449;River Ness E side Turning Beacon;Breakwater light;57.492670;-4.236833;-0.375;land;;registry
+A3492;Nigg Ferry Jetty SE corner;Breakwater light;57.691830;-4.021167;0.447;water;;registry
+A3492.05;Nigg Energy Park East Quay;Breakwater light;57.692570;-4.024167;0.559;water;;registry
+A3492.4;Nigg Energy Park Finger Quay;Breakwater light;57.693330;-4.035167;0.981;water;;registry
+A3493.2;Nigg Oil Terminal East;Breakwater light;57.692500;-4.040500;1.085;water;;registry
+A3493.3;Nigg Oil Terminal West;Breakwater light;57.692670;-4.045667;1.288;water;;registry
+A3495.2;Saltburn Pier E Dolphin;Breakwater light;57.687980;-4.136017;1.435;water;;registry
+A3495.4;Saltburn Pier W end;Breakwater light;57.687900;-4.140217;1.238;water;;registry
+A3497.1;Invergordon Distillery Outfall Rear;Rear light;57.694550;-4.149800;0.105;borderline;;registry
+A3498.2;Invergordon Admiralty Pier E side;Breakwater light;57.686100;-4.159567;0.625;water;;registry
+A3498.4;Invergordon Admiralty Pier W side;Breakwater light;57.685650;-4.164283;0.565;water;;registry
+A3499;Invergordon Supply Base SE corner;Breakwater light;57.685170;-4.167833;0.535;water;;registry
+A3499.2;Invergordon Supply Base SW corner;Breakwater light;57.684750;-4.172567;0.548;water;;registry
+A3499.5;Invergordon Berth No 5 SE Corner;Breakwater light;57.684500;-4.179167;0.548;water;;registry
+A3499.6;Invergordon Service Base Quay West SW Corner;Breakwater light;57.684100;-4.185400;0.566;water;;registry
+A3514;Helmsdale Harbour Ldg Lts Front;Breakwater light;58.115000;-3.650333;-0.547;land;;registry
+A3514.1;Helmsdale Harbour Dir Lt;Breakwater light;58.115170;-3.650667;-0.579;land;;registry
+A3516;Helmsdale Harbour NW Pier;Breakwater light;58.114380;-3.648783;-0.415;land;;registry
+A3558;Duncansby Head;Breakwater light;58.644030;-3.025117;0.214;borderline;;registry
+A3562;Muckle Skerry;Orientation light;58.690170;-2.924633;4.875;water;;registry
+A3568;Swilkie Point;Breakwater light;58.695880;-3.116750;6.019;water;;registry
+A3569;Stroma South;Breakwater light;58.664140;-3.136917;2.520;water;;registry
+A3572;Gills Bay Pier Head;Breakwater light;58.640420;-3.159333;-0.430;land;;registry
+A3574;Dunnet Head;Breakwater light;58.671280;-3.376650;-0.571;land;;registry
+A3582.5;Queen Elizabeth RoRo Pier;Breakwater light;58.610670;-3.540083;0.456;water;;registry
+A3583;Saint Ola RoRo Pier Head;Breakwater light;58.610170;-3.543167;0.255;borderline;;registry
+A3584;Ice Quay Head;Breakwater light;58.611330;-3.546500;0.208;borderline;;registry
+A3602;Cantick Head South East end;Breakwater light;58.787100;-3.131317;1.784;water;;registry
+A3610;Hoxa Head;Breakwater light;58.821850;-3.034733;-0.173;borderline;;registry
+A3614;Saint Margaret's Hope Needle Point Reef;Breakwater light;58.834820;-2.957633;-0.545;land;;registry
+A3616;Saint Margaret's Hope Ldg Lts Front;Breakwater light;58.827170;-2.954500;-1.428;land;;registry
+A3616.1;Saint Margaret's Hope Ldg Lts Rear;Breakwater light;58.826170;-2.954333;-1.541;land;;registry
+A3644;Hoy Mouth Ldg Lts Front;Breakwater light;58.940330;-3.310000;1.563;water;;registry
+A3644.1;Hoy Mouth Ldg Lts Rear;Breakwater light;58.935670;-3.273333;2.498;water;;registry
+A3654;Pole Star Pier SE corner;Breakwater light;58.958880;-3.298800;-0.713;land;;registry
+A3656;Ldg Lts Front;Breakwater light;58.960250;-3.302617;-0.775;land;;registry
+A3656.1;Ldg Lts Rear;Breakwater light;58.960630;-3.303267;-0.802;land;;registry
+A3662;North Pier Head;Breakwater light;58.962580;-3.295250;-0.829;land;;registry
+A3662.5;South Pier South End;Breakwater light;58.961830;-3.297167;-0.940;land;;registry
+A3662.8;Coplands Pier South End;Breakwater light;58.960670;-3.293833;-0.567;land;;registry
+A3663;Marina Pier East End;Breakwater light;58.964170;-3.293500;-0.865;land;;registry
+A3680;S end Auskerry;Orientation light;59.025900;-2.572233;5.926;water;;registry
+A3684;Helliar Holm S end;Breakwater light;59.018920;-2.900983;2.309;water;;registry
+A3687.7;Hatston Ferry Terminal Hatston Pier East;Breakwater light;58.999080;-2.971600;-0.093;borderline;;registry
+A3687.8;Hatston Ferry Terminal Hatston Pier West;Breakwater light;59.001020;-2.976900;0.087;borderline;;registry
+A3688;Harbour Pier North End;Breakwater light;58.988180;-2.961750;-1.476;land;;registry
+A3688.5;Harbour Pier East End;Breakwater light;58.988600;-2.958617;-1.491;land;;registry
+A3695;Harbour Marina Pier Breakwater;Breakwater light;58.988070;-2.958850;-1.544;land;;registry
+A3700;Brough of Birsay;Breakwater light;59.136830;-3.339167;1.915;water;;registry
+A3776;Bressay - Kirkabister Ness;Breakwater light;60.120000;-1.121833;0.237;borderline;;registry
+A3874;White Head;Breakwater light;58.516800;-4.648417;0.645;water;;registry
+A4404;Cloch Point;Breakwater light;55.942330;-4.878833;0.855;water;;registry
+A5900.5;Howth Harbour Trawler Pier;Breakwater light;53.391630;6.068300;-1.792;land;;registry
+B0634;Noorderdam Head;Breakwater light;51.994500;4.047333;0.386;water;;registry
+B0635;Nieuwe Zuiderdam Head;Breakwater light;51.985670;4.041500;-0.683;land;;registry
+B0636;Noorderdam;Breakwater light;51.986650;4.084200;-0.253;borderline;;registry
+B0637;Maasmond Ldg Lts Front;Front light / breakwater light;51.981330;4.081500;-0.817;land;;registry
+B0637.1;Maasmond Ldg Lts Rear;Rear light;51.977500;4.096833;-1.389;land;;registry
+B0638;Hoek van Holland Ldg Lts Front;Front light;51.975830;4.125500;-2.303;land;;registry
+B0638.1;Hoek van Holland Ldg Lts Rear;Rear light;51.974670;4.131833;-2.687;land;;registry
+B0640;Berghaven W side;Breakwater light;51.976170;4.124167;-2.213;land;;registry
+B0640.4;Berghaven E side;Breakwater light;51.976000;4.124700;-2.252;land;;registry
+B0640.423;Nieuwe Waterweg No 2;Warning light;51.967600;4.144583;-3.593;land;;registry
+B0640.427;Nieuwe Waterweg No 4;Warning light;51.962770;4.153000;-3.676;land;;registry
+B0640.429;No 1;Warning light;51.960100;4.149283;-4.122;land;;registry
+B0642;Entrance Ldg Lts Front;Front light;51.959520;4.145050;-4.383;land;;registry
+B0642.1;Entrance Ldg Lts Rear;Rear light;51.957330;4.152167;-4.261;land;;registry
+B0651.5;WMO;Warning light;51.960070;4.158717;-3.672;land;;registry
+B0651.6;WMO;Warning light;51.956850;4.154267;-4.209;land;;registry
+B0651.611;No 6;Breakwater light;51.956970;4.163217;-3.768;land;;registry
+B0651.613;No 3;Breakwater light;51.954450;4.159800;-4.185;land;;registry
+B0651.615;No 8;Breakwater light;51.954730;4.167533;-3.786;land;;registry
+B0651.617;No 5;Breakwater light;51.952220;4.164083;-4.204;land;;registry
+B0651.7;WMO;Warning light;51.953200;4.171667;-3.741;land;;registry
+B0651.8;WMO;Warning light;51.949830;4.167100;-4.298;land;;registry
+B0655.31;No 10;Warning light;51.948930;4.179383;-3.787;land;;registry
+B0655.33;No 7;Warning light;51.945900;4.175900;-4.261;land;;registry
+B0655.35;No 12;Warning light;51.944370;4.190183;-3.709;land;;registry
+B0655.37;No 9;Warning light;51.941580;4.187283;-4.130;land;;registry
+B0655.39;No 14;Warning light;51.941170;4.199333;-3.577;land;;registry
+B0655.41;No 11;Warning light;51.937680;4.198783;-3.951;land;;registry
+B0655.43;No 16;Warning light;51.938000;4.208333;-3.448;land;;registry
+B0655.45;No 13;Warning light;51.933480;4.209833;-3.825;land;;registry
+B0662;Maassluis Ldg Lts Front No 18;Front light / warning light;51.934470;4.217950;-3.326;land;;registry
+B0662.1;Maassluis Ldg Lts Rear;Rear light;51.936930;4.215200;-3.216;land;;registry
+B0662.31;Maassluis No 15;Warning light;51.930130;4.216133;-3.848;land;;registry
+B0662.33;Maassluis No 20;Warning light;51.931670;4.223000;-3.328;land;;registry
+B0662.35;Maassluis No 17;Warning light;51.926320;4.221767;-3.909;land;;registry
+B0662.37;Maassluis No 22;Warning light;51.927830;4.227833;-3.415;land;;registry
+B0662.39;Maassluis No 19;Warning light;51.922530;4.226783;-3.981;land;;registry
+B0662.41;Maassluis No 24;Warning light;51.922600;4.233500;-3.588;land;;registry
+B0662.43;Maassluis No 21;Warning light;51.918580;4.232517;-4.027;land;;registry
+B0662.45;Maassluis No 26;Warning light;51.919450;4.237933;-3.632;land;;registry
+B0662.49;Maassluis No 28;Warning light;51.916550;4.243267;-3.602;land;;registry
+B0670;Buitenhaven W Head;Breakwater light;51.915900;4.245983;-3.507;land;;registry
+B0670.2;Buitenhaven E Head;Breakwater light;51.915630;4.246850;-3.483;land;;registry
+B0670.41;Maassluis No 23;Warning light;51.910800;4.247917;-3.882;land;;registry
+B0670.43;Maassluis No 30;Warning light;51.914350;4.248717;-3.498;land;;registry
+B0670.45;Maassluis No 25;Orientation light;51.907170;4.256950;-3.735;land;;registry
+B0670.47;Maassluis No 32;Orientation light;51.911520;4.255183;-3.407;land;;registry
+B0670.51;Maassluis No 34;Warning light;51.908030;4.264100;-3.283;land;;registry
+B0673;Blankenburg S side of dyke Ldg Lts Front;Front light;51.900000;4.272500;-3.722;land;;registry
+B0673.1;Blankenburg S side of dyke Ldg Lts Rear;Rear light;51.900500;4.268833;-3.823;land;;registry
+B0673.46;Maassluis No 31;Warning light;51.896470;4.287200;-3.569;land;;registry
+B0674;Maassluis Botlek W side;Breakwater light;51.890920;4.304917;-3.669;land;;registry
+B0674.2;Koggehaven Dock Entrance W Side;Breakwater light;51.898000;4.308667;-2.802;land;;registry
+B0674.25;Koggehaven Dock Entrance E Side;Breakwater light;51.897800;4.310083;-2.788;land;;registry
+B0678.4;1st Petroleumhaven Entrance E side;Breakwater light;51.893220;4.343433;-2.834;land;;registry
+B0680;Buitenhaven W Mole Head;Breakwater light;51.899630;4.348650;-2.111;land;;registry
+B0680.2;Buitenhaven E Mole Head;Breakwater light;51.899850;4.349233;-2.090;land;;registry
+B0681;Koningin Wilhelminahaven Entrance W side;Breakwater light;51.901000;4.353333;-1.990;land;;registry
+B0682;Vulcaanhaven Entrance W side;Breakwater light;51.901670;4.363733;-2.005;land;;registry
+B0682.2;Vulcaanhaven Entrance E side;Breakwater light;51.901630;4.365750;-2.032;land;;registry
+B0683.2;2nd Petroleumhaven Entrance E side;Breakwater light;51.897000;4.370833;-2.821;land;;registry
+B0684;Wiltonhaven Entrance W side;Breakwater light;51.900000;4.379667;-2.376;land;;registry
+B0684.2;Wiltonhaven Entrance E side;Breakwater light;51.899830;4.382167;-2.424;land;;registry
+B0685;Madroelhaven Entrance W side;Breakwater light;51.895230;4.382467;-3.087;land;;registry
+B0685.2;Madroelhaven Entrance E side;Breakwater light;51.894980;4.384917;-3.070;land;;registry
+B0685.4;1 WT;Warning light;51.894830;4.388333;-3.045;land;;registry
+B0685.5;2 WT;Warning light;51.894830;4.389000;-3.037;land;;registry
+B0686;Eemhaven Entrance E side;Breakwater light;51.895170;4.399500;-2.871;land;;registry
+B0687.2;Wilhelminahaven E side;Breakwater light;51.899280;4.397983;-2.435;land;;registry
+B0689;Voorhaven W side;Breakwater light;51.901830;4.409000;-2.019;land;;registry
+B0690;Merwehaven E side;Breakwater light;51.903470;4.417300;-1.820;land;;registry
+B0696.2;Lekhaven E side;Breakwater light;51.904180;4.429567;-2.045;land;;registry
+B0697;Ĳsselhaven Entrance W side;Breakwater light;51.904130;4.431400;-2.096;land;;registry
+B0697.2;Ĳsselhaven Entrance E side;Breakwater light;51.904020;4.434633;-2.189;land;;registry
+B0697.3;Waalhaven Entrance W Side;Breakwater light;51.899830;4.431833;-2.573;land;;registry
+B0697.4;Waalhaven Entrance E Side;Breakwater light;51.899700;4.438400;-2.750;land;;registry
+B0698.2;Delfshaven Schiemond E Side;Breakwater light;51.901870;4.448117;-2.541;land;;registry
+B0699;Delfshaven Schiehaven E side;Breakwater light;51.901120;4.454150;-2.467;land;;registry
+B0699.4;Parkhaven W Side Entrance;Breakwater light;51.901870;4.465883;-2.084;land;;registry
+B0699.5;Parkhaven E Side Entrance;Breakwater light;51.902480;4.467533;-1.975;land;;registry
+B0700.5;Euromast;Warning light;51.905500;4.466667;-1.671;land;;registry
+B0701;Maashaven W side Charlois;Breakwater light;51.898330;4.466833;-2.442;land;;registry
+B0701.1;Maashaven;Warning light;51.897680;4.469050;-2.456;land;;registry
+B0701.5;Westerkade;Breakwater light;51.906400;4.478900;-1.259;land;;registry
+B0701.6;Westerkade;Harbour light;51.906650;4.479500;-1.216;land;;registry
+B0701.7;World Port Centre Stadsgebied;Leading light;51.904830;4.484667;-1.326;land;;registry
+B0702;Leuvehaven W side;Breakwater light;51.910930;4.483850;-0.649;land;;registry
+B0711.4;Entrance E side No 1;Breakwater light;51.890930;4.324300;-3.248;land;;registry
+B0711.6;W side;Warning light;51.887300;4.321233;-3.690;land;;registry
+B0711.9;W side;Warning light;51.884930;4.322967;-3.929;land;;registry
+B0766;Ldg Lts Front;Front light;52.461780;4.574500;-0.050;borderline;;registry
+B0766.1;Ldg Lts Rear;Rear light;52.460830;4.582733;-0.963;land;;registry
+B0767;S Breakwater Head;Breakwater light;52.463670;4.532333;4.538;water;;registry
+B0768;N Breakwater Head;Breakwater light;52.467500;4.542500;3.555;water;;registry
+B0769;N Pier Head;Breakwater light;52.466630;4.554000;2.293;water;;registry
+B0770;S Pier Head;Breakwater light;52.462230;4.554933;2.067;water;;registry
+B0783;Haringhaven W side of Entrance;Breakwater light;52.462700;4.578583;-0.463;land;;registry
+B0784;Vissershaven E side of Entrance;Breakwater light;52.463170;4.582667;-0.889;land;;registry
+B0784.2;Seaport Marina W side Entrance;Breakwater light;52.460850;4.559067;1.582;water;;registry
+B0784.21;Seaport Marina Entrance E side;Breakwater light;52.460670;4.559500;1.530;water;;registry
+B0784.5;Zuidelijk Sluiseiland;Breakwater light;52.464630;4.587383;-1.354;land;;registry
+B0785;Zuider Buitenkanaal Entrance S side;Breakwater light;52.462500;4.563500;1.153;water;;registry
+B0786;Zuider Buitenkanaal Entrance W side;Leading light;52.464070;4.573200;0.155;borderline;;registry
+B0786.5;Ijmondhaven Entrance W Side;Breakwater light;52.462330;4.569333;0.521;water;;registry
+B0786.51;Ijmondhaven Entrance E Side;Breakwater light;52.462270;4.571783;0.256;borderline;;registry
+B0789;Noorder Buitenkanaal Ldg Lts Front;Front light;52.469880;4.593683;-1.885;land;;registry
+B0801.5;No 1 Rijksbinnenhaven Entrance W Side;Breakwater light;52.468130;4.624617;-4.999;land;;registry
+B0802.5;No 2 Rijksbinnenhaven Entrance W Side;Breakwater light;52.466680;4.628933;-5.472;land;;registry
+B0803;No 2 Rijksbinnenhaven Entrance E side;Breakwater light;52.466030;4.630483;-5.651;land;;registry
+B0803.2;No 3 Rijksbinnenhaven Entrance W Side;Breakwater light;52.717780;4.630567;1.584;water;;registry
+B0803.5;No 3 Rijksbinnenhaven Entrance E Side;Breakwater light;52.465670;4.631833;-5.792;land;;registry
+B0842;J.C.J. van Speijk;Orientation light;52.619000;4.621667;0.046;borderline;;registry
+B0849;Grote Kaap;Orientation light;52.880930;4.714750;0.236;borderline;;registry
+B0894;Vlieland;Breakwater light;53.295640;5.058222;0.161;borderline;;registry
+B0899.5;Veerboorgat VBG 1;Breakwater light;53.295530;5.078200;0.831;water;;registry
+B0913.6;Harlingen Ldg Lts Front;Breakwater light;53.175300;5.403233;1.868;water;;registry
+B0914;Zuidhavendam;Breakwater light;53.176000;5.402833;1.938;water;;registry
+B0915.4;P10;Breakwater light;53.181500;5.380500;4.474;water;;registry
+B0915.6;New N Mole Head;Breakwater light;53.176600;5.405350;1.702;water;;registry
+B0915.7;Old N Mole Head;Breakwater light;53.175220;5.405917;1.586;water;;registry
+B0915.9;PAAL 2;Breakwater light;53.175270;5.408400;1.331;water;;registry
+B0916.2;Old S Mole No 1;Breakwater light;53.173670;5.407667;1.342;water;;registry
+B2346;Guldholmen;Breakwater light;59.435000;10.576670;1.795;water;;registry
+B2359;Drøbak - Molenfeuer;Breakwater light;59.663330;10.626670;-0.934;land;;registry
+B2364;Kaholmen;Breakwater light;59.680000;10.610000;0.709;water;;registry
+B2370;Tronstadodden;Breakwater light;59.691670;10.591670;-0.290;borderline;;registry
+B2396;Gåsungene;Breakwater light;59.840000;10.588330;2.859;water;;registry
+B2422;Dyna;Breakwater light;59.900000;10.683330;0.516;water;;registry
+B2428;Kavringen;Breakwater light;59.900000;10.723330;-0.218;borderline;;registry
+B2429;Kavringsanden;Breakwater light;59.901670;10.726670;-0.473;land;;registry

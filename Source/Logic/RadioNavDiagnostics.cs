@@ -16,6 +16,8 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public const string LighthouseGlowVerboseKey = "RadioNav.LighthouseGlowVerbose";
         public const string LighthouseMapMarkerPositionKey = "RadioNav.LighthouseMapMarkerPosition";
+        // Declutter shown/hidden counter (ADR-032); off by default.
+        public const string LighthouseDeclutterStatsKey = "RadioNav.LighthouseDeclutterStats";
 
         private const int CacheMs = 250;
         // Environment.TickCount instead of Stopwatch: System.Diagnostics is
@@ -49,6 +51,8 @@ namespace UBOAT.Mods.RadioNavigation
                     IsEnabled(LighthouseGlowVerboseKey, true);
                 cachedValue[LighthouseMapMarkerPositionKey] =
                     IsEnabled(LighthouseMapMarkerPositionKey, true);
+                cachedValue[LighthouseDeclutterStatsKey] =
+                    IsEnabled(LighthouseDeclutterStatsKey, false);
                 cacheRefreshedAt = now;
                 cacheInitialized = true;
             }

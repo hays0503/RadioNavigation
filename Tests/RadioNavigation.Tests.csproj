@@ -120,6 +120,14 @@
     <Compile Include="SignalPanelViewTests.cs" />
     <Compile Include="EntityTypeRowValuesTests.cs" />
     <Compile Include="FixCardComposerTests.cs" />
+    <Compile Include="LeuchtfeuerRegistryTests.cs" />
+    <Compile Include="LighthouseGateAndScaleTests.cs" />
+    <Compile Include="LighthouseAlignmentTests.cs" />
+    <Compile Include="LighthouseLandGateTests.cs" />
+    <Compile Include="CoastQuadTreePortTests.cs" />
+    <Compile Include="LighthouseStaleGroupPolicyTests.cs" />
+    <Compile Include="MarkerDeclutterTests.cs" />
+    <Compile Include="Helpers\CoastQuadTreePort.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -156,6 +164,12 @@
     <Compile Include="..\Source\UI\ChronometerMapDragMath.cs" Link="Source\UI\ChronometerMapDragMath.cs" />
     <Compile Include="..\Source\Data\LighthouseProfile.cs" Link="Source\Data\LighthouseProfile.cs" />
     <Compile Include="..\Source\Data\LighthouseProfiles.cs" Link="Source\Data\LighthouseProfiles.cs" />
+    <Compile Include="..\Source\Data\LeuchtfeuerRegistry.cs" Link="Source\Data\LeuchtfeuerRegistry.cs" />
+    <Compile Include="..\Source\Logic\LighthouseDistanceGate.cs" Link="Source\Logic\LighthouseDistanceGate.cs" />
+    <Compile Include="..\Source\Logic\LighthouseLandGate.cs" Link="Source\Logic\LighthouseLandGate.cs" />
+    <Compile Include="..\Source\Logic\LighthouseStaleGroupPolicy.cs" Link="Source\Logic\LighthouseStaleGroupPolicy.cs" />
+    <Compile Include="..\Source\Logic\LighthouseScale.cs" Link="Source\Logic\LighthouseScale.cs" />
+    <Compile Include="..\Source\Logic\LighthouseAlignment.cs" Link="Source\Logic\LighthouseAlignment.cs" />
     <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />
     <Compile Include="..\Source\Data\StarCatalog.cs" Link="Source\Data\StarCatalog.cs" />
     <Compile Include="..\Source\Data\NavStarNames.cs" Link="Source\Data\NavStarNames.cs" />
@@ -166,6 +180,7 @@
     <Compile Include="..\Source\Logic\StationMatchFormatter.cs" Link="Source\Logic\StationMatchFormatter.cs" />
     <Compile Include="..\Source\Logic\StationCallsignResolver.cs" Link="Source\Logic\StationCallsignResolver.cs" />
     <Compile Include="..\Source\Logic\LighthouseMarkerSizing.cs" Link="Source\Logic\LighthouseMarkerSizing.cs" />
+    <Compile Include="..\Source\Logic\MarkerDeclutter.cs" Link="Source\Logic\MarkerDeclutter.cs" />
     <Compile Include="..\Source\Logic\RadioNavDiagnostics.cs" Link="Source\Logic\RadioNavDiagnostics.cs" />
     <Compile Include="..\Source\Logic\RadioNavProbeJson.cs" Link="Source\Logic\RadioNavProbeJson.cs" />
     <Compile Include="..\Source\Logic\TransformHelpers.cs" Link="Source\Logic\TransformHelpers.cs" />

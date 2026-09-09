@@ -800,7 +800,11 @@ foreach (var name in missing)
             var n = string.IsNullOrEmpty(ns) ? "" : $"namespace {ns};\n";
             string t;
             if (attribute)
-                t = $"public class {typeName} : System.Attribute {{ }}";
+            {
+                // Attribute usages like [FormerlySerializedName("x")] need a
+                // constructor; params object[] accepts any positional form.
+                t = $"public class {typeName} : System.Attribute {{ public {typeName}(params object[] args) {{ }} }}";
+            }
             else if (isEnum)
                 t = members.Length > 0
                     ? $"public enum {typeName} {{ {members} }}"

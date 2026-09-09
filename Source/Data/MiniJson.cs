@@ -38,7 +38,41 @@ namespace UBOAT.Mods.RadioNavigation
             char c = s[pos];
             if (c == '{') return ParseObject(s, ref pos);
             if (c == '"') return ParseString(s, ref pos);
+            if (c == '[') return ParseArray(s, ref pos);
             return ParseNumber(s, ref pos);
+        }
+
+        private static List<object> ParseArray(string s, ref int pos)
+        {
+            var list = new List<object>();
+            pos++;
+            SkipWs(s, ref pos);
+            if (pos < s.Length && s[pos] == ']')
+            {
+                pos++;
+                return list;
+            }
+
+            while (true)
+            {
+                list.Add(ParseValue(s, ref pos));
+                SkipWs(s, ref pos);
+                if (pos >= s.Length)
+                    throw new FormatException("Unexpected end of JSON array");
+
+                char separator = s[pos];
+                if (separator == ',')
+                {
+                    pos++;
+                    continue;
+                }
+                if (separator == ']')
+                {
+                    pos++;
+                    return list;
+                }
+                throw new FormatException("Expected ',' or ']'");
+            }
         }
 
         private static Dictionary<string, object> ParseObject(string s, ref int pos)

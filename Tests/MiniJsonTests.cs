@@ -48,9 +48,31 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void Parse_Array_Throws()
+        public void Parse_Array_ReturnsList()
         {
-            Assert.Throws<FormatException>(() => MiniJson.Parse("{\"a\": [1]}"));
+            // Arrays were unsupported before the Leuchtfeuer registry needed
+            // them; they now parse into List<object>.
+            object value = MiniJson.Parse("{\"a\": [1, \"x\", {\"b\": 2}], \"c\": []}");
+            var root = Assert.IsType<Dictionary<string, object>>(value);
+            var array = Assert.IsType<List<object>>(root["a"]);
+            Assert.Equal(3, array.Count);
+            Assert.Equal(1.0, array[0]);
+            Assert.Equal("x", array[1]);
+            var nested = Assert.IsType<Dictionary<string, object>>(array[2]);
+            Assert.Equal(2.0, nested["b"]);
+            Assert.Empty(Assert.IsType<List<object>>(root["c"]));
+        }
+
+        [Fact]
+        public void Parse_Array_Unterminated_Throws()
+        {
+            Assert.Throws<FormatException>(() => MiniJson.Parse("{\"a\": [1"));
+        }
+
+        [Fact]
+        public void Parse_Array_MissingComma_Throws()
+        {
+            Assert.Throws<FormatException>(() => MiniJson.Parse("{\"a\": [1 2]}"));
         }
 
         [Fact]

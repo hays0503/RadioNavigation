@@ -37,34 +37,41 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [Fact]
         public void FlareTakesOver_AllGoodFppNear_True()
         {
-            Assert.True(LighthouseBeamGate.FlareTakesOver(true, true, true, true, false, 500.0, 30000.0, 1.0));
+            Assert.True(LighthouseBeamGate.FlareTakesOver(true, true, true, true, false, 500.0, 30000.0));
+        }
+
+        [Fact]
+        public void FlareTakesOver_OffBeamNight_True()
+        {
+            // The steady lamp-glow floor keeps the flare valid off-beam:
+            // no beam-alignment condition in the takeover decision.
+            Assert.True(LighthouseBeamGate.FlareTakesOver(true, true, true, true, false, 1753.0, 26532.0));
         }
 
         [Fact]
         public void FlareTakesOver_FppBeyondCap_False()
         {
-            Assert.False(LighthouseBeamGate.FlareTakesOver(true, true, true, true, false, 2000.0, 30000.0, 1.0));
+            Assert.False(LighthouseBeamGate.FlareTakesOver(true, true, true, true, false, 31000.0, 30000.0));
         }
 
         [Fact]
         public void FlareTakesOver_DeviceFar_True()
         {
-            Assert.True(LighthouseBeamGate.FlareTakesOver(true, true, true, true, true, 5000.0, 30000.0, 1.0));
+            Assert.True(LighthouseBeamGate.FlareTakesOver(true, true, true, true, true, 5000.0, 30000.0));
         }
 
         [Fact]
         public void FlareTakesOver_MissingPieces_False()
         {
-            Assert.False(LighthouseBeamGate.FlareTakesOver(false, true, true, true, false, 500.0, 30000.0, 1.0));
-            Assert.False(LighthouseBeamGate.FlareTakesOver(true, true, false, true, false, 500.0, 30000.0, 1.0));
-            Assert.False(LighthouseBeamGate.FlareTakesOver(true, true, true, false, false, 500.0, 30000.0, 1.0));
-            Assert.False(LighthouseBeamGate.FlareTakesOver(true, true, true, true, false, 500.0, 30000.0, 0.0));
+            Assert.False(LighthouseBeamGate.FlareTakesOver(false, true, true, true, false, 500.0, 30000.0));
+            Assert.False(LighthouseBeamGate.FlareTakesOver(true, true, false, true, false, 500.0, 30000.0));
+            Assert.False(LighthouseBeamGate.FlareTakesOver(true, true, true, false, false, 500.0, 30000.0));
         }
 
         [Fact]
         public void FlareTakesOver_FarClipCulled_False()
         {
-            Assert.False(LighthouseBeamGate.FlareTakesOver(true, true, true, true, false, 500.0, 500.0, 1.0));
+            Assert.False(LighthouseBeamGate.FlareTakesOver(true, true, true, true, false, 500.0, 500.0));
         }
 
         [Fact]

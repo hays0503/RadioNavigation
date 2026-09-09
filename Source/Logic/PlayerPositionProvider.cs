@@ -67,6 +67,37 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        /// <summary>
+        /// World-space position of the player ship's transform. The ship
+        /// always lives in the current floating-origin compensated frame, so
+        /// this is the anchor for placing scene content at charted lat/lon
+        /// (see LighthouseAlignment).
+        /// </summary>
+        public bool TryGetShipWorldPosition(out Vector3 world)
+        {
+            world = Vector3.zero;
+            try
+            {
+                FieldInfo shipField = ResolvePlayerShipField();
+                if (shipField.IsNull())
+                    return false;
+                object ship = shipField.GetValue(null);
+                // PlayerShip derives from DeepMonoBehaviour (a Component), so
+                // the transform carries the authoritative world position.
+                Component component = ship as Component;
+                if (component.IsNull())
+                    return false;
+                world = component.transform.position;
+                return IsFinite(world.x) && IsFinite(world.z);
+            }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("PlayerPositionProvider.TryGetShipWorldPosition"))
+                    Debug.LogWarning("[RadioNav][POSITION] ship world position unavailable: " + e.Message);
+                return false;
+            }
+        }
+
         private static FieldInfo ResolvePlayerShipField()
         {
             if (playerShipField.IsNull())

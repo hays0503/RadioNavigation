@@ -40,6 +40,12 @@ namespace UBOAT.Mods.RadioNavigation
         public const double SpillPeak = 0.08;         // weak spill at 0° (~8% of peak)
         public const double SpillSigmaDeg = 20.0;     // spill reaches ~30-40°, then fades
 
+        // Steady lamp glow: the light source itself is visible from any
+        // bearing (a real lighthouse shows a faint steady point between
+        // beam flashes). Fraction of the beam peak contributed omni-
+        // directionally, before attenuation/transmittance/gamma.
+        public const double LampGlowBase = 0.06;
+
         // Size channel constants (pixels).
         public const double SizeShrinkPower = 0.3;
         public const double SizeMinPx = 8.0;
@@ -121,6 +127,21 @@ namespace UBOAT.Mods.RadioNavigation
         public static double StreakLengthCapPx(double distanceM)
         {
             return StreakNearMaxPx + (FarStreakMaxPx - StreakNearMaxPx) * FarClampT(distanceM);
+        }
+
+        /// <summary>
+        /// Steady lamp-glow floor, independent of the beam cones: what the
+        /// observer sees between beam flashes (a real lighthouse lamp is
+        /// visible from any bearing at night). Same attenuation and
+        /// transmittance as the flash channel; no wide/beam factors.
+        /// </summary>
+        public static double GlowIntensity(double distanceM, double fogginess01)
+        {
+            return Math.Pow(
+                DistanceAttenuation(distanceM)
+                * Transmittance(distanceM, fogginess01)
+                * LampGlowBase,
+                DisplayGamma);
         }
 
         /// <summary>

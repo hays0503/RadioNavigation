@@ -17,6 +17,7 @@ coverage.cobertura.xml
 
 # Analysis
 graphify-out/
+roslynator-report.sarif
 
 # IDE
 .vs/
