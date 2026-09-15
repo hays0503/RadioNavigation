@@ -881,6 +881,10 @@ _Maтрица охватывает F01-F52. F53-F76 не имеют перекр
 
 ### Открыто (документировано, требует отдельного слайса/live)
 
-Открытых пунктов нет. F208–F228 закрыты полностью (включая F227c — V3080/V3095 снова включены).
+| ID | P | Область | Суть |
+|----|---|---------|------|
+| **F229** | P1 | Live · AssetBundle | В игре 2026.1-patch21 AssetBundle мода (`Bundles/testui`, содержит `Radio.prefab`, `IconLighthouse.prefab`) **не зарегистрирован** в `ResourceManager` → `InstantiatePrefab("Radio")` = null, панель и маркеры отсутствуют (`mod_state.markers`=0). Игра также сообщает об отсутствующих собственных ассетах. Не связано с Source-правками F208–F228 (бандл грузит игра до логики мода). Требуется: пересобрать бандл под текущую версию / проверить `Mod.LoadAssetBundles` и `ResourceManager.AddAssetBundle` |
+
+F208–F228 закрыты полностью (включая F227c — V3080/V3095 снова включены).
 
 **Гейты после правок:** `tests.ps1` 786 PASS / 0 fail (было 761); `RadioNavigation.Analyzers.Tests` 68 PASS (было 55); `RadioNavigation.SourceCheck` 51 PASS (было 44); `build.ps1` Build OK + PVS clean; `analyze.ps1 -Profile quick` baseline clean; `analyze.ps1 -RnAudit` clean (0 genuine).

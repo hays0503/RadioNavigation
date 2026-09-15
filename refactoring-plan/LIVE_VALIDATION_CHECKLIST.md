@@ -59,6 +59,8 @@ Static Source check: `InformationPanelHandler` и `SonneController` симмет
 
 ## D. Пост-аудит F208–F228 (live-only, статика закрыта 2026-09-15)
 
+> **Live-run 2026-09-15 — заблокирован.** Игра запущена (2026.1-patch21), мод загружен (5/5 патчей, registry 209, `modLoaded=true`), но **AssetBundle мода не зарегистрирован** в `ResourceManager`: `Requested asset at path "Radio" doesn't exist` → панель и маркеры отсутствуют (`mod_state.markers`=0, `radionav.loaded`=false). Игра также сообщает об отсутствующих собственных ассетах (`Icons/Map/Empty - Enemy`, `Icons/Missions/...`). Правка `Source/*.cs` hot-reload watcher не подняла. Причина — окружение/бандл (не Source-правки F208–F228). Новый открытый пункт: **F229**. Пункты ниже — pending до восстановления загрузки бандла.
+
 Все пункты закрыты статически (тесты/SourceCheck/PVS); ниже — то, что видно только в игре.
 
 - [ ] **F208 — blockade хронометра.** Открыть карту → развернуть хронометр → перетащить его тело. После отпускания: маршрут на карте рисуется, клики/выбор работают. Если нет — `GameInput` blockade утёк (`ChronometerDragProtocol.ReleaseBlockade`).
