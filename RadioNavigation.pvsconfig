@@ -7,7 +7,8 @@
 # Rationale: this is a Unity mod. Several PVS rules fire systematically on
 # patterns that are correct-by-construction here but which PVS cannot model:
 #   - custom extension-method null/range guards (IsNull/IsNotNull/IsPositive)
-#     that PVS does not recognize as guards -> spurious V3080/V3105/V3095/V3106;
+#     that PVS does not recognize as guards -> spurious V3105/V3106 (V3080/
+#     V3095 were fixed 2026-09-15 by using explicit == null guards, see below);
 #   - Unity's '?.' on possibly-destroyed UnityEngine.Object -> V3211;
 #   - intentional silent catch blocks in reflection fallbacks -> V3163;
 #   - deliberate exact-zero float comparisons via IsZero()/IsNotZero() -> V3024.
@@ -16,10 +17,17 @@
 # false positive rooted in the above patterns. If the mod ever drops the
 # extension-guard style or introduces raw unguarded member access, re-enable
 # the corresponding rule and re-triage.
+#
+# 2026-09-15 F227c resolution: V3080/V3095 are ENABLED again. PVS-Studio has no
+# C# per-line/per-file suppression (inline //-V: is C++-only; //-V::CODE:path is
+# ignored) and [SuppressMessage] is unusable (the game sandbox denies
+# System.Diagnostics.*), so the 18 hits were fixed at the source: the
+# IsNull()/IsNotNull() guards on those paths became explicit == null / != null
+# (all targets are UnityEngine.Object types, where the overloaded operator keeps
+# fake-null semantics, or plain references). One genuine hardening was added:
+# LighthouseBeamGlow.ApplyDotLayout now null-checks the dot/halo rects.
 
-//-V::3080
 //-V::3105
-//-V::3095
 //-V::3106
 //-V::3211
 //-V::3042

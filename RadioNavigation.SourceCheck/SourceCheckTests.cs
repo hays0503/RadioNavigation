@@ -422,6 +422,243 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Input-blockade lease gate. ChronometerDragProtocol acquires a GameInput
+        /// blockade on the component passed to OnMapDragBegin; the SAME reference
+        /// must be released when the drag ends. CancelNativeDrag removes a
+        /// DIFFERENT component (shipControlUI), so it cannot satisfy this gate.
+        /// Without a matching release the mod's own blockade leaks, and
+        /// GameInput.HasActiveBlockades() keeps map route drawing and map clicks
+        /// disabled for the rest of the session.
+        /// </summary>
+        [Fact]
+        public void Blockade_AcquireReleaseBalanced()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            string path = ModCompiler.EnumerateSources()
+                .FirstOrDefault(p => Path.GetFileName(p) == "ChronometerDragProtocol.cs");
+            Assert.True(path != null, "ChronometerDragProtocol.cs not found");
+
+            var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path).GetRoot();
+            var invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>().ToList();
+
+            int adds = invocations.Count(inv => inv.Expression is MemberAccessExpressionSyntax ma
+                && ma.Name.Identifier.Text == "AddBlockade");
+            int removes = invocations.Count(inv => inv.Expression is MemberAccessExpressionSyntax ma
+                && ma.Name.Identifier.Text == "RemoveBlockade");
+
+            Assert.True(adds == 1, $"expected exactly 1 AddBlockade call, found {adds}");
+            Assert.True(removes >= 1,
+                "ChronometerDragProtocol acquires a GameInput blockade but never removes it — "
+                + "map input stays blocked after the first expanded-chronometer drag");
+        }
+
+        /// <summary>
+        /// Sextant owned-resource lifetime. Sprite.Create assets and
+        /// ScriptableObject profiles are NOT owned by the canvas/volume
+        /// GameObject, so they leak unless destroyed explicitly. Also pins the
+        /// eyecup texture handoff: the texture created for the eyecup sprite
+        /// must be stored on Result.EyecupTexture or the controller's
+        /// Destroy(eyecupTexture) never fires.
+        /// </summary>
+        [Fact]
+        public void SextantOwnedResources_AreDestroyed()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            string overlay = SourceText("SextantOverlay.cs");
+            Assert.Contains("OwnedSprites", overlay);
+
+            string builder = SourceText("SextantOcularBuilder.cs");
+            Assert.Contains("result.EyecupTexture =", builder);
+            Assert.Contains("result.OwnedSprites.Add", builder);
+
+            string controller = SourceText("SextantController.cs");
+            Assert.Contains("ownedSprites", controller);
+            Assert.Contains("Destroy(ownedSprites[i])", controller);
+
+            string bloom = SourceText("SextantBloomCut.cs");
+            Assert.Contains("Destroy(leftProfile)", bloom);
+            Assert.Contains("Destroy(rightProfile)", bloom);
+        }
+
+        /// <summary>
+        /// F220 frame-hot gate: the sextant PIP pose sync must not do
+        /// per-frame reflection/component lookups (cached in TypeMemberCache +
+        /// per-camera dictionaries), and CameraResolver must not use the
+        /// allocating Camera.allCameras accessor.
+        /// </summary>
+        [Fact]
+        public void FrameHot_ReflectionAndCameraLookupsCached()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+
+            MethodDeclarationSyntax sync = FindMethod("SextantPipPose", "SyncCameraState");
+            if (sync == null)
+            {
+                problems.Add("SextantPipPose.SyncCameraState not found");
+            }
+            else
+            {
+                bool reflects = sync.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(inv => CalledName(inv) == "GetProperty"
+                        || CalledName(inv) == "GetField");
+                if (reflects)
+                    problems.Add("SextantPipPose.SyncCameraState still does per-frame GetProperty/GetField");
+            }
+
+            bool usesAllCameras = false;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                if (Path.GetFileName(path) != "CameraResolver.cs")
+                    continue;
+                var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path).GetRoot();
+                usesAllCameras = root.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                    .Any(ma => ma.Name.Identifier.Text == "allCameras");
+            }
+            if (usesAllCameras)
+                problems.Add("CameraResolver still uses Camera.allCameras (array allocated per call)");
+
+            string sky = SourceText("SkyVisibilityResolver.cs");
+            if (sky.Contains("GetType().FullName +"))
+                problems.Add("SkyVisibilityResolver still builds a per-frame string cache key");
+
+            Assert.True(problems.Count == 0, string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// F221 release-log gate: informational diagnostics must be behind
+        /// RadioNavDiagnostics.IsVerboseLogEnabled() (default off) instead of
+        /// flooding Player.log in release. The flare over-range log is gated
+        /// on frame.verbose (its throttle only advances when verbose is on).
+        /// </summary>
+        [Fact]
+        public void ReleaseLogs_AreGated()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+
+            string station = SourceText("StationManager.cs");
+            if (!station.Contains("RadioNavDiagnostics.IsVerboseLogEnabled"))
+                problems.Add("StationManager bearing report is not gated by RadioNavDiagnostics");
+
+            string story = SourceText("RadioStoryIntegration.cs");
+            if (!story.Contains("RadioNavDiagnostics.IsVerboseLogEnabled"))
+                problems.Add("RadioStoryIntegration decision log is not gated");
+
+            string gateway = SourceText("StoryDecisionGateway.cs");
+            if (!gateway.Contains("RadioNavDiagnostics.IsVerboseLogEnabled"))
+                problems.Add("StoryDecisionGateway stage log is not gated");
+
+            string radio = SourceText("RadioHandler.cs");
+            if (!radio.Contains("RadioNavDiagnostics.IsVerboseLogEnabled"))
+                problems.Add("RadioHandler visibility log is not gated");
+
+            string flare = SourceText("LighthouseFlareDriver.cs");
+            if (!flare.Contains("frame.verbose && frame.now"))
+                problems.Add("LighthouseFlareDriver over-range log is not verbose-gated");
+
+            Assert.True(problems.Count == 0, string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// F223: a failed UnityEngine.UI.Image resolution must be latched, or
+        /// every frame re-scans all loaded assemblies and re-logs the warning.
+        /// </summary>
+        [Fact]
+        public void LighthouseDotUi_ImageTypeFailureLatched()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            string text = SourceText("LighthouseDotUi.cs");
+            Assert.Contains("imageTypeResolveFailed", text);
+            Assert.Contains("imageTypeResolveFailed = true", text);
+        }
+
+        /// <summary>
+        /// F228: build.ps1 must define the same preprocessor symbols as the
+        /// game's RoslynCSharp mod compiler (UBOAT, UBOAT_2024_1,
+        /// UNITY_STANDALONE_WIN) and must NOT define RELEASE, which the game
+        /// never sets. Otherwise a local build compiles different #if branches
+        /// than the in-game compile.
+        /// </summary>
+        [Fact]
+        public void BuildScript_GameDefineParity()
+        {
+            string build = File.ReadAllText(Path.Combine(ModCompiler.ModRoot, "build.ps1"));
+            Assert.Contains("UBOAT;UBOAT_2024_1;UNITY_STANDALONE_WIN", build);
+            Assert.DoesNotContain("\"RELEASE\"", build);
+        }
+
+        /// <summary>
+        /// F227: every pure (non-Unity/game-bound) Source file must be linked
+        /// into the unit-test project, or it silently escapes coverage and can
+        /// never lower it. Unity/MonoBehaviour files are exercised live and are
+        /// skipped by the heuristic (no UnityEngine/UBOAT/DWS using, no [Inject]).
+        /// </summary>
+        [Fact]
+        public void TestProject_LinksAllSourceFiles()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            string csproj = File.ReadAllText(
+                Path.Combine(ModCompiler.ModRoot, "Tests", "RadioNavigation.Tests.csproj"));
+            var problems = new List<string>();
+
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                string text = File.ReadAllText(path);
+                if (text.Contains("using UnityEngine")
+                    || text.Contains("using UBOAT.")
+                    || text.Contains("using DWS.")
+                    || text.Contains("[Inject]"))
+                    continue;
+
+                string fileName = Path.GetFileName(path);
+                if (!csproj.Contains("\\" + fileName + "\""))
+                    problems.Add(fileName + " is pure but not linked in Tests/RadioNavigation.Tests.csproj");
+            }
+
+            Assert.True(problems.Count == 0, string.Join("\n", problems));
+        }
+
+        private static MethodDeclarationSyntax FindMethod(string typeName, string methodName)
+        {
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text != typeName)
+                        continue;
+                    return type.Members.OfType<MethodDeclarationSyntax>()
+                        .FirstOrDefault(m => m.Identifier.Text == methodName);
+                }
+            }
+            return null;
+        }
+
+        private static string CalledName(InvocationExpressionSyntax invocation)
+        {
+            if (invocation.Expression is MemberAccessExpressionSyntax ma)
+                return ma.Name.Identifier.Text;
+            if (invocation.Expression is IdentifierNameSyntax id)
+                return id.Identifier.Text;
+            return null;
+        }
+
+        private static string SourceText(string fileName)
+        {
+            string path = ModCompiler.EnumerateSources()
+                .FirstOrDefault(p => Path.GetFileName(p) == fileName);
+            Assert.True(path != null, fileName + " not found in mod sources");
+            return File.ReadAllText(path);
+        }
+
+        /// <summary>
         /// Harmony patch-slot contract (live 2026-09-03: radio menu missing).
         /// RadioStoryIntegration.InjectT3PLL38Decision MUST be wired as a
         /// postfix on RadioStory.ContinueStory, never a prefix:

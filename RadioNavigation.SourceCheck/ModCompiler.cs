@@ -19,8 +19,27 @@ namespace RadioNavigation.SourceCheck
     /// </summary>
     internal static class ModCompiler
     {
-        public const string ModRoot =
-            @"C:\Users\Sergey Pimenov\AppData\LocalLow\Deep Water Studio\UBOAT\Mods\RadioNavigation";
+        public static readonly string ModRoot = ResolveModRoot();
+
+        /// <summary>
+        /// F227: derive the mod root from the running assembly instead of a
+        /// hardcoded user path, so the neural-slop guard works on any machine
+        /// or CI checkout. Walk up from bin/ until a directory contains both
+        /// Source/ and Manifest.json.
+        /// </summary>
+        private static string ResolveModRoot()
+        {
+            for (DirectoryInfo dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+            {
+                if (Directory.Exists(Path.Combine(dir.FullName, "Source"))
+                    && File.Exists(Path.Combine(dir.FullName, "Manifest.json")))
+                {
+                    return dir.FullName;
+                }
+            }
+            // Fallback: legacy hardcoded location (unusual layouts only).
+            return @"C:\Users\Sergey Pimenov\AppData\LocalLow\Deep Water Studio\UBOAT\Mods\RadioNavigation";
+        }
 
         /// <summary>
         /// Exact language/define contract of the game's RoslynCSharp mod

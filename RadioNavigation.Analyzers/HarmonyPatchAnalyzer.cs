@@ -62,8 +62,19 @@ namespace RadioNavigation.Analyzers
                     // metadata: game assemblies are obfuscated and Roslyn under-reports their
                     // members (verified: ShipControlUI 30/87 methods), so "not found" against
                     // Roslyn alone would flood false positives.
-                    if (getMethod != null)
-                        ReportUnresolvedTarget(context, getMethod.Value);
+                    //
+                    // When metadata CONFIRMS the target exists, the handler return-type
+                    // contract (RN0009) must still be validated: without the target's
+                    // signature we can't check params (RN0003/RN0005), but the return-type
+                    // rule is signature-independent. Skipping it here silently exempted
+                    // every real patch on an obfuscated game type (RadioStory/Locale).
+                    if (getMethod != null && ReportUnresolvedTarget(context, getMethod.Value))
+                    {
+                        if (candidate.PrefixExpr != null)
+                            ValidateHandlerReturnTypeOnly(context, candidate, candidate.PrefixExpr, isPrefix: true);
+                        if (candidate.PostfixExpr != null)
+                            ValidateHandlerReturnTypeOnly(context, candidate, candidate.PostfixExpr, isPrefix: false);
+                    }
                     continue;
                 }
 
@@ -83,7 +94,12 @@ namespace RadioNavigation.Analyzers
         ///   Metadata unavailable   -> fall back to old behavior: report RN0001 only for in-source
         ///                             types (game types can't be confirmed absent without an index).
         /// </summary>
-        private static void ReportUnresolvedTarget(
+        /// <returns>
+        /// True when raw metadata confirms the target exists (obfuscation hid it from
+        /// Roslyn). The caller uses this to still run the signature-independent handler
+        /// return-type check (RN0009).
+        /// </returns>
+        private static bool ReportUnresolvedTarget(
             SyntaxNodeAnalysisContext context,
             ResolvedGetMethod getMethod)
         {
@@ -97,14 +113,14 @@ namespace RadioNavigation.Analyzers
             switch (lookup)
             {
                 case MetadataLookupResult.Found:
-                    return;
+                    return true;
                 case MetadataLookupResult.Ambiguous:
                     context.ReportDiagnostic(Diagnostic.Create(
                         Diagnostics.TargetAmbiguous,
                         getMethod.Location,
                         getMethod.MethodName,
                         getMethod.DeclaringType.ToDisplayString()));
-                    return;
+                    return false;
                 case MetadataLookupResult.MethodNotFound:
                 case MetadataLookupResult.TypeNotFound:
                     context.ReportDiagnostic(Diagnostic.Create(
@@ -112,7 +128,7 @@ namespace RadioNavigation.Analyzers
                         getMethod.Location,
                         getMethod.MethodName,
                         getMethod.DeclaringType.ToDisplayString()));
-                    return;
+                    return false;
                 default:
                     if (getMethod.DeclaringType.Locations.Any(l => l.IsInSource))
                     {
@@ -122,8 +138,27 @@ namespace RadioNavigation.Analyzers
                             getMethod.MethodName,
                             getMethod.DeclaringType.ToDisplayString()));
                     }
-                    return;
+                    return false;
             }
+        }
+
+        /// <summary>
+        /// RN0009-only path for targets confirmed by raw metadata but hidden from Roslyn
+        /// (obfuscated game types): the handler return-type contract is signature-independent,
+        /// so it can be checked without the target symbol.
+        /// </summary>
+        private static void ValidateHandlerReturnTypeOnly(
+            SyntaxNodeAnalysisContext context,
+            HarmonyPatchCandidate candidate,
+            ExpressionSyntax handlerExpr,
+            bool isPrefix)
+        {
+            var inner = UnwrapHarmonyMethod(handlerExpr);
+            var handlerSymbol = ResolveMethodInfo(context, inner, out _);
+            if (handlerSymbol == null)
+                return;
+
+            ValidateHandlerReturnType(context, candidate.PatchCall, handlerSymbol, isPrefix);
         }
 
         private void ValidateHandler(

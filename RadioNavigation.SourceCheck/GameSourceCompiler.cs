@@ -22,9 +22,20 @@ namespace RadioNavigation.SourceCheck
     /// </summary>
     internal static class GameSourceCompiler
     {
-        public const string GameRoot = @"C:\code\projects\uboat";
-        public const string ManagedDir =
-            @"C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed";
+        // F227: overridable for CI/other machines; defaults match this dev box.
+        public static readonly string GameRoot =
+            Environment.GetEnvironmentVariable("UBOAT_GAME_SOURCE")
+            ?? @"C:\code\projects\uboat";
+
+        public static readonly string ManagedDir = ResolveManagedDir();
+
+        private static string ResolveManagedDir()
+        {
+            string gamePath = Environment.GetEnvironmentVariable("UBOAT_GAME_PATH");
+            if (!string.IsNullOrEmpty(gamePath))
+                return Path.Combine(gamePath, "UBOAT_Data", "Managed");
+            return @"C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed";
+        }
 
         private static readonly string[] ExcludedOwnAssemblies =
         {

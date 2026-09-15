@@ -33,7 +33,7 @@ namespace RadioNavigation.Analyzers
 
         private static readonly HashSet<string> PerFrameMethods = new HashSet<string>
         {
-            "Update", "LateUpdate", "FixedUpdate"
+            "Update", "LateUpdate", "FixedUpdate", "OnGUI"
         };
 
         private static readonly HashSet<string> LookupMethodNames = new HashSet<string>
@@ -74,6 +74,13 @@ namespace RadioNavigation.Analyzers
             context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.ObjectCreationExpression);
             context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.InterpolatedStringExpression);
             context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.AddExpression);
+            context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.AddAssignmentExpression);
+            context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.ArrayCreationExpression);
+            context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.ImplicitArrayCreationExpression);
+            context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.CastExpression);
+            context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.SimpleLambdaExpression);
+            context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.ParenthesizedLambdaExpression);
+            context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.AnonymousMethodExpression);
             context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.EqualsValueClause);
             context.RegisterSyntaxNodeAction(AnalyzeAudioAllocation, SyntaxKind.SimpleAssignmentExpression);
             context.RegisterSyntaxNodeAction(AnalyzeBackgroundContext, SyntaxKind.InvocationExpression);
@@ -92,7 +99,7 @@ namespace RadioNavigation.Analyzers
             if (!IsInsideMethod(invocation, out var method))
                 return;
 
-            if (!PerFrameMethods.Contains(method.Identifier.ValueText))
+            if (!IsPerFrameContext(method))
                 return;
 
             string name = GetCalledName(invocation);
@@ -104,6 +111,33 @@ namespace RadioNavigation.Analyzers
                 invocation.GetLocation(),
                 name,
                 method.Identifier.ValueText));
+        }
+
+        /// <summary>
+        /// Per-frame contexts: the Update family/OnGUI, plus a coroutine body that yields
+        /// per-frame (yield return null / WaitForEndOfFrame). Lookups there run every frame
+        /// and should be cached, same as in Update.
+        /// </summary>
+        private static bool IsPerFrameContext(MethodDeclarationSyntax method)
+        {
+            if (PerFrameMethods.Contains(method.Identifier.ValueText))
+                return true;
+
+            string returnType = method.ReturnType?.ToString();
+            bool isIterator = returnType == "IEnumerator"
+                || (returnType != null && returnType.EndsWith(".IEnumerator", System.StringComparison.Ordinal));
+            if (!isIterator)
+                return false;
+
+            foreach (var y in method.DescendantNodes().OfType<YieldStatementSyntax>())
+            {
+                if (y.Expression == null)
+                    continue; // yield break
+                string expr = y.Expression.ToString();
+                if (expr == "null" || expr.Contains("WaitForEndOfFrame"))
+                    return true;
+            }
+            return false;
         }
 
         private void AnalyzeAudioAllocation(SyntaxNodeAnalysisContext context)
@@ -126,6 +160,22 @@ namespace RadioNavigation.Analyzers
                     if (IsStringConcatenation((BinaryExpressionSyntax)context.Node, context))
                         ReportAudioAllocation(context, context.Node, "string concatenation");
                     break;
+                case SyntaxKind.AddAssignmentExpression:
+                    if (IsStringAddAssignment((AssignmentExpressionSyntax)context.Node, context))
+                        ReportAudioAllocation(context, context.Node, "string concatenation");
+                    break;
+                case SyntaxKind.ArrayCreationExpression:
+                case SyntaxKind.ImplicitArrayCreationExpression:
+                    ReportAudioAllocation(context, context.Node, "array allocation");
+                    break;
+                case SyntaxKind.CastExpression:
+                    AnalyzeExplicitCast(context, (CastExpressionSyntax)context.Node);
+                    break;
+                case SyntaxKind.SimpleLambdaExpression:
+                case SyntaxKind.ParenthesizedLambdaExpression:
+                case SyntaxKind.AnonymousMethodExpression:
+                    ReportAudioAllocation(context, context.Node, "delegate/lambda allocation");
+                    break;
                 case SyntaxKind.InvocationExpression:
                     AnalyzeAudioInvocation(context, (InvocationExpressionSyntax)context.Node);
                     break;
@@ -136,6 +186,29 @@ namespace RadioNavigation.Analyzers
                     AnalyzeBoxing(context, ((AssignmentExpressionSyntax)context.Node).Right);
                     break;
             }
+        }
+
+        /// <summary>
+        /// `s += x` where s is a string allocates a new string (unlike `i += 1`).
+        /// </summary>
+        private static bool IsStringAddAssignment(AssignmentExpressionSyntax assignment, SyntaxNodeAnalysisContext context)
+        {
+            var left = context.SemanticModel.GetTypeInfo(assignment.Left).Type;
+            return left != null && left.SpecialType == SpecialType.System_String;
+        }
+
+        /// <summary>
+        /// Explicit `(object)value` / `(IInterface)value` cast of a value type boxes.
+        /// (Implicit boxing on assignment/argument is handled by AnalyzeBoxing.)
+        /// </summary>
+        private void AnalyzeExplicitCast(SyntaxNodeAnalysisContext context, CastExpressionSyntax cast)
+        {
+            var operand = context.SemanticModel.GetTypeInfo(cast.Expression).Type;
+            var target = context.SemanticModel.GetTypeInfo(cast.Type).Type;
+            if (operand == null || target == null)
+                return;
+            if (operand.IsValueType && !target.IsValueType)
+                ReportAudioAllocation(context, cast, "boxing");
         }
 
         private void AnalyzeBoxing(SyntaxNodeAnalysisContext context, ExpressionSyntax value)
@@ -355,10 +428,22 @@ namespace RadioNavigation.Analyzers
         {
             for (var t = type; t != null; t = t.BaseType)
             {
-                if (t.ContainingNamespace?.ToString() == "UnityEngine")
+                var ns = t.ContainingNamespace?.ToString();
+                if (ns != null && IsMainThreadNamespace(ns))
                     return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// Main-thread-only namespaces. Exact "UnityEngine" misses UnityEngine.UI.*, TMPro.*
+        /// and the game's own UBOAT.* types (all main-thread), so match by prefix.
+        /// </summary>
+        private static bool IsMainThreadNamespace(string ns)
+        {
+            return ns == "UnityEngine" || ns.StartsWith("UnityEngine.", System.StringComparison.Ordinal)
+                || ns == "TMPro" || ns.StartsWith("TMPro.", System.StringComparison.Ordinal)
+                || ns == "UBOAT" || ns.StartsWith("UBOAT.", System.StringComparison.Ordinal);
         }
 
         private static string GetCalledName(InvocationExpressionSyntax invocation)

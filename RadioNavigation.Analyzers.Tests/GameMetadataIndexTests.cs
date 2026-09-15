@@ -191,6 +191,29 @@ public class Patcher
         }
 
         [Fact]
+        public void MetadataFound_BadReturnPrefix_StillReportsRN0009()
+        {
+            // Track 3 hardening: the target is confirmed by raw metadata (Roslyn-hidden),
+            // so RN0001 must NOT fire - but the signature-independent handler return-type
+            // contract (RN0009) must still be validated. Before the fix this silently
+            // skipped RN0009 for every real patch on an obfuscated game type.
+            if (!HasGameDll) return;
+            var src = @"
+using System.Reflection;
+public class Patcher
+{
+    public void Apply(HarmonyLib.Harmony h)
+    {
+        var m = typeof(UBOAT.Game.UI.ShipControlUI).GetMethod(""ApplyToolPositionLimits"", BindingFlags.Static | BindingFlags.NonPublic);
+        h.Patch(m, prefix: new HarmonyLib.HarmonyMethod(typeof(Patcher).GetMethod(""P"")));
+    }
+    public static int P(object __instance) { return 0; }
+}
+";
+            AssertHas("RN0009", Run(src));
+        }
+
+        [Fact]
         public void ApplyToolPositionLimits_BindingFlagsVariable_StaticPin_NoDiagnostic()
         {
             // Step 3: BindingFlags held in a local variable (like Main.cs 'anyStatic') must be

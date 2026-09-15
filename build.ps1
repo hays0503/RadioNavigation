@@ -79,7 +79,12 @@ $outPath = Join-Path $OutputDir "radionavigation.dll"
 
 # F78: C# preprocessor symbols are case-sensitive; /define:Debug would not
 # match #if DEBUG. Map the Configuration to an UPPERCASE symbol.
-$defineSymbol = if ($Configuration -eq "Debug") { "DEBUG" } else { "RELEASE" }
+# F228: mirror the game's RoslynCSharp compiler define set (UBOAT,
+# UBOAT_2024_1, UNITY_STANDALONE_WIN; the game never defines RELEASE) so a
+# local build compiles the same #if branches as the in-game compile. Debug
+# adds DEBUG for local step-through only.
+$gameSymbols = "UBOAT;UBOAT_2024_1;UNITY_STANDALONE_WIN"
+$defineSymbol = if ($Configuration -eq "Debug") { "DEBUG;$gameSymbols" } else { $gameSymbols }
 
 # F196: /debug:full + /optimize+ combined break step-through debugging
 # (optimizer removes locals); split the flags per configuration.

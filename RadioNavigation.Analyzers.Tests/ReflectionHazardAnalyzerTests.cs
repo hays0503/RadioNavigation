@@ -138,6 +138,43 @@ public class M
         }
 
         [Fact]
+        public void AssignedThenUsedUnguarded_ReportsRN0010()
+        {
+            var src = @"
+using System.Reflection;
+public class Foo { public int f; }
+public class M
+{
+    public void Go(object obj)
+    {
+        var fi = typeof(Foo).GetField(""f"", BindingFlags.Public | BindingFlags.Instance);
+        fi.SetValue(obj, 1);
+    }
+}
+";
+            AssertHas("RN0010", Run(src));
+        }
+
+        [Fact]
+        public void AssignedThenGuardedWithIsNotNull_NoRN0010()
+        {
+            var src = @"
+using System.Reflection;
+public static class Guards { public static bool IsNotNull(this object o) { return o != null; } }
+public class Foo { public int f; }
+public class M
+{
+    public void Go(object obj)
+    {
+        var fi = typeof(Foo).GetField(""f"", BindingFlags.Public | BindingFlags.Instance);
+        if (fi.IsNotNull()) fi.SetValue(obj, 1);
+    }
+}
+";
+            AssertNone(Run(src));
+        }
+
+        [Fact]
         public void NonReflectionCall_NoRN0010()
         {
             var src = @"
