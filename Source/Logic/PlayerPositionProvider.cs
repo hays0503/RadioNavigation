@@ -39,7 +39,7 @@ namespace UBOAT.Mods.RadioNavigation
                 PropertyInfo sandboxProp = ResolveSandboxShipProperty(ship.GetType());
                 if (sandboxProp.IsNotNull())
                     sandbox = sandboxProp.GetValue(ship, null);
-                if (sandbox.IsNull())
+                if (sandbox == null)
                     return false;
 
                 Vector2 position = Vector2.zero;

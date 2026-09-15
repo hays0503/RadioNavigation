@@ -21,6 +21,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         private GameObject leftGo;
         private GameObject rightGo;
+        // sharedProfile is a ScriptableObject, NOT owned by the volume
+        // GameObject — it must be destroyed explicitly or it leaks per open.
+        private PostProcessProfile leftProfile;
+        private PostProcessProfile rightProfile;
         private bool logged;
 
         /// <summary>Creates (once) the volume for one PIP half and adds its
@@ -49,9 +53,15 @@ namespace UBOAT.Mods.RadioNavigation
                     volume.sharedProfile = profile;
                     volumeGo.SetActive(false); // active only while filter>0
                     if (rightSide)
+                    {
                         rightGo = volumeGo;
+                        rightProfile = profile;
+                    }
                     else
+                    {
                         leftGo = volumeGo;
+                        leftProfile = profile;
+                    }
                     Debug.Log(LogPrefix + " BLOOMCUT volume " + (rightSide ? "right" : "left")
                         + " on layer " + layer + " created (hidden)");
                 }
@@ -128,8 +138,14 @@ namespace UBOAT.Mods.RadioNavigation
                 UnityEngine.Object.Destroy(leftGo);
             if (rightGo != null)
                 UnityEngine.Object.Destroy(rightGo);
+            if (leftProfile != null)
+                UnityEngine.Object.Destroy(leftProfile);
+            if (rightProfile != null)
+                UnityEngine.Object.Destroy(rightProfile);
             leftGo = null;
             rightGo = null;
+            leftProfile = null;
+            rightProfile = null;
         }
     }
 }

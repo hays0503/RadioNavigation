@@ -18,6 +18,10 @@ namespace UBOAT.Mods.RadioNavigation
         public const string LighthouseMapMarkerPositionKey = "RadioNav.LighthouseMapMarkerPosition";
         // Declutter shown/hidden counter (ADR-032); off by default.
         public const string LighthouseDeclutterStatsKey = "RadioNav.LighthouseDeclutterStats";
+        // F221: informational release logs (bearing report, decision/stage,
+        // panel visibility, flare over-range). OFF by default — these are
+        // diagnostics, not errors; enable with PlayerPrefs RadioNav.VerboseLog=1.
+        public const string VerboseLogKey = "RadioNav.VerboseLog";
 
         private const int CacheMs = 250;
         // Environment.TickCount instead of Stopwatch: System.Diagnostics is
@@ -53,10 +57,21 @@ namespace UBOAT.Mods.RadioNavigation
                     IsEnabled(LighthouseMapMarkerPositionKey, true);
                 cachedValue[LighthouseDeclutterStatsKey] =
                     IsEnabled(LighthouseDeclutterStatsKey, false);
+                cachedValue[VerboseLogKey] =
+                    IsEnabled(VerboseLogKey, false);
                 cacheRefreshedAt = now;
                 cacheInitialized = true;
             }
             return cachedValue.TryGetValue(key, out bool value) ? value : IsEnabled(key, defaultValue);
+        }
+
+        /// <summary>
+        /// True when the shared informational-log switch is on (default off).
+        /// Cached, so it is safe on per-frame paths (F221).
+        /// </summary>
+        public static bool IsVerboseLogEnabled()
+        {
+            return IsEnabledCached(VerboseLogKey, false);
         }
     }
 }

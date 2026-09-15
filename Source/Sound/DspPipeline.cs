@@ -66,8 +66,24 @@ namespace UBOAT.Mods.RadioNavigation
         private float cachedGaussian;
         private bool hasCachedGaussian;
 
-        public float NoiseFloor { get; set; } = 0.002f;
-        public float ImpulseProbability { get; set; } = 0.001f;
+        // Tuning written on the main thread (AudioSynthesisEngine.ApplyFeedback)
+        // and read on the audio thread (Apply). volatile closes the visibility
+        // gap; a non-volatile field may be hoisted out of the sample loop.
+        private volatile float noiseFloor = 0.002f;
+        private volatile float impulseProbability = 0.001f;
+
+        public float NoiseFloor
+        {
+            get { return noiseFloor; }
+            set { noiseFloor = value; }
+        }
+
+        public float ImpulseProbability
+        {
+            get { return impulseProbability; }
+            set { impulseProbability = value; }
+        }
+
         public float ImpulseAmplitude { get; set; } = 0.3f;
         public float QsbDepth { get; set; } = 0.75f;
         public float QsbFrequency { get; set; } = 0.15f;
@@ -149,7 +165,15 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
         public float SaturationDrive { get; set; } = 1.5f;
-        public float WhistleLevel { get; set; } = 0f;
+
+        // Written on the main thread (ApplyFeedback), read in Process on the
+        // audio thread — volatile for the same visibility reason as NoiseFloor.
+        private volatile float whistleLevel;
+        public float WhistleLevel
+        {
+            get { return whistleLevel; }
+            set { whistleLevel = value; }
+        }
 
         public ReceiverDsp(float sampleRate)
         {

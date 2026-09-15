@@ -25,6 +25,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private Canvas canvas;
         private Type imageType;
+        private bool imageTypeResolveFailed;
         private Component coreImage;
         private Component haloImage;
         private Component streakImage;
@@ -74,8 +75,9 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Builds the canvas and the three images once. Safe to call again
-        /// after a failed attempt (retries the Image type resolution).
+        /// Builds the canvas and the three images once. A failed Image type
+        /// resolution is latched (F223) so callers do not re-scan assemblies
+        /// every frame.
         /// </summary>
         public bool EnsureBuilt(string ownerName)
         {
@@ -169,6 +171,14 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 return true;
             }
+            // F223: negative cache. Without it every frame re-scanned all
+            // loaded assemblies and re-logged the warning when UnityEngine.UI
+            // was unavailable. Core modules are loaded at startup, so a miss
+            // is permanent for the session.
+            if (imageTypeResolveFailed)
+            {
+                return false;
+            }
 
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
             for (int i = 0; i < assemblies.Length; i++)
@@ -181,6 +191,7 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
 
+            imageTypeResolveFailed = true;
             Debug.LogWarning("[RadioNav][Lighthouse] glow: '" + ImageTypeName +
                 "' not found; screen-space dot fallback unavailable");
             return false;

@@ -27,7 +27,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         private ResourceManager resourceManager;
         private Harmony harmony;
-        private bool loaded;
+        // Stable identity of the bootstrap type across hot-reload assemblies
+        // (AssemblyQualifiedName changes per load; FullName does not).
+        private const string BootstrapTypeFullName = "UBOAT.Mods.RadioNavigation.ModBootstrapper";
         public ModBootstrapper(ResourceManager resourceManager)
         {
             this.resourceManager = resourceManager;
@@ -37,24 +39,30 @@ namespace UBOAT.Mods.RadioNavigation
         {
             Debug.Log("[RadioNav][Main] RadioNavigation v" + Assembly.GetExecutingAssembly().GetName().Version + ", UBOAT " + Application.version);
 
-            if (loaded)
-            {
-                harmony?.UnpatchAll(harmony.Id); // F139: bare UnpatchAll() removes other mods' patches; 0Harmony 2.2.2 has no UnpatchSelf
-                RadioStoryIntegration.ResetRuntimeState();
-                LighthousePlacer.Reset();
-                LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
-                GameTimeResolver.Reset();
-                // Lifecycle sweep (risk register iter2): stale cross-scene
-                // state that the four resets above do not cover — camera hook
-                // + cached cameras, radio power latch, type/member caches
-                // (game update may rename), stale fix pin.
-                CameraResolver.ResetForReload();
-                RadioPowerBus.Reset();
-                GameTypeCache.Clear();
-                WarnOnce.Reset();
-                FixMapMarker.Clear();
+            // Reset cross-scene state on EVERY load. The game creates a new
+            // Main instance per hot reload (Mod.InitializeAssembly), so an
+            // instance 'loaded' flag is never true on the second call — the old
+            // guard was dead and left stale statics/hooks behind.
+            bool reload = harmony != null;
+            if (reload)
+                harmony.UnpatchAll(harmony.Id); // F139: bare UnpatchAll() removes other mods' patches; 0Harmony 2.2.2 has no UnpatchSelf
+            RadioStoryIntegration.ResetRuntimeState();
+            LighthousePlacer.Reset();
+            LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
+            GameTimeResolver.Reset();
+            // Lifecycle sweep (risk register iter2): stale cross-scene
+            // state that the four resets above do not cover — camera hook
+            // + cached cameras, radio power latch, type/member caches
+            // (game update may rename), stale fix pin.
+            CameraResolver.ResetForReload();
+            RadioPowerBus.Reset();
+            GameTypeCache.Clear();
+            TypeMemberCache.Clear();
+            SkyVisibilityResolver.Reset();
+            WarnOnce.Reset();
+            FixMapMarker.Clear();
+            if (reload)
                 Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
-            }
 
             harmony = new Harmony("UBOAT.Mods.RadioNavigation");
             HarmonyPatchInstaller.Apply(harmony);
@@ -95,17 +103,56 @@ namespace UBOAT.Mods.RadioNavigation
                     LeuchtfeuerRegistry.Profiles.Count + " theater profiles");
             }
 
+            // A hot reload loads a NEW assembly without unloading the old one;
+            // the old instance's SceneEventsListener handlers survive and root
+            // it. Purge them before re-subscribing (F219).
+            PurgeStaleSceneHandlers();
             SceneEventsListener.OnSceneStart -= SceneEventsListener_OnSceneStart;
             SceneEventsListener.OnSceneAwake -= SceneEventsListener_OnSceneAwake;
             SceneEventsListener.OnSceneStart += SceneEventsListener_OnSceneStart;
             SceneEventsListener.OnSceneAwake += SceneEventsListener_OnSceneAwake;
 
-            loaded = true;
-
             Debug.Log("[RadioNav][DIAG] version=" + Assembly.GetExecutingAssembly().GetName().Version +
                 " game=" + Application.version +
                 " di=" + (InjectionFramework.Instance.IsNotNull() ? "ok" : "null") +
                 " resourceManager=" + (resourceManager.IsNotNull() ? "ok" : "null"));
+        }
+
+        /// <summary>
+        /// Remove stale <see cref="SceneEventsListener"/> handlers left by a
+        /// previous hot-reload assembly. The game loads a new assembly on
+        /// recompile but never unloads the old one, so its subscriptions stay
+        /// alive and would build a duplicate panel each reload.
+        /// </summary>
+        private static void PurgeStaleSceneHandlers()
+        {
+            PurgeEvent(typeof(SceneEventsListener), "OnSceneStart", "SceneEventsListener_OnSceneStart");
+            PurgeEvent(typeof(SceneEventsListener), "OnSceneAwake", "SceneEventsListener_OnSceneAwake");
+        }
+
+        private static void PurgeEvent(Type eventOwner, string eventName, string handlerName)
+        {
+            try
+            {
+                FieldInfo field = eventOwner.GetField(eventName,
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (field == null)
+                    return;
+
+                if (!(field.GetValue(null) is Delegate current))
+                    return;
+
+                Delegate kept = SceneEventHandlerPurge.RemoveAll(current, BootstrapTypeFullName, handlerName);
+                if (!ReferenceEquals(kept, current))
+                {
+                    field.SetValue(null, kept);
+                    Debug.Log("[RadioNav][Main] purged stale " + eventName + " handler(s) from a previous reload");
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[RadioNav][Main] stale handler purge failed for " + eventName + ": " + e.Message);
+            }
         }
 
         private void SceneEventsListener_OnSceneAwake(Scene scene)
@@ -176,7 +223,7 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
 
                 GameObject radio = InstantiateRadio(viewport);
-                if (radio.IsNull())
+                if (radio == null)
                     return;
 
                 SceneContentBuilder.Build(radio);

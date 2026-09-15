@@ -90,6 +90,19 @@ namespace UBOAT.Mods.RadioNavigation
         private Texture2D ringTexture;
         private Texture2D circleMaskTexture;
         private Texture2D eyecupTexture;
+        private System.Collections.Generic.List<Sprite> ownedSprites;
+
+        // Cached delegates for the per-frame input poller: method-group
+        // conversions would allocate a new delegate each frame.
+        private Action<float> logArcInputDelegate;
+        private Action<int, bool> setFiltersDelegate;
+        private Action zoomInDelegate;
+        private Action zoomOutDelegate;
+        private Action resetArcDelegate;
+        private Action manualRenderDelegate;
+        private Action<bool, float> sunReadoutDelegate;
+        private Action<float> sunDriftLogDelegate;
+        private Action painStarIdResetDelegate;
 
         // PPv2 bloom-cut volumes live in SextantBloomCut (extracted).
         private readonly SextantBloomCut bloomCut = new SextantBloomCut();
@@ -110,6 +123,15 @@ namespace UBOAT.Mods.RadioNavigation
             worksheet = new SextantWorksheet(positionProvider);
             bodiesReadout = new SextantBodiesReadout(positionProvider);
             inputPoller = new SextantInputPoller(arcInput, worksheet, starId);
+            logArcInputDelegate = LogArcInputVector;
+            setFiltersDelegate = SetFilters;
+            zoomInDelegate = ZoomIn;
+            zoomOutDelegate = ZoomOut;
+            resetArcDelegate = ResetArc;
+            manualRenderDelegate = () => vectorLog.OnManualRender(arcAngle);
+            sunReadoutDelegate = UpdateSunReadout;
+            sunDriftLogDelegate = LogSunDrift;
+            painStarIdResetDelegate = starId.Reset;
             calibrator.Load();
         }
 
@@ -126,9 +148,9 @@ namespace UBOAT.Mods.RadioNavigation
                     Close();
                     return;
                 }
-                inputPoller.PollArc(Time.unscaledDeltaTime, ref arcAngle, ShiftHeld(), LogArcInputVector);
-                inputPoller.PollFilters(SetFilters);
-                inputPoller.PollZoom(ZoomIn, ZoomOut, ResetArc);
+                inputPoller.PollArc(Time.unscaledDeltaTime, ref arcAngle, ShiftHeld(), logArcInputDelegate);
+                inputPoller.PollFilters(setFiltersDelegate);
+                inputPoller.PollZoom(zoomInDelegate, zoomOutDelegate, resetArcDelegate);
                 UpdatePipPose();
                 if (vectorLog.OnViewRotate(viewCamera))
                     LogVectorState("rotate");
@@ -152,6 +174,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (IsOpen && gameInput != null)
                 gameInput.RemoveBlockade(this);
             pipFactory.Destroy();
+            SextantPipPose.Reset();
             IsOpen = false;
 
             if (canvasRoot != null) Destroy(canvasRoot);
@@ -159,6 +182,15 @@ namespace UBOAT.Mods.RadioNavigation
             if (ringTexture != null) Destroy(ringTexture);
             if (circleMaskTexture != null) Destroy(circleMaskTexture);
             if (eyecupTexture != null) Destroy(eyecupTexture);
+            if (ownedSprites != null)
+            {
+                for (int i = 0; i < ownedSprites.Count; i++)
+                {
+                    if (ownedSprites[i] != null)
+                        Destroy(ownedSprites[i]);
+                }
+                ownedSprites.Clear();
+            }
             renderCheck.Destroy();
         }
 
@@ -393,7 +425,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void UpdatePipPose()
         {
             SextantPipPose.Update(pipFactory, arcAngle, zoom.FovDivisor,
-                ref viewCamera, () => vectorLog.OnManualRender(arcAngle));
+                ref viewCamera, manualRenderDelegate);
         }
 
         // ---- glare application lives in SextantGlareCoordinator
@@ -425,9 +457,9 @@ namespace UBOAT.Mods.RadioNavigation
             frame.FilterDimLeft = filterDimLeftImage;
             frame.FilterDimRight = filterDimRightImage;
             frame.PainText = painText;
-            frame.SunReadout = UpdateSunReadout;
-            frame.SunDriftLog = LogSunDrift;
-            frame.PainStarIdReset = starId.Reset;
+            frame.SunReadout = sunReadoutDelegate;
+            frame.SunDriftLog = sunDriftLogDelegate;
+            frame.PainStarIdReset = painStarIdResetDelegate;
             glare.Update(dt, frame);
         }
 
@@ -542,6 +574,7 @@ namespace UBOAT.Mods.RadioNavigation
             ringTexture = ui.RingTexture;
             circleMaskTexture = ui.CircleMaskTexture;
             eyecupTexture = ui.EyecupTexture;
+            ownedSprites = ui.OwnedSprites;
             // NOTE: ui.OpaqueViewMaterial intentionally not cached here — the
             // ocular images already hold it (SextantOcularBuilder assigns
             // Left/RightViewImage.material), so no extra reference is needed

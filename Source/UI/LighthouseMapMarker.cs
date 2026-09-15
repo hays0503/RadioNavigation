@@ -31,6 +31,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private readonly List<LighthouseProfile> fleet = new List<LighthouseProfile>();
         private float positionLogTimer;
+        private bool staleCleanupDone;
 
         protected override int MarkerCount => fleet.Count;
 
@@ -108,12 +109,25 @@ namespace UBOAT.Mods.RadioNavigation
                 return direct.Asset;
             }
 
-            Debug.LogWarning(LogPrefix + " lighthouse icon '" + IconAssetName +
-                "' not found in bundle (prefab Image/SpriteRenderer or Sprite); marker icon will be blank");
+            if (!iconWarned)
+            {
+                iconWarned = true;
+                Debug.LogWarning(LogPrefix + " lighthouse icon '" + IconAssetName +
+                    "' not found in bundle (prefab Image/SpriteRenderer or Sprite); marker icon will be blank");
+            }
             return null;
         }
 
-        protected override void OnMaintenance() => DestroyStaleGameMarkers();
+        protected override void OnMaintenance()
+        {
+            // One successful scan with nothing left to remove means the old-save
+            // stale markers are gone; stop the whole-scene FindObjectsOfType
+            // every second for the rest of the session.
+            if (staleCleanupDone)
+                return;
+            if (DestroyStaleGameMarkers() == 0)
+                staleCleanupDone = true;
+        }
 
         protected override void OnMarkerPositioned(int index, Vector3 worldPosition, float scale, float iconPx)
         {
@@ -145,8 +159,9 @@ namespace UBOAT.Mods.RadioNavigation
         /// true, for which the game already created an EntityMarkerUI with
         /// the Unknown icon. Remove those so only our own markers remain.
         /// </summary>
-        private void DestroyStaleGameMarkers()
+        private int DestroyStaleGameMarkers()
         {
+            int removed = 0;
             EntityMarkerUI[] markers = FindObjectsOfType<EntityMarkerUI>();
             for (int i = 0; i < markers.Length; i++)
             {
@@ -156,12 +171,14 @@ namespace UBOAT.Mods.RadioNavigation
                     continue;
                 }
 
-                if (marker.Entity.Name.StartsWith("Lighthouse "))
+                if (marker.Entity.Name.StartsWith("Lighthouse ", StringComparison.Ordinal))
                 {
                     Debug.Log(LogPrefix + " removed stale game marker for '" + marker.Entity.Name + "'");
                     Destroy(marker.gameObject);
+                    removed++;
                 }
             }
+            return removed;
         }
     }
 }

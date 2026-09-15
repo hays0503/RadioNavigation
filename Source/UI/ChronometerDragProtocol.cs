@@ -27,6 +27,9 @@ namespace UBOAT.Mods.RadioNavigation
         private Vector2 localDragPoint;
         private bool mapDragActive;
         private GameInput gameInput;
+        // The component passed to GameInput.AddBlockade; GameInput.RemoveBlockade
+        // must receive the SAME reference, so the lease is tracked here.
+        private Component blockadeBlocker;
 
         public ChronometerDragProtocol(
             System.Func<bool> isRaised,
@@ -122,6 +125,7 @@ namespace UBOAT.Mods.RadioNavigation
             // Mirror native HandleDialDragging: the GameInput blockade keeps
             // the map pan and other input consumers from eating the same
             // left-drag gesture while we move the expanded face.
+            blockadeBlocker = blocker;
             AcquireInputBlockade(blocker);
         }
 
@@ -169,7 +173,23 @@ namespace UBOAT.Mods.RadioNavigation
                     persistPosition();
             }
 
+            // Release the SAME component we added; CancelNativeDrag only clears
+            // the native ShipControlUI blockade, so without this the mod's own
+            // blockade leaks and map route/click input stays dead for the session.
+            ReleaseBlockade();
+
             scaleSubsystem.CancelMapDrag();
+        }
+
+        /// <summary>
+        /// Release any blockade acquired by a map drag (also used on teardown).
+        /// </summary>
+        public void ReleaseBlockade()
+        {
+            if (blockadeBlocker == null)
+                return;
+            ReleaseInputBlockade(blockadeBlocker);
+            blockadeBlocker = null;
         }
 
         // ---- input blockade -------------------------------------------------

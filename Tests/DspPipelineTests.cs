@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using Xunit;
 
 namespace UBOAT.Mods.RadioNavigation.Tests
@@ -86,6 +87,31 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 max = Math.Max(max, Math.Abs(sample));
             }
             Assert.True(max <= 1.0001f, "max=" + max);
+        }
+
+        // Audio-thread visibility: tuning written on the main thread and read
+        // in the audio callback must be volatile, or the JIT may hoist the read
+        // out of the sample loop and the operator never hears the change.
+        [Fact]
+        public void Atmosphere_TuningFields_AreVolatile()
+        {
+            AssertVolatile(typeof(Atmosphere), "noiseFloor");
+            AssertVolatile(typeof(Atmosphere), "impulseProbability");
+            AssertVolatile(typeof(ReceiverDsp), "whistleLevel");
+        }
+
+        private static void AssertVolatile(Type type, string fieldName)
+        {
+            FieldInfo field = type.GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.True(field != null, type.Name + "." + fieldName + " field not found");
+            Type[] mods = field.GetRequiredCustomModifiers();
+            bool isVolatile = false;
+            for (int i = 0; i < mods.Length; i++)
+            {
+                if (mods[i].FullName == "System.Runtime.CompilerServices.IsVolatile")
+                    isVolatile = true;
+            }
+            Assert.True(isVolatile, type.Name + "." + fieldName + " must be volatile");
         }
     }
 }

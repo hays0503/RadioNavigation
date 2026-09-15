@@ -111,8 +111,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (!EnsureDependencies())
                 return;
 
-            if (!EnsureBuilt())
-                return;
+            EnsureBuilt();
 
             RunMaintenance();
 
@@ -163,12 +162,10 @@ namespace UBOAT.Mods.RadioNavigation
             return true;
         }
 
-        private bool EnsureBuilt()
+        private void EnsureBuilt()
         {
-            if (built)
-                return true;
-            BuildAll();
-            return built;
+            if (!built)
+                BuildAll();
         }
 
         private void RunMaintenance()
@@ -303,7 +300,14 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 iconSprite = LoadIconSprite();
                 if (iconSprite == null)
+                {
+                    // Latch the failure: without this EnsureBuilt retries
+                    // LoadIconSprite (bundle lookup) every frame and the
+                    // derived marker's warning floods Player.log. The derived
+                    // class has already logged the reason once.
+                    built = true;
                     return;
+                }
             }
 
             OnBeforeBuildViews();
@@ -319,9 +323,11 @@ namespace UBOAT.Mods.RadioNavigation
                 views.Add(BuildMarkerView(i));
 
             built = true;
+            Transform managerParent = markersManager.transform.parent;
             Debug.Log(LogPrefix + " markers built=" + views.Count +
                 " icon='" + (iconSprite != null ? iconSprite.name : "null") + "'" +
-                " parent='" + markersManager.transform.parent.name + "/" + markersManager.transform.name + "'");
+                " parent='" + (managerParent != null ? managerParent.name : "(root)") +
+                "/" + markersManager.transform.name + "'");
         }
 
         private MarkerView BuildMarkerView(int index)
@@ -471,7 +477,10 @@ namespace UBOAT.Mods.RadioNavigation
                 return tooltipFont;
             }
 
-            Font arial = Font.CreateDynamicFontFromOSFont("Arial", TooltipFontSize);
+            Font arial = Font.CreateDynamicFontFromOSFont("Arial", TooltipFontSize)
+                ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (arial == null)
+                return null;
             tooltipFont = TMP_FontAsset.CreateFontAsset(arial);
             return tooltipFont;
         }

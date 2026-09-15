@@ -191,7 +191,13 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     scheduler.OnSequenceFinished();
                     var nextPattern = scheduler.GetCurrentConsolPattern();
-                    if (nextPattern.IsNotNull() && nextPattern.Length.IsPositive())
+                    if (nextPattern == null)
+                    {
+                        SetState(State.Idle);
+                        isActive = false;
+                        return;
+                    }
+                    if (nextPattern.Length.IsPositive())
                     {
                         // F175: consol and sequence sources are mutually
                         // exclusive — clear the sequence when entering consol.
@@ -201,12 +207,9 @@ namespace UBOAT.Mods.RadioNavigation
                         StartElement();
                         return;
                     }
-                    else
-                    {
-                        SetState(State.Idle);
-                        isActive = false;
-                        return;
-                    }
+                    SetState(State.Idle);
+                    isActive = false;
+                    return;
                 }
                 else
                 {
@@ -220,7 +223,13 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     scheduler.OnSequenceFinished();
                     var nextSeq = scheduler.GetCurrentSequence();
-                    if (nextSeq.IsNotNull() && nextSeq.ElementCount.IsPositive())
+                    if (nextSeq == null)
+                    {
+                        SetState(State.Idle);
+                        isActive = false;
+                        return;
+                    }
+                    if (nextSeq.ElementCount.IsPositive())
                     {
                         // F175: entering a plain sequence must clear any stale
                         // consol pattern.

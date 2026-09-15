@@ -286,8 +286,11 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     gateScratch.Add(placement);
                 }
-                else if (placement.Spawned)
+                else if (LighthouseSpawnBudget.Consumed(placement.Spawned, placement.WantsSpawn) == 1)
                 {
+                    // F222: a pending grant (WantsSpawn && !Spawned) also
+                    // occupies a slot; counting only Spawned let the cap be
+                    // exceeded across ticks.
                     spawnedCount++;
                 }
             }
@@ -310,12 +313,8 @@ namespace UBOAT.Mods.RadioNavigation
                 for (int i = 0; i < gateScratch.Count; i++)
                 {
                     Placement placement = gateScratch[i];
-                    if (placement.WantsSpawn)
-                    {
-                        continue; // already granted
-                    }
 
-                    if (spawnedCount >= MaxConcurrent3D)
+                    if (!LighthouseSpawnBudget.CanGrant(spawnedCount, MaxConcurrent3D))
                     {
                         break;
                     }
@@ -648,7 +647,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             Transform rotator = TransformHelpers.FindChildRecursive(container.transform, placement.Profile.RotatorObjectName);
-            if (rotator.IsNull())
+            if (rotator == null)
             {
                 placement.RotatorWaitAttempts++;
                 if (placement.RotatorWaitAttempts % 120 == 0)
@@ -680,7 +679,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Debug.Log(LogPrefix + " '" + placement.GroupName + "': fixed light, rotator skipped");
             }
-            else if (rotator.GetComponent<LighthouseRotator>().IsNotNull())
+            else if (rotator.GetComponent<LighthouseRotator>() != null)
             {
                 Debug.Log(LogPrefix + " '" + placement.GroupName + "': rotator already attached, skipping");
             }

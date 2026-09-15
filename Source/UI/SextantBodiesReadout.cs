@@ -94,27 +94,9 @@ namespace UBOAT.Mods.RadioNavigation
             double jd = AstroMath.ToJulianDay(utc);
             double lstDeg = AstroMath.LstDeg(jd, lon);
 
-            var entries = new List<KeyValuePair<float, string>>();
             float moonAlt;
             bool moonUp = TryGetMoonAlt(jd, lstDeg, lat, out moonAlt);
-
-            foreach (StarEntry star in StarCatalog.Stars)
-            {
-                if (!star.IsNav)
-                    continue;
-                double altRad, azRad, e, n, u;
-                AstroMath.RaDecToEnu(star.RaDeg * Mathf.Deg2Rad, star.DecDeg * Mathf.Deg2Rad,
-                    lstDeg, lat, out altRad, out azRad, out e, out n, out u);
-                float alt = (float)(altRad * Mathf.Rad2Deg);
-                if (alt <= 0f)
-                    continue;
-                string name = NavStarNames.TryGetName(star.Hip, out string starName)
-                    ? starName
-                    : "HIP " + star.Hip.ToString(CultureInfo.InvariantCulture);
-                entries.Add(new KeyValuePair<float, string>(alt, name + " " + FormatAlt(alt)));
-            }
-
-            entries.Sort((a, b) => b.Key.CompareTo(a.Key));
+            var entries = BuildStarEntries(lstDeg, lat);
 
             // Eye height above sea level first (HE, meters - the value a
             // navigator needs for the dip correction), then the Moon, then
@@ -137,6 +119,39 @@ namespace UBOAT.Mods.RadioNavigation
                 shown++;
             }
             SetBodiesLine(sb.Length > 0 ? sb.ToString() : null);
+        }
+
+        /// <summary>
+        /// Visible navigation stars as (altitude, "name alt") sorted by
+        /// altitude descending. F226: the catalog keeps every catalogue row,
+        /// so a multiple system shares one HIP across rows; show it once.
+        /// Hip=0 is the no-HIP sentinel and must NOT collapse distinct stars.
+        /// </summary>
+        private static List<KeyValuePair<float, string>> BuildStarEntries(double lstDeg, float lat)
+        {
+            var entries = new List<KeyValuePair<float, string>>();
+            var seenHips = new HashSet<int>();
+
+            foreach (StarEntry star in StarCatalog.Stars)
+            {
+                if (!star.IsNav)
+                    continue;
+                if (star.Hip != 0 && !seenHips.Add(star.Hip))
+                    continue;
+                double altRad, azRad, e, n, u;
+                AstroMath.RaDecToEnu(star.RaDeg * Mathf.Deg2Rad, star.DecDeg * Mathf.Deg2Rad,
+                    lstDeg, lat, out altRad, out azRad, out e, out n, out u);
+                float alt = (float)(altRad * Mathf.Rad2Deg);
+                if (alt <= 0f)
+                    continue;
+                string name = NavStarNames.TryGetName(star.Hip, out string starName)
+                    ? starName
+                    : "HIP " + star.Hip.ToString(CultureInfo.InvariantCulture);
+                entries.Add(new KeyValuePair<float, string>(alt, name + " " + FormatAlt(alt)));
+            }
+
+            entries.Sort((a, b) => b.Key.CompareTo(a.Key));
+            return entries;
         }
 
         private void SetBodiesLine(string line)

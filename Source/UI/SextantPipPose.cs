@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using UBOAT.Game.Scene.Camera;
 using UnityEngine;
@@ -15,6 +16,13 @@ namespace UBOAT.Mods.RadioNavigation
     public static class SextantPipPose
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
+
+        // Per-camera caches for the per-frame pass-mask sync (P5.4 slice 4b):
+        // the AdditionalCameraData component and the last applied culling mask.
+        private static readonly Dictionary<Camera, UBOAT.Game.Scene.Rendering.AdditionalCameraData> addCache =
+            new Dictionary<Camera, UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+        private static readonly Dictionary<Camera, int> maskCache =
+            new Dictionary<Camera, int>();
 
         public static void Update(SextantPipFactory factory, double arcAngle,
             float fovDivisor, ref Camera viewCamera, Action manualRender)
@@ -55,28 +63,37 @@ namespace UBOAT.Mods.RadioNavigation
         public static void SyncCameraState(Camera cam, Camera source, float fovDivisor)
         {
             cam.fieldOfView = source.fieldOfView / fovDivisor;
-            cam.cullingMask = source.cullingMask | SunDiscRenderer.SunDiscLayerMask;
-            // Keep the SRP pass mask in sync with the live cullingMask
+            int mask = source.cullingMask | SunDiscRenderer.SunDiscLayerMask;
+            cam.cullingMask = mask;
+
+            // Per-frame hot path: cache the AdditionalCameraData per camera and
+            // skip the pass walk entirely while the mask is unchanged. Pass
+            // member lookups go through TypeMemberCache (no per-frame
+            // GetProperty/GetField, no string key allocation).
+            if (maskCache.TryGetValue(cam, out int lastMask) && lastMask == mask)
+                return;
+            maskCache[cam] = mask;
+
             try
             {
-                var pipAdd = cam.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
-                if (pipAdd != null)
+                UBOAT.Game.Scene.Rendering.AdditionalCameraData pipAdd;
+                if (!addCache.TryGetValue(cam, out pipAdd) || pipAdd == null)
                 {
-                    Array passes = pipAdd.Passes as Array;
-                    if (passes != null)
-                    {
-                        foreach (object p in passes)
-                        {
-                            var prop = p.GetType().GetProperty("CullingMask");
-                            if (prop != null && prop.CanWrite)
-                                prop.SetValue(p, cam.cullingMask);
-                            else
-                            {
-                                FieldInfo f = p.GetType().GetField("cullingMask", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
-                                if (f != null) f.SetValue(p, cam.cullingMask);
-                            }
-                        }
-                    }
+                    pipAdd = cam.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                    addCache[cam] = pipAdd;
+                }
+                if (pipAdd == null)
+                    return;
+
+                if (!(pipAdd.Passes is Array passes))
+                    return;
+
+                for (int i = 0; i < passes.Length; i++)
+                {
+                    object p = passes.GetValue(i);
+                    if (p == null)
+                        continue;
+                    ApplyPassMask(p, mask);
                 }
             }
             catch (Exception e)
@@ -86,6 +103,40 @@ namespace UBOAT.Mods.RadioNavigation
                 if (WarnOnce.ShouldLog("SextantController.SyncCameraState"))
                     Debug.LogWarning("[RadioNav][Sextant] SyncCameraState failed: " + e.Message);
             }
+        }
+
+        /// <summary>Writes the culling mask onto one SRP pass (property or field).</summary>
+        private static void ApplyPassMask(object pass, int mask)
+        {
+            Type passType = pass.GetType();
+            MemberInfo member = TypeMemberCache.GetInstanceMember(passType, "CullingMask");
+            if (member is PropertyInfo property)
+            {
+                if (property.CanWrite)
+                {
+                    property.SetValue(pass, mask);
+                    return;
+                }
+            }
+            else if (member is FieldInfo field)
+            {
+                field.SetValue(pass, mask);
+                return;
+            }
+
+            MemberInfo fallback = TypeMemberCache.GetInstanceMember(passType, "cullingMask");
+            if (fallback is FieldInfo fallbackField)
+                fallbackField.SetValue(pass, mask);
+        }
+
+        /// <summary>
+        /// Drops per-camera caches (PIP cameras are recreated per open).
+        /// Called from the controller's teardown.
+        /// </summary>
+        public static void Reset()
+        {
+            addCache.Clear();
+            maskCache.Clear();
         }
 
         public static Vector3 Forward(SextantPipFactory factory, Camera viewCamera,

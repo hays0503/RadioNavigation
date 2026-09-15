@@ -95,5 +95,22 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             PlayerPrefs.DeleteKey(glowKey);
             PlayerPrefs.DeleteKey(markerKey);
         }
+
+        [Fact]
+        public void VerboseLog_DefaultOff_AndToggleOn()
+        {
+            // F221: the shared informational-log switch is off by default.
+            PlayerPrefs.DeleteKey(RadioNavDiagnostics.VerboseLogKey);
+            System.Threading.Thread.Sleep(300);
+            Assert.False(RadioNavDiagnostics.IsVerboseLogEnabled());
+
+            PlayerPrefs.SetInt(RadioNavDiagnostics.VerboseLogKey, 1);
+            System.Threading.Thread.Sleep(300);
+            Assert.True(RadioNavDiagnostics.IsVerboseLogEnabled());
+
+            PlayerPrefs.DeleteKey(RadioNavDiagnostics.VerboseLogKey);
+            System.Threading.Thread.Sleep(300);
+            Assert.False(RadioNavDiagnostics.IsVerboseLogEnabled());
+        }
     }
 }

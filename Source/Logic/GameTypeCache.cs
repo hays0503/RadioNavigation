@@ -17,10 +17,20 @@ namespace UBOAT.Mods.RadioNavigation
         private static readonly string[] GameAssemblies = { "com.uboat.game", "Assembly-CSharp" };
 
         private static readonly Dictionary<string, Type> cache = new Dictionary<string, Type>();
+        // Default-probe hot path (Resolve(typeName)) keyed by typeName alone so
+        // no per-call "name\0assembly" string is built on the frame path.
+        private static readonly Dictionary<string, Type> defaultCache = new Dictionary<string, Type>();
 
         public static Type Resolve(string typeName)
         {
-            return Resolve(typeName, GameAssemblies);
+            Type type;
+            if (!defaultCache.TryGetValue(typeName, out type))
+            {
+                type = ResolveUncached(typeName, GameAssemblies);
+                if (type != null)
+                    defaultCache[typeName] = type;
+            }
+            return type;
         }
 
         public static Type Resolve(string typeName, params string[] probeAssemblies)
@@ -28,22 +38,28 @@ namespace UBOAT.Mods.RadioNavigation
             string key = typeName + "\0" + string.Join("\0", probeAssemblies);
             if (!cache.TryGetValue(key, out Type type))
             {
-                type = null;
-                foreach (string assembly in probeAssemblies)
-                {
-                    type = Type.GetType(typeName + ", " + assembly);
-                    if (type != null)
-                        break;
-                }
+                type = ResolveUncached(typeName, probeAssemblies);
                 if (type != null)
                     cache[key] = type;
             }
             return type;
         }
 
+        private static Type ResolveUncached(string typeName, string[] probeAssemblies)
+        {
+            foreach (string assembly in probeAssemblies)
+            {
+                Type type = Type.GetType(typeName + ", " + assembly);
+                if (type != null)
+                    return type;
+            }
+            return null;
+        }
+
         public static void Clear()
         {
             cache.Clear();
+            defaultCache.Clear();
         }
     }
 }

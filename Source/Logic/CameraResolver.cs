@@ -18,6 +18,19 @@ namespace UBOAT.Mods.RadioNavigation
         private static MainCamera gameMainCamera;
         private static Camera lastLoggedCamera;
 
+        // P5.1: FindObjectOfType<MainCamera> is a whole-scene scan; TryResolve
+        // runs from several LateUpdates per frame and the MainCamera is
+        // null/inactive exactly during scene loads, so memo it per frame.
+        private static int mainCameraProbeFrame = -1;
+        // Reused buffer for FindScreenCamera (Camera.allCameras allocates a new
+        // array every call).
+        private static Camera[] cameraBuffer = new Camera[16];
+
+        // Cached "Generic" enum value: Enum.ToString() allocates on Mono and
+        // ResolveDeviceCamera used to format the mode every frame.
+        private static bool genericModeResolved;
+        private static object genericModeValue;
+
         private const float WorldRadiusM = 3900f;
 
         /// <summary>
@@ -32,7 +45,13 @@ namespace UBOAT.Mods.RadioNavigation
             InstallOnce();
 
             if (gameMainCamera == null || !gameMainCamera.gameObject.activeInHierarchy)
-                gameMainCamera = Object.FindObjectOfType<MainCamera>();
+            {
+                if (mainCameraProbeFrame != Time.frameCount)
+                {
+                    mainCameraProbeFrame = Time.frameCount;
+                    gameMainCamera = Object.FindObjectOfType<MainCamera>();
+                }
+            }
 
             Camera candidate = null;
 
@@ -127,6 +146,9 @@ namespace UBOAT.Mods.RadioNavigation
             gameMainCamera = null;
             deviceProbeFrame = -1;
             deviceProbeCamera = null;
+            mainCameraProbeFrame = -1;
+            genericModeResolved = false;
+            genericModeValue = null;
         }
 
         private static Camera ResolveDeviceCamera()
@@ -134,8 +156,9 @@ namespace UBOAT.Mods.RadioNavigation
             if (gameMainCamera == null) return null;
             try
             {
-                // CameraMode enum сравниваем строкой, чтобы не зависеть от точного типа в сборке игры
-                if (gameMainCamera.CurrentMode.ToString() == "Generic" &&
+                // CameraMode enum сравниваем значением (кэш Enum.Parse), а не
+                // строкой: Enum.ToString() аллоцирует на Mono.
+                if (IsGenericMode(gameMainCamera) &&
                     gameMainCamera.GenericController.IsNotNull() &&
                     gameMainCamera.GenericController.ExternalController is UBOAT.Game.Scene.Camera.ExternalControllers.PeriscopeController pc &&
                     pc.IsNotNull() && pc.Periscope.IsNotNull())
@@ -152,8 +175,24 @@ namespace UBOAT.Mods.RadioNavigation
             return null;
         }
 
-        private static bool IsUtilityCamera(Camera cam)
+        private static bool IsGenericMode(MainCamera mainCamera)
         {
+            if (mainCamera == null)
+                return false;
+            if (!genericModeResolved)
+            {
+                genericModeResolved = true;
+                Type modeType = mainCamera.CurrentMode.GetType();
+                if (modeType.IsEnum)
+                {
+                    try { genericModeValue = Enum.Parse(modeType, "Generic"); }
+                    catch (ArgumentException) { genericModeValue = null; }
+                }
+            }
+            return genericModeValue != null && genericModeValue.Equals(mainCamera.CurrentMode);
+        }
+
+        private static bool IsUtilityCamera(Camera cam)        {
             if (cam == null) return false;
             string name = cam.name;
             return name == "Loading Camera" ||
@@ -164,12 +203,21 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static Camera FindScreenCamera()
         {
-            Camera best = null;
-            Camera[] cameras = Camera.allCameras;
-            for (int i = 0; i < cameras.Length; i++)
+            if (cameraBuffer == null || cameraBuffer.Length == 0)
+                cameraBuffer = new Camera[16];
+
+            int count = Camera.GetAllCameras(cameraBuffer);
+            if (count >= cameraBuffer.Length)
             {
-                Camera cam = cameras[i];
-                if (!cam.isActiveAndEnabled || cam.orthographic || cam.targetTexture != null || IsUtilityCamera(cam))
+                cameraBuffer = new Camera[count + 4];
+                count = Camera.GetAllCameras(cameraBuffer);
+            }
+
+            Camera best = null;
+            for (int i = 0; i < count; i++)
+            {
+                Camera cam = cameraBuffer[i];
+                if (cam == null || !cam.isActiveAndEnabled || cam.orthographic || cam.targetTexture != null || IsUtilityCamera(cam))
                     continue;
                 if (best == null || cam.depth > best.depth)
                     best = cam;

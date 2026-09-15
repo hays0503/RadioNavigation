@@ -123,7 +123,7 @@ namespace UBOAT.Mods.RadioNavigation
                     : null, frame.renderingCamera, frame.worldPositionProvider);
                 return;
             }
-            if (frame.deviceView && distance > FlareMaxDistanceM && frame.now >= frame.nextDiagTime)
+            if (frame.deviceView && distance > FlareMaxDistanceM && frame.verbose && frame.now >= frame.nextDiagTime)
             {
                 Debug.Log("[RadioNav][Lighthouse] flare: device view keeps flare active beyond " +
                     FlareMaxDistanceM.ToString("F0") + "m (dist=" + distance.ToString("F0") +

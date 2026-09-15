@@ -302,13 +302,17 @@ namespace UBOAT.Mods.RadioNavigation
             lastDotSize = metrics.Size;
 
             RectTransform dotRect = dotUi.CoreRect;
+            RectTransform dotHaloRect = dotUi.HaloRect;
+            // Explicit null checks (not IsNull()): PVS V3080 cannot model the
+            // extension guard, and a not-built dot UI would NRE here.
+            if (dotRect == null || dotHaloRect == null)
+                return;
             dotRect.anchoredPosition = metrics.CenterOffset;
             dotRect.sizeDelta = new Vector2(metrics.Size, metrics.Size);
-            RectTransform dotHaloRect = dotUi.HaloRect;
             dotHaloRect.anchoredPosition = metrics.CenterOffset;
             dotHaloRect.sizeDelta = new Vector2(metrics.Size * 3f, metrics.Size * 3f);
             RectTransform dotStreakRect = dotUi.StreakRect;
-            if (dotStreakRect.IsNotNull())
+            if (dotStreakRect != null)
             {
                 dotStreakRect.anchoredPosition = metrics.CenterOffset;
                 dotStreakRect.sizeDelta = new Vector2(metrics.StreakLength, metrics.StreakThickness);

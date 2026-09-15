@@ -54,8 +54,9 @@ namespace UBOAT.Mods.RadioNavigation
                     originalDialColor = dialImage.color;
             }
 
+            Graphic toggleGraphic = toggleComp.graphic;
             Debug.Log("[RadioNav][Toggle] Start"
-                + " toggle.graphic=" + (toggleComp.graphic.IsNotNull() ? toggleComp.graphic.name : "null")
+                + " toggle.graphic=" + (toggleGraphic != null ? toggleGraphic.name : "null")
                 + " toggle.isOn=" + toggleComp.isOn
                 + " dialColor=" + (dialImage.IsNotNull() ? dialImage.color.ToString() : "no-dial"));
 

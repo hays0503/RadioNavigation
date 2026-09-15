@@ -103,25 +103,17 @@ namespace UBOAT.Mods.RadioNavigation
                         bool phaseChanged = false;
 
                         var consolPattern = sched.GetCurrentConsolPattern();
-                        if (consolPattern.IsNotNull() && consolPattern.Length.IsPositive())
+                        if (consolPattern == null)
+                        {
+                            phaseChanged = AdvanceIdleSequence(sched, keyers[s], stations[s].Config, phaseChanged);
+                        }
+                        else if (consolPattern.Length.IsPositive())
                         {
                             keyers[s].LoadConsol(consolPattern, sched, stations[s].Config);
                         }
                         else
                         {
-                            var seq = sched.GetCurrentSequence();
-                            if (seq.IsNull() || seq.ElementCount.IsZero())
-                            {
-                                if (seq.IsNotNull())
-                                {
-                                    sched.OnSequenceFinished();
-                                    phaseChanged = true;
-                                }
-                            }
-                            else
-                            {
-                                keyers[s].Load(seq, sched, stations[s].Config);
-                            }
+                            phaseChanged = AdvanceIdleSequence(sched, keyers[s], stations[s].Config, phaseChanged);
                         }
 
                         // F98: exactly one scheduler tick per logical tick.
@@ -184,6 +176,27 @@ namespace UBOAT.Mods.RadioNavigation
             if (stations.IsNull() || schedulers.IsNull() || keyers.IsNull() || carriers.IsNull())
                 return 0;
             return Math.Min(stations.Length, Math.Min(schedulers.Length, Math.Min(keyers.Length, carriers.Length)));
+        }
+
+        /// <summary>
+        /// Idle-keyer sequence handling: a pending sequence is loaded, a
+        /// zero-length sequence finishes the phase. Extracted so the caller
+        /// keeps explicit null guards (PVS V3080) without a conditional-access
+        /// diagnostic (RCS1146).
+        /// </summary>
+        private bool AdvanceIdleSequence(StationScheduler sched, MorseKeyer keyer,
+            ConsolCycleConfig config, bool phaseChanged)
+        {
+            var seq = sched.GetCurrentSequence();
+            if (seq == null)
+                return phaseChanged;
+            if (seq.ElementCount.IsZero())
+            {
+                sched.OnSequenceFinished();
+                return true;
+            }
+            keyer.Load(seq, sched, config);
+            return phaseChanged;
         }
 
         public void ProcessAudio(float[] data, int channels, StationState[] stations, MorseKeyer[] keyers, CarrierGenerator[] carriers, bool radioOn, int currentZoneIndex, int sonneZoneIndex)

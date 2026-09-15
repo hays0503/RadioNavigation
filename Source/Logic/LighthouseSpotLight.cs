@@ -47,7 +47,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             FindSun();
             Transform spot = TransformHelpers.FindChildRecursive(rotator, SpotLightName);
-            if (spot.IsNull())
+            if (spot == null)
             {
                 Debug.LogWarning("[RadioNav][Lighthouse] glow: '" + SpotLightName + "' not found under '" + rotator.name + "'");
                 return;

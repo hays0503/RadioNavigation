@@ -145,7 +145,8 @@ namespace UBOAT.Mods.RadioNavigation
             // Convert.ToInt32 works on boxed enums ((int) would throw
             // InvalidCastException). RadioStoryStage: Unknown=0, MainChoices=1.
             int stageValue = Convert.ToInt32(stageField.GetValue(instance));
-            Debug.Log("[RadioNav] stage=" + stageValue + " (1=MainChoices)");
+            if (RadioNavDiagnostics.IsVerboseLogEnabled())
+                Debug.Log("[RadioNav] stage=" + stageValue + " (1=MainChoices)");
             return stageValue == 1;
         }
 
@@ -165,12 +166,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static int GetDecisionCount(object decisions, System.Collections.IList list)
         {
-            if (list.IsNotNull())
+            if (list != null)
                 return list.Count;
 
-            if (decisions.IsNull()) return -1;
+            if (decisions == null) return -1;
             var countProp = decisions.GetType().GetProperty("Count");
-            if (countProp.IsNull())
+            if (countProp == null)
             {
                 Debug.LogWarning("[RadioNav] Decisions has no Count property");
                 return -1;

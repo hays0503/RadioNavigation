@@ -175,6 +175,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void LogBearingDiagnostics(BeaconStation[] beaconStations)
         {
+            // F221: the report is a diagnostic, not an error — gate it so it
+            // does not flood Player.log at ~5 Hz while cruising.
+            if (!RadioNavDiagnostics.IsVerboseLogEnabled())
+                return;
+
             if (!positionAvailable
                 || (bearingDiagnosticsLogged
                     && Math.Abs(playerLatitude - lastBearingLogLatitude) < 0.00001f

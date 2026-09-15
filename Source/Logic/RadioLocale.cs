@@ -43,10 +43,10 @@ namespace UBOAT.Mods.RadioNavigation
         internal static void EnsureInitialized()
         {
             var singletonType = GameTypeCache.Resolve("DWS.Common.InjectionFramework.ScriptableObjectSingleton");
-            if (singletonType.IsNotNull())
+            if (singletonType != null)
                 loadSingletonMethod = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
             localeType = GameTypeCache.Resolve("UBOAT.Game.Core.Data.Locale");
-            if (!loadSingletonMethod.IsNull() && !localeType.IsNull())
+            if (loadSingletonMethod != null && localeType != null)
                 languageProp = localeType.GetProperty("Language", BindingFlags.Public | BindingFlags.Instance);
         }
 

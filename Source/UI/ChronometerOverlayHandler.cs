@@ -63,6 +63,11 @@ namespace UBOAT.Mods.RadioNavigation
             if (!TryResolveChronometer())
                 return;
 
+            // TryResolveChronometer guarantees non-null, but an explicit check
+            // lets PVS V3080 see the guard across the method boundary.
+            if (shipControlUI == null)
+                return;
+
             bool isOpen = shipControlUI.IsChronometerOpen;
             ChronometerOpenTracker.Frame frame = ChronometerOpenTracker.Track(
                 hasPreviousOpenState, previousOpenState, isOpen,
@@ -383,6 +388,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void OnDestroy()
         {
             EndLocalDrag();
+            dragProtocol.ReleaseBlockade();
 
             if (raiseState.Raised)
                 RestoreChronometerLayer();

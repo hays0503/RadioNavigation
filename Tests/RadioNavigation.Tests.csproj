@@ -100,6 +100,10 @@
     <Compile Include="GameTypeCacheTests.cs" />
     <Compile Include="CourseSamplerTests.cs" />
     <Compile Include="WarnOnceTests.cs" />
+    <Compile Include="SceneEventHandlerPurgeTests.cs" />
+    <Compile Include="TypeMemberCacheTests.cs" />
+    <Compile Include="LighthouseSpawnBudgetTests.cs" />
+    <Compile Include="ConstellationLinesTests.cs" />
     <Compile Include="FrameThrottleTests.cs" />
     <Compile Include="StationGainModelTests.cs" />
     <Compile Include="SignalTranscriberTests.cs" />
@@ -202,6 +206,10 @@
     <Compile Include="..\Source\Logic\RadioPowerBus.cs" Link="Source\Logic\RadioPowerBus.cs" />
     <Compile Include="..\Source\Logic\GameTypeCache.cs" Link="Source\Logic\GameTypeCache.cs" />
     <Compile Include="..\Source\Logic\WarnOnce.cs" Link="Source\Logic\WarnOnce.cs" />
+    <Compile Include="..\Source\Logic\SceneEventHandlerPurge.cs" Link="Source\Logic\SceneEventHandlerPurge.cs" />
+    <Compile Include="..\Source\Logic\TypeMemberCache.cs" Link="Source\Logic\TypeMemberCache.cs" />
+    <Compile Include="..\Source\Logic\LighthouseSpawnBudget.cs" Link="Source\Logic\LighthouseSpawnBudget.cs" />
+    <Compile Include="..\Source\Data\ConstellationLines.cs" Link="Source\Data\ConstellationLines.cs" />
     <Compile Include="..\Source\Logic\FrameThrottle.cs" Link="Source\Logic\FrameThrottle.cs" />
     <Compile Include="..\Source\Logic\CourseSampler.cs" Link="Source\Logic\CourseSampler.cs" />
     <Compile Include="..\Source\Logic\StationGainModel.cs" Link="Source\Logic\StationGainModel.cs" />

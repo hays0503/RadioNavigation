@@ -61,14 +61,15 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
 
                 var decisions = StoryDecisionGateway.GetDecisions(__instance);
-                if (decisions.IsNull())
+                if (decisions == null)
                     return;
 
                 var decisionsList = decisions as System.Collections.IList;
                 int count = StoryDecisionGateway.GetDecisionCount(decisions, decisionsList);
                 if (count.IsNegative()) return;
 
-                Debug.Log("[RadioNav] Decision count=" + count);
+                if (RadioNavDiagnostics.IsVerboseLogEnabled())
+                    Debug.Log("[RadioNav] Decision count=" + count);
 
                 if (StoryDecisionGateway.DecisionAlreadyExists(decisions, decisionsList, count, RadioLocale.Key))
                 {

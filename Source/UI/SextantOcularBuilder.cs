@@ -44,7 +44,11 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject eyecupGo = new GameObject("Eyecup", typeof(Image));
             eyecupGo.transform.SetParent(canvasRoot.transform, false);
             Image eyecup = eyecupGo.GetComponent<Image>();
-            eyecup.sprite = SextantSprites.CreateEyecupSprite(SextantSprites.CreateEyecupTexture());
+            Texture2D eyecupTexture = SextantSprites.CreateEyecupTexture();
+            result.EyecupTexture = eyecupTexture;
+            Sprite eyecupSprite = SextantSprites.CreateEyecupSprite(eyecupTexture);
+            eyecup.sprite = eyecupSprite;
+            result.OwnedSprites.Add(eyecupSprite);
             eyecup.raycastTarget = false;
             AnchorCenter(eyecup.rectTransform, EyecupSizeUnits, EyecupSizeUnits);
 
@@ -58,7 +62,9 @@ namespace UBOAT.Mods.RadioNavigation
             AnchorCenter(result.PipRect, SextantOverlayLayout.OcularSizeUnits, SextantOverlayLayout.OcularSizeUnits);
             Image maskGraphic = pipGo.GetComponent<Image>();
             result.CircleMaskTexture = SextantSprites.CreateCircleMaskTexture();
-            maskGraphic.sprite = SextantSprites.CreateCircleMaskSprite(result.CircleMaskTexture);
+            Sprite circleMaskSprite = SextantSprites.CreateCircleMaskSprite(result.CircleMaskTexture);
+            maskGraphic.sprite = circleMaskSprite;
+            result.OwnedSprites.Add(circleMaskSprite);
             maskGraphic.raycastTarget = false;
             Mask ocularMask = pipGo.GetComponent<Mask>();
             ocularMask.showMaskGraphic = false;
@@ -194,7 +200,9 @@ namespace UBOAT.Mods.RadioNavigation
             ringGo.transform.SetParent(pipGo.transform, false);
             Image ring = ringGo.GetComponent<Image>();
             result.RingTexture = SextantSprites.CreateRingTexture();
-            ring.sprite = SextantSprites.CreateRingSprite(result.RingTexture);
+            Sprite ringSprite = SextantSprites.CreateRingSprite(result.RingTexture);
+            ring.sprite = ringSprite;
+            result.OwnedSprites.Add(ringSprite);
             ring.raycastTarget = false;
             Stretch(ring.rectTransform);
         }

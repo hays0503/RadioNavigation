@@ -33,6 +33,10 @@ namespace UBOAT.Mods.RadioNavigation
         private float cachedFeedbackAngle = -1f;
         private int cachedZoneIndex = -1;
         private float cachedCursorAngle = -1f;
+        // Cursor range is -90..90, so -1 is a VALID angle and cannot double as a
+        // sentinel (a cursor at -45 would be discarded on teardown). Track
+        // validity explicitly instead.
+        private bool hasCachedCursor;
         private SonneController sonneController;
 
         private string stationBaseText = "";
@@ -112,7 +116,10 @@ namespace UBOAT.Mods.RadioNavigation
             if (zoneHandler.IsNotNull())
                 cachedZoneIndex = zoneHandler.CurrentIndex;
             if (radioHandler.IsNotNull())
+            {
                 cachedCursorAngle = radioHandler.CursorAngle;
+                hasCachedCursor = true;
+            }
 
             patternUpdateTimer += Time.deltaTime;
             if (patternUpdateTimer >= PatternUpdateInterval)
@@ -138,7 +145,7 @@ namespace UBOAT.Mods.RadioNavigation
                     (feedbackSpinner.IsNotNull() ? feedbackSpinner.Angle : 0f),
                 cachedZoneIndex >= 0 ? cachedZoneIndex :
                     (zoneHandler.IsNotNull() ? zoneHandler.CurrentIndex : 0),
-                cachedCursorAngle >= 0f ? cachedCursorAngle :
+                hasCachedCursor ? cachedCursorAngle :
                     (radioHandler.IsNotNull() ? radioHandler.CursorAngle : 0f));
         }
 
