@@ -59,7 +59,7 @@ Static Source check: `InformationPanelHandler` и `SonneController` симмет
 
 ## D. Пост-аудит F208–F228 (live-only, статика закрыта 2026-09-15)
 
-> **Live-run 2026-09-15 — заблокирован.** Игра запущена (2026.1-patch21), мод загружен (5/5 патчей, registry 209, `modLoaded=true`), но **AssetBundle мода не зарегистрирован** в `ResourceManager`: `Requested asset at path "Radio" doesn't exist` → панель и маркеры отсутствуют (`mod_state.markers`=0, `radionav.loaded`=false). Игра также сообщает об отсутствующих собственных ассетах (`Icons/Map/Empty - Enemy`, `Icons/Missions/...`). Правка `Source/*.cs` hot-reload watcher не подняла. Причина — окружение/бандл (не Source-правки F208–F228). Новый открытый пункт: **F229**. Пункты ниже — pending до восстановления загрузки бандла.
+> **Live-run 2026-09-15 — F229 исправлен.** Игра 2026.1-patch21 не регистрировала AssetBundle мода в `ResourceManager` (`InstantiatePrefab("Radio")` = null). Добавлен mod-side fallback (прямая загрузка `Bundles/testui` через рефлексию) — live подтверждено: панель создана (`radio=created handlers=11`, `radionav.loaded=true`, станции декодируются), маркеры `lighthouseMapMarker=1/navMapMarkerBase=3`. **Важно:** игра грузит `Temp/radionavigation.dll` и не перекомпилирует Source при старте — держать DLL в синхроне (`build.ps1` → копия в `Temp/radionavigation.dll`).
 
 Все пункты закрыты статически (тесты/SourceCheck/PVS); ниже — то, что видно только в игре.
 

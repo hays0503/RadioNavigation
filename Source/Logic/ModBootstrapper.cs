@@ -276,11 +276,28 @@ namespace UBOAT.Mods.RadioNavigation
             return false;
         }
 
+        private const string BundleFileName = "testui";
+        private const string RadioPrefabName = "Radio";
+        private const string RadioPrefabPath = "Assets/Packages/testui/Radio.prefab";
+        // Reflection handle: AssetBundle lives in UnityEngine.AssetBundleModule,
+        // which the mod's compile reference set (and possibly the game's mod
+        // compiler) does not include, so the type must not be named directly.
+        private static object fallbackBundle;
+
         private GameObject InstantiateRadio(Transform viewport)
         {
             Debug.Log("[RadioNav][Main] InstantiatePrefab(\"Radio\") from resourceManager \u2014 AssetBundle Bundles/testui expected to be loaded by game mod loader");
-            GameObject radio = resourceManager.InstantiatePrefab("Radio");
+            GameObject radio = resourceManager.IsNotNull() ? resourceManager.InstantiatePrefab("Radio") : null;
             if (radio.IsNull())
+            {
+                // F229: on 2026.1-patch21 the game does not register the mod's
+                // AssetBundle in the ResourceManager (assetToBundleMap stays
+                // empty), so InstantiatePrefab falls back to a SimpleResource
+                // and fails. Self-heal by loading the bundle directly; the
+                // fallback is skipped whenever the game path works.
+                radio = InstantiateFromBundleFallback();
+            }
+            if (radio == null)
             {
                 Debug.LogError("[RadioNav][Main] Prefab 'Radio' not found in AssetBundle or InstantiatePrefab returned null. Check Bundles/testui");
                 return null;
@@ -306,6 +323,122 @@ namespace UBOAT.Mods.RadioNavigation
 
             RadioInstaller.Instantiate(radio, viewport);
             return radio;
+        }
+
+        /// <summary>
+        /// F229 fallback: load Bundles/testui directly and instantiate the Radio
+        /// prefab. Used only when the game's ResourceManager lookup failed.
+        /// Reuses an already-loaded bundle (hot reload / double load) instead of
+        /// throwing from AssetBundle.LoadFromFile.
+        /// </summary>
+        private static GameObject InstantiateFromBundleFallback()
+        {
+            try
+            {
+                Type bundleType = GameTypeCache.Resolve("UnityEngine.AssetBundle", "UnityEngine.AssetBundleModule");
+                if (bundleType == null)
+                {
+                    Debug.LogError("[RadioNav][Main] fallback: UnityEngine.AssetBundle type not found");
+                    return null;
+                }
+
+                if (fallbackBundle == null)
+                    fallbackBundle = FindLoadedBundle(bundleType);
+
+                if (fallbackBundle == null)
+                {
+                    string path = System.IO.Path.Combine(
+                        Application.persistentDataPath, "Mods", "RadioNavigation", "Bundles", BundleFileName);
+                    if (!System.IO.File.Exists(path))
+                    {
+                        Debug.LogError("[RadioNav][Main] fallback bundle missing: " + path);
+                        return null;
+                    }
+
+                    MethodInfo loadFromFile = FindMethod(bundleType, "LoadFromFile", isStatic: true, parameterCount: 1);
+                    if (loadFromFile == null)
+                    {
+                        Debug.LogError("[RadioNav][Main] fallback: AssetBundle.LoadFromFile not found");
+                        return null;
+                    }
+                    fallbackBundle = loadFromFile.Invoke(null, new object[] { path });
+                }
+
+                if (fallbackBundle == null)
+                {
+                    Debug.LogError("[RadioNav][Main] fallback AssetBundle.LoadFromFile returned null");
+                    return null;
+                }
+
+                // Non-generic LoadAsset(string): the generic LoadAsset<T>(string)
+                // shares the name+signature and makes Type.GetMethod ambiguous.
+                MethodInfo loadAsset = FindMethod(bundleType, "LoadAsset", isStatic: false, parameterCount: 1);
+                if (loadAsset == null)
+                {
+                    Debug.LogError("[RadioNav][Main] fallback: AssetBundle.LoadAsset not found");
+                    return null;
+                }
+
+                UnityEngine.Object prefab = loadAsset.Invoke(fallbackBundle, new object[] { RadioPrefabName }) as UnityEngine.Object;
+                if (prefab == null)
+                    prefab = loadAsset.Invoke(fallbackBundle, new object[] { RadioPrefabPath }) as UnityEngine.Object;
+                if (prefab == null)
+                {
+                    Debug.LogError("[RadioNav][Main] fallback bundle has no 'Radio' prefab");
+                    return null;
+                }
+
+                GameObject instance = Object.Instantiate(prefab) as GameObject;
+                Debug.LogWarning("[RadioNav][Main] Instantiated 'Radio' via direct AssetBundle fallback (game ResourceManager did not register the mod bundle)");
+                return instance;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[RadioNav][Main] direct bundle fallback failed: " + e.Message);
+                Debug.LogException(e);
+                return null;
+            }
+        }
+
+        private static object FindLoadedBundle(Type bundleType)
+        {
+            MethodInfo all = FindMethod(bundleType, "GetAllLoadedAssetBundles", isStatic: true, parameterCount: 0);
+            if (all == null)
+                return null;
+            var bundles = all.Invoke(null, null) as System.Collections.IEnumerable;
+            if (bundles == null)
+                return null;
+            PropertyInfo nameProperty = bundleType.GetProperty(
+                "name", BindingFlags.Public | BindingFlags.Instance, null, typeof(string), Type.EmptyTypes, null);
+            foreach (object bundle in bundles)
+            {
+                if (bundle == null)
+                    continue;
+                string name = nameProperty != null ? nameProperty.GetValue(bundle) as string : null;
+                if (name == BundleFileName)
+                    return bundle;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// First non-generic public method with the given name/static/arity.
+        /// Avoids Type.GetMethod AmbiguousMatchException when an overload shares
+        /// the name (e.g. AssetBundle.LoadAsset vs LoadAsset&lt;T&gt;).
+        /// </summary>
+        private static MethodInfo FindMethod(Type type, string name, bool isStatic, int parameterCount)
+        {
+            foreach (MethodInfo method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
+            {
+                if (method.Name != name || method.IsGenericMethodDefinition)
+                    continue;
+                if (method.IsStatic != isStatic)
+                    continue;
+                if (method.GetParameters().Length != parameterCount)
+                    continue;
+                return method;
+            }
+            return null;
         }
     }
 }
