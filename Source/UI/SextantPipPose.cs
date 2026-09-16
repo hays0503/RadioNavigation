@@ -24,6 +24,25 @@ namespace UBOAT.Mods.RadioNavigation
         private static readonly Dictionary<Camera, int> maskCache =
             new Dictionary<Camera, int>();
 
+        // Test-aim override (MCP bridge /sextant/aim): replaces the camera yaw
+        // while active so an agent can point the alidade at a body without
+        // mouse input. Gated by PlayerPrefs RadioNav.TestAim; cleared on close.
+        private static float testAimYawDeg;
+        private static bool testAimActive;
+
+        /// <summary>Test override: both PIP cameras yaw to the given azimuth.</summary>
+        public static void SetTestAim(float yawDeg)
+        {
+            testAimYawDeg = yawDeg;
+            testAimActive = true;
+        }
+
+        /// <summary>Drops the test override (sextant close/teardown).</summary>
+        public static void ClearTestAim()
+        {
+            testAimActive = false;
+        }
+
         public static void Update(SextantPipFactory factory, double arcAngle,
             float fovDivisor, ref Camera viewCamera, Action manualRender)
         {
@@ -34,11 +53,12 @@ namespace UBOAT.Mods.RadioNavigation
 
             Transform mt = viewCamera.transform;
             Vector3 mainEuler = mt.eulerAngles;
+            float yaw = testAimActive ? testAimYawDeg : mainEuler.y;
             factory.LeftCamera.transform.position = mt.position;
-            factory.LeftCamera.transform.rotation = Quaternion.Euler(0f, mainEuler.y, 0f);
+            factory.LeftCamera.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
             factory.RightCamera.transform.position = mt.position;
             // Positive Euler X pitches DOWN in Unity; the alidade looks UP.
-            factory.RightCamera.transform.rotation = Quaternion.Euler(-(float)arcAngle, mainEuler.y, 0f);
+            factory.RightCamera.transform.rotation = Quaternion.Euler(-(float)arcAngle, yaw, 0f);
 
             SyncCameraState(factory.LeftCamera, viewCamera, fovDivisor);
             SyncCameraState(factory.RightCamera, viewCamera, fovDivisor);
@@ -145,7 +165,9 @@ namespace UBOAT.Mods.RadioNavigation
             if (factory.RightCamera != null)
                 return factory.RightCamera.transform.forward;
             float yaw = 0f;
-            if (viewCamera != null)
+            if (testAimActive)
+                yaw = testAimYawDeg;
+            else if (viewCamera != null)
                 yaw = viewCamera.transform.eulerAngles.y;
             else if (gameMainCamera != null)
                 yaw = gameMainCamera.transform.eulerAngles.y;

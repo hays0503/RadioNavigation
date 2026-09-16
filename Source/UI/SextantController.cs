@@ -43,6 +43,9 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>True while the overlay is up; ConstellationMesh gates Z on it (§7.4).</summary>
         public static bool IsOpen { get; private set; }
 
+        /// <summary>Live device instance for the MCP probe (set in Awake).</summary>
+        internal static SextantController Instance { get; private set; }
+
         internal double arcAngle;
         private int leftFilterCount;
         private int rightFilterCount;
@@ -121,6 +124,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Awake()
         {
+            Instance = this;
             worksheet = new SextantWorksheet(positionProvider);
             bodiesReadout = new SextantBodiesReadout(positionProvider);
             inputPoller = new SextantInputPoller(arcInput, worksheet, starId);
@@ -175,10 +179,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
+            if (Instance == this)
+                Instance = null;
             if (IsOpen && gameInput != null)
                 gameInput.RemoveBlockade(this);
             pipFactory.Destroy();
             SextantPipPose.Reset();
+            SextantPipPose.ClearTestAim();
             IsOpen = false;
 
             if (canvasRoot != null) Destroy(canvasRoot);
@@ -320,6 +327,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             IsOpen = false;
+            SextantPipPose.ClearTestAim();
             if (gameInput != null)
                 gameInput.RemoveBlockade(this);
             pipFactory.Detach();
@@ -335,6 +343,77 @@ namespace UBOAT.Mods.RadioNavigation
             if (helpPanel != null)
                 helpPanel.SetActive(false);
             Debug.Log(LogPrefix + " closed");
+        }
+
+        // ---- MCP probe surface (SextantProbe, external agents) -------------
+
+        internal SextantWorksheet WorksheetForProbe
+        {
+            get { return worksheet; }
+        }
+
+        internal SextantStarId StarIdForProbe
+        {
+            get { return starId; }
+        }
+
+        internal int LeftFilterCount
+        {
+            get { return leftFilterCount; }
+        }
+
+        internal int RightFilterCount
+        {
+            get { return rightFilterCount; }
+        }
+
+        internal double ArcAngle
+        {
+            get { return arcAngle; }
+        }
+
+        /// <summary>Opens the device for the probe; false when CanOpen() is
+        /// false (outside the live view) or the open did not stick.</summary>
+        internal bool TryOpenForProbe()
+        {
+            if (IsOpen)
+                return true;
+            TryOpen();
+            return IsOpen;
+        }
+
+        internal void CloseForProbe()
+        {
+            Close();
+        }
+
+        internal void SetArcForProbe(double deg)
+        {
+            arcAngle = deg;
+            UpdateReadout(true);
+        }
+
+        internal void SetFiltersForProbe(int left, int right)
+        {
+            leftFilterCount = left;
+            rightFilterCount = right;
+            UpdateFilterLabel();
+            UpdateFilterDim();
+            SunDiscRenderer.Active = IsOpen && rightFilterCount > 0;
+            bloomCut.Update(IsOpen, leftFilterCount, rightFilterCount);
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} FILTERSIDE side=PROBE left={1} right={2}",
+                LogPrefix, leftFilterCount, rightFilterCount));
+        }
+
+        internal bool TryGetPositionForProbe(out float lat, out float lon)
+        {
+            return positionProvider.TryGetPosition(out lat, out lon);
+        }
+
+        internal void ResetMoonDiagTimerForProbe()
+        {
+            gameSun.ResetMoonDiagTimer();
         }
 
         // §13.4 camera gate: sextant exists only in live deck views.
@@ -502,7 +581,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// adapts the position provider and game clock to explicit inputs.
         /// Needs a valid sandbox position (lat/lon), like star identification.
         /// </summary>
-        private bool TryGetOwnSun(out Vector3 dirWorld, out float altDeg, out float azDeg)
+        internal bool TryGetOwnSun(out Vector3 dirWorld, out float altDeg, out float azDeg)
         {
             dirWorld = Vector3.zero;
             altDeg = 0f;
@@ -535,7 +614,7 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>Own Meeus moon alt/az at the sandbox position.</summary>
-        private bool TryGetOwnMoon(out float altDeg, out float azDeg)
+        internal bool TryGetOwnMoon(out float altDeg, out float azDeg)
         {
             altDeg = 0f;
             azDeg = 0f;

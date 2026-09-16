@@ -29,11 +29,19 @@ namespace UBOAT.Mods.RadioNavigation
         private float holdTimer;
         private CelestialBody lastFoundBody;
         private CelestialBody identifiedBody;
+        private float identifiedAltDeg;
 
         /// <summary>The currently identified body (Kind=None while none).</summary>
         public CelestialBody IdentifiedBody
         {
             get { return identifiedBody; }
+        }
+
+        /// <summary>Altitude of the identified body at identification time
+        /// (degrees; 0 while none) — the MCP probe reports it.</summary>
+        public float IdentifiedAltDeg
+        {
+            get { return identifiedAltDeg; }
         }
 
         /// <summary>The currently identified body name ("" while none).</summary>
@@ -46,6 +54,7 @@ namespace UBOAT.Mods.RadioNavigation
         public void Reset()
         {
             holdTimer = 0f;
+            identifiedAltDeg = 0f;
             lastFoundBody = CelestialBody.None();
             identifiedBody = CelestialBody.None();
         }
@@ -69,6 +78,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (pain)
             {
                 holdTimer = 0f;
+                identifiedAltDeg = 0f;
                 identifiedBody = CelestialBody.None();
                 if (nameText != null)
                     nameText.text = "";
@@ -90,6 +100,7 @@ namespace UBOAT.Mods.RadioNavigation
                             || identifiedBody.Hip != lastFoundBody.Hip
                             || identifiedBody.Name != lastFoundBody.Name;
                         identifiedBody = lastFoundBody;
+                        identifiedAltDeg = bodyAlt;
                         if (justIdentified)
                             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                                 "{0} IDHIT name={1} kind={2} alt={3:F2} arc={4:F2} |d|={5:F2}",
@@ -100,6 +111,7 @@ namespace UBOAT.Mods.RadioNavigation
                 else
                 {
                     holdTimer = 0f;
+                    identifiedAltDeg = 0f;
                     identifiedBody = CelestialBody.None();
                 }
             }

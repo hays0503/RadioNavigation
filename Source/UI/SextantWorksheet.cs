@@ -70,6 +70,16 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly CourseSampler courseSampler = new CourseSampler();
         private string sectionText;
 
+        // Published-fix snapshot for the MCP probe (mirrors the card's
+        // Versetzung/FIX section, computed at record time only). ErrorNm is
+        // NaN when the sandbox position was unavailable at record time.
+        internal bool FixPublished { get; private set; }
+        internal double FixLatDeg { get; private set; }
+        internal double FixLonDeg { get; private set; }
+        internal double FixErrorNm { get; private set; }
+        internal double FixCrossingDeg { get; private set; }
+        internal bool FixSameBody { get; private set; }
+
         public SextantWorksheet(IPlayerPositionProvider positionProvider)
         {
             this.positionProvider = positionProvider;
@@ -177,7 +187,10 @@ namespace UBOAT.Mods.RadioNavigation
             if (runningFix.CanSolve)
                 RecomputeFixSnapshot();
             else
+            {
                 sectionText = null;
+                FixPublished = false;
+            }
             bool isSecond = runningFix.Observation2 == obs;
             statusLine = isSecond ? FixCardRecorded2 : FixCardRecorded1;
             statusTimer = FixStatusSeconds;
@@ -195,6 +208,7 @@ namespace UBOAT.Mods.RadioNavigation
             runningFix.Reset();
             FixMapMarker.Clear();
             sectionText = null;
+            FixPublished = false;
             statusLine = FixCardNewSeries;
             statusTimer = FixStatusSeconds;
             panelTimer = 0f;
@@ -282,6 +296,10 @@ namespace UBOAT.Mods.RadioNavigation
                 runningFix.Observation1, runningFix.Observation2);
             bool sameBody = runningFix.Observation1.BodyKind == runningFix.Observation2.BodyKind
                 && runningFix.Observation1.BodyHip == runningFix.Observation2.BodyHip;
+            FixCrossingDeg = crossDeg;
+            FixSameBody = sameBody;
+            FixPublished = false;
+            FixErrorNm = double.NaN;
             sb.Append(FixCardGeometry).Append(' ')
               .Append(crossDeg.ToString("F0", CultureInfo.InvariantCulture))
               .Append('\u00B0').Append(" \u2014 ");
@@ -321,6 +339,9 @@ namespace UBOAT.Mods.RadioNavigation
             sb.Append("FIX\n");
             sb.Append("\u03C6 ").Append(SextantDmFormat.FormatLatLon(fixLat, true));
             sb.Append("  \u03BB ").Append(SextantDmFormat.FormatLatLon(fixLon, false)).Append('\n');
+            FixLatDeg = fixLat;
+            FixLonDeg = fixLon;
+            FixPublished = true;
             FixMapMarker.Set(fixLat, fixLon,
                 "FIX " + runningFix.Observation2.Utc.ToString("HH:mm:ss", CultureInfo.InvariantCulture) +
                 "\n" + runningFix.Observation1.ToBody().AsciiName +
@@ -331,6 +352,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (positionProvider.TryGetPosition(out curLat, out curLon))
             {
                 double errNm = RunningFixCalculator.FixErrorNm(fixLat, fixLon, curLat, curLon);
+                FixErrorNm = errNm;
                 sb.Append(FixCardDeltaFromGame).Append(' ')
                   .Append(errNm.ToString("F1", CultureInfo.InvariantCulture)).Append(" NM");
             }
