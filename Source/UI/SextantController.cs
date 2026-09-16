@@ -78,6 +78,7 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly SextantEffectMirror effectMirror = new SextantEffectMirror();
 
         private GameObject canvasRoot;
+        private GameObject helpPanel;
         private Image filterDimLeftImage;
         private Image filterDimRightImage;
         private Image glareImage;
@@ -159,7 +160,10 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateReadout(false);
                 UpdateBodiesReadout(Time.unscaledDeltaTime);
+                UpdateMoonParity(Time.unscaledDeltaTime);
                 inputPoller.PollFix(arcAngle);
+                if (Input.GetKeyDown(KeyCode.P))
+                    ToggleHelp();
                 worksheet.UpdateCourseSampler(Time.unscaledDeltaTime);
                 worksheet.UpdatePanel(Time.unscaledDeltaTime);
             }
@@ -254,6 +258,19 @@ namespace UBOAT.Mods.RadioNavigation
             renderCheck.ResetForOpen();
             SunDiscRenderer.RandomizeDisc(); // fresh sunspot pattern per open
             SunDiscRenderer.Active = false;
+            gameSun.ResetMoonDiagTimer();
+            if (helpPanel != null)
+                helpPanel.SetActive(false);
+        }
+
+        /// <summary>P key: show/hide the on-screen F-Tafel legend.</summary>
+        private void ToggleHelp()
+        {
+            if (helpPanel == null)
+                return;
+            bool show = !helpPanel.activeSelf;
+            helpPanel.SetActive(show);
+            Debug.Log(LogPrefix + " help " + (show ? "shown" : "hidden"));
         }
 
         private void AttachAndConfigureCameras()
@@ -315,6 +332,8 @@ namespace UBOAT.Mods.RadioNavigation
                 pipFactory.RightCamera.enabled = false;
             if (canvasRoot != null)
                 canvasRoot.SetActive(false);
+            if (helpPanel != null)
+                helpPanel.SetActive(false);
             Debug.Log(LogPrefix + " closed");
         }
 
@@ -474,7 +493,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             float eyeHeightM = viewCamera != null
                 ? viewCamera.transform.position.y : 0f;
-            bodiesReadout.UpdateBodies(dt, eyeHeightM);
+            bodiesReadout.UpdateBodies(dt, eyeHeightM,
+                worksheet.Observation1AzDeg, worksheet.Observation1Name);
         }
 
         /// <summary>
@@ -499,6 +519,40 @@ namespace UBOAT.Mods.RadioNavigation
             dirWorld = new Vector3((float)fix.DirX, (float)fix.DirY, (float)fix.DirZ);
             altDeg = fix.AltDeg;
             azDeg = fix.AzDeg;
+            return true;
+        }
+
+        /// <summary>
+        /// V1 Moon parity telemetry: own Meeus moon alt/az fed to the
+        /// PlayerPrefs-gated MOONDIAG log so the game/mod moon coincidence
+        /// can be judged from Player.log.
+        /// </summary>
+        private void UpdateMoonParity(float dt)
+        {
+            float ownAlt, ownAz;
+            bool ownOk = TryGetOwnMoon(out ownAlt, out ownAz);
+            gameSun.LogMoonParity(dt, ownOk, ownAlt, ownAz);
+        }
+
+        /// <summary>Own Meeus moon alt/az at the sandbox position.</summary>
+        private bool TryGetOwnMoon(out float altDeg, out float azDeg)
+        {
+            altDeg = 0f;
+            azDeg = 0f;
+            float lat, lon;
+            if (!positionProvider.TryGetPosition(out lat, out lon))
+                return false;
+
+            DateTime utc = GameTimeResolver.GetUtcNow();
+            // The Moon shares the game sky time shift (ADR-033 v2.4): compare
+            // (and render) the same calibrated moon the fix uses.
+            double jd = CelestialEphemeris.JdFor(CelestialBody.Moon(), utc);
+            if (!AstroMath.MoonRaDec(jd, out double raRad, out double decRad))
+                return false;
+            AstroMath.RaDecToEnu(raRad, decRad, AstroMath.LstDeg(jd, lon), lat,
+                out double altRad, out double azRad, out _, out _, out _);
+            altDeg = (float)(altRad * Mathf.Rad2Deg);
+            azDeg = (float)(azRad * Mathf.Rad2Deg);
             return true;
         }
 
@@ -581,6 +635,7 @@ namespace UBOAT.Mods.RadioNavigation
             // to keep Unity from unloading it.
             bodiesReadout.BindLabels(ui.SunAltText, ui.BodiesAltText);
             worksheet.BindCard(ui.FixCardText);
+            helpPanel = SextantHelpPanel.Build(canvasRoot);
         }
 
         // Procedural sprites live in SextantSprites; SRP render-pass

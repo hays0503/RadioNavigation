@@ -82,10 +82,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void PollFix(double arcAngle)
         {
-            // I records a sight (only with the sun identified and held),
+            // I records a sight of the identified body (Sun, Moon or star),
             // O starts a new worksheet series.
             if (Input.GetKeyDown(KeyCode.I))
-                worksheet.CaptureObservation(starId.IdentifiedName, arcAngle);
+                worksheet.CaptureObservation(starId.IdentifiedBody, arcAngle);
             if (Input.GetKeyDown(KeyCode.O))
                 worksheet.ResetSeries();
         }

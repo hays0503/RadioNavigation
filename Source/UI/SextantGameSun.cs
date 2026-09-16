@@ -19,6 +19,9 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
         private const float DriftLogIntervalSeconds = 10f;
+        private const string MoonDiagPrefsKey = "RadioNav.MoonDiag";
+        private const float MoonDiagIntervalSeconds = 10f;
+        private const double Deg2Rad = Math.PI / 180.0;
 
         private Weather weather;
         private PropertyInfo skyProperty;
@@ -27,6 +30,10 @@ namespace UBOAT.Mods.RadioNavigation
         private bool membersResolved;
         private bool unavailableWarned;
         private float driftLogTimer;
+        private MemberInfo moonAltMember;
+        private MemberInfo moonAzMember;
+        private bool moonMembersResolved;
+        private float moonDiagTimer;
 
         /// <summary>
         /// Reads the game's TOD_Sky sun direction/altitude via cached
@@ -122,6 +129,106 @@ namespace UBOAT.Mods.RadioNavigation
         public void ResetDriftTimer()
         {
             driftLogTimer = 0f;
+        }
+
+        /// <summary>Forces the first moon-parity line on the next Update.</summary>
+        public void ResetMoonDiagTimer()
+        {
+            moonDiagTimer = 0f;
+        }
+
+        /// <summary>Game TOD_Sky moon altitude/azimuth via cached reflection.
+        /// False when the weather/sky or the moon members are unavailable.</summary>
+        public bool TryGetMoon(out float alt, out float az)
+        {
+            alt = 0f;
+            az = 0f;
+            if (weather == null && InjectionFramework.Instance.IsNotNull())
+                weather = InjectionFramework.Instance.GetInstance<Weather>();
+            if (weather == null)
+                return false;
+
+            try
+            {
+                if (skyProperty == null)
+                    skyProperty = weather.GetType().GetProperty("Sky");
+                if (skyProperty == null)
+                    return false;
+
+                object sky = skyProperty.GetValue(weather, null);
+                if (sky == null)
+                    return false;
+
+                if (!moonMembersResolved)
+                {
+                    moonMembersResolved = true;
+                    moonAltMember = FindMember(sky.GetType(), "MoonAltitude");
+                    moonAzMember = FindMember(sky.GetType(), "MoonAzimuth");
+                }
+                if (moonAltMember == null || moonAzMember == null)
+                    return false;
+
+                alt = Convert.ToSingle(ReadMember(sky, moonAltMember));
+                az = Convert.ToSingle(ReadMember(sky, moonAzMember));
+                return true;
+            }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SextantGameSun.moonReflection"))
+                    Debug.LogWarning(LogPrefix + " MOONDIAG reflection failed: " + e.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// PlayerPrefs-gated Moon parity telemetry (SEXTANT_PLAN v2.2, V1):
+        /// compares the game TOD_Sky moon with the mod's own MoonRaDec moon so
+        /// the "two moons" question is answered from a log, not by eye.
+        /// sep &lt; 0.3° -> the discs coincide; sep &gt; 0.5° -> two moons.
+        /// Throttled to 10 s; enable with PlayerPrefs RadioNav.MoonDiag=1.
+        /// </summary>
+        public void LogMoonParity(float dt, bool ownOk, float ownAlt, float ownAz)
+        {
+            // Throttle first: PlayerPrefs is only read once per interval, not
+            // every frame.
+            moonDiagTimer -= dt;
+            if (moonDiagTimer > 0f)
+                return;
+            moonDiagTimer = MoonDiagIntervalSeconds;
+            if (PlayerPrefs.GetInt(MoonDiagPrefsKey, 0) == 0)
+                return;
+            if (!ownOk)
+                return;
+
+            float gameAlt, gameAz;
+            if (!TryGetMoon(out gameAlt, out gameAz))
+            {
+                if (WarnOnce.ShouldLog("SextantGameSun.moonUnavailable"))
+                    Debug.LogWarning(LogPrefix + " MOONDIAG game moon unavailable via reflection");
+                return;
+            }
+
+            double sep = SphericalSeparationDeg(ownAlt, ownAz, gameAlt, gameAz);
+            float dAlt = ownAlt - gameAlt;
+            float dAz = ownAz - gameAz;
+            if (dAz > 180f) dAz -= 360f;
+            if (dAz < -180f) dAz += 360f;
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} MOONDIAG sep={1:F3} dalt={2:F3} daz={3:F3} mod(alt={4:F2} az={5:F1}) game(alt={6:F2} az={7:F1})",
+                LogPrefix, sep, dAlt, dAz, ownAlt, ownAz, gameAlt, gameAz));
+        }
+
+        /// <summary>Great-circle separation (deg) of two alt/az pairs.</summary>
+        private static double SphericalSeparationDeg(double alt1, double az1, double alt2, double az2)
+        {
+            double a1 = alt1 * Deg2Rad;
+            double a2 = alt2 * Deg2Rad;
+            double dAz = (az1 - az2) * Deg2Rad;
+            double cosSep = Math.Sin(a1) * Math.Sin(a2)
+                + Math.Cos(a1) * Math.Cos(a2) * Math.Cos(dAz);
+            if (cosSep > 1.0) cosSep = 1.0;
+            if (cosSep < -1.0) cosSep = -1.0;
+            return Math.Acos(cosSep) * 180.0 / Math.PI;
         }
 
         private static MemberInfo FindMember(Type type, string name)

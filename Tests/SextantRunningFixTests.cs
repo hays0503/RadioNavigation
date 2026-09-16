@@ -47,6 +47,27 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             return RunningFixCalculator.BuildObservation(utc, hc, drLat, drLon);
         }
 
+        /// <summary>Hc/Az of any body at an arbitrary position/time (test-side
+        /// access to the same CelestialEphemeris the mod uses).</summary>
+        private static void BodyHcAz(CelestialBody body, DateTime utc,
+            double latDeg, double lonDeg, out double hcDeg, out double azDeg)
+        {
+            double jd = CelestialEphemeris.JdFor(body, utc);
+            CelestialEphemeris.Compute(body, utc, out double raRad, out double decRad);
+            AstroMath.RaDecToEnu(raRad, decRad, AstroMath.LstDeg(jd, lonDeg), latDeg,
+                out double altRad, out double azRad, out _, out _, out _);
+            hcDeg = altRad * 180.0 / Math.PI;
+            azDeg = azRad * 180.0 / Math.PI;
+        }
+
+        private static SextantObservation ObservationFromTruth(CelestialBody body,
+            DateTime utc, double truthLat, double truthLon, double drLat, double drLon)
+        {
+            double hc, az;
+            BodyHcAz(body, utc, truthLat, truthLon, out hc, out az);
+            return RunningFixCalculator.BuildObservation(utc, hc, drLat, drLon, body);
+        }
+
         // ---- ephemeris fields (F-Tafel structure) --------------------------
 
         [Fact]
@@ -54,10 +75,10 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             SextantObservation obs = RunningFixCalculator.BuildObservation(
                 SightTime, 30.0, TrueLat, TrueLon);
-            Assert.NotEqual(0.0, obs.ShaSunDeg, 6);
+            Assert.NotEqual(0.0, obs.ShaBodyDeg, 6);
             double roundtrip = RunningFixCalculator.Normalize360(
-                obs.GhaAriesDeg + obs.ShaSunDeg);
-            Assert.Equal(obs.GhaSunDeg, roundtrip, 9);
+                obs.GhaAriesDeg + obs.ShaBodyDeg);
+            Assert.Equal(obs.GhaBodyDeg, roundtrip, 9);
         }
 
         [Fact]
@@ -67,8 +88,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 SightTime, 30.0, TrueLat, TrueLon);
             // Real relation: GHA = norm360(gamma - RA); SHA = norm360(GHA - gamma).
             double sha = RunningFixCalculator.Normalize360(
-                obs.GhaSunDeg - obs.GhaAriesDeg);
-            Assert.Equal(obs.ShaSunDeg, sha, 9);
+                obs.GhaBodyDeg - obs.GhaAriesDeg);
+            Assert.Equal(obs.ShaBodyDeg, sha, 9);
         }
 
         [Fact]
@@ -77,7 +98,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             SextantObservation obs = RunningFixCalculator.BuildObservation(
                 SightTime, 30.0, TrueLat, TrueLon);
             double lha = RunningFixCalculator.Normalize360(
-                obs.GhaSunDeg + obs.DrLonDeg);
+                obs.GhaBodyDeg + obs.DrLonDeg);
             Assert.Equal(lha, obs.LhaDeg, 9);
         }
 
@@ -391,6 +412,121 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             double angle = RunningFixCalculator.CrossingAngleDeg(
                 SightWithAzimuth(20.0), SightWithAzimuth(65.0));
             Assert.Equal(45.0, angle, 6);
+        }
+
+        [Fact]
+        public void IsCrossingUsable_Threshold_IsOneDegree()
+        {
+            Assert.Equal(1.0, RunningFixCalculator.MinUsableCrossingAngleDeg, 9);
+            Assert.True(RunningFixCalculator.IsCrossingUsable(1.0));
+            Assert.True(RunningFixCalculator.IsCrossingUsable(15.0));
+            Assert.False(RunningFixCalculator.IsCrossingUsable(0.99));
+        }
+
+        // ---- body-aware observations (SEXTANT_PLAN v2.2) ----------------------
+
+        [Fact]
+        public void BuildObservation_StarBody_UsesCatalogRaDec()
+        {
+            CelestialBody vega = CelestialBody.Star(91262, "Vega");
+            SextantObservation obs = RunningFixCalculator.BuildObservation(
+                SightTime, 30.0, TrueLat, TrueLon, vega);
+
+            Assert.Equal(CelestialBodyKind.Star, obs.BodyKind);
+            Assert.Equal(91262, obs.BodyHip);
+            Assert.Equal("Vega", obs.BodyName);
+            // SHA = norm(gamma - RA - gamma) = norm(-RA) for any body.
+            Assert.Equal(RunningFixCalculator.Normalize360(-obs.BodyRaDeg),
+                obs.ShaBodyDeg, 6);
+            Assert.Equal(obs.BodyDecDeg, obs.DecDeg, 9);
+        }
+
+        [Fact]
+        public void BuildObservation_MoonBody_MarkedAndFinite()
+        {
+            SextantObservation obs = RunningFixCalculator.BuildObservation(
+                SightTime, 30.0, TrueLat, TrueLon, CelestialBody.Moon());
+
+            Assert.Equal(CelestialBodyKind.Moon, obs.BodyKind);
+            Assert.Equal("Moon", obs.ToBody().AsciiName);
+            Assert.False(double.IsNaN(obs.BodyRaDeg) || double.IsInfinity(obs.BodyRaDeg));
+            Assert.False(double.IsNaN(obs.BodyDecDeg) || double.IsInfinity(obs.BodyDecDeg));
+        }
+
+        [Fact]
+        public void RecomputeHcAz_Star_RoundTripsAtSamePosition()
+        {
+            // The refinement pass must use the frozen BodyRa/BodyDec: at the
+            // same assumed position the recomputed Hc/Az equal the record.
+            CelestialBody vega = CelestialBody.Star(91262, "Vega");
+            SextantObservation obs = RunningFixCalculator.BuildObservation(
+                SightTime, 30.0, TrueLat, TrueLon, vega);
+
+            double hc, az;
+            RunningFixCalculator.RecomputeHcAz(obs, TrueLat, TrueLon, out hc, out az);
+            Assert.Equal(obs.HcDeg, hc, 9);
+            Assert.Equal(obs.AzDeg, az, 9);
+        }
+
+        [Fact]
+        public void SyntheticFix_TwoStars_Simultaneous_ReturnsTruePosition()
+        {
+            // Two nav stars sighted two minutes apart (no transfer). The
+            // algorithm sees only the displaced DR and must recover truth.
+            CelestialBody vega = CelestialBody.Star(91262, "Vega");
+            CelestialBody sirius = CelestialBody.Star(32349, "Sirius");
+            DateTime t1 = SightTime;
+            DateTime t2 = SightTime.AddMinutes(2);
+
+            SextantObservation obs1 = ObservationFromTruth(vega, t1,
+                TrueLat, TrueLon, TrueLat + DrLatOffsetDeg, TrueLon + DrLonOffsetDeg);
+            SextantObservation obs2 = ObservationFromTruth(sirius, t2,
+                TrueLat, TrueLon, TrueLat + DrLatOffsetDeg, TrueLon + DrLonOffsetDeg);
+
+            RunningFixCalculator calc = new RunningFixCalculator();
+            calc.Record(obs1);
+            calc.Record(obs2);
+            double lat, lon;
+            Assert.True(calc.CalculateFix(0.0, 0.0, out lat, out lon));
+
+            double errNm = RunningFixCalculator.FixErrorNm(lat, lon, TrueLat, TrueLon);
+            Assert.True(errNm < 0.05,
+                string.Format("fix {0:F5},{1:F5} err {2:F4} NM", lat, lon, errNm));
+        }
+
+        [Fact]
+        public void SyntheticFix_MixedBodies_UsesVersetzung()
+        {
+            // Sun first, then a star after a run: the two sights come from
+            // different ephemeris routes (calibrated vs plain) but the fix
+            // still recovers the second sight's true position.
+            double courseDeg = 90.0;
+            double speedKn = 6.0;
+            double dtHours = 0.5;
+            double runNm = speedKn * dtHours;
+            double dLat = runNm * Math.Cos(courseDeg * Math.PI / 180.0) / 60.0;
+            double dLon = runNm * Math.Sin(courseDeg * Math.PI / 180.0) /
+                (60.0 * Math.Cos(TrueLat * Math.PI / 180.0));
+
+            DateTime t1 = SightTime;
+            DateTime t2 = SightTime.AddHours(dtHours);
+
+            SextantObservation obs1 = ObservationFromTruth(CelestialBody.Sun(), t1,
+                TrueLat, TrueLon, TrueLat + DrLatOffsetDeg, TrueLon + DrLonOffsetDeg);
+            SextantObservation obs2 = ObservationFromTruth(CelestialBody.Star(91262, "Vega"), t2,
+                TrueLat + dLat, TrueLon + dLon,
+                TrueLat + dLat + DrLatOffsetDeg, TrueLon + dLon + DrLonOffsetDeg);
+
+            RunningFixCalculator calc = new RunningFixCalculator();
+            calc.Record(obs1);
+            calc.Record(obs2);
+            double lat, lon;
+            Assert.True(calc.CalculateFix(courseDeg, speedKn, out lat, out lon));
+
+            double errNm = RunningFixCalculator.FixErrorNm(lat, lon,
+                TrueLat + dLat, TrueLon + dLon);
+            Assert.True(errNm < 0.05,
+                string.Format("fix {0:F5},{1:F5} err {2:F4} NM", lat, lon, errNm));
         }
     }
 }

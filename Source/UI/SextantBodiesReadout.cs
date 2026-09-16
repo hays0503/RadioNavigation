@@ -7,13 +7,13 @@ using UnityEngine;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Right-side verification readout of the sextant (SEXTANT_PLAN §13):
-    /// the own Meeus sun altitude line and, below it, the eye height, the
-    /// Moon altitude and the nav stars currently above the horizon (top N
-    /// by altitude). Throttled to 1 s — bodies move far too slowly to
-    /// justify per-frame strings. Extracted from SextantController (SRP:
-    /// readout formatting is not device logic). Owns the throttle timer
-    /// and the change-detection caches; the controller binds the labels.
+    /// Right-side verification readout of the sextant (SEXTANT_PLAN §13,
+    /// v2.2): the own Meeus sun altitude line and, below it, the eye height,
+    /// the Moon (with its sightability status), the nav stars currently
+    /// above the horizon (top N by altitude) with their azimuths, and — once
+    /// a first sight is recorded — the recommended second body for a good
+    /// crossing angle. Throttled to 1 s. Extracted from SextantController
+    /// (SRP: readout formatting is not device logic).
     /// </summary>
     internal sealed class SextantBodiesReadout
     {
@@ -21,9 +21,17 @@ namespace UBOAT.Mods.RadioNavigation
             "\u0412\u044B\u0441\u043E\u0442\u0430 \u0441\u043E\u043B\u043D\u0446\u0430 \u043D\u0430\u0434 \u0443\u0440\u043E\u0432\u043D\u0435\u043C \u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442\u0430: ";
         private const string MoonLabel = "\u041B\u0443\u043D\u0430";
         private const string EyeHeightLabel = "\u0413\u043B\u0430\u0437";
+        private const string MoonBelow =
+            "\u041B\u0443\u043D\u0430: \u043F\u043E\u0434 \u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442\u043E\u043C";
+        private const string MoonNew =
+            "\u041B\u0443\u043D\u0430: \u043D\u043E\u0432\u0430\u044F (\u043D\u0435 \u0432\u0438\u0434\u043D\u0430)";
+        private const string RecommendPrefix =
+            "\u2192 \u0412\u0442\u043E\u0440\u043E\u0435 \u0441\u0432\u0435\u0442\u0438\u043B\u043E: ";
 
         private const float IntervalSeconds = 1f;
         private const int MaxStars = 10;
+        // Keep in step with SextantStarId: a new moon is not sightable.
+        private const double MoonMinIllumination = 0.05;
 
         private readonly IPlayerPositionProvider positionProvider;
 
@@ -72,9 +80,11 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Bodies block: eye height, Moon, then nav stars top-N by altitude.
+        /// Bodies block: eye height, Moon status, nav stars with azimuths,
+        /// then the recommended second body once a first sight exists.
         /// </summary>
-        public void UpdateBodies(float dt, float eyeHeightM)
+        public void UpdateBodies(float dt, float eyeHeightM,
+            double firstSightAzDeg, string firstSightName)
         {
             if (bodiesText == null)
                 return;
@@ -93,41 +103,102 @@ namespace UBOAT.Mods.RadioNavigation
             DateTime utc = GameTimeResolver.GetUtcNow();
             double jd = AstroMath.ToJulianDay(utc);
             double lstDeg = AstroMath.LstDeg(jd, lon);
+            // The Moon shares the game sky time shift (ADR-033 v2.4).
+            double moonJd = CelestialEphemeris.JdFor(CelestialBody.Moon(), utc);
+            double moonLst = AstroMath.LstDeg(moonJd, lon);
 
-            float moonAlt;
-            bool moonUp = TryGetMoonAlt(jd, lstDeg, lat, out moonAlt);
-            var entries = BuildStarEntries(lstDeg, lat);
+            var candidates = new List<BodyRecommendation.Candidate>();
+            var sb = new StringBuilder();
 
             // Eye height above sea level first (HE, meters - the value a
-            // navigator needs for the dip correction), then the Moon, then
-            // stars: top N by altitude.
-            var sb = new StringBuilder();
+            // navigator needs for the dip correction the game does not model),
+            // then the Moon, then stars: top N by altitude.
             sb.Append(EyeHeightLabel + " " +
                 eyeHeightM.ToString("F1", CultureInfo.InvariantCulture) + " \u043C");
-            if (moonUp)
+
+            AddSunCandidate(candidates, utc, lstDeg, lat);
+            AppendMoon(sb, candidates, moonJd, moonLst, lat);
+            AppendStars(sb, candidates, lstDeg, lat);
+
+            if (!double.IsNaN(firstSightAzDeg))
             {
-                if (sb.Length > 0)
-                    sb.Append('\n');
-                sb.Append(MoonLabel + " " + FormatAlt(moonAlt));
+                BodyRecommendation.Result rec =
+                    BodyRecommendation.Recommend(firstSightAzDeg, candidates, firstSightName);
+                if (rec.Found)
+                {
+                    sb.Append('\n').Append(RecommendPrefix).Append(rec.Name)
+                      .Append(" (\u0394Az ")
+                      .Append(rec.SeparationDeg.ToString("F0", CultureInfo.InvariantCulture))
+                      .Append("\u00B0)");
+                }
             }
-            int shown = 0;
-            for (int i = 0; i < entries.Count && shown < MaxStars; i++)
-            {
-                if (sb.Length > 0)
-                    sb.Append('\n');
-                sb.Append(entries[i].Value);
-                shown++;
-            }
+
             SetBodiesLine(sb.Length > 0 ? sb.ToString() : null);
         }
 
+        /// <summary>Moon line: status when below the horizon or new, else
+        /// altitude + azimuth. Only a sightable Moon enters the candidates.</summary>
+        private static void AppendMoon(StringBuilder sb, List<BodyRecommendation.Candidate> candidates,
+            double jd, double lstDeg, double lat)
+        {
+            bool hasCoords = AstroMath.MoonRaDec(jd, out double raRad, out double decRad);
+            if (!hasCoords)
+                return;
+
+            AstroMath.RaDecToEnu(raRad, decRad, lstDeg, lat,
+                out double altRad, out double azRad, out _, out _, out _);
+            float alt = (float)(altRad * Mathf.Rad2Deg);
+            float az = (float)(azRad * Mathf.Rad2Deg);
+
+            if (AstroMath.MoonIllumination(jd) < MoonMinIllumination)
+            {
+                sb.Append('\n').Append(MoonNew);
+                return;
+            }
+            if (alt <= 0f)
+            {
+                sb.Append('\n').Append(MoonBelow);
+                return;
+            }
+
+            sb.Append('\n').Append(MoonLabel + " " + FormatAlt(alt) + " Az " + FormatAz(az));
+            candidates.Add(new BodyRecommendation.Candidate
+            {
+                Name = MoonLabel,
+                AltDeg = alt,
+                AzDeg = az
+            });
+        }
+
+        /// <summary>The Sun is a valid second body in daytime; it is not
+        /// printed here (its own altitude line sits above).</summary>
+        private static void AddSunCandidate(List<BodyRecommendation.Candidate> candidates,
+            DateTime utc, double lstDeg, double lat)
+        {
+            if (!CelestialEphemeris.Compute(CelestialBody.Sun(), utc,
+                    out double raRad, out double decRad))
+                return;
+            AstroMath.RaDecToEnu(raRad, decRad, lstDeg, lat,
+                out double altRad, out double azRad, out _, out _, out _);
+            float alt = (float)(altRad * Mathf.Rad2Deg);
+            if (alt <= 0f)
+                return;
+            candidates.Add(new BodyRecommendation.Candidate
+            {
+                Name = CelestialBody.Sun().Name,
+                AltDeg = alt,
+                AzDeg = (float)(azRad * Mathf.Rad2Deg)
+            });
+        }
+
         /// <summary>
-        /// Visible navigation stars as (altitude, "name alt") sorted by
-        /// altitude descending. F226: the catalog keeps every catalogue row,
-        /// so a multiple system shares one HIP across rows; show it once.
-        /// Hip=0 is the no-HIP sentinel and must NOT collapse distinct stars.
+        /// Visible navigation stars as "name alt Az az" sorted by altitude
+        /// descending. F226: the catalog keeps every catalogue row, so a
+        /// multiple system shares one HIP across rows; show it once. Hip=0 is
+        /// the no-HIP sentinel and must NOT collapse distinct stars.
         /// </summary>
-        private static List<KeyValuePair<float, string>> BuildStarEntries(double lstDeg, float lat)
+        private static void AppendStars(StringBuilder sb, List<BodyRecommendation.Candidate> candidates,
+            double lstDeg, float lat)
         {
             var entries = new List<KeyValuePair<float, string>>();
             var seenHips = new HashSet<int>();
@@ -144,14 +215,27 @@ namespace UBOAT.Mods.RadioNavigation
                 float alt = (float)(altRad * Mathf.Rad2Deg);
                 if (alt <= 0f)
                     continue;
+                float az = (float)(azRad * Mathf.Rad2Deg);
                 string name = NavStarNames.TryGetName(star.Hip, out string starName)
                     ? starName
                     : "HIP " + star.Hip.ToString(CultureInfo.InvariantCulture);
-                entries.Add(new KeyValuePair<float, string>(alt, name + " " + FormatAlt(alt)));
+                entries.Add(new KeyValuePair<float, string>(alt,
+                    name + " " + FormatAlt(alt) + " Az " + FormatAz(az)));
+                candidates.Add(new BodyRecommendation.Candidate
+                {
+                    Name = name,
+                    AltDeg = alt,
+                    AzDeg = az
+                });
             }
 
             entries.Sort((a, b) => b.Key.CompareTo(a.Key));
-            return entries;
+            int shown = 0;
+            for (int i = 0; i < entries.Count && shown < MaxStars; i++)
+            {
+                sb.Append('\n').Append(entries[i].Value);
+                shown++;
+            }
         }
 
         private void SetBodiesLine(string line)
@@ -167,16 +251,9 @@ namespace UBOAT.Mods.RadioNavigation
             return altDeg.ToString("F1", CultureInfo.InvariantCulture) + "\u00B0";
         }
 
-        /// <summary>Own Meeus moon altitude (negative below the horizon).</summary>
-        private static bool TryGetMoonAlt(double jd, double lstDeg, double lat, out float altDeg)
+        private static string FormatAz(float azDeg)
         {
-            altDeg = 0f;
-            if (!AstroMath.MoonRaDec(jd, out double raRad, out double decRad))
-                return false;
-            AstroMath.RaDecToEnu(raRad, decRad, lstDeg, lat,
-                out double altRad, out _, out _, out _, out _);
-            altDeg = (float)(altRad * Mathf.Rad2Deg);
-            return true;
+            return azDeg.ToString("F0", CultureInfo.InvariantCulture) + "\u00B0";
         }
     }
 }

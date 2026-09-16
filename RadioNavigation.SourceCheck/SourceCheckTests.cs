@@ -3428,6 +3428,123 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Body-routing gate (SEXTANT_PLAN v2.2): the sextant must sight any
+        /// body through CelestialEphemeris, not just the Sun. Pins
+        /// CelestialEphemeris.Compute -> SunRaDec/MoonRaDec/TryGetStarRaDec,
+        /// the calibrated JdForKind, the body-aware BuildObservation routing
+        /// and the Moon identification. A re-inline or a Sun-only regression
+        /// fails here.
+        /// </summary>
+        [Fact]
+        public void CelestialEphemeris_RoutesBodies()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var ephemeris = FindSourceType(roots, "CelestialEphemeris");
+            if (ephemeris == null)
+            {
+                problems.Add("type 'CelestialEphemeris' not found in Source/");
+            }
+            else
+            {
+                var compute = FindMethod(ephemeris, "Compute");
+                if (compute == null)
+                    problems.Add("CelestialEphemeris.Compute not found");
+                else
+                {
+                    if (!InvokesName(compute, "SunRaDec"))
+                        problems.Add("CelestialEphemeris.Compute never invokes SunRaDec");
+                    if (!InvokesName(compute, "MoonRaDec"))
+                        problems.Add("CelestialEphemeris.Compute never invokes MoonRaDec");
+                    if (!InvokesName(compute, "TryGetStarRaDec"))
+                        problems.Add("CelestialEphemeris.Compute never invokes TryGetStarRaDec");
+                }
+                var jdForKind = FindMethod(ephemeris, "JdForKind");
+                if (jdForKind == null)
+                    problems.Add("CelestialEphemeris.JdForKind not found");
+                else if (!InvokesName(jdForKind, "CalibratedJd"))
+                    problems.Add("CelestialEphemeris.JdForKind never invokes CalibratedJd");
+            }
+
+            var runningFix = FindSourceType(roots, "RunningFixCalculator");
+            if (runningFix == null)
+            {
+                problems.Add("type 'RunningFixCalculator' not found in Source/");
+            }
+            else
+            {
+                bool routes = runningFix.Members.OfType<MethodDeclarationSyntax>()
+                    .Where(m => m.Identifier.Text == "BuildObservation"
+                        && m.ParameterList.Parameters.Count == 5)
+                    .Any(m => InvokesName(m, "Compute") && InvokesName(m, "JdFor"));
+                if (!routes)
+                    problems.Add("RunningFixCalculator.BuildObservation(5 args) never routes through CelestialEphemeris");
+            }
+
+            var starId = FindSourceType(roots, "SextantStarId");
+            if (starId == null)
+                problems.Add("type 'SextantStarId' not found in Source/");
+            else if (!starId.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Any(inv => inv.Expression is MemberAccessExpressionSyntax ma
+                    && ma.Name.Identifier.Text == "MoonRaDec"))
+                problems.Add("SextantStarId never invokes MoonRaDec — the Moon cannot be sighted");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} celestial-body routing violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Hip=0 sentinel gate (SEXTANT_PLAN v2.2 regression F1): the star
+        /// scan must skip no-HIP catalog rows, and the worksheet must reject a
+        /// body whose ephemeris cannot be resolved instead of silently
+        /// building a wrong fix.
+        /// </summary>
+        [Fact]
+        public void SextantStarId_SkipsNoHipSentinel()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var starId = FindSourceType(roots, "SextantStarId");
+            if (starId == null)
+            {
+                problems.Add("type 'SextantStarId' not found in Source/");
+            }
+            else
+            {
+                var findStar = FindMethod(starId, "TryFindStar");
+                if (findStar == null)
+                    problems.Add("SextantStarId.TryFindStar not found");
+                else if (!InvokesName(findStar, "IsSightableStar"))
+                    problems.Add("SextantStarId.TryFindStar never invokes IsSightableStar — Hip=0 sentinel can be sighted");
+            }
+
+            var worksheet = FindSourceType(roots, "SextantWorksheet");
+            if (worksheet == null)
+            {
+                problems.Add("type 'SextantWorksheet' not found in Source/");
+            }
+            else
+            {
+                var capture = FindMethod(worksheet, "CaptureObservation");
+                if (capture == null)
+                    problems.Add("SextantWorksheet.CaptureObservation not found");
+                else if (!InvokesName(capture, "Compute"))
+                    problems.Add("SextantWorksheet.CaptureObservation never validates CelestialEphemeris.Compute — unknown bodies silently fall back to the sun");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} no-HIP sentinel violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Visibility gate (SRP slice BeamGate): flare/dot decisions flow
         /// LighthouseBeamGlow.IsFlareTakingOver -&gt; FlareTakesOver and
         /// GetBeamVisibilityFactor -&gt; BeamFactor. A re-inline of the cone

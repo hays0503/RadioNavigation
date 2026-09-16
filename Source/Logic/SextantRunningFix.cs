@@ -3,13 +3,14 @@ using System;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// One recorded sun sight, frozen at the moment the player pressed the
+    /// One recorded sight, frozen at the moment the player pressed the
     /// record key (F-Tafel Beobachtungsblatt block). Holds the dead-reckoned
     /// position the navigator believed he was at, plus the full ephemeris
     /// chain of the German worksheet: gamma (GHA Aries), SHA, GHA, lambda_g,
     /// LHA, delta, h_b (measured), h1 (computed Hc), Az and the intercept
-    /// a = Ho - Hc. Ephemeris fields come from AstroMath (Meeus), the same
-    /// model the sextant's glare/identification already uses.
+    /// a = Ho - Hc. Ephemeris fields come from AstroMath (Meeus) through
+    /// CelestialEphemeris, which routes the Sun (calibrated) and the
+    /// Moon/stars (plain UTC) to the right source.
     /// </summary>
     public sealed class SextantObservation
     {
@@ -19,9 +20,18 @@ namespace UBOAT.Mods.RadioNavigation
         public double DrLatDeg;
         public double DrLonDeg;
 
+        // Body identity (SEXTANT_PLAN v2.2): the sight may be the Sun, the
+        // Moon or a catalog star. BodyRaDeg/BodyDecDeg freeze the ephemeris
+        // used for the fix refinement, so RecomputeHcAz is body-agnostic.
+        public CelestialBodyKind BodyKind;
+        public string BodyName;
+        public int BodyHip;
+        public double BodyRaDeg;
+        public double BodyDecDeg;
+
         public double GhaAriesDeg;
-        public double ShaSunDeg;
-        public double GhaSunDeg;
+        public double ShaBodyDeg;
+        public double GhaBodyDeg;
         public double LhaDeg;
         public double DecDeg;
 
@@ -34,6 +44,21 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>F-Tafel gleichnam.t rule: LHA I,II -> West; III,IV -> Ost.</summary>
         public bool QuadrantWest;
+
+        /// <summary>Reconstructs the body identity for display (map tooltip,
+        /// card) from the frozen observation fields.</summary>
+        public CelestialBody ToBody()
+        {
+            switch (BodyKind)
+            {
+                case CelestialBodyKind.Moon:
+                    return CelestialBody.Moon();
+                case CelestialBodyKind.Star:
+                    return CelestialBody.Star(BodyHip, BodyName);
+                default:
+                    return CelestialBody.Sun();
+            }
+        }
     }
 
     /// <summary>
@@ -49,12 +74,14 @@ namespace UBOAT.Mods.RadioNavigation
     }
 
     /// <summary>
-    /// Two-observation sun running fix (F-Tafel "two sun sights with
-    /// Versetzung"): LOP1 -> transfer by course/speed over the sight
-    /// interval -> intersect with LOP2 -> FIX. Because Marcq St. Hilaire is a
-    /// linearization around the assumed position, the fix is refined by
-    /// recomputing Hc/Az at the previous fix (default 2 iterations).
-    /// Pure math, no Unity - unit-tested offline.
+    /// Two-observation running fix (F-Tafel "two sights with Versetzung"):
+    /// LOP1 -> transfer by course/speed over the sight interval -> intersect
+    /// with LOP2 -> FIX. The two sights may be any bodies (Sun, Moon, star)
+    /// or the same body twice; simultaneous star sights have dt≈0 and no
+    /// transfer. Because Marcq St. Hilaire is a linearization around the
+    /// assumed position, the fix is refined by recomputing Hc/Az at the
+    /// previous fix (default 2 iterations). Pure math, no Unity -
+    /// unit-tested offline.
     /// </summary>
     public sealed class RunningFixCalculator
     {
@@ -251,6 +278,16 @@ namespace UBOAT.Mods.RadioNavigation
             return d;
         }
 
+        /// <summary>Below this crossing angle the LOP intersection amplifies
+        /// the intercept errors too much to publish a fix (1/sin(1°) ≈ 57);
+        /// the card still warns "слабо" between 1° and 15°.</summary>
+        public const double MinUsableCrossingAngleDeg = 1.0;
+
+        public static bool IsCrossingUsable(double crossingAngleDeg)
+        {
+            return crossingAngleDeg >= MinUsableCrossingAngleDeg;
+        }
+
         /// <summary>Great-circle distance fix -> reference, in NM (error from
         /// the dead-reckoned position shown on the panel).</summary>
         public static double FixErrorNm(double fixLatDeg, double fixLonDeg,
@@ -267,27 +304,39 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Builds a full worksheet observation from the sun ephemeris
-        /// (AstroMath, Meeus): gamma = GHA Aries, GHA sun = gamma - RA,
-        /// SHA = GHA - gamma (NOT zero for the sun), LHA = GHA + lambda_g,
-        /// Hc/Az at the dead-reckoned position, intercept a = (Ho - Hc) * 60.
+        /// Builds a full worksheet observation from the body ephemeris
+        /// (AstroMath, Meeus): gamma = GHA Aries, GHA body = gamma - RA,
+        /// SHA = GHA - gamma, LHA = GHA + lambda_g, Hc/Az at the
+        /// dead-reckoned position, intercept a = (Ho - Hc) * 60.
         /// </summary>
         public static SextantObservation BuildObservation(DateTime utc,
             double hoDeg, double drLatDeg, double drLonDeg)
         {
-            // Calibrated ephemeris time (SUNDRIFT Δt; identical to plain
-            // ToJulianDay while no calibration is applied).
-            double jd = SunEphemerisCalibration.CalibratedJd(utc);
+            return BuildObservation(utc, hoDeg, drLatDeg, drLonDeg, CelestialBody.Sun());
+        }
+
+        /// <summary>Body-aware overload (SEXTANT_PLAN v2.2): the Sun is
+        /// calibrated, the Moon and stars use plain UTC — see
+        /// CelestialEphemeris.</summary>
+        public static SextantObservation BuildObservation(DateTime utc,
+            double hoDeg, double drLatDeg, double drLonDeg, CelestialBody body)
+        {
+            double jd = CelestialEphemeris.JdFor(body, utc);
             double ghaAries = Normalize360(AstroMath.GmstDeg(jd));
 
             double raRad, decRad;
-            AstroMath.SunRaDec(jd, out raRad, out decRad);
+            if (!CelestialEphemeris.Compute(body, utc, out raRad, out decRad))
+            {
+                // Defensive: an unknown body falls back to the sun ephemeris
+                // so the record still carries a self-consistent chain.
+                AstroMath.SunRaDec(jd, out raRad, out decRad);
+            }
             double raDeg = Normalize360(raRad * Rad2Deg);
             double decDeg = decRad * Rad2Deg;
 
-            double ghaSun = Normalize360(ghaAries - raDeg);
-            double shaSun = Normalize360(ghaSun - ghaAries);
-            double lha = Normalize360(ghaSun + drLonDeg);
+            double ghaBody = Normalize360(ghaAries - raDeg);
+            double shaBody = Normalize360(ghaBody - ghaAries);
+            double lha = Normalize360(ghaBody + drLonDeg);
 
             double lstDeg = AstroMath.LstDeg(jd, drLonDeg);
             double altRad, azRad, e, n, u;
@@ -301,9 +350,14 @@ namespace UBOAT.Mods.RadioNavigation
             obs.HoDeg = hoDeg;
             obs.DrLatDeg = drLatDeg;
             obs.DrLonDeg = drLonDeg;
+            obs.BodyKind = body.Kind;
+            obs.BodyName = body.Name;
+            obs.BodyHip = body.Hip;
+            obs.BodyRaDeg = raDeg;
+            obs.BodyDecDeg = decDeg;
             obs.GhaAriesDeg = ghaAries;
-            obs.ShaSunDeg = shaSun;
-            obs.GhaSunDeg = ghaSun;
+            obs.ShaBodyDeg = shaBody;
+            obs.GhaBodyDeg = ghaBody;
             obs.LhaDeg = lha;
             obs.DecDeg = decDeg;
             obs.HcDeg = hcDeg;
@@ -316,15 +370,17 @@ namespace UBOAT.Mods.RadioNavigation
             return obs;
         }
 
-        /// <summary>Hc/Az of the sun at an arbitrary position and the
-        /// observation's frozen time (fix refinement pass).</summary>
+        /// <summary>Hc/Az of the recorded body at an arbitrary position and
+        /// the observation's frozen time (fix refinement pass). Uses the
+        /// frozen BodyRa/BodyDec, so it works for any body; the ephemeris
+        /// time is calibrated only for the Sun.</summary>
         public static void RecomputeHcAz(SextantObservation observation,
             double latDeg, double lonDeg, out double hcDeg, out double azDeg)
         {
-            double jd = SunEphemerisCalibration.CalibratedJd(observation.Utc);
+            double jd = CelestialEphemeris.JdForKind(observation.BodyKind, observation.Utc);
             double lstDeg = AstroMath.LstDeg(jd, lonDeg);
-            double raRad = Normalize360(observation.GhaAriesDeg - observation.GhaSunDeg) * Deg2Rad;
-            double decRad = observation.DecDeg * Deg2Rad;
+            double raRad = observation.BodyRaDeg * Deg2Rad;
+            double decRad = observation.BodyDecDeg * Deg2Rad;
             double altRad, azRad, e, n, u;
             AstroMath.RaDecToEnu(raRad, decRad, lstDeg, latDeg,
                 out altRad, out azRad, out e, out n, out u);

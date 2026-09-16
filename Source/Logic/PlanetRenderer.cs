@@ -90,8 +90,14 @@ namespace UBOAT.Mods.RadioNavigation
             if (material != null)
                 material.color = new Color(1f, 1f, 1f, SkyVisibilityResolver.GetVisibility());
 
-            double jd = AstroMath.ToJulianDay(GameTimeResolver.GetUtcNow());
+            DateTime utc = GameTimeResolver.GetUtcNow();
+            double jd = AstroMath.ToJulianDay(utc);
             double lstDeg = AstroMath.LstDeg(jd, longitude);
+            // The Moon shares the game's sky time shift (ADR-033 v2.4): render
+            // it at the calibrated hour angle so the mod disc sits on the
+            // game's moon instead of ~1.6° away.
+            double moonJd = CelestialEphemeris.JdFor(CelestialBody.Moon(), utc);
+            double moonLst = AstroMath.LstDeg(moonJd, longitude);
             bool needsRebuild = !meshRenderer.enabled
                 || MeshRebuildPolicy.NeedsRebuild(
                     cam.transform.position, lastCameraPosition,
@@ -105,11 +111,12 @@ namespace UBOAT.Mods.RadioNavigation
             lastCameraRotation = cam.transform.rotation;
             lastLstDeg = lstDeg;
             lastLatitude = latitude;
-            RebuildMesh(cam, latitude, lstDeg, jd);
+            RebuildMesh(cam, latitude, lstDeg, jd, moonLst, moonJd);
             meshRenderer.enabled = true;
         }
 
-        private void RebuildMesh(Camera cam, float latitude, double lstDeg, double jd)
+        private void RebuildMesh(Camera cam, float latitude, double lstDeg, double jd,
+            double moonLst, double moonJd)
         {
             vertices.Clear();
             triangles.Clear();
@@ -120,13 +127,21 @@ namespace UBOAT.Mods.RadioNavigation
             for (int planetId = 0; planetId < PlanetCount; planetId++)
             {
                 double ra, dec;
-                bool hasCoordinates = planetId == 4
-                    ? AstroMath.MoonRaDec(jd, out ra, out dec)
-                    : AstroMath.PlanetRaDec(planetId, jd, out ra, out dec);
+                double bodyLst = lstDeg;
+                bool hasCoordinates;
+                if (planetId == 4)
+                {
+                    hasCoordinates = AstroMath.MoonRaDec(moonJd, out ra, out dec);
+                    bodyLst = moonLst;
+                }
+                else
+                {
+                    hasCoordinates = AstroMath.PlanetRaDec(planetId, jd, out ra, out dec);
+                }
                 if (!hasCoordinates)
                     continue;
 
-                AstroMath.RaDecToEnu(ra, dec, lstDeg, latitude,
+                AstroMath.RaDecToEnu(ra, dec, bodyLst, latitude,
                     out double altitude, out _, out double e, out double n, out double u);
                 if (altitude <= 0)
                     continue;

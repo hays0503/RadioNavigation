@@ -1,6 +1,7 @@
 # SEXTANT_PLAN — Секстант для RadioNavigation (PIP-две камеры, всё программно)
 
 > Версия: 1.13 (2026-08-30). Статус: исполнен (eee0274…9aa7506); PIP вода+пост.
+> 2.2 (2026-09-16): ручное счисление по Солнцу/Луне/звёздам — ADR-033. См. §15.
 > 1.13 (2026-08-30): SHA-формат + фикс-снимок по I. Авторская верификация
 > in-game (обратный пересчёт сферической астрономии): fix/h₀/Az сходятся с
 > ошибкой 0.006–0.013′ — цепочка точна. Найденная «аномалия γ+SHA ≠ GHA на
@@ -592,3 +593,71 @@ SextantGlareTests: пик в 0° = sunIntensity; спад 2σ → <10%; филь
 - Проводка: `Main.cs` AddComponent после StationMapMarker. Переживает
   закрытие карты; после перезапуска игры появляется снова с новым FIX
   (серия в памяти — осознанное решение v1.9).
+
+---
+
+## 15. Ручное счисление по Солнцу, Луне и звёздам (v2.2, 2026-09-16)
+
+См. ADR-033. Кратко:
+
+### 15.1 Ядро
+- `Source/Logic/CelestialBody.cs` — `CelestialBodyKind {None,Sun,Moon,Star}`,
+  `CelestialBody {Kind,Name,Hip}`, `AsciiName` для карты.
+- `Source/Logic/CelestialEphemeris.cs` — `Compute(body,utc)` → SunRaDec /
+  MoonRaDec / StarCatalog; `JdForKind` → `CalibratedJd` **только для Солнца**.
+- `SextantRunningFix`: `SextantObservation` +`BodyKind/BodyName/BodyHip/
+  BodyRaDeg/BodyDecDeg`, `ShaSunDeg/GhaSunDeg` → `ShaBodyDeg/GhaBodyDeg`;
+  `BuildObservation(..., CelestialBody)`; `RecomputeHcAz` по замороженным
+  RA/Dec (телос-агностичен).
+- `SextantStarId` → `IdentifiedBody`: конус Sun→Moon→звезда; Луна при
+  `alt>0` и `MoonIllumination ≥ 0.05`.
+
+### 15.2 Понятность
+- Правая колонка: азимуты к высотам, статус Луны, рекомендация второго
+  светила (`BodyRecommendation`, кандидат ближе к 90° от азимута №1,
+  alt ≥ 10°).
+- Карточка: имя тела в «НАБЛЮДЕНИЕ №n»; флаг «Луна ±0.3°»; «низко — грубо»
+  при Ho<10°; «a > 30 NM — проверьте наведение»; «Линии совпадают…» при
+  пересечении <3°.
+- «Ошибка от счисления» → **«Δ от места игры (проверка)»**: эталон —
+  истинная позиция игры, это самопроверка замеров.
+- Футер допущений на карточке; экранная справка F-Tafel по клавише **P**
+  (`SextantHelpPanel`): расшифровка полей, порядок действий, допущения.
+- Маркер FIX: имена светил в тултипе (латиница — TMP без кириллицы).
+
+### 15.3 Допущения игры (раскрываются, не считаются)
+- Рефракция, параллакс Луны, наклон горизонта (dip) — не моделируются;
+  замер геоцентрический, согласован с отрисованным небом.
+- Эфемерида Луны low-precision ±0.3° (~18 NM).
+- Звёзды — каталог J1942 без прецессии.
+- Смешанная серия (Солнце + звезда) использует разные эфемеридные часы
+  (Δt vs UTC) — корректно относительно отрисованного неба.
+- Серия не переживает save/load (решение автора).
+
+### 15.4 Гейты
+- `tests.ps1` 812 PASS; SourceCheck 53 PASS (`CelestialEphemeris_RoutesBodies`,
+  `SextantStarId_SkipsNoHipSentinel`); `build.ps1` + PVS clean;
+  `MethodComplexity_NoSuperMethods` PASS (FindNearestBody разбит на
+  FindSunInCone/TryFindMoonCos/TryFindStar).
+- In-game smoke — на авторе.
+
+### 15.5 Регрессионные фиксы (v2.3, 2026-09-16)
+- **F1**: `Hip=0` sentinel — `IsSightableStar(hip) => hip>0` в `CelestialEphemeris`,
+  guard в `TryGetStarRaDec`, пропуск в `SextantStarId.TryFindStar`.
+- **N1**: `CaptureObservation` отклоняет тело без эфемериды (WarnOnce), чтобы
+  fallback на Солнце не дал тихо неверный фикс.
+- **N2**: порог «линии совпадают» 3° → **1°**
+  (`RunningFixCalculator.MinUsableCrossingAngleDeg` / `IsCrossingUsable`).
+- **N3/N4**: контекстный совет `FixCardComposer.GeometryAdvice(crossDeg, sameBody)`
+  и `CoincidentMessage(sameBody)`.
+- **F3**: `BodyRecommendation.Recommend(..., excludeName)` + `Observation1Name`.
+- **V1**: `SextantGameSun.TryGetMoon`/`LogMoonParity` (PlayerPrefs
+  `RadioNav.MoonDiag=1`, throttle 10 с) — сравнение игровой/мод-Луны;
+  `sep>0.5°` = две Луны.
+- **v2.4 (лунная калибровка)**: MOONDIAG показал `sep≈1.6°` (тот же сдвиг
+  неба: 6.6 мин × 15.04°/ч ≈ 1.65°). Δt распространён на Луну согласованно:
+  `CelestialEphemeris.KindUsesCalibration` (Sun+Moon), `PlanetRenderer`
+  (moonJd/moonLst), `SextantBodiesReadout`, `SextantStarId.TryFindMoonCos`,
+  `SextantController.TryGetOwnMoon`. Звёзды — plain UTC. Проверка: `sep`
+  должен упасть до ≲0.3°.
+- Планеты не счисляются — отмечено в справке P и README.

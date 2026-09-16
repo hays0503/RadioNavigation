@@ -124,6 +124,8 @@
     <Compile Include="SignalPanelViewTests.cs" />
     <Compile Include="EntityTypeRowValuesTests.cs" />
     <Compile Include="FixCardComposerTests.cs" />
+    <Compile Include="CelestialEphemerisTests.cs" />
+    <Compile Include="BodyRecommendationTests.cs" />
     <Compile Include="LeuchtfeuerRegistryTests.cs" />
     <Compile Include="LighthouseGateAndScaleTests.cs" />
     <Compile Include="LighthouseAlignmentTests.cs" />
@@ -194,6 +196,9 @@
     <Compile Include="..\Source\Logic\SextantArc.cs" Link="Source\Logic\SextantArc.cs" />
     <Compile Include="..\Source\Logic\SextantGlare.cs" Link="Source\Logic\SextantGlare.cs" />
     <Compile Include="..\Source\Logic\SextantRunningFix.cs" Link="Source\Logic\SextantRunningFix.cs" />
+    <Compile Include="..\Source\Logic\CelestialBody.cs" Link="Source\Logic\CelestialBody.cs" />
+    <Compile Include="..\Source\Logic\CelestialEphemeris.cs" Link="Source\Logic\CelestialEphemeris.cs" />
+    <Compile Include="..\Source\Logic\BodyRecommendation.cs" Link="Source\Logic\BodyRecommendation.cs" />
     <Compile Include="..\Source\Logic\SunEphemerisCalibration.cs" Link="Source\Logic\SunEphemerisCalibration.cs" />
     <Compile Include="..\Source\Logic\SunEphemeris.cs" Link="Source\Logic\SunEphemeris.cs" />
     <Compile Include="..\Source\UI\PrefabNames.cs" Link="Source\UI\PrefabNames.cs" />

@@ -21,7 +21,8 @@ namespace UBOAT.Mods.RadioNavigation
             "Ctrl+\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0442\u043E\u0447\u043D\u043E (0,2\u2032) \u00B7 " +
             "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440 \u043F\u0440\u0430\u0432\u044B\u0439 \u00B7 Ctrl+1\u20133: \u043B\u0435\u0432\u044B\u0439 \u00B7 " +
             "0: \u0441\u043D\u044F\u0442\u044C \u00B7 R: 0\u00B0 \u00B7 +/\u2212: \u0437\u0443\u043C \u00B7 " +
-            "I: \u0437\u0430\u043C\u0435\u0440 \u00B7 O: \u0441\u0435\u0440\u0438\u044F \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
+            "I: \u0437\u0430\u043C\u0435\u0440 \u00B7 O: \u0441\u0435\u0440\u0438\u044F \u00B7 " +
+            "P: \u0441\u043F\u0440\u0430\u0432\u043A\u0430 \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
 
         /// <summary>All references the controller needs after the build.</summary>
         public sealed class Result
