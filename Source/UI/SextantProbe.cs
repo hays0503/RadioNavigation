@@ -360,9 +360,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void AppendMarker(StringBuilder sb)
         {
-            sb.Append(",\"marker\":{\"hasFix\":").Append(FixMapMarker.HasFix ? "true" : "false");
-            sb.Append(",\"lat\":").Append(Num(FixMapMarker.FixLat));
-            sb.Append(",\"lon\":").Append(Num(FixMapMarker.FixLon));
+            bool hasFix = FixMapMarker.HasFix;
+            sb.Append(",\"marker\":{\"hasFix\":").Append(hasFix ? "true" : "false");
+            // FixMapMarker.Clear() keeps the last coordinates; report 0/0
+            // while no fix is published (probe contract).
+            sb.Append(",\"lat\":").Append(hasFix ? Num(FixMapMarker.FixLat) : "0");
+            sb.Append(",\"lon\":").Append(hasFix ? Num(FixMapMarker.FixLon) : "0");
             sb.Append(",\"suppressed\":").Append(FixMapMarker.Suppressed ? "true" : "false").Append('}');
         }
 
