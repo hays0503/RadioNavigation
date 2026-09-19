@@ -92,7 +92,9 @@ namespace UBOAT.Mods.RadioNavigation
             return due;
         }
 
-        /// <summary>1 Hz MANUALRENDER heartbeat inside UpdatePipPose.</summary>
+        /// <summary>1 Hz pose heartbeat inside UpdatePipPose (log string kept
+        /// as "MANUALRENDER" for existing log greps; the cameras are rendered
+        /// by the SRP camera loop, not by a manual Render()).</summary>
         public void OnManualRender(double arcAngle)
         {
             manualRenderTimer -= Time.unscaledDeltaTime;

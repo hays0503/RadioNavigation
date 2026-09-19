@@ -8,10 +8,12 @@ namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
     /// Per-frame PIP camera pose behind SextantController (P5.4 slice 4b,
-    /// SRP): main-camera tracking, SRP state sync and forced render live
-    /// here with explicit inputs; the controller owns open/close/input and
-    /// passes its factory, arc and zoom divisor. Creation still lives in
-    /// SextantPipFactory. Moved verbatim (pose order, log strings).
+    /// SRP): main-camera tracking, SRP state sync and the debug heartbeat
+    /// live here with explicit inputs; the controller owns open/close/input
+    /// and passes its factory, arc and zoom divisor. The cameras are rendered
+    /// by the game's SRP camera loop (both enabled), not by a manual Render()
+    /// — see Update(). Creation still lives in SextantPipFactory. Moved
+    /// verbatim (pose order, log strings).
     /// </summary>
     public static class SextantPipPose
     {
@@ -60,30 +62,51 @@ namespace UBOAT.Mods.RadioNavigation
             // Positive Euler X pitches DOWN in Unity; the alidade looks UP.
             factory.RightCamera.transform.rotation = Quaternion.Euler(-(float)arcAngle, yaw, 0f);
 
-            SyncCameraState(factory.LeftCamera, viewCamera, fovDivisor);
-            SyncCameraState(factory.RightCamera, viewCamera, fovDivisor);
-            factory.RefreshMirroredState();
+            // Inside the boat the hull blocks the sky, so each PIP renders the
+            // interior directly: it takes the interior camera's culling mask
+            // (the sea gate + RenderScene=true are applied around this call).
+            // Single GBuffer writer per pass, whose depth matches the lighting
+            // camera — the shared-_GBufferZ mismatch that corrupted one ocular
+            // half (SEXTANT_PLAN §16.17) is gone by construction.
+            MainCamera interiorMain = MainCamera.Instance;
+            bool insideBoat = interiorMain?.IsInsideBoat == true;
+            int interiorMask = insideBoat ? factory.InteriorMirror.InteriorMask : 0;
 
-            // The game's SRP renders attached cameras once and never
-            // refreshes them with the updated pose; force the render so the
-            // right RT follows the alidade.
+            SyncCameraState(factory.LeftCamera, viewCamera, fovDivisor, interiorMask);
+            SyncCameraState(factory.RightCamera, viewCamera, fovDivisor, interiorMask);
+            factory.RefreshMirroredState(viewCamera);
+
+            // The sea must stay hidden like in the game's own inside view
+            // (R5: the hull blocks the sea, so the ocular must not show it).
+            factory.InteriorMirror.Sync(insideBoat);
+            factory.SyncWaterRenderList(insideBoat);
+
+            // Both PIP cameras are enabled (SextantController), so the game's
+            // SRP camera loop renders each exactly once per frame with the pose
+            // set above — after LateUpdate positioned the sun disc and the
+            // interior clone. The old manual Render() here ran in Update (before
+            // those LateUpdates) and was a no-op for the disabled left camera;
+            // GPU-verified 2026-09-17 (RenderDoc capture: left RT <= 0.025 RGB,
+            // right RT <= 0.917, both written 2-3x per frame).
             if (SextantVectorLog.Enabled && manualRender != null)
                 manualRender();
-            try
-            {
-                factory.LeftCamera.Render();
-                factory.RightCamera.Render();
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning(LogPrefix + " MANUALRENDER failed: " + e.Message);
-            }
         }
 
-        public static void SyncCameraState(Camera cam, Camera source, float fovDivisor)
+        public static void SyncCameraState(Camera cam, Camera source, float fovDivisor, int interiorMask)
         {
             cam.fieldOfView = source.fieldOfView / fovDivisor;
-            int mask = source.cullingMask | SunDiscRenderer.SunDiscLayerMask;
+            // Camera params the game recomputes while the sextant is open:
+            // the FPP far clip follows the inside state and the weather fog
+            // (FPPCameraController.cs:942: 40 m inside, fog-dependent
+            // outside), the near clip changes with the view (:615-616). The
+            // PIP must stay 1:1 with the eyes, so copy them every frame.
+            cam.nearClipPlane = source.nearClipPlane;
+            cam.farClipPlane = source.farClipPlane;
+            cam.depthTextureMode = source.depthTextureMode;
+            // Inside the boat (interiorMask != 0) the PIP renders the interior
+            // directly instead of the exterior view; the sun disc layer stays
+            // visible for the alidade either way.
+            int mask = (interiorMask != 0 ? interiorMask : source.cullingMask) | SunDiscRenderer.SunDiscLayerMask;
             cam.cullingMask = mask;
 
             // Per-frame hot path: cache the AdditionalCameraData per camera and
@@ -102,26 +125,29 @@ namespace UBOAT.Mods.RadioNavigation
                     pipAdd = cam.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
                     addCache[cam] = pipAdd;
                 }
-                if (pipAdd == null)
-                    return;
-
-                if (!(pipAdd.Passes is Array passes))
-                    return;
-
-                for (int i = 0; i < passes.Length; i++)
-                {
-                    object p = passes.GetValue(i);
-                    if (p == null)
-                        continue;
-                    ApplyPassMask(p, mask);
-                }
+                ApplyMaskToPasses(pipAdd, mask);
             }
             catch (Exception e)
             {
                 // Culling/sun-layer divergence must surface once instead of
                 // silently rendering a wrong PIP stack every pose update.
                 if (WarnOnce.ShouldLog("SextantController.SyncCameraState"))
-                    Debug.LogWarning("[RadioNav][Sextant] SyncCameraState failed: " + e.Message);
+                    Debug.LogWarning(LogPrefix + " SyncCameraState failed: " + e.Message);
+            }
+        }
+
+        /// <summary>Writes a culling mask onto every SRP pass of one camera.</summary>
+        internal static void ApplyMaskToPasses(UBOAT.Game.Scene.Rendering.AdditionalCameraData data, int mask)
+        {
+            if (data == null || !(data.Passes is Array passes))
+                return;
+
+            for (int i = 0; i < passes.Length; i++)
+            {
+                object p = passes.GetValue(i);
+                if (p == null)
+                    continue;
+                ApplyPassMask(p, mask);
             }
         }
 

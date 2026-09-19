@@ -379,9 +379,8 @@ namespace UBOAT.Mods.RadioNavigation
                     return null;
                 }
 
-                UnityEngine.Object prefab = loadAsset.Invoke(fallbackBundle, new object[] { RadioPrefabName }) as UnityEngine.Object;
-                if (prefab == null)
-                    prefab = loadAsset.Invoke(fallbackBundle, new object[] { RadioPrefabPath }) as UnityEngine.Object;
+                UnityEngine.Object prefab = loadAsset.Invoke(fallbackBundle, new object[] { RadioPrefabName }) as UnityEngine.Object
+                    ?? loadAsset.Invoke(fallbackBundle, new object[] { RadioPrefabPath }) as UnityEngine.Object;
                 if (prefab == null)
                 {
                     Debug.LogError("[RadioNav][Main] fallback bundle has no 'Radio' prefab");
@@ -405,8 +404,7 @@ namespace UBOAT.Mods.RadioNavigation
             MethodInfo all = FindMethod(bundleType, "GetAllLoadedAssetBundles", isStatic: true, parameterCount: 0);
             if (all == null)
                 return null;
-            var bundles = all.Invoke(null, null) as System.Collections.IEnumerable;
-            if (bundles == null)
+            if (!(all.Invoke(null, null) is System.Collections.IEnumerable bundles))
                 return null;
             PropertyInfo nameProperty = bundleType.GetProperty(
                 "name", BindingFlags.Public | BindingFlags.Instance, null, typeof(string), Type.EmptyTypes, null);
@@ -419,6 +417,46 @@ namespace UBOAT.Mods.RadioNavigation
                     return bundle;
             }
             return null;
+        }
+
+        /// <summary>
+        /// Loads a single asset (by name, then by full bundle path) from the
+        /// mod's already-loaded AssetBundle. F229: on 2026.1-patch21 the game
+        /// never registers the mod bundle in the ResourceManager, so every
+        /// ResourceManager.RetrieveAsset() call degrades to Resources.Load()
+        /// and returns null for mod assets (GPU-verified 2026-09-17: the
+        /// ocular views lost their opaque material and were alpha-gated by the
+        /// stock UI shader). This is the direct-bundle escape hatch for such
+        /// callers; the bundle itself is loaded by InstantiateFromBundleFallback.
+        /// </summary>
+        internal static UnityEngine.Object LoadBundleAsset(string assetName)
+        {
+            try
+            {
+                Type bundleType = GameTypeCache.Resolve("UnityEngine.AssetBundle", "UnityEngine.AssetBundleModule");
+                if (bundleType == null)
+                    return null;
+
+                if (fallbackBundle == null)
+                    fallbackBundle = FindLoadedBundle(bundleType);
+                if (fallbackBundle == null)
+                    return null;
+
+                MethodInfo loadAsset = FindMethod(bundleType, "LoadAsset", isStatic: false, parameterCount: 1);
+                if (loadAsset == null)
+                    return null;
+
+                // Unity accepts both the asset name and its full project path.
+                UnityEngine.Object asset = loadAsset.Invoke(fallbackBundle, new object[] { assetName }) as UnityEngine.Object
+                    ?? loadAsset.Invoke(fallbackBundle, new object[] { "Assets/Packages/testui/" + assetName }) as UnityEngine.Object;
+                return asset;
+            }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("ModBootstrapper.LoadBundleAsset"))
+                    Debug.LogWarning("[RadioNav][Main] LoadBundleAsset('" + assetName + "') failed: " + e.Message);
+                return null;
+            }
         }
 
         /// <summary>

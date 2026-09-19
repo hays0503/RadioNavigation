@@ -37,6 +37,11 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 ApplyPatches(harmony, targets);
             }
+
+            // Separate target assembly (com.dws.pipeline.Runtime): keeps the
+            // PIP render pass at one GBuffer writer (§16.21). Non-fatal - a
+            // miss only leaves the old shared-_GBufferZ behaviour.
+            PipCloneCameraPatch.Apply(harmony);
         }
 
         private static PatchTarget[] ResolveTargets()

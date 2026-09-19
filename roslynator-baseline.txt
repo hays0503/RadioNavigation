@@ -53,7 +53,6 @@
   Source\Logic\SunDiscRenderer.cs : warning RCS1146: 
   Source\Logic\SunDiscRenderer.cs : warning RCS1213: 
   Source\Sound\DspPipeline.cs : warning RCS1169: 
-  Source\Sound\DspPipeline.cs : warning RCS1188: 
   Source\UI\ChronometerCursorPolicy.cs : warning RCS1161: 
   Source\UI\ChronometerCursorPolicy.cs : warning RCS1238: 
   Source\UI\ChronometerOverlayHandler.cs : warning RCS1146: 
@@ -82,8 +81,10 @@
   Source\UI\SextantDmFormat.cs : warning RCS1238: 
   Source\UI\SextantEffectMirror.cs : warning RCS1146: 
   Source\UI\SextantGameSun.cs : warning RCS1173: 
+  Source\UI\SextantInteriorPoseFollower.cs : warning RCS1213: 
   Source\UI\SextantPipFactory.cs : warning RCS1128: 
   Source\UI\SextantPipFactory.cs : warning RCS1146: 
+  Source\UI\SextantPipInteriorPose.cs : warning RCS1213: 
   Source\UI\SextantPipPose.cs : warning RCS1146: 
   Source\UI\SextantRenderPasses.cs : warning RCS1146: 
   Source\UI\ShipControlUIBridge.cs : warning RCS1146: 

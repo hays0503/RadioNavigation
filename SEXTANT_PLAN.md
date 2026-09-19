@@ -661,3 +661,751 @@ SextantGlareTests: пик в 0° = sunIntensity; спад 2σ → <10%; филь
   `SextantController.TryGetOwnMoon`. Звёзды — plain UTC. Проверка: `sep`
   должен упасть до ≲0.3°.
 - Планеты не счисляются — отмечено в справке P и README.
+
+---
+
+## 16. Интерьер лодки в окуляре (Route B, 2026-09-17)
+
+### 16.1 Проблема
+Внутри лодки PIP-камеры копировали **главную** камеру (её culling mask +
+pass-лист), а интерьер рисует отдельная `InteriorCamera`. Итог: окуляр
+смотрел сквозь борт (небо/море), лодки не видно.
+
+### 16.2 Механизм (IL, не перепроверять)
+- SRP `DeepPipeline.CollectCameras` (com.dws.pipeline.Runtime) добавляет
+  интерьерную `VirtualCamera` вторым `CameraData` **только если у
+  рендерящейся камеры на GameObject есть `VirtualSceneRenderer`**
+  (`DeepCameraData::.ctor` → `camera.GetComponent<VirtualSceneRenderer>()`;
+  guard: `enabled` + `RenderingEnabled` + `VirtualCamera != null` +
+  `isActiveAndEnabled`).
+- `CollectCameras` копирует `near/far/FOV/projection` с корневой камеры на
+  `VirtualCamera` и рендерит обе в **общий g-buffer** → один lighting/blit в
+  таргет корневой камеры. Forward-путь `CollectCameras` не вызывает.
+- `VirtualSceneRenderer` per-GameObject; `LateUpdate` ставит
+  `virtualCamera.localPosition/localRotation` из `vs.Target` + своего
+  transform; `SetRenderingEnabled(true)` пишет `localCamera.clearFlags=Nothing`
+  (его `localCamera` = PIP-камера, т.к. `GetComponent<Camera>()` на её
+  GameObject). Поле `interiorCamera` у VSR — **static**, не трогать.
+- `VirtualSceneRenderer.VirtualScene` в игре = null (сериализованное поле);
+  сцена приходит per-frame override'ом. Канонический источник —
+  `PlayerShip.Interior.VirtualScene` (`Target` = лодка, `SceneCamera` =
+  `Interior Camera`).
+- **Interior-пространство**: interior-сцена живёт в root-объекте
+  `Player Ship Interior Locator` (`pos (0,100,0)`, `rot identity`);
+  `InteriorCamera.parent` = этот locator, `InteriorCamera.localPosition` =
+  ship-local смещение глаза (FPP-контроллер кладёт его через
+  `OverrideLocalTransformation(virtualScene, container.InverseTransformPoint(eye))`).
+  VSR `LateUpdate` считает `vs.Target.InverseTransformPoint(...)` в ship-local
+  фрейме — это же значение, но применять его надо в **locator-пространстве**
+  (иначе промах на 100 м по Y).
+
+### 16.3 Решение (`SextantInteriorMirror.cs`)
+На каждую PIP-камеру:
+1. **Clone-камера** (`<PIP>InteriorClone`) — child к
+   **`InteriorCamera.transform.parent`** (interior locator; fallback —
+   `VirtualScene.Target`): `Camera` (копия `InteriorCamera.Camera`) +
+   `AdditionalCameraData` (pass-лист с `InteriorCamera.AdditionalCameraData`);
+   `StreamingController` нет (null-guard). Parent обязателен именно locator:
+   `LateUpdate` пишет ship-local `localPosition`, и в locator-пространстве он
+   попадает ровно в world-позицию игровой `InteriorCamera`
+   (live 2026-09-17: clone `(-0.8,100.9,0.0)` == `InteriorCamera`
+   `(-0.76,100.90,-0.01)`).
+2. **`VirtualSceneRenderer`** на GameObject PIP-камеры (reflection:
+   `GameTypeCache.Resolve("UBOAT.Game.Scene.Effects.VirtualSceneRenderer",
+   "com.uboat.rendering")` + `AddComponent(Type)`), поля `virtualCamera` =
+   clone, `virtualScene` = `PlayerShip.Interior.VirtualScene`.
+3. Per-frame (`SextantPipPose.Update` → `InteriorMirror.Sync(IsInsideBoat)`):
+   `vsr.enabled = IsInsideBoat` (снаружи — выкл, окуляр снова небо/море);
+   clone `cullingMask` = `InteriorCamera.Camera.cullingMask`
+   (`545264640` / `8393728` / `131072`) + маски pass-ов; вернуть PIP
+   `clearFlags = SolidColor` (VSR ставит Nothing один раз).
+4. `Attach` — **до первого `Render()`**: `DeepCameraData` кэширует VSR в
+   ctor. Teardown: `Close` → `SetEnabled(false)`, `Destroy` → destroy clone+VSR.
+
+### 16.4 Почему корректно
+Ровно тот же путь, что у главной камеры: `CollectCameras` → `CAM1.Initialize`
+→ `SetCamera`/`RenderGBuffer` в общий g-buffer → один lighting/blit. Поза/FOV
+— от PIP, pass-лист/маска — от интерьерной камеры. Clone изолирован: главную
+`VirtualCamera`/`StreamingController` не шарит (иначе драка в LateUpdate и
+`OnDisable` гасит общий интерьер).
+
+### 16.5 Верификация (2026-09-17)
+- Первая итерация: clone был child лодки → world y≈0.1 вместо 100.9 → в
+  окуляре интерьер сверху, снизу небо (пользовательский скрин «НЕ РАБОТАЕТ»).
+  Фикс — parent = `InteriorCamera.transform.parent` (locator).
+- In-game FPP внутри: окуляр заполнен интерьером (стены, люк с сеткой,
+  оборудование), неба сквозь борт нет; clone world == `InteriorCamera`
+  world (y≈100.9).
+- Мостик (`insideBoat=false`): окуляр снова небо/море, интерьера нет.
+- Главный вид не задет (screenshot closed = чистый интерьер).
+- Перф: закрытый секстант ~50 fps / 19.9 ms, открытый (интерьер) ~32 fps /
+  31.6 ms. Модальный прибор — допустимо.
+- Гейты: build.ps1 + PVS clean; tests.ps1 812 PASS; SourceCheck 53 PASS.
+
+### 16.6 Gotcha: игра компилирует мод в `Temp`
+`Mod.LoadAssembly` пишет сборку в
+`%USERPROFILE%\AppData\LocalLow\Deep Water Studio\UBOAT\Temp\<assemblyName>.dll`,
+а НЕ в корень мода; build.ps1-DLL в корне игра не читает. Если Temp-DLL не
+обновляется (наблюдалось 2026-09-17), можно скопировать build.ps1-DLL в Temp и
+проставить ему `LastWriteTime = now` (тогда `IsAssemblyOutdated` вернёт false и
+игра загрузит готовую сборку).
+
+### 16.7 GPU-верификация артефактов окуляра и фиксы (2026-09-17, RenderDoc)
+
+Захват кадра (`captures/sextant_frame6198.rdc`, D3D11, 4033 действия; экспорты
+`frame_final.png`, `rt_34023.png`, `rt_34040.png`) дал GPU-правду.
+
+**Измерено:**
+- Вью окуляра (`LeftView` event 40630, `RightView` event 40634) сэмплят две
+  512×512 `R16G16B16A16` RT мода: `34040` (левая) и `34023` (правая).
+- Пиксельный шейдер (5133) премультиплицирует: `mul o0.xyz, r0.www, r0.xyzx`
+  (RGB × alpha), blend `One / InvSrcAlpha` → итог `out = tex.rgb × tex.a` над
+  чёрным `LensBacking`. Альфа RT: `34040` = 0.029..0.644, `34023` = 0.028..1.203
+  → картинка окуляра затемняется/гейтится альфой.
+- Содержимое половин разное: `34040` RGB ≤ 0.025 (практически чёрная),
+  `34023` RGB ≤ 0.917 (засвеченная белая заливка). Каждая RT пишется 2–3 раза
+  за кадр (`34040`: 10953/17170/22201; `34023`: 5794/27339) — ручной рендер + SRP.
+- Основной вид рендерится в 1129×635 и апскейлится (FSR, `fsrMode=2` в
+  settings.ubt); PIP — 512×512; Present — event 40742.
+
+**Причины (подтверждены):**
+1. F229: игра не регистрирует бандл мода в `ResourceManager`, поэтому
+   `RetrieveAsset<Material>("RadioNavOpaqueView")` уходит в `SimpleResource` →
+   `Resources.Load` → null; вью остаются на стоковом UI-шейдере, который
+   умножает картинку на альфу RT (то самое «alpha darkening» из комментария
+   `SextantOcularBuilder`).
+2. Левая PIP-камера была `enabled=false` и «рендерилась» только вручную
+   `Camera.Render()` в `Update` (до LateUpdate; для disabled-камеры — no-op) →
+   левая RT чёрная, правая засвечена.
+
+**Фиксы:**
+- `ModBootstrapper.LoadBundleAsset(name)` — прямое `AssetBundle.LoadAsset` из уже
+  загруженного бандла (сначала по имени, затем по полному пути
+  `Assets/Packages/testui/<name>`); `SextantOcularBuilder.ResolveOpaqueViewMaterial`
+  пробует `ResourceManager` → бандл-материал → бандл-шейдер + `new Material`.
+- Обе PIP-камеры `enabled=true` (`SextantController.AttachAndConfigureCameras`);
+  ручной `Camera.Render()` из `SextantPipPose.Update` убран — один путь, рендер
+  SRP-циклом после LateUpdate. Регистрация в `AttachedCameras` сохранена (вода).
+
+**Открыто:** засвет правой половины (белая заливка) — вероятно, отсутствие
+пер-камерных драйверов неба/экспозиции на PIP (в дампе нет `TOD_Camera`) и/или
+не скомпозитился интерьер; проверять после фиксов.
+
+### 16.8 Семантика «внутри лодки» и наведение интерьера (2026-09-17, live-верифицировано)
+
+**Требования (пользователь):** секстант — для наблюдения светил; внутри лодки корпус логично
+блокирует небо, поэтому окуляр показывает интерьер, идентификация не срабатывает, моря нет;
+интерьер в окуляре наводится алидадой так же, как небо снаружи (правая половина опускается/
+поднимается). Снаружи — без изменений (правая камера от алидады, небо/море, идентификация).
+
+**Реализация:**
+1. **Наведение интерьера** — `SextantInteriorPoseFollower` (`[DefaultExecutionOrder(10000)]`,
+   LateUpdate после VSR) на каждом клоне: `Clone.rotation = Source.rotation` (мировая ориентация
+   PIP-камеры; locator сам переводит в локальную). До этого VSR писал клону только `localPosition`
+   → интерьер был статичен. Живой POSE-лог: left src/clone `(0, yaw, 0)`, right `(300°, yaw, 0)`
+   при arc=60; пиксельный тест (timeScale=0): контроль arc0/arc0 → RIGHT=1.55, тест arc0/arc60 →
+   RIGHT=33.36, LEFT от алидады не зависит.
+2. **Море внутри** — `SextantPipFactory.SyncWaterRenderList(insideBoat)` (per-frame из
+   `SextantPipPose.Update`): `WaterCamera.SetCustomWaterRenderList(emptyList)` внутри, `null`
+   снаружи — тот же механизм, что у игры (`FPPCameraController.cs:827`); PIP-камеры хранят ссылки
+   на свои `WaterCamera`.
+3. **Идентификация внутри** — `SextantStarId.Update(dt, pain, canSight, ...)`: при
+   `canSight=false` (`MainCamera.IsInsideBoat`) цикл сбрасывается, имя очищается. Live: наведение
+   ровно на Солнце внутри → `identified=None`; снаружи → `identified=Sun`.
+4. **Баг имени** — `SextantEffectMirror.GetMirrorMembers` копировал `UnityEngine.Object.name`
+   (public writable property) с главной камеры на добавленные компоненты → PIP-объекты
+   переименовывались в «Main Camera» (путаница в логах/поисках по имени). Фикс: пропуск
+   свойств, объявленных в `UnityEngine.Object` (`name`, `hideFlags`).
+
+**Верификация:** build.ps1 + PVS clean; analyze.ps1 quick baseline clean (включая SourceCheck);
+SourceCheck 53 PASS; tests.ps1 812 PASS; live MCP внутри/снаружи (скриншоты + `sextant`/POSE-логи).
+Открытым остаётся засвет/bloom PIP из 16.7 — в финальной сборке пересвет не воспроизведён
+(интерьер рендерится штатно); проверить по кадрам пользователя при следующем прогоне.
+
+### 16.9 Зум ×1 по умолчанию и «картинка как из глаз FPP» (2026-09-17/18, live-верифицировано)
+
+**Требования (пользователь):** «по умолчанию зума нет»; «картинка как будто мы просто смотрим из
+глаз игрока» (окуляр = 1:1 обычный вид FPP).
+
+**История диагноза (важно):**
+1. Засвет ламп в окуляре (огромные цветные пятна) сначала связали с PPv2-bloom: фильтр-тест
+   (bloom-cut том) убирал пятна. Затем «внутри эффектов нет» (полное отключение поста PIP) убрало
+   пятна, но дало клиппинг эмиссивных объектов (сырой HDR без экспозиции/тонмаппинга) — тоже неверно.
+2. Финальный live A/B (рефлексия по компонентам PIP) показал правду: **пятна даёт непрогретая
+   авто-экспозиция legacy-стека** (PPv1 `EyeAdaptation`). Свежий `PostProcessingBehaviour` на PIP
+   стартует неадаптированным (пересвеченным) и сходится за ~30–45 с; в этот период яркий рендер +
+   bloom = огромные ореолы. После прогрева картинка PIP совпадает с глазами (проверено скриншотами:
+   внутри — тот же тёмный интерьер, что и главный вид; снаружи — небо/море как было).
+
+**Как это устроено в игре (для протокола):** ни один вид не рендерится с выключенным постом.
+Каждый режим ставит свой legacy-профиль на старте и восстанавливает на выходе
+(`FPPCameraController.cs:638/693`, `SectionViewCameraController.cs:1134`, `FreeFlyCameraController.cs:478`,
+`MapCameraController.cs:604-605/701`, устройства `GenericCameraController.cs:307-308/349`); PPv2-тома
+интерьер/экстерьер переключаются по `IsInsideBoat` (`MainCamera.cs:1568-1587`), у устройств —
+`CustomPostProcessControl` (`PeriscopeController.cs:312/568`) и свои тома (`:372-384`); SSMS-туман —
+per-camera (`FPPCameraController.cs:631-636`). GPU-подтверждение (RenderDoc, старый кадр): PPv1-пасс
+1920×1080 читает 34×19 luminance-текстуру (адаптация экспозиции) + PPv2-bloom мип-цепочки.
+
+**Реализация (финал):**
+1. **Зум ×1** — `SextantZoom.DefaultIndex = 2` → `5` (`Steps = {6,4.5,3,2,1.5,1}`; индекс 0 = ×6).
+   Тесты: `Default_Is1x_NoZoom`, `PipFov_DividesMainFov` (60/1 = 60 + три шага внутрь = 3x),
+   `ZoomInOut_RoundTrips` (с дефолта ZoomOut — no-op).
+2. **Гейт эффектов убран** (откат «эффектов нет»): `SextantPipPose` больше не вызывает
+   `SyncPostEffects`; `SextantPipFactory.SyncPostEffects` и `SextantEffectMirror.SetEffectsEnabled`
+   удалены. PIP всегда рендерится полным зеркальным стеком FPP-камеры (legacy + PPv2 + SSMS).
+3. **Per-frame follow-up в `RefreshMirroredState`:** `SextantEffectMirror.RefreshPostProfile()` копирует
+   живой `profile` источника на все зеркалированные `PostProcessingBehaviour` (игра меняет профиль по
+   виду/отсеку, `SectionViewCameraController.cs:1134`) — member `profile` резолвится один раз.
+4. **Per-frame синк камеры в `SyncCameraState`:** `nearClipPlane`, `farClipPlane`, `depthTextureMode`
+   (игра пересчитывает far каждый кадр: 40 м внутри, туман-зависимый снаружи — `FPPCameraController.cs:942`).
+5. **POSE-спам после закрытия** — `SextantInteriorPoseFollower.LateUpdate` early-return при
+   `!SextantController.IsOpen` (раньше фолловеры писали POSE каждые ~5 с после `closed`).
+
+**Live-верификация (2026-09-18, MCP):** `ATTACH ... fov=65.0 pipFov=65.0` (зума нет); строки
+`POSTEFFECTS` в логе больше нет; внутри (после прогрева ~40 с) окуляр = тёмный интерьер как у глаз,
+пятен нет; на мостике — небо/море как было; после `closed` — 0 POSE-строк. Гейты: build.ps1 + PVS
+clean; analyze.ps1 quick baseline clean (173 диагностики, −2 от удалённого гейта); SourceCheck 53 PASS;
+tests.ps1 812 PASS.
+
+**Известное поведение (не баг):**
+- **Прогрев экспозиции** — после каждого открытия секстанта первые ~30–45 с картинка PIP
+  пересвечена (и на ярких лампах bloom раздувается) — legacy `EyeAdaptation` на свежем компоненте
+  сходится к уровню глаз. Тот же паттерн у игровых device-видов (камера перископа включается только
+  на время вида). Если мешает — возможный follow-up: прайминг состояния адаптации с главной камеры
+  (рефлексия во внутренности PPv1) или удержание компонента тёплым.
+  **Устарело (2026-09-18): см. §16.10 — legacy-стек снят с PIP, диагноз §16.9 о прогреве
+  `EyeAdaptation` не подтвердился (его RT на главной камере всегда null, т.е. эффект выключен).**
+- **×3 на яркую лампу** — при зуме в лампу она клиппуется (яркий источник в тёмной сцене) — как у
+  реальной камеры; дефолт ×1 (для замеров) этого не показывает.
+
+### 16.10 Legacy-стек снят с PIP-камер; остаточный пересвет окуляра (2026-09-18, live A/B)
+
+**Проблема:** после §16.9 пользователь показал серию кадров — окуляр пересвечивает яркие объекты в
+огромные шары с радужными каймами («это не то»). Диагностика:
+
+1. **Половины окуляра идентичны** (arc=0 → обе PIP-камеры в одной позе; лог POSE + совпадающие
+   сэмплы RENDERCHECK) — шар это объект в кадре, не рассинхрон половин. Фильтры 0/0 — солнечный
+   диск (`SunDiscRenderer.Active = IsOpen && rightFilterCount > 0`) не при чём.
+2. **A/B №1 (PIP):** `PostProcessingBehaviour.enabled=false` на обеих PIP-камерах → шар схлопывается
+   до нормальной лампы (проверено в моторном/торпедном отсеках).
+3. **A/B №2 (глаза):** то же выключение на главной камере → картинка глаз **не меняется** (legacy-стек
+   на главной камере инертен). Вывод: legacy PPv1 применяется только к PIP и именно он раздувает лампы.
+4. Внутренности (рефлексия): legacy `EyeAdaptation` на главной камере не активен (RT null — эффект
+   выключен в профиле), PPv2 `AutoExposure` в игре выключен (`enabled=false`; `BrighterNights.cs`
+   крутит его `minLuminance` — включается ночью). Состояния на PIP не было ни у того, ни у другого.
+5. **Фикс:** legacy PPv1 больше **не зеркалируется** на PIP — `SextantEffectMirror
+   .AddMirroredEffectComponents` пропускает `PostProcessingBehaviour` (комментарий класса);
+   удалены `RefreshPostProfile`/`SyncEyeAdaptation` и вся мёртвая машинерия. На PIP остаются:
+   PPv2 `PostProcessLayer`, `SSMSGlobalFog`, `SSMS` (per-frame `RefreshSsms`) и синк PPv2-экспозиции
+   `SyncAutoExposure` (dormant, пока игра не включит AutoExposure ночью).
+6. **Остаток (открыто):** в части сцен окуляр всё ещё «замывает» яркий источник мягким пятном.
+   При выключенном PPv2 сырой рендер PIP = ядовито-насыщенный HDR **без пятна** → пятно делает
+   PPv2-тонмаппинг пересвеченного raw-рендера PIP. Кандидаты: настройки `AdditionalCameraData`
+   клона/интерьера (пока совпадают с defaults), per-layer состояние PPv2 (DOF/TAA), SSMS,
+   яркость интерьерного композита (клон+VSR). Следующий шаг: бисекция PPv2-эффектов через per-PIP
+   том (по образцу `SextantBloomCut`).
+
+**Гейты:** build.ps1 + PVS clean; SourceCheck 53 PASS; Roslynator baseline clean (174); tests.ps1
+812 PASS. Temp-DLL обновлён, игра перезапущена.
+
+### 16.11 КОРНЕВАЯ ПРИЧИНА шара найдена: `AdditionalCameraData.RenderScene` (2026-09-18, live A/B на паузе)
+
+**Симптом:** в отсеках окуляр пересвечивал лампы в огромный белый шар с радужными каёмками
+(скриншоты пользователя), глаза в той же сцене — чисто; снаружи не воспроизводилось.
+
+**Метод (важно для будущих A/B):** сцена динамична, кадры «до/после» не сравнимы, если между ними
+успел пройти персонаж/смена света. Решающие A/B сняты **на паузе** (`pause on`): поза и свет
+заморожены, меняется ровно один флаг через `reflect_set`. Дополнительно: `McpReflect.FindInstance`
+(`Mods/McpBridge/Source/Logic/McpReflect.cs:468`) молча подставляет первый компонент типа в сцене,
+если на указанном объекте его нет — **проверять `old` в ответе `reflect_set`** (там был реальный
+`old=false`, т.е. попали именно в PIP, а не в главную камеру).
+
+**Причина:** мод ставил PIP-камерам `AdditionalCameraData.RenderScene = true` навсегда
+(`SextantPipFactory` + `SextantRenderPasses.Setup`). Игра пересчитывает этот флаг каждый кадр:
+`GenericCameraController.PreCull:483` держит `false`, пока интерьер рисует `VirtualSceneRenderer`
+(внутри лодки), и `true` снаружи. С `true` внутри PIP рисует **внешнюю сцену поверх интерьерного
+композита** → пересвеченный вход → PPv2-bloom + тонмаппинг = белый шар.
+
+**Доказательство (live, пауза, одна поза, `RenderScene` только на двух PIP):**
+
+| Состояние | Окуляр |
+|---|---|
+| `RenderScene=true` (как было) | гигантский белый шар с радужными каёмками = артефакт пользователя |
+| `RenderScene=false` (как у главной внутри) | чистый интерьер, совпадает с глазами |
+
+**Дополнительно проверено и отклонено:**
+- `StencilMask` на PIP: у главной внутри `true`, у PIP/клона `false` (клоны совпадают с игровой
+  `Interior Camera` — у неё тоже `false`). Принудительный `true` на PIP **тоже даёт шар** (и при
+  `RenderScene=false`) — значит на PIP его надо оставлять `false`, **зеркалить нельзя**.
+- `UseCustomAmbient`/`Desaturation`/`ForceUpscaleBeforePostprocess`/`RenderScene` у `Interior Camera`
+  = `false`/`false`/`false`/`true` — клон совпадает, трогать не нужно.
+- Звёздная сфера внутри отключена (`StarsMesh.cs:80-84`), солнечный диск — только при фильтрах
+  (`SunDiscRenderer.Active`), при `filters=0` не рисуется.
+
+**Фикс:** `SextantPipFactory.SyncRenderScene(viewCamera)` — покадровое зеркалирование живого
+`RenderScene` с view-камеры на оба PIP (кэш компонентов: `GetComponent` только при смене камеры).
+Вызывается из `RefreshMirroredState(viewCamera)` (сигнатура изменена, вызывающий один —
+`SextantPipPose.cs:67`). Плюс начальное значение берётся с живой камеры сразу при создании.
+Живая проверка: после `reflect_set RenderScene=true` значение **само вернулось в `false` за кадр** —
+покадровый синк работает. Внутри `RenderScene=false`, `StencilMask=false`, как надо.
+
+**Остаток (открыто, меньший):** у ярких ламп остаётся умеренный ореол (синие лампы/щели), крупнее,
+чем у глаз. Причина класса: PIP рендерит 512² и показывает половину RT, а bloom считается по всему
+RT. Если помешает — следующий шаг: per-PIP том `Bloom.enabled=false` (механика `SextantBloomCut`
+уже есть) или подъём RT.
+
+**Гейты:** build.ps1 + PVS clean; analyze.ps1 quick baseline clean (174); tests.ps1 812 PASS.
+Temp-DLL обновлён, игра перезапущена.
+
+### 16.12 Bloom-cut всегда при открытом секстанте + RenderDoc-захват (2026-09-18, ночь)
+
+**Артефакты пользователя (второй раунд, 4 скрина):** цветные ореолы вокруг ламп (синий/красный) +
+жёсткие чёрные квадраты в окуляре; нестабильны (мигают). Разбор кадра пользователя (`crop` 4x):
+чёрные квадраты — **чистые прямоугольники с резкими краями** (48²/32²/24²/16² px на экране, т.е.
+~5–15 px в RT), вложенных размеров — сигнатура мип-цепочки; bloom мягкий → квадраты **не bloom**.
+Кандидаты: SSMS/SSMSGlobalFog (мип-пирамида, зеркалится на PIP) либо портальный клиппинг.
+
+**Фикс ореолов (сделан):** `SextantBloomCut` теперь **всегда активен, пока секстант открыт**
+(`Update(open, ...)`: `rightOn = open`, `leftOn = open`; раньше — только при `filters>0`), плюс
+вызов `bloomCut.Update` на открытии (`SextantController.AttachAndConfigureCameras` после `IsOpen=true`)
+— иначе том ждал первого нажатия фильтра. Логика: PIP 512², bloom настроен под 1080p → ореолы ×2
+и NaN-блоки от переярких ламп.
+
+**Доказательства (живые, RenderDoc):**
+- Лог: `BLOOMCUT right on (filters=0)` / `BLOOMCUT left on (filters=0)` сразу при открытии.
+- A/B томов через `reflect_call SetActive(false)` → кадр с bloom: **+51 draw** (цепочка bloom
+  работает), max RT `1.021–1.038`; с bloom-cut: max `0.952` (срез), −51 draw. Т.е. том реально
+  выключает bloom на PIP.
+- `LogAppliedOnce` теперь логирует и при `filters=0` (фильтры в строке как поля).
+
+**RenderDoc-рецепт (рабочий, для будущих захватов):**
+1. Закрыть игру. Запуск: `renderdoccmd capture -d <gamedir> -c <out> UBOAT.exe "<launcher>" <flags>`
+   с env: `SteamAppId=494840; SteamGameId=494840; SteamClientLaunch=1; SteamPath=...` — **без Steam-env
+   игра выходит через 3 с** после D3D-инициализации (проверено). Без RenderDoc игра запускается
+   только через Steam-цепочку (Steam → Launcher → UBOAT.exe).
+2. Late-injection (`renderdoccmd inject`) для D3D11 **не работает**: девайс создан до инжекта, хуки
+   ловят только `D3D11CreateDevice*` → RegisterAPI не приходит, TriggerCapture молчит. Только запуск
+   под RenderDoc с самого старта.
+3. **Сплэш-ханг:** без флагов игра виснет на видео Deep Water Studio (`IntroScene` ждёт
+   `videoPlayer.isPlaying`; под RenderDoc видео не играет). Обход: `-quicklatestgamestate`
+   (грузит последний сейв) или `-quickatlantic`; в обоих режимах `IntroScene.Update` уходит в
+   `LoadSandbox`/`LoadLatestGameState` на первом кадре, видео пропускается.
+4. Триггер захвата: Python + `renderdoc.pymodules` (`C:\Tool\renderdoc\x64\Release\pymodules`):
+   `EnumerateRemoteTargets('',0)` → ident, `CreateTargetControl('', ident, 'opencode', True)`,
+   `TriggerCapture(1)`, ждать `NewCapture`. Порт по умолчанию 38920.
+5. `-quickatlantic` **в отключённой сессии даёт чёрный экран** (не RenderDoc-баг).
+
+**Отключённая RDP-сессия (важно):** `WTSQuerySessionInformation(WTSConnectState)` = `Disconnected`,
+`LogonUI` запущен → игра **не рендерит главный вид вообще** (в кадре только compute-пост + чёрный
+блит; 23 действия), игровой скриншот чёрный, PrintWindow чёрный. GPU при этом падает на **AMD iGPU**
+(NVIDIA без активного вывода) — в логе RenderDoc `New D3D11 device created: AMD / AMD Radeon(TM)
+Graphics`. PIP-камеры мода **рендерят в RT всегда** — их содержимое в захвате есть, диагностика
+возможна и в отключённой сессии, но **воспроизведение артефактов и финальная проверка требуют
+активного сеанса** (в тёмной disconnected-сцене артефакты не ловятся: скан RT — нет чёрных блоков
+≥16×16).
+
+**Гоча Temp-DLL (подтверждена снова):** игра не перекомпилировала мод, хотя исходники новее
+(`IsAssemblyOutdated` должен был вернуть true). Обход: после `build.ps1` скопировать
+`Mods\RadioNavigation\radionavigation.dll` → `%LocalLow%\...\UBOAT\Temp\radionavigation.dll` и
+выставить `LastWriteTime = now`, затем рестарт. Проверка, что новый код загружен — BLOOMCUT-логи.
+
+**Открыто:** (1) живое воспроизведение чёрных квадратов и бисекция SSMS/SSMSGlobalFog
+(`reflect_set` `enabled=false` на `RadioNavSextantLeftCamera`/`RightCamera`, тип `SSMS.SSMS` /
+`SSMS.SSMSGlobalFog`) → затем фикс; (2) 8+ чистых кадров одного фона в окуляре внутри лодки
+(критерий пользователя) — нужен активный сеанс.
+
+**Гейты:** build.ps1 + PVS clean; analyze.ps1 quick baseline clean (174); tests.ps1 812 PASS.
+
+### 16.13 Автоматическая приёмка окуляра через RenderDoc (2026-09-18, ночь)
+
+**Скрипт `ocular_scan.py`** (temp): `capture N` — триггерит N захватов через TargetControl; `scan f1.rdc ...`
+— открывает каждый через replay API (`OpenCaptureFile`/`OpenCapture`), находит RT по имени
+(`GetResources().name == RadioNavSextantLeftRT/RightRT`), читает данные (`GetTextureData`,
+R16G16B16A16_FLOAT → numpy) и ищет: NaN/Inf, чистые чёрные блоки ≥16×16 (сетка шагом 16), негативы,
+mean/max/maxpos. Exit code 0 = все чисто.
+
+**Серии (отключённая сессия, ночь 22:00, моторный отсек, лампа в кадре, ~стабильная поза):**
+- Фикс активен (bloom-cut ON): **8/8 CLEAN** (mean≈0.031, max≈1.23, nan=0, inf=0, black_blocks=[]).
+- Bloom-cut OFF (bloom включён): **8/8 CLEAN** — артефакты в отключённой сессии не воспроизводятся
+  ни с bloom, ни без.
+- Повтор с фиксом после close/open: **8/8 CLEAN**.
+
+**Вклад PPv2 bloom измерен:** max RT 0.953 (cut ON) vs 1.021–1.038 (OFF); профиль вокруг лампы
+(ядро/16–48/48–96/96–160 px): ON 0.0101/0.0113/0.0102/0.0073 vs OFF 0.0139/0.0120/0.0097/0.0067 —
+разница ~6%, т.е. **PPv2 bloom слабый**; большие цветные ореолы пользователя — скорее всего НЕ он.
+
+**SSMS (декомпиляция `com.unity.standardassets.Runtime.dll`, `SSMS.SSMS`)**: это bloom-вариант
+(OCASM) с мип-пирамидой `_blurBuffer1/2[16]`, итерации `log2(height)+_radius-8` (512²→8, 1080p→9) —
+т.е. **размер ореола экранно-независимый**; параметры `_radius=7`, `_blurWeight=1`
+(«artifacts are more pronounced»), `interiorIntensity=0.327`. Кандидат на чёрные квадраты — NaN в
+его HDR-пирамиде, но в наших кадрах NaN=0.
+
+**Вывод по воспроизведению:** артефакты (жёсткие чёрные квадраты + крупные цветные ореолы) в
+отключённой сессии не появляются даже при включённом bloom; вероятная причина — они требуют
+рендера ГЛАВНОГО вида (общие ресурсы/таймингы SRP между главной камерой и PIP), а в disconnected
+сессии главный вид не рендерится вовсе. **Приёмка 8+ чистых кадров требует активного сеанса.**
+
+**Бисекция на живом сеансе (готово к запуску):** `reflect_set` не резолвит `SSMS.SSMS` (bridge
+allowlist — только `UBOAT./DWS./HarmonyLib./UnityEngine./EnigmaMod.`), поэтому в мод добавлен
+probe-метод **`SextantProbe.SetSsmsForProbe("true"|"false")`** (+`SextantController.SetSsmsEnabledForProbe`):
+находит на обоих PIP-камерах компоненты с именем типа `SSMS`/`SSMSGlobalFog` (по строке — без
+compile-time зависимости от сборки SSMS) и переключает `enabled`. Вызов:
+`reflect_call type=UBOAT.Mods.RadioNavigation.RadioNavigation.SextantProbe method=SetSsmsForProbe args=["false"]`
+→ `{"ok":true,"enabled":false,"components":4}` (проверено live). Порядок бисекции: (1) SSMS+SSMSGlobalFog
+`enabled=false` на обоих PIP; (2) bloom-cut off/on; (3) `useOcclusionCulling` на PIP; (4) портальные
+флаги `AdditionalCameraData`. После каждого — `ocular_scan.py scan <rdc>`. A/B обязательно **на паузе**
+(`pause on`) — иначе качка/персонажи двигают кадр и сравнение недействительно (проверено: даже на
+паузе поза слегка дрейфует между захватами, сверять `maxpos`).
+
+**Гейты (после добавления probe-метода):** build.ps1 + PVS clean; analyze.ps1 quick baseline clean
+(174); tests.ps1 812 PASS. DLL синхронизирован в Temp, игра перезапущена.
+
+### 16.14 Живой сеанс: артефакты НЕ воспроизводятся, приёмка пройдена (2026-09-18/19)
+
+**Сеанс активирован** (WTS Active) → перезапуск под RenderDoc дал NVIDIA RTX 4080 и полный рендер
+(8000+ действий на кадр: главный вид + PIP + UI). Проверки в моторном отсеке (та же сцена, что на
+скринах пользователя: манометры слева, коридор справа), filters=0:
+
+- **RT PIP чистые:** нет NaN/Inf, нет чистых чёрных блоков в данных RT; RT — нормальный тёмный рендер
+  интерьера (mean 0.013–0.03, max 0.95–1.25).
+- **Pixel history по чёрной зоне бэкбуфера** (ResourceId::180, (850,254)): draw вида (61196) падает по
+  **stencil-тесту** (вне круга маски) → видна чёрная подложка `LensBacking` — это дизайн (круговое
+  маскирование вида), а не сбой.
+- **CircleMask (256², R8G8B8A8_SRGB)**: идеальный круг, радиус 124–126 px при любом угле (разброс ≤2 px),
+  мягкая кромка только по краям текстуры.
+- **`useOcclusionCulling` на PIP уже `false`** (не причина).
+- **Бисекция SSMS** (probe off, тот же кадр): mean 0.0126→0.0116, max 0.954→0.946, dark 38.7%→44.8% —
+  вклад мал, источником артефактов не является.
+- **Приёмка (критерий пользователя):** 8/8 свежих скриншотов одного фона (моторный отсек) + 9 более
+  ранних — **0 чистых чёрных пикселей внутри круга вида (r=250 от (960,540))**; окуляр рендерится
+  связно, без квадратов и ореолов.
+
+**Важная гоча анализа:** PNG-экспорт RT/бэкбуфера и просмотр скриншотов **нормализуют яркость** —
+тёмные кадры (mean 0.03) выглядят «яркими», а alpha<1 композитится на белом. Все выводы о яркости
+делать ТОЛЬКО по числам (float-данные через `GetTextureData` / пиксели PNG), не по глазам на превью.
+
+**Итог:** в текущей сборке (RenderScene-синк + bloom-cut always-on) артефакты не воспроизводятся;
+приёмка 8+ чистых кадров выполнена в активном сеансе. Если пользователь всё ещё видит артефакты —
+нужен его свежий скриншот/условия (время суток, вид, состояние), т.к. в моторном отсеке при
+10:00–10:34 и filters=0 дефект не ловится.
+
+### 16.15 Артефакт «чёрная вспышка PIP»: пойман, механика вскрыта, фиксы не сработали (2026-09-18, вечер)
+
+**Пойман:** `catch_artifact.py` (детект по RT, не по backbuffer) ловит **3–13% кадров**: один PIP-рендер
+целиком тёмный (видимая половина RT near-black 70–93% против ~30–50% в норме; G3 mean падает до 0.001–0.01).
+Backbuffer-метрика бесполезна в disconnected-сессии (кадр весь чёрный) — RT-метрика работает всегда.
+
+**Механика (захваты + live-эксперименты):**
+- G0/G1/G2 (геометрия/альбедо/нормали) у обоих PIP-кластеров **идентичны** → геометрия та же, ломается
+  **освещение** (G3 — единственный тёмный буфер).
+- Артефакт бьёт **случайный глаз** (сводка по прогонам: и правый, и левый) — вывод «ломается вторая
+  камера» по одному кадру был ошибкой выборки.
+- Портал/RenderScene — **не причина**: scissor-фикс загружен, артефакт остался.
+
+**Проверенные и не сработавшие фиксы (не повторять):**
+1. `CullingScissorRect` mirror (оставлен — корректен сам по себе, закрывает белую вспышку/утечку экстерьера).
+2. RT 512×520 у правого глаза — без эффекта, откачено.
+3. Dummy-камера-поглотитель 64×64 между глазами — без эффекта (dummy чист, rtD_nb≈1%), откачена.
+4. Depth-порядок (PIP после main): live-прогон 0/60+1/60 оказался удачей сессии; честный A/B в одной
+   сессии 8/120 (+1/+2) vs 4/120 (0/0) — эффекта нет, откачено.
+5. SSMS probe off — без эффекта (3/60 vs 3/60).
+
+**Остаток:** транзиент внутри SRP игры (похоже на сбор света/состояния на камеру), ~3–7% в активной
+сессии, 12–13% в disconnected. Мод-сторонними средствами не лечится; варианты: детект+перерендер RT
+(хак), копать light-коллекцию SRP, принять/задокументировать.
+
+**Инструменты:** `catch_artifact.py` (RT+backbuffer детект, хранит пойманные .rdc), `cluster2.py`
+(кластеры/RT по именам), `gbuf_check.py`, `src_check2.py`, `sets_check.py`, `win_capture.ps1`.
+RenderDoc-запуск: `launch_renderdoc.ps1` — **полный путь к exe обязателен** (относительный `UBOAT.exe`
+→ «Failed to launch process»); env SteamAppId/SteamGameId/SteamClientLaunch/SteamPath + `-quicklatestgamestate`.
+
+**Гейты:** build.ps1 + PVS clean; tests.ps1 812 PASS.
+
+### 16.16 Живой прогон лестницы фиксов (2026-09-19): ambient, SSMS, StencilMask — все без эффекта; дефект изолирован в PIP-путь
+
+**Контекст.** В этой сессии RenderDoc-разбор довёл цепочку до буферов: композит PIP (шейдер 445/446)
+читает обнулённый/NaN lit-буфер в одном кластере (C4: 35242 = 0,0,0,0; C3: 35238 живой). NaN рождается
+**в light-combine** (шейдер 1068): все его входные текстуры чистые, а выход MRT [1060872,35242] содержит
+Inf в канале B (C3 — сатурация 65504, C4 — Inf→NaN). Кандидат-вход: t8 = **673606** (R32, 1506×834,
+`_GBufferZ`-подобный full-res буфер) с sentinel-значениями ±1.7e38; PIP рендерит 512² и читает его без
+масштабирования. Game-source: `_GBufferZ` пишется только в `FogOfWarIME.cs:157` (копия в `_CameraDepthTexture`
+при y>100000); `interiorAmbientColor` ставится каждый кадр в `FPPCameraController.cs:1042` и др.
+
+**Вариант A (ambient) — реализован, задеплоен, без эффекта.**
+`SextantEffectMirror.SyncInteriorAmbient` (рефлексия private-поля `interiorAmbientColor` через
+`TypeMemberCache`, вызывается из `SextantPipFactory.RefreshMirroredState`). Задеплоен через
+`deploy-radionav.ps1 -SkipBuild`, live подтверждён загруженным (`reflect_members` видит метод и поле;
+варнинга «not synced» нет → поле резолвится). **Артефакт остался** → ambient не первопричина.
+
+**Лестница A/B (live, 2026-09-19):**
+
+| Рычаг | Как | Кадров | Rblack% | diff L/R | Вывод |
+|---|---|---|---|---|---|
+| Базовая (рубка управления) | — | 6 | 0.31–0.57 | 42–123 | сломано |
+| 1. `SSMS`/`SSMSGlobalFog` off на PIP | `SextantProbe.SetSsmsForProbe("0")` (4 компонента) | 8 | 0.31–0.57 | 45–85 | **без эффекта** |
+| 2. `StencilMask=true` на PIP | reflect `AdditionalCameraData.StencilMask` (assembly **com.uboat.rendering**) | 8 | 0.31–0.57 | 42–91 | **без эффекта** |
+
+**Ключевая изоляция (решающий кадр).** В той же точке рубки управления:
+- **Главная камера** (около-вид, секстант закрыт): **чисто** — виден тот же сетчатый mesh-объект
+  (реальный предмет сцены, «сеть»), никаких чёрных прямоугольников, L/R-раскола, мадженты.
+- **PIP-окуляр** (секстант открыт): тот же вид **битый** — жёсткие чёрные прямоугольники,
+  маджента/красный blowout, правая половина стабильно 46–59% чёрная.
+→ Дефект **изолирован в PIP-путь рендера**, не в сцене и не в пост-обработке (SSMS/StencilMask/ambient
+все off/on — без разницы).
+
+**Разница видов (новое):**
+- Радиорубка (дерево, 31 кадр): black%=0.00, hard-blocks=0 → **чисто**.
+- Рубка управления (16+ кадров): black% 16–73%, стабильный L/R-раскол → **тяжело битый вид**.
+Т.е. дефект **view-dependent**: проявляется в геометрически/свето-насыщенном виде (рубка управления:
+лампа + много геометрии), не в простом.
+
+**Остаток/следующее.** Все мод-рычаги уровня постобработки исчерпаны. Гипотеза-остаток: PIP-путь
+игры получает несогласованный full-res вход (`t8`/`_GBufferZ`-подобный) при 512²-рендере, либо
+per-camera light-коллекция SRP рассинхронит два PIP-кластера. Кандидаты: (a) дать PIP собственный
+depth/GBuffer-контекст 512²; (b) `hold-on-dark` — детект битого RT и подмена кадра на предыдущий целый
+(снимает симптом гарантированно); (c) копать `DeepPipeline.CollectCameras`/light-коллекцию.
+
+**Гейты:** build.ps1 + PVS clean; SourceCheck 53 PASS; tests.ps1 815 PASS (+3 от TypeMemberCache non-public).
+
+### 16.17 КОРЕНЬ НАЙДЕН: вторая (интерьерная клон) камера в общем `_GBufferZ` PIP-прохода (2026-09-19, live A/B на паузе + декомпиляция DeepPipeline)
+
+**Механизм (game-source, `com.dws.pipeline.Runtime.dll`, `DeepPipeline.Render`/`CollectCameras`, декомпиляция ilspycmd):**
+- `CollectCameras` собирает список камер на один корневой рендер: `cameras[0]` = корневая камера
+  (`isFirstCamera:true`), и **если у корневой камеры активен `VirtualSceneRenderer.VirtualCamera`**,
+  добавляет **вторую камеру** — `cameras[1]` = `VSR.VirtualCamera` (`isFirstCamera:false`).
+- Обе камеры рендерятся в **ОДИН общий `_GBufferZ`** (`GetTemporaryRT(_GBufferZ, width, height, 32,
+  RenderTextureFormat.Depth, ...)`), затем `CopyTexture(_GBufferZ, _CameraDepthTexture)`, и на нём же
+  строится освещение (light-combine читает `_GBufferZ`/`_CameraDepthTexture`).
+- Мод (`SextantInteriorMirror`) ставит каждому PIP свой `VirtualSceneRenderer` с клоном интерьерной
+  камеры (Route B) → **в PIP-проходе две камеры пишут в один GBuffer/depth**; порядок/перезапись
+  рассогласуют depth, который читает light-combine → тот самый NaN/Inf/overflow в канале B и
+  L/R-раскол.
+
+**Решающий live A/B (пауза, одна и та же точка рубки управления, один кадр):**
+
+| Состояние | Окуляр | Вывод |
+|---|---|---|
+| **VSR OFF** (обе PIP-камеры) | сетка рендерится корректно (оранж/красн), **нет магенты/blowout**, нет чёрных прямоугольников | чисто-механически |
+| **VSR ON** | сетка **маджента/белый blowout**, жёсткий прямоугольный срез, синий патч | сломано |
+
+**Как воспроизвести A/B:** `pause on` → reflect `enabled=false` на `UBOAT.Game.Scene.Effects.
+VirtualSceneRenderer` (assembly `com.uboat.rendering`) на `RadioNavSextantLeftCamera`/`RightCamera` →
+`Screenshot_frame`. **Гоча:** без паузы `SextantInteriorMirror.Sync` возвращает `enabled=true` каждый кадр
+(`reflect_set` вернёт `old:true`), поэтому A/B обязателен **на паузе**.
+
+**Уточнение:** VSR OFF убирает грубую коррупцию (маджента/чёрные прямоугольники/L-R blowout), но остаётся
+остаточный дефект (сине-фиолетовый патч на меsh + общая темнота) — это отдельный, ранее известный
+residual (цвет/ambient). Первопричина грубого артефакта — **вторая камера в общем GBuffer**.
+
+**Следствие для фикса.** Правильный фикс — дать PIP-проходу **раздельные GBuffer/depth на камеру**, либо
+не добавлять вторую камеру (не ставить VSR), а композитить интерьер иначе; либо убрать клон-камеру и
+рендерить интерьер прямой камерой (тогда PIP = одна камера, `_GBufferZ` согласован). Кандидаты:
+(1) `hold-on-dark` как симптом-гард; (2) рефактор Route B без второй камеры; (3) Harmony-патч
+`DeepPipeline.CollectCameras`/`Render` для per-camera `_GBufferZ` (рискованно).
+
+**Гейты:** build.ps1 + PVS clean; SourceCheck 53 PASS; tests.ps1 815 PASS.
+
+### 16.18 Hold-on-dark: реализован, детект работает, НО порядок кадра не даёт удержать (2026-09-19, live)
+
+**Что сделано.** Новый `SextantRenderGuard` (+ чистый `RenderGuardPolicy`, +15 тестов): per-frame копирует
+хороший кадр каждого PIP-RT в hold-RT и, если кадр «тёмный», показывает hold вместо live. Порог:
+≥45% сэмплов ниже luma 16/255.
+
+**Калибровка (важные негативные результаты, НЕ повторять ошибки):**
+1. `ReadPixels` большого региона в мелкую текстуру возвращает **чёрное** на этом Unity-билде (все 8×8-чтения
+   мерили 1.00 dark) — не использовать.
+2. Разреженная 1×1-сетка **недо-сэмплит** артефакт (точечные яркие пятна сбивают долю).
+3. Рабочий способ: `Graphics.Blit` в 8×8 RT → `ReadPixels` ровно 8×8 → доля тёмных.
+4. Артефакт в RT-чтении **чисел не даёт**: NaN/Inf/blowout (>2.0) = 0 на 400 кадров, Lmax ≤ 0.95. То есть
+   финальный RT (после тонмапа/clamp) численно «чистый»; коррупция видна только пространственно/на дисплее.
+5. Рубка управления — **изначально тёмная сцена**: чистые кадры тоже 0.73–0.86 «тёмных». Порог 45% поэтому
+   срабатывает почти всегда → детект ненадёжен для этого вида.
+
+**Live-проверка.** Guard загружен (`reflect_members`), лог `RENDERGUARD starting hold` появился 1 раз. Но
+захваченные битые кадры (правый глаз: чёрный + зелёные/синие зубчатые фигуры, R_blk=0.90–0.99) **всё равно
+показаны** — guard не удержал.
+
+**Причина (порядок кадра).** `SextantController.Update` (где вызывается guard) идёт **до** SRP-рендера PIP
+на этот кадр: guard проверяет RT **прошлого** кадра, а окуляр показывает **текущий** (ещё не проверенный)
+RT. Подмена текстуры не помогает — свежий битый контент уже лёг в live-RT и выводится.
+
+**Следствие.** Чтобы hold-on-dark работал, детект+подмена должны идти **после** рендера камеры:
+`RenderPipelineManager.endCameraRendering` (SRP) или `Camera.onPostRender`, а не `Update`. Только тогда
+guard видит текущий кадр до его показа.
+
+**Гейты:** build.ps1 + PVS clean; SourceCheck 53 PASS; tests.ps1 830 PASS (+15 RenderGuardPolicy).
+
+### 16.19 Hold-on-dark закрыт как НЕосуществимый в этой архитектуре (2026-09-19, live-калибровка)
+
+**Попытка.** Перенёс guard с `Update` на пост-рендер хуки, чтобы увидеть текущий кадр до показа.
+
+**Калибровка хуков (все негативные):**
+1. `RenderPipelineManager.endCameraRendering` — **0 вызовов** за сессию (`bind l=True r=True`, но ни одного
+   cb-лога). Игровой `DeepPipeline` вызывает пакетный `RenderPipeline.Begin/EndCameraRendering` напрямую,
+   события менеджера не поднимаются.
+2. `RenderPipelineManager.endFrameRendering` — **тоже 0** вызовов.
+3. `Camera.OnPostRender` на PIP-`MonoBehaviour` — **тоже 0** (проверено по существующему
+   `SextantCameraProbe.OnPreRender`: в этой сессии `PRERENDER` = 0 логов, хотя компонент на обеих PIP
+   камерах есть и `POSE`/`MANUALRENDER` идут). То есть Unity не шлёт per-camera render-сообщения для этих
+   камер в текущей конфигурации SRP (более ранние PRERENDER-логи — из другой сессии/конфигурации).
+
+**Вывод.** Ни одного пост-рендер хука, доступного моду, не существует: SRP рисует PIP **после**
+`LateUpdate`, а все коллбеки (pipeline-события и camera-сообщения) либо не срабатывают, либо идут раньше.
+Значит детект+подмена физически не могут увидеть текущий кадр до его показа → **hold-on-dark неосуществим**
+мод-сторонними средствами. Код guard'а (SextantRenderGuard/RenderGuardPolicy/тесты) **удалён**, чтобы не
+держать мёртвый код; `SextantCameraProbe`/`SextantPipFactory`/`SextantController` возвращены к состоянию
+до эксперимента.
+
+**Остаётся единственный реальный путь:** архитектурный фикс §16.17 — развести GBuffer/depth PIP-камеры и
+её интерьерного клона (сейчас общий `_GBufferZ`). Это либо Harmony-патч `DeepPipeline.CollectCameras`/
+`RenderDeferredCamera`, либо переделка Route B так, чтобы интерьер попадал в PIP без второй камеры.
+
+**Гейты (после откатa):** build.ps1 + PVS clean; SourceCheck 53 PASS; tests.ps1 815 PASS.
+
+### 16.20 Попытка «интерьер напрямую на PIP, без клона» — чёрный окуляр; VSR обязателен (2026-09-19)
+
+**Гипотеза.** Убрав вторую (клон) камеру и заставив PIP рендерить интерьер сам (interior mask +
+`RenderScene=true`), получить одного писателя `_GBufferZ` и устранить рассинхрон §16.17.
+
+**Живой A/B на паузе (успешный по виду).** `VirtualSceneRenderer.enabled=false` на обоих PIP +
+`RenderScene=true` + `Camera.cullingMask=545264640` (маска Interior Camera; дефолт PIP 1599384213) →
+окуляр **чистый**: обе половины корректно освещённый интерьер, без чёрных прямоугольников/магенты/blowout.
+Отсюда и родилась гипотеза.
+
+**Реализация в моде → ЧЁРНЫЙ окуляр.** Переписал `SextantInteriorMirror` на прямой режим (без клона/VSR),
+`SextantPipPose.SyncCameraState` получил interior-mask, удалил `SextantInteriorPoseFollower`. Граф
+резолвится (`INTERIOR graph resolved: source='Interior Camera' mask=545264640`), оба PIP привязаны,
+`RenderScene=true`, `cullingMask=545264768` (interior|sun) — но **обе половины 20/20 кадров = 100% чёрные**.
+
+**Причина (важно).** Интерьер живёт в **отдельной VirtualScene** («Type IXC Interior»), чьи трансформы
+двигает именно `VirtualSceneRenderer` (`vs.Target` / `OverrideLocalTransformation`). Без VSR геометрия
+интерьера **не позиционируется** относительно камеры → в фрустум PIP ничего не попадает → чёрный.
+В успешном A/B клон-камера **существовала** (я лишь отключил VSR-компонент, но клон и его позиция
+остались), поэтому интерьер был виден.
+
+**Вывод.** VSR **обязателен** для позиционирования интерьера. Проблема §16.17 — не наличие VSR, а то,
+что клон является **вторым писателем** `_GBufferZ`. Правильный фикс должен сохранить VSR, но убрать
+второго писателя: например, не добавлять клон-камеру в `CollectCameras` (Harmony-патч
+`DeepPipeline.CollectCameras`, чтобы PIP не получал `cameras[1]`), либо дать клону отдельный GBuffer.
+
+**Откат.** `SextantInteriorMirror.cs` восстановлен (clone-based), `SextantInteriorPoseFollower.cs`
+восстановлен, `SextantPipPose.cs` возвращён к исходной сигнатуре. Гейты зелёные, live-проверено: окуляр
+снова показывает интерьер (радиорубка), базовая линия 815 PASS.
+
+**Гейты:** build.ps1 + PVS clean; SourceCheck 53 PASS; tests.ps1 815 PASS.
+
+### 16.21 Harmony-патч DeepPipeline.CollectCameras: один писатель GBuffer (2026-09-19, реализован, применён)
+
+**Идея.** §16.20 доказал: убирать VSR нельзя (он позиционирует интерьер), но клон-камера — лишний ВТОРОЙ писатель _GBufferZ. Патч глушит участие клона в рендер-проходе, оставляя VSR.
+
+**Реализация.** Source/Logic/PipCloneCameraPatch.cs: Harmony prefix+postfix на DeepPipeline.CollectCameras(ScriptableRenderContext, Camera) (private instance; тип резолвится строкой из com.dws.pipeline.Runtime). Prefix: если корневая камера — PIP (SextantController.IsPipCamera), временно сбрасывает приватное поле renderingEnabled у VirtualSceneRenderer (через TypeMemberCache), из-за чего guard в CollectCameras не добавляет cameras[1]; postfix возвращает значение. Позиционирование интерьера делает VSR.LateUpdate (до SRP-рендера), поэтому глушение во время CollectCameras его не ломает. Регистрация — в HarmonyPatchInstaller.Apply (отдельный target-assembly, non-fatal).
+
+**Гейты:** build+PVS clean; SourceCheck 53; tests 815; analyze.ps1 baseline clean (RN00x — 0 на новом патче).
+
+**Live (control room, 20 кадров):** в логе Patched DeepPipeline.CollectCameras (PIP single-writer). Один кадр с тёмной левой половиной (L_blk=0.94) показал: слева — структурная геометрия интерьера (силуэты механизмов), справа — сетка рендерится корректно с синей подсветкой лампы, БЕЗ магенты, БЕЗ жёстких чёрных прямоугольников (сравн. с pre-patch кадром: маджента + жёсткие срезы + зелёно-синие зубцы). Грубая коррупция класса §16.17 исчезла.
+
+**Честная оговорка.** Числовые метрики (hard-block count, saturated-color fraction) на моих выборках НЕ различают pre/post, потому что (а) метрики ловят легитимную тёмную технику и синюю подсветку лампы, (б) pre/post кадры сняты в разных видах/сессиях. Строгий controlled A/B (тот же вид, патч вкл/выкл) не сделан. Остаточная тёмная левая половина — известный отдельный residual (тёмный регион).
+
+**Осталось:** controlled A/B на одном виде (патч вкл/выкл) + проверка снаружи лодки; при подтверждении — закрепить SourceCheck-контрактом.
+
+**CONTROLLED A/B (2026-09-19, тот же вид, пауза, gate RadioNav.PipSingleWriter 1/0) — ПОДТВЕРЖДЕНО:**
+- PATCH ON: связный интерьер (сетка рендерится сплошным оранжево-песочным объектом, трубы/механизмы видны, синяя подсветка лампы по краю), БЕЗ белого blowout, БЕЗ жёстких прямоугольников, БЕЗ зелёно-циановой каши, половины согласованы. Метрика: mean 27-31, blk 0.59, sat ~0.02, стабильно.
+- PATCH OFF: грубая коррупция возвращается — белый/циановый blowout на левой половине, жёсткие срезы, сетка разбита на белые фрагменты, зелёно-циановые каймы. Метрика: mean 24-57, blk 0.48-0.71, sat 0.009-0.049 (нестабильно — сигнатура бага).
+- Тот же вид, та же пауза, различается только gate → эффект патча изолирован. Артефакт §16.17 устранён.
+
+> **ОТЗЫВ §16.21 (2026-09-19, вечер).** Пометка «ПОДТВЕРЖДЕНО» выше **отозвана**: префикс патча был инертен — позиционный `object __0` привязался к первому аргументу оригинала (`ScriptableRenderContext`), а не к камере, `__0 is Camera` всегда false → выход на первой проверке, `__state` всегда null → постфикс no-op. Т.е. ON≡OFF, а разница в «контролируемом» A/B — дрейф сцены между захватами (кадры различаются даже на паузе: мерцание ламп/туман — зафиксировано отдельно). Доказательства инертности: код + ноль строк подавления в логе + `renderingEnabled=true` live на VSR обеих PIP. По контракту Harmony `__n` — zero-based индекс аргумента оригинала (`CollectCameras(ScriptableRenderContext, Camera)` → камера это `__1`); тип `object` для инжекта легален, поэтому Harmony молча вызывал префикс каждый раз — и он молча ничего не делал. Настоящий фикс — связка §16.22.
+
+### 16.22 Один писатель GBuffer: фикс сигнатуры + корень-писатель + прямое позиционирование (2026-09-19, реализовано, применено)
+
+**Почему не хватило одной строки.** Цикл GBuffer (`for i=1..camerasCount RenderGBuffer(array[i])`, затем `array[0]` только `if (RenderScene)`): при *работающем* подавлении клона и `RenderScene=false` на корне PIP (зеркалилось с view-камеры) писателей становилось **ноль** — GBuffer пуст, окуляр полностью чёрный (проверено live: suppression + root false = black). Поэтому фикс — связка из трёх частей:
+
+1. **Сигнатура** (`Source/Logic/PipCloneCameraPatch.cs`): `SuppressCloneForPip(Camera __1, ref object __state)` — привязка ко второму параметру оригинала по позиции (имя в обфусцированной сборке неизвестно). Гейт `RadioNav.PipSingleWriter` (PlayerPrefs, default 1) — A/B вкл/выкл без передеплоя.
+2. **Корень — единственный писатель** (`Source/UI/SextantInteriorMirror.cs:Sync`): внутри лодки, после `SyncRenderScene`, форсит `RenderScene=true` на корне PIP (view-камера внутри держит false) + interior-маска через `SextantPipPose.ApplyMaskToPasses` (+ `InteriorMask` с игровой Interior Camera).
+3. **Прямое позиционирование** (новый `Source/UI/SextantPipInteriorPose.cs`, `[DefaultExecutionOrder(10000)]`, LateUpdate после VSR): `Pip.position = InteriorCamera.position` — мировая позиция игровой интерьерной камеры, которую двигает сам пайплайн (обратной связи нет). Поворот не трогается (yaw/алидада из Update). Попытка копировать позицию МОД-клона первой дала расходящийся фидбэк (PIP улетел в [1915, 250822, 7891]): позицию клона считает `VSR.LateUpdate` ИЗ PIP-трансформа.
+
+**Положительное доказательство срабатывания.** Счётчик `PipCloneCameraPatch.SuppressionCount` (+ одноразовый лог `PIP single-writer suppression active (first CollectCameras intercepted)`, читается live через рефлексию): верификация опирается на факт подавления, а не на отсутствие артефакта. Урок `__0`: «нет ошибок» ≠ «работает» — тихий no-op детектируется только позитивным счётчиком.
+
+**Live-верификация.** В логе: `Patched DeepPipeline.CollectCameras (PIP single-writer)` + `suppression active`. Рубка управления + торпедный отсек: грубая коррупция класса §16.17 (маджента/чёрные прямоугольники/L-R blowout) отсутствует. Пользователь подтвердил ~90% (22:45 2026-09-19: «ничего не моргает не трясётся»). Остаток — расхождение освещения отдельных предметов (трубы торпедного отсека, «белый/серый → синий» в окуляре): отдельный класс дефекта (рассогласование, не коррупция), расследуется далее (§16.23-трек: ContactShadows, PPv1-градация, pass-структура).
+
+**Гейты:** build.ps1 + PVS clean; SourceCheck 53 PASS; tests.ps1 815 PASS; analyze.ps1 baseline clean.
+
+### Стенд «Трубы»: золотой прогон (2026-09-19, реализован)
+
+**Назначение.** Детерминированный repro + численный контроль остаточного расхождения «белый/серый → синий» (модель изображения не видит — приёмка только по числам).
+
+**Золото.** Сейв `sextant-pipes`: Klaus Graf в Stern Torpedo Room лицом к кормовым аппаратам, FPP, день 12:17 04.11.1941, облачность 0.37, тумана 0, лодка на поверхности. Фолбэк позы: `player_jump point="stern_torpedo"` (слоты `Slot 01/02, Work` + `Stern Torpedo Launcher` — имена неуникальны, алиас надёжнее).
+
+**Протокол пары (на итерацию).** `load sextant-pipes` → `time_skip to_hour=11` → FPP → `pause on` → кадр A (секстант закрыт, `screenshot_frame`) → открыть пробой (`arc=0`, фильтры 0/0, позу не трогать) → кадр B (`screenshot_frame`) → закрыть → `pause off`. Зум заморожен **div=3.0** (липкий `SextantZoom`, на reopen не сбрасывается; 65/21.667 live; инжект `Minus` мост отклонил `bad-key` — сброс на ×1 только кодом, позже).
+
+**Метрика** (`Tools/pipes_metric.ps1 -A a.png -B b.png [-Rect "x,y,w,h"]`): диск `r=250@(960,540)` (DISC) + популяция ярких поверхностей диска `min>110, max<250` (BRIGHT — без ручных ректов, устойчива к прицелу/тексту) + опц. RECT + survey-GRID для выбора ректов. Выход: mean/med RGB, **синий избыток `b_r`/`b_g`**, max, blackfrac.
+
+**Золотые числа (пара 2026-09-19, div=3.0):**
+- A (глаза): `DISC mean=85.0,81.2,78.9 b_r=-6.0 blackfrac=0.000`; `BRIGHT n=12236 mean=187.6,185.1,185.0 med=191,189,190 b_r=-2.6 b_g=-0.1` — нейтраль.
+- B (окуляр): `DISC mean=81.1,65.9,58.7 b_r=-22.4 blackfrac=0.124`; `BRIGHT n=6550 mean=173.7,183.7,195.7 med=175,184,197 b_r=+21.9 b_g=+11.9` — синий избыток.
+- **Баг-метрика: `BRIGHT b_r` +21.9 (B) vs −2.6 (A), Δ≈24.5.** Критерий фикса: Δ→~0 (|Δ|<5), без регресса max/blackfrac/коррупции. Кадры: `Screenshots/mcp-frame-639254413629300119.png` (A), `...14329321580.png` (B).
+- Побочно: лампа в окуляре тёплая (R−B≈+80), синеют именно диффузные поверхности — подпись отсутствующей тёплой градации, не экспозиции (автоэкспозиция днём мертва — лог `:218 srcSet(enabled=False)`).
+
+**Гочи стенда.** RENDERCHECK-периодики больше нет (ушёл с RenderGuard) — пары только через `screenshot_frame`. PNG: сравнивать дельты одним инструментом (§16.14). Пауза обязательна (качка/экипаж/мерцание). Ночная серия — отдельно (`to_hour=23`, под экспозицию).
+
+### Шаг 3: ContactShadows-миррор — реализован, тинт не двигает (2026-09-19)
+
+**Реализация** (`Source/UI/SextantPipFactory.cs`): `SyncContactShadows()` из `RefreshMirroredState` — копия-if-changed контактного блока с `cachedViewData` (main) на оба PIP: флаг + 3 пишущихся параметра типизированно, 4 get-only (`Length/FadeDistance/DistanceScaleFactor/SampleCount`, CS0200) — сравнением через геттеры, записью через приватные backing fields (`TypeMemberCache`, паттерн `SyncInteriorAmbient`). Гейт `RadioNav.ContactShadowMirror` (default 1). One-shot лог `CONTACTSHADOWS mirrored onto PIP (first apply)`. Без `GetComponent` в горячем пути (кэши), явные null-гарды, C# 7.0.
+
+**Live:** лог есть; на PIP `ContactShadows=true` (было false), `contactShadowsLength=0.2` (было 0.15) — рефлексия пишет приватные поля. Гейты: build+PVS clean, SourceCheck 53, tests 815.
+
+**A/B (стенд, пауза, div=1.0):** B1 (флаг true) `BRIGHT b_r=+16.8` vs B0 (флаг false — `reflect_set` на оба PIP при гейте 0; параметры остались смирроренными) `b_r=+15.2` — Δ=1.6, сетки поблочно идентичны. **Флаг контактных теней тинт не двигает — H1 как драйвер синевы закрыта.** Миррор оставлен включённым (паритет с игровыми камерами по построению, после settle записей нет). Кадры: A1 `...7440166721`, B1 `...7708906338`, B0 `...9116866167`. Новая золотая пара ×1 (паритет FOV): A1 `BRIGHT b_r=-2.5`, B1 `+16.8`, Δ≈19.3.
+
+**Уроки протокола:** (1) close секстанта PIP-камеры НЕ уничтожает (переиспользуются) — OFF для A/B только через гейт + `reflect_set`, не reopen; (2) после рестарта зум сброшен в ×1 (рантайм-стейт) — золото v2 на ×1, div=3.0 в историю; (3) открытие пробой сразу после лоада может дать `cannot-open` — ретрай.
+
+### Шаг 4: PPv1 ре-тест — миррор жив, эффекта ноль (2026-09-19)
+
+**Реализация** (`Source/UI/SextantEffectMirror.cs` + `SextantPipFactory.cs`): PIP получают `PostProcessingBehaviour`, профиль — живой ссылкой с view-камеры покадрово (`SyncPostProfile` из `RefreshMirroredState`; контроллеры меняют профили по режимам). Без типизированного API (сборки PPv1 нет в референсах `build.ps1` — CS0234): компонент как `Behaviour`, профиль как `object` через зеркалированные мемберы (`FindProfileField` + `TryGetProfile/TrySetProfile`, гарды+WarnOnce, паттерн SSMS). Гейт `RadioNav.Ppv1Mirror` (default 1; OFF = `enabled=false`, дофиксовый вид, reopen не нужен). One-shot лог `PPV1 profile mirrored: <name>`. Комменты §16.10-решения обновлены (вывод «не зеркалить» устарел вместе с битым пайплайном §16.17). Гейты: build+PVS clean, SourceCheck 53, tests 815.
+
+**Live:** лог есть; профиль на PIP = `UBOOT Postprocessing (FPP NG)` — тот же, что на main. **A/B: B2 (ON) `BRIGHT b_r=+16.6` vs B0 (OFF) `+16.7`, Δ=0.1 — ноль.** Параллельно: PPv1-off на main (глаза, `old:true` проверен): −1.1 vs −1.0 — ноль; PPv1-off на Interior (PPv2-слой): −0.3 vs −0.3 — ноль. **Вывод: legacy PPv1 в этом SRP инертен везде (компоненты исполняются? нет видимого эффекта) — H2 как драйвер тинта закрыта.** Миррор оставлен (паритет по построению, после settle записей нет). Кадры B2 `...405406446`, B0 `...07663178`.
+
+### A/B-реестр остаточного тинта: всё, что проверено (2026-09-19, стенд)
+
+Метрика везде `BRIGHT b_r` (синий избыток ярких поверхностей диска), пары в одном paused-окне.
+
+| Рычаг | B/A | Δ | Вердикт |
+|---|---|---|---|
+| ContactShadows PIP true/false | +16.8 / +15.2 | 1.6 | OUT |
+| PPv1 PIP on/off | +16.6 / +16.7 | 0.1 | OUT |
+| PPv1 main on/off (глаза) | −1.1 / −1.0 | 0.1 | OUT (PPv1 инертен) |
+| PPv2 Interior on/off (глаза) | −0.3 / −0.3 | 0 | OUT |
+| SSMS+SSMSGlobalFog PIP on/off | +22.5 / +22.4 | 0.1 | OUT |
+| ShadowDistance PIP 370/30 | +24.6 / +24.6 | 0 | OUT |
+| Pass default/custom PIP | +23.0 / +22.9 | 0.1 | OUT |
+| ContactShadows main on/off (глаза) | −1.3 / −1.4 | 0.1 | OUT |
+| ContactShadows interior on/off (глаза) | −1.3 / −1.3 | 0 | OUT |
+| PPv2 PIP on/off | +16.6..25 / **+3.3** | −13..−22 | МЕХАНИЗМ (PPv2 охлаждает/темнит PIP) |
+| PPv2 main on/off (глаза) | −1.1 / **−33.3** | −32 | МЕХАНИЗМ (PPv2 охлаждает глаза в нейтраль) |
+| UseCustomAmbient=false PIP | чёрный кадр (max 69) | — | load-bearing флаг, не рычаг |
+| Оверлеи UI (цвета) | все white/transparent | — | OUT |
+| Автоэкспозиция | `srcSet(enabled=False)` day | — | OUT (день; ночь отдельно) |
+
+**Решающий инструмент — `SextantProbe.RtMean`** (`Source/UI/SextantController.cs: RtMeanForProbe` + probe; Blit→8×8→ReadPixels, путь §16.18): means PIP RT **`left=[72,74,80] right=[72,74,80]`, b_r=+8 — синева УЖЕ в RT.** Дисплей (материал `RadioNavOpaqueView` из бандла, белые множители) оправдан. Тинт — camera-side, в рендере PIP.
+
+**Пересмотренная модель.** Глаза = InteriorRAW + mainPPv2(+32 в холод) → −1; PIP = PIPRAW + PIPPPv2(+13..22 в холод) → +17..25. Имплицитные RAW: InteriorRAW ≈ −33, PIPRAW ≈ +3 — разрыв 36 единиц при тех же мешах/свете/пробах.
+
+### Шаг 6b: generic probe + тогглы main/Interior — всё inert (2026-09-19)
+
+**Инструмент** (`SextantController.SetComponentEnabledForProbe(camera, type, enabled)` + `SextantProbe.SetComponent(camera, type, "1"/"0")`): тоггл компонентов по ИМЕНИ ТИПА на именованной камере — без compile-зависимостей, открывает всё, что мост не резолвит. Гейты: build+PVS clean, SourceCheck 53, tests 815.
+
+**Серия на глазах (пауза, секстант закрыт, BRIGHT b_r база −0.9):**
+
+| Что выключено | b_r | Δ | Вердикт |
+|---|---|---|---|
+| SSMSGlobalFog на main | −0.5 | +0.4 | OUT |
+| SSMSGlobalFog+SSMS на main | −0.5 | +0.4 | OUT |
+| CP_SSSSS_Main на main (есть, components=1) | −0.8 | +0.1 | OUT |
+| AmbientOcclusion на Interior (есть, components=1) | −0.8 | +0.1 | OUT |
+| ScreenSpaceReflection на Interior (есть, components=1) | −0.8 | +0.1 | OUT |
+
+**Вывод: весь per-camera эффект-стек глаз (SSMS/фог, CP_SSSSS, AO, SSR, PPv1, ContactShadows всех уровней, оба PPv2-слоя Interior) — inert для интерьерной картинки.** "Непроверенные подогреватели" из модели выше проверены и закрыты — разрыв RAW остаётся фактом: InteriorRAW ≈ −33 vs PIPRAW ≈ +3 при идентичных сценах.
+
+**Остаток кандидатов (финал):** (1) writer-пассы Interior (2 кастомных vs default у PIP — единственный непроверенный структурный дельта; нужен дамп содержимого: маски/флаги/SSR); (2) разрешение 512²; (3) shared PPv2 `fog`-инстанс (аудит); (4) VSR-позиционирование (микро). PIP-only warm-том — production-формат независимо от корня (критерий Δ<5 + валидация рубка/ночь).
+
+**Инцидент гейта.** `RadioNav.PipSingleWriter` найден в `0` (застрял с A/B §16.21; PlayerPrefs персистентны) — вся сессия шла с двумя писателями. Восстановлен в `1`, подавление проверено (`SuppressionCount=2496`), пара переснята: тинт остался (+25.4 vs −2.6) — гейт не причина тинта. УРОК: гигиена гейтов — фиксировать все `RadioNav.*` до/после A/B; добавлено в протокол.
+
+**Уроки протокола (дополнение).** (4) лоадсейв ставит чёрный кадр если снимать сразу — ждать ~15 с settle после `load`; (5) стойка дрейфует между окнами (качка лодки unpaused!): валидны только внутриоконные пары, золотые числа — референс; (6) `screen_set` 1920×1080 каждый прогон (окно было 1360×745 — геометрия метрики плывёт); (7) `wait_for` падает сразу если мост в окне рестарта — смотреть `boot.log`, ретраить `get_state`; (8) открытие пробой после лоада — ретрай; (9) PIP-пробы чтения (`reflect_get` полей) работают и на приватные поля (`contactShadowsLength=0.2` проверен).

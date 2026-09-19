@@ -18,6 +18,10 @@ namespace UBOAT.Mods.RadioNavigation
         private const string LogPrefix = "[RadioNav][Sextant]";
         private const float VeilAlpha = 0.85f;
         private const float EyecupSizeUnits = 1000f;
+        // Bundle asset names (manifest "Paths:" section): the opaque view
+        // material and the shader it is built from.
+        private const string OpaqueViewAssetName = "RadioNavOpaqueView";
+        private const string OpaqueViewShaderName = "RadioNavUIOpaque";
 
         /// <summary>
         /// Builds veil, eyecup, ocular, views, sights, dimmers, glare and
@@ -209,25 +213,44 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>
         /// Loads the opaque view material from the mod's AssetBundle
-        /// (RadioNavOpaqueView, shader RadioNav/UIOpaque). Returns null when
-        /// unavailable — the views then keep the stock UI shader.
+        /// (RadioNavOpaqueView, shader RadioNav/UIOpaque). The game
+        /// ResourceManager is tried first, but on 2026.1-patch21 it never
+        /// registers the mod bundle (F229) and silently degrades to
+        /// Resources.Load, so the material is loaded straight from the
+        /// already-loaded bundle as a fallback. GPU-verified 2026-09-17
+        /// (RenderDoc capture): without it the stock UI shader premultiplies
+        /// the view by the RT alpha (0.03..0.64) and the ocular picture is
+        /// darkened/gated. Returns null only when the asset is genuinely
+        /// missing — the views then keep the stock UI shader.
         /// </summary>
         private static Material ResolveOpaqueViewMaterial(ResourceManager resourceManager, UnityEngine.Object assetContext)
         {
-            if (resourceManager == null)
+            if (resourceManager != null)
             {
-                Debug.LogWarning(LogPrefix +
-                    " resourceManager unavailable - ocular views keep the stock UI shader (alpha darkening possible)");
-                return null;
+                Resource<Material> material =
+                    resourceManager.RetrieveAsset<Material>(OpaqueViewAssetName, assetContext, false);
+                if (material.Valid && material.Asset != null)
+                    return material.Asset;
             }
 
-            Resource<Material> material =
-                resourceManager.RetrieveAsset<Material>("RadioNavOpaqueView", assetContext, false);
-            if (material.Valid && material.Asset != null)
-                return material.Asset;
+            // F229 fallback: the bundle is loaded (ModBootstrapper) but not
+            // registered with the game's ResourceManager, so RetrieveAsset()
+            // cannot see it. Load the material — or build one from the bundled
+            // shader — directly from the bundle.
+            Material fromBundle = ModBootstrapper.LoadBundleAsset(OpaqueViewAssetName) as Material;
+            if (fromBundle != null)
+                return fromBundle;
+
+            Shader shader = ModBootstrapper.LoadBundleAsset(OpaqueViewShaderName) as Shader;
+            if (shader != null)
+            {
+                Material created = new Material(shader);
+                created.name = OpaqueViewAssetName + " (runtime)";
+                return created;
+            }
 
             Debug.LogWarning(LogPrefix +
-                " 'RadioNavOpaqueView' not found in bundle - ocular views keep the stock UI shader (alpha darkening possible)");
+                " '" + OpaqueViewAssetName + "' not found in bundle - ocular views keep the stock UI shader (alpha darkening possible)");
             return null;
         }
 

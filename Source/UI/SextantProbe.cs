@@ -148,6 +148,65 @@ namespace UBOAT.Mods.RadioNavigation
             return TryDouble(text, out arc) && InRange(arc, 0.0, SextantArc.MaxDeg);
         }
 
+        /// <summary>Test-only: SSMS/SSMSGlobalFog toggle on both PIP cameras —
+        /// ocular artifact bisection (SEXTANT_PLAN §16.13). Returns the number
+        /// of components touched; the call itself does not change the device
+        /// state, so it is safe on an open sextant.</summary>
+        public static string SetSsmsForProbe(string enabledText)
+        {
+            SextantController controller = ResolveController();
+            if (controller == null)
+                return "{\"ok\":false,\"error\":\"no-live-probe\"}";
+            bool enabled = enabledText == "1"
+                || string.Equals(enabledText, "true", StringComparison.OrdinalIgnoreCase);
+            int count = controller.SetSsmsEnabledForProbe(enabled);
+            return "{\"ok\":true,\"enabled\":" + (enabled ? "true" : "false")
+                + ",\"components\":" + count.ToString(CultureInfo.InvariantCulture) + "}";
+        }
+
+        /// <summary>Test-only: toggles components by type name on a named
+        /// camera — the generic form of SetSsmsForProbe for types the bridge
+        /// cannot resolve (main-camera SSMS/CP_SSSSS, interior AO/SSR).
+        /// Args: camera name, type name, "1"/"true" or "0"/"false".</summary>
+        public static string SetComponent(string cameraText, string typeText, string enabledText)
+        {
+            SextantController controller = ResolveController();
+            if (controller == null)
+                return "{\"ok\":false,\"error\":\"no-live-probe\"}";
+            bool enabled;
+            if (!TryBool(enabledText, out enabled))
+                return "{\"ok\":false,\"error\":\"bad-enabled\"}";
+            int count = controller.SetComponentEnabledForProbe(cameraText, typeText, enabled);
+            if (count < 0)
+                return "{\"ok\":false,\"error\":\"no-camera\"}";
+            return "{\"ok\":true,\"enabled\":" + (enabled ? "true" : "false")
+                + ",\"components\":" + count.ToString(CultureInfo.InvariantCulture) + "}";
+        }
+
+        /// <summary>Test-only numeric readback of both PIP render targets
+        /// (means 0-255) — the camera-side vs display-side tint discriminator
+        /// (SEXTANT_PLAN residual-light track). Requires an open sextant.</summary>
+        public static string RtMean()
+        {
+            SextantController controller = ResolveController();
+            if (controller == null)
+                return "{\"ok\":false,\"error\":\"no-live-probe\"}";
+            if (!SextantController.IsOpen)
+                return "{\"ok\":false,\"error\":\"not-open\"}";
+            return controller.RtMeanForProbe();
+        }
+
+        /// <summary>Test-only: SRP pass-list dump (masks/flags) of the main,
+        /// interior and PIP cameras — the writer-level pass difference
+        /// (SEXTANT_PLAN residual-light track).</summary>
+        public static string PassDump()
+        {
+            SextantController controller = ResolveController();
+            if (controller == null)
+                return "{\"ok\":false,\"error\":\"no-live-probe\"}";
+            return controller.PassDumpForProbe();
+        }
+
         /// <summary>Finite value inside [min, max] — NaN/Infinity are rejected
         /// (NaN passes plain comparisons and would poison the arc/camera pose).</summary>
         private static bool InRange(double value, double min, double max)

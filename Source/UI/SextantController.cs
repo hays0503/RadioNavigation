@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using DWS.Common.InjectionFramework;
 using DWS.Common.Resources;
@@ -45,6 +46,19 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>Live device instance for the MCP probe (set in Awake).</summary>
         internal static SextantController Instance { get; private set; }
+
+        /// <summary>
+        /// True when the camera is one of the two sextant PIP halves. Used by
+        /// PipCloneCameraPatch to keep the PIP render pass at a single GBuffer
+        /// writer (§16.21).
+        /// </summary>
+        public static bool IsPipCamera(Camera camera)
+        {
+            if (camera == null || Instance == null)
+                return false;
+            return camera == Instance.pipFactory.LeftCamera
+                || camera == Instance.pipFactory.RightCamera;
+        }
 
         internal double arcAngle;
         private int leftFilterCount;
@@ -285,13 +299,16 @@ namespace UBOAT.Mods.RadioNavigation
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
             pipFactory.AttachToMain();
-            // Attached cameras are rendered via MainCamera's pass list;
-            // keep enabled=false like periscope's small view. Standalone
-            // cameras (not attached) need enabled=true.
+            // Both PIP cameras take the SAME render path: enabled=true, so the
+            // game's SRP camera loop renders each one once per frame with the
+            // pose set in Update (i.e. after LateUpdate positioned the sun disc
+            // and the interior clone). The old split (left disabled + manual
+            // Render() in Update) left the left RT effectively black —
+            // GPU-verified 2026-09-17 (RenderDoc): left RT RGB <= 0.025 vs
+            // right RT RGB <= 0.917, the disabled camera's manual render being
+            // a no-op. Water still needs the AttachedCameras registration.
             if (pipFactory.LeftCamera != null)
-                pipFactory.LeftCamera.enabled = !pipFactory.WaterAttached;
-            // The right camera must re-render with the updated pose: the
-            // attached pass list does not refresh it, so keep it enabled.
+                pipFactory.LeftCamera.enabled = true;
             if (pipFactory.RightCamera != null)
                 pipFactory.RightCamera.enabled = true;
             int attachedCount = pipFactory.AttachedCount();
@@ -305,6 +322,10 @@ namespace UBOAT.Mods.RadioNavigation
             UpdatePipPose();
             LogVectorState("open");
             IsOpen = true;
+            // Bloom-cut is always-on while open (512x512 PIP: halos + NaN
+            // black blocks from the 1080p-tuned bloom) - arm it on the open
+            // edge, otherwise it would wait for the first filter keypress.
+            bloomCut.Update(IsOpen, leftFilterCount, rightFilterCount);
         }
 
         /// <summary>
@@ -331,6 +352,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (gameInput != null)
                 gameInput.RemoveBlockade(this);
             pipFactory.Detach();
+            pipFactory.InteriorMirror.SetEnabled(false);
             SunDiscRenderer.Active = false;
             SunDiscRenderer.ResetDirection();
             bloomCut.Hide();
@@ -414,6 +436,264 @@ namespace UBOAT.Mods.RadioNavigation
         internal void ResetMoonDiagTimerForProbe()
         {
             gameSun.ResetMoonDiagTimer();
+        }
+
+        /// <summary>Test-only: toggles the mirrored SSMS/SSMSGlobalFog image
+        /// effects on both PIP cameras. Components are matched by type NAME, so
+        /// the mod keeps no compile-time dependency on the SSMS assembly. Live
+        /// bisection aid for the ocular glow / black-square artifacts
+        /// (SSEXTANT_PLAN §16.13). Returns the number of components touched.</summary>
+        internal int SetSsmsEnabledForProbe(bool enabled)
+        {
+            int count = 0;
+            Camera[] cameras = { pipFactory.LeftCamera, pipFactory.RightCamera };
+            for (int i = 0; i < cameras.Length; i++)
+            {
+                if (cameras[i] == null)
+                    continue;
+                MonoBehaviour[] behaviours = cameras[i].GetComponents<MonoBehaviour>();
+                for (int j = 0; j < behaviours.Length; j++)
+                {
+                    MonoBehaviour behaviour = behaviours[j];
+                    if (behaviour == null)
+                        continue;
+                    string typeName = behaviour.GetType().Name;
+                    if (typeName != "SSMS" && typeName != "SSMSGlobalFog")
+                        continue;
+                    behaviour.enabled = enabled;
+                    count++;
+                }
+            }
+            Debug.Log(LogPrefix + " SSMS probe " + (enabled ? "on" : "off")
+                + " components=" + count);
+            return count;
+        }
+
+        /// <summary>Test-only: dumps the SRP pass lists (CullingMask /
+        /// Enabled / ScreenSpaceReflections per pass) of the main, interior
+        /// and both PIP cameras as JSON. The Interior Camera carries 2 custom
+        /// passes vs the PIP's main-cloned 1 (or default structure) — this
+        /// shows what the writer-level pass difference actually is
+        /// (residual-light track). Read-only; nested pass type resolved by
+        /// name so no compile-time dependency beyond AdditionalCameraData.</summary>
+        internal string PassDumpForProbe()
+        {
+            StringBuilder sb = new StringBuilder(512);
+            sb.Append("{\"ok\":true,\"cameras\":{");
+            DumpPasses(sb, "Main Camera");
+            sb.Append(',');
+            DumpPasses(sb, "Interior Camera");
+            Camera[] pips = { pipFactory.LeftCamera, pipFactory.RightCamera };
+            for (int i = 0; i < pips.Length; i++)
+            {
+                if (pips[i] == null)
+                    continue;
+                sb.Append(",\"pip");
+                sb.Append(i);
+                sb.Append("\":");
+                AppendPassList(sb, pips[i].GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>());
+            }
+            sb.Append("}}");
+            return sb.ToString();
+        }
+
+        private static void DumpPasses(StringBuilder sb, string cameraName)
+        {
+            sb.Append('\"');
+            sb.Append(cameraName);
+            sb.Append("\":");
+            GameObject go = GameObject.Find(cameraName);
+            UBOAT.Game.Scene.Rendering.AdditionalCameraData data = null;
+            if (go != null)
+                data = go.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+            AppendPassList(sb, data);
+        }
+
+        private static void AppendPassList(StringBuilder sb, UBOAT.Game.Scene.Rendering.AdditionalCameraData data)
+        {
+            if (data == null)
+            {
+                sb.Append("null");
+                return;
+            }
+            sb.Append('[');
+            try
+            {
+                MemberInfo passesMember = TypeMemberCache.GetInstanceMember(
+                    data.GetType(), "Passes");
+                PropertyInfo passesProp = passesMember as PropertyInfo;
+                Array passes = passesProp != null ? passesProp.GetValue(data, null) as Array : null;
+                if (passes == null)
+                {
+                    sb.Append(']');
+                    return;
+                }
+                for (int i = 0; i < passes.Length; i++)
+                {
+                    if (i > 0)
+                        sb.Append(',');
+                    object pass = passes.GetValue(i);
+                    if (pass == null)
+                    {
+                        sb.Append("null");
+                        continue;
+                    }
+                    Type passType = pass.GetType();
+                    sb.Append("{\"mask\":");
+                    sb.Append(ReadPassInt(pass, passType, "CullingMask"));
+                    sb.Append(",\"enabled\":");
+                    sb.Append(ReadPassBool(pass, passType, "Enabled") ? "true" : "false");
+                    sb.Append(",\"ssr\":");
+                    sb.Append(ReadPassBool(pass, passType, "ScreenSpaceReflections") ? "true" : "false");
+                    sb.Append('}');
+                }
+                sb.Append(']');
+            }
+            catch (Exception e)
+            {
+                sb.Append("],\"error\":\"");
+                sb.Append(e.GetType().Name);
+                sb.Append("\"}");
+            }
+        }
+
+        private static string ReadPassInt(object pass, Type passType, string name)
+        {
+            try
+            {
+                MemberInfo member = TypeMemberCache.GetInstanceMember(passType, name);
+                PropertyInfo property = member as PropertyInfo;
+                if (property == null)
+                    return "null";
+                object value = property.GetValue(pass, null);
+                if (value is int)
+                    return ((int)value).ToString(CultureInfo.InvariantCulture);
+                return "null";
+            }
+            catch
+            {
+                return "null";
+            }
+        }
+
+        private static bool ReadPassBool(object pass, Type passType, string name)
+        {
+            try
+            {
+                MemberInfo member = TypeMemberCache.GetInstanceMember(passType, name);
+                PropertyInfo property = member as PropertyInfo;
+                if (property == null)
+                    return false;
+                object value = property.GetValue(pass, null);
+                if (value is bool)
+                    return (bool)value;
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>Test-only: toggles components by type NAME on a named
+        /// camera ("Main Camera", "Interior Camera", PIP cameras...).
+        /// Name-based, so the mod keeps no compile-time dependency on
+        /// external assemblies the MCP bridge cannot resolve (SSMS,
+        /// CP_SSSSS_Main, Standard Assets AO/SSR, TOD). Bisection aid for
+        /// the residual tint (SEXTANT_PLAN step 6): which main/interior-path
+        /// effect carries the eyes' warmth. Returns -1 when the camera is
+        /// not found, else the number of components touched.</summary>
+        internal int SetComponentEnabledForProbe(string cameraName, string typeName, bool enabled)
+        {
+            if (string.IsNullOrEmpty(cameraName) || string.IsNullOrEmpty(typeName))
+                return -1;
+            GameObject target = GameObject.Find(cameraName);
+            if (target == null)
+                return -1;
+            int count = 0;
+            MonoBehaviour[] behaviours = target.GetComponents<MonoBehaviour>();
+            for (int i = 0; i < behaviours.Length; i++)
+            {
+                MonoBehaviour behaviour = behaviours[i];
+                if (behaviour == null)
+                    continue;
+                Type type = behaviour.GetType();
+                if (type.Name != typeName && type.FullName != typeName)
+                    continue;
+                behaviour.enabled = enabled;
+                count++;
+            }
+            Debug.Log(LogPrefix + " COMPONENT probe camera='" + cameraName
+                + "' type='" + typeName + "' " + (enabled ? "on" : "off")
+                + " components=" + count);
+            return count;
+        }
+
+        /// <summary>Test-only numeric readback of both PIP render targets
+        /// (channel means 0-255): distinguishes a camera-side tint (the RT
+        /// itself is already blue) from a display-side one (RT neutral, the
+        /// screen blue). Uses the calibrated path (§16.18): Blit into an 8x8
+        /// RT, then ReadPixels exactly 8x8 (a direct large-region ReadPixels
+        /// returns black on this Unity build).</summary>
+        internal string RtMeanForProbe()
+        {
+            int lr, lg, lb, rr, rg, rb;
+            bool leftOk = TryReadRtMean(pipFactory.LeftRt, out lr, out lg, out lb);
+            bool rightOk = TryReadRtMean(pipFactory.RightRt, out rr, out rg, out rb);
+            if (!leftOk && !rightOk)
+                return "{\"ok\":false,\"error\":\"no-rt\"}";
+            return "{\"ok\":true,\"left\":[" + lr + "," + lg + "," + lb
+                + "],\"right\":[" + rr + "," + rg + "," + rb + "]}";
+        }
+
+        private static bool TryReadRtMean(RenderTexture source, out int r, out int g, out int b)
+        {
+            r = 0;
+            g = 0;
+            b = 0;
+            if (source == null)
+                return false;
+            RenderTexture temp = null;
+            Texture2D tex = null;
+            RenderTexture previous = RenderTexture.active;
+            try
+            {
+                temp = RenderTexture.GetTemporary(8, 8, 0, RenderTextureFormat.ARGB32);
+                Graphics.Blit(source, temp);
+                RenderTexture.active = temp;
+                tex = new Texture2D(8, 8, TextureFormat.RGBA32, false);
+                tex.ReadPixels(new Rect(0, 0, 8, 8), 0, 0, false);
+                Color32[] pixels = tex.GetPixels32();
+                if (pixels == null || pixels.Length == 0)
+                    return false;
+                long sr = 0;
+                long sg = 0;
+                long sb = 0;
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    sr += pixels[i].r;
+                    sg += pixels[i].g;
+                    sb += pixels[i].b;
+                }
+                r = (int)(sr / pixels.Length);
+                g = (int)(sg / pixels.Length);
+                b = (int)(sb / pixels.Length);
+                return true;
+            }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SextantController.RtMeanRead"))
+                    Debug.LogWarning(LogPrefix + " RT mean readback failed: " + e.Message);
+                return false;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                if (temp != null)
+                    RenderTexture.ReleaseTemporary(temp);
+                if (tex != null)
+                    UnityEngine.Object.Destroy(tex);
+            }
         }
 
         // §13.4 camera gate: sextant exists only in live deck views.
@@ -662,7 +942,11 @@ namespace UBOAT.Mods.RadioNavigation
             bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
             float lat, lon;
             bool posOk = positionProvider.TryGetPosition(out lat, out lon);
-            starId.Update(dt, glare.IsPained, SextantPipPose.Forward(pipFactory, viewCamera, gameMainCamera, arcAngle),
+            // Hull gate (R5): inside the boat the hull blocks the sky, so no
+            // body may be identified there — the ocular shows the interior.
+            MainCamera main = MainCamera.Instance;
+            bool canSight = main == null || !main.IsInsideBoat;
+            starId.Update(dt, glare.IsPained, canSight, SextantPipPose.Forward(pipFactory, viewCamera, gameMainCamera, arcAngle),
                 ownOk, ownDir, ownAlt, gameOk, gameDir, posOk, lat, lon,
                 nameText, arcAngle);
         }

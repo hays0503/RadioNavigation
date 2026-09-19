@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using PlayWay.Water;
 using UBOAT.Game.Scene.Camera;
 using UnityEngine;
@@ -20,6 +22,12 @@ namespace UBOAT.Mods.RadioNavigation
         public const int RtWidth = 512;
         public const int RtHeight = 512;
 
+        // NOTE (2026-09-18): the PIP scene render intermittently loses its
+        // lighting (one whole RT goes dark, ~3-7% of frames, either eye at
+        // random) inside the game's SRP — a game-side transient that this mod
+        // could not eliminate. Tried and measured ineffective: render-order
+        // overrides (depth), a dummy absorber camera, distinct RT sizes, the
+        // SSMS mirror toggle. See SEXTANT_PLAN.md §16.15.
         private const string LogPrefix = "[RadioNav][Sextant]";
 
         public Camera LeftCamera { get; private set; }
@@ -36,9 +44,43 @@ namespace UBOAT.Mods.RadioNavigation
         private bool waterAttachWarned;
         private SextantEffectMirror effectMirror;
 
+        // Per-frame RenderScene sync (see SyncRenderScene): the PIP data
+        // components created here plus the view camera's data cached across
+        // frames (one GetComponent per view-camera change, never per frame).
+        private UBOAT.Game.Scene.Rendering.AdditionalCameraData leftData;
+        private UBOAT.Game.Scene.Rendering.AdditionalCameraData rightData;
+        private Camera cachedViewCamera;
+        private UBOAT.Game.Scene.Rendering.AdditionalCameraData cachedViewData;
+
+        // Sea gate (R5): the game hides the sea inside the boat per camera
+        // (WaterCamera.SetCustomWaterRenderList(empty), FPPCameraController
+        // .cs:827). The PIP copies the main WaterCamera config once, so the
+        // sea kept rendering through the ocular inside the hull; the state
+        // is re-applied per frame from SextantPipPose.
+        private WaterCamera leftWaterCamera;
+        private WaterCamera rightWaterCamera;
+        private readonly List<Water> emptyWaterList = new List<Water>();
+        private bool waterListSynced;
+        private bool waterListInside;
+
+        // Contact-shadow mirror gate (residual-light track, step 3):
+        // PlayerPrefs A/B switch, default 1 (mirror on).
+        private const string ContactShadowMirrorPrefsKey = "RadioNav.ContactShadowMirror";
+        private bool contactShadowMirrorLogged;
+
+        // Route B interior composite: clone interior camera + own
+        // VirtualSceneRenderer per PIP camera (see SextantInteriorMirror).
+        private readonly SextantInteriorMirror interiorMirror = new SextantInteriorMirror();
+
+        internal SextantInteriorMirror InteriorMirror
+        {
+            get { return interiorMirror; }
+        }
+
         // Live source references fed to the mirror each frame.
         private Component sourceSsmsFog;
         private Component sourceSsms;
+        private Component sourcePpv1;
 
         internal void Ensure(Camera viewCamera, float fovDivisor,
             RawImage leftViewImage, RawImage rightViewImage,
@@ -143,6 +185,15 @@ namespace UBOAT.Mods.RadioNavigation
         public void Destroy()
         {
             Detach();
+            interiorMirror.Destroy();
+            leftWaterCamera = null;
+            rightWaterCamera = null;
+            waterListSynced = false;
+            contactShadowMirrorLogged = false;
+            leftData = null;
+            rightData = null;
+            cachedViewCamera = null;
+            cachedViewData = null;
             if (LeftCamera != null) UnityEngine.Object.Destroy(LeftCamera.gameObject);
             if (RightCamera != null) UnityEngine.Object.Destroy(RightCamera.gameObject);
             LeftCamera = null;
@@ -161,10 +212,197 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        public void RefreshMirroredState()
+        public void RefreshMirroredState(Camera viewCamera)
         {
             if (effectMirror != null)
+            {
                 effectMirror.RefreshSsms(sourceSsmsFog, sourceSsms);
+                effectMirror.SyncPostProfile(sourcePpv1);
+                // The game recomputes the fog's interior ambient from the
+                // interior light probes every frame (FPPCameraController.cs:1042);
+                // the one-off PIP fog clone would otherwise keep a stale
+                // ambient and overflow the light-combine term (see
+                // SextantEffectMirror.SyncInteriorAmbient).
+                effectMirror.SyncInteriorAmbient(sourceSsmsFog);
+                // PPv2 keeps the adapted exposure per PostProcessLayer; the
+                // PIPs' fresh layers need the main layer's state (enabled at
+                // night by the game's BrighterNights task).
+                effectMirror.SyncAutoExposure();
+            }
+            SyncRenderScene(viewCamera);
+            SyncContactShadows();
+        }
+
+        /// <summary>
+        /// Mirrors the live <c>AdditionalCameraData.RenderScene</c> of the
+        /// view camera onto both PIP cameras. The game recomputes that flag
+        /// every frame (<c>GenericCameraController.PreCull:483</c>: false
+        /// while the interior <c>VirtualSceneRenderer</c> renders the scene),
+        /// so a PIP stuck at the creation-time <c>true</c> draws the exterior
+        /// scene on top of the interior composite — the over-bright input the
+        /// PPv2 stack blooms into the ocular's white blob. Live paused-frame
+        /// A/B (2026-09-18): true = giant white blob with rainbow fringes,
+        /// false = clean interior matching the eyes; only reproduces inside
+        /// the boat, where the two values differ.
+        /// <c>StencilMask</c> is deliberately NOT mirrored: the PIP's interior
+        /// clone writes the stencil, so <c>true</c> on the PIP leaks the
+        /// exterior through the hull as well (same A/B).
+        /// </summary>
+        private void SyncRenderScene(Camera viewCamera)
+        {
+            if (viewCamera == null)
+                return;
+            if (!ReferenceEquals(viewCamera, cachedViewCamera))
+            {
+                cachedViewCamera = viewCamera;
+                cachedViewData = viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+            }
+            if (cachedViewData == null)
+                return;
+            bool value = cachedViewData.RenderScene;
+            if (leftData != null && leftData.RenderScene != value)
+                leftData.RenderScene = value;
+            if (rightData != null && rightData.RenderScene != value)
+                rightData.RenderScene = value;
+
+            // The portal system masks the exterior render to the visible
+            // portals' viewport bbox with this normalized rect while
+            // RenderScene=true (ExteriorViewPortalsController.PreCull:109;
+            // full (0,0,1,1) otherwise, :43). Mirroring RenderScene alone left
+            // the PIP at the full rect, so whenever a door was in view the
+            // PIP drew the exterior scene over the WHOLE frame — the blocky
+            // over-dark/over-bright ocular artifact that flashes with the
+            // portal state (live 2026-09-18).
+            Rect scissor = cachedViewData.CullingScissorRect;
+            if (leftData != null && leftData.CullingScissorRect != scissor)
+                leftData.CullingScissorRect = scissor;
+            if (rightData != null && rightData.CullingScissorRect != scissor)
+                rightData.CullingScissorRect = scissor;
+        }
+
+        /// <summary>
+        /// Mirrors the view camera's screen-space contact-shadow block onto
+        /// both PIP cameras (residual-light track, step 3). The PIP data
+        /// components are created fresh with ContactShadows=false while every
+        /// game camera in the path renders them (main + interior cameras both
+        /// true live) — the ocular missed the contact darkening on pipes and
+        /// brackets. Source is the cached view-camera data (the main camera
+        /// in FPP); each field is copied only on change, so a settled state
+        /// performs no writes. Gated by PlayerPrefs
+        /// RadioNav.ContactShadowMirror (default 1) for A/B without
+        /// redeploying.
+        /// </summary>
+        private void SyncContactShadows()
+        {
+            if (PlayerPrefs.GetInt(ContactShadowMirrorPrefsKey, 1) == 0)
+                return;
+            if (cachedViewData == null)
+                return;
+            bool applied = CopyContactShadows(cachedViewData, leftData);
+            applied |= CopyContactShadows(cachedViewData, rightData);
+            if (applied && !contactShadowMirrorLogged)
+            {
+                contactShadowMirrorLogged = true;
+                Debug.Log(LogPrefix + " CONTACTSHADOWS mirrored onto PIP (first apply)");
+            }
+        }
+
+        private static bool CopyContactShadows(
+            UBOAT.Game.Scene.Rendering.AdditionalCameraData from,
+            UBOAT.Game.Scene.Rendering.AdditionalCameraData to)
+        {
+            if (from == null || to == null)
+                return false;
+            bool changed = false;
+            if (to.ContactShadows != from.ContactShadows)
+            {
+                to.ContactShadows = from.ContactShadows;
+                changed = true;
+            }
+            if (to.ContactShadowsLengthMultiplier != from.ContactShadowsLengthMultiplier)
+            {
+                to.ContactShadowsLengthMultiplier = from.ContactShadowsLengthMultiplier;
+                changed = true;
+            }
+            if (to.ContactShadowsMaxDistance != from.ContactShadowsMaxDistance)
+            {
+                to.ContactShadowsMaxDistance = from.ContactShadowsMaxDistance;
+                changed = true;
+            }
+            // The remaining four are get-only properties (CS0200): compare
+            // through the getters, write through the private backing fields
+            // (same TypeMemberCache pattern as SyncInteriorAmbient).
+            changed |= CopyContactShadowField(from, to, "ContactShadowsLength", "contactShadowsLength");
+            changed |= CopyContactShadowField(from, to, "ContactShadowsFadeDistance", "contactShadowsFadeDistance");
+            changed |= CopyContactShadowField(from, to, "ContactShadowsDistanceScaleFactor", "contactShadowsDistanceScaleFactor");
+            changed |= CopyContactShadowField(from, to, "ContactShadowsSampleCount", "contactShadowsSampleCount");
+            if (to.ContactShadowsSampleCountMultiplier != from.ContactShadowsSampleCountMultiplier)
+            {
+                to.ContactShadowsSampleCountMultiplier = from.ContactShadowsSampleCountMultiplier;
+                changed = true;
+            }
+            return changed;
+        }
+
+        private static bool CopyContactShadowField(
+            UBOAT.Game.Scene.Rendering.AdditionalCameraData from,
+            UBOAT.Game.Scene.Rendering.AdditionalCameraData to,
+            string propertyName, string fieldName)
+        {
+            Type type = from.GetType();
+            PropertyInfo property = TypeMemberCache.GetInstanceMember(type, propertyName) as PropertyInfo;
+            FieldInfo field = TypeMemberCache.GetInstanceMember(type, fieldName) as FieldInfo;
+            if (property == null || field == null)
+            {
+                if (WarnOnce.ShouldLog("SextantPipFactory.ContactField." + fieldName))
+                    Debug.LogWarning(LogPrefix + " contact-shadow member '" + fieldName + "' not found - field skipped");
+                return false;
+            }
+            try
+            {
+                object fromValue = property.GetValue(from, null);
+                if (Equals(fromValue, property.GetValue(to, null)))
+                    return false;
+                field.SetValue(to, fromValue);
+                return true;
+            }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SextantPipFactory.ContactFieldCopy." + fieldName))
+                    Debug.LogWarning(LogPrefix + " contact-shadow copy '" + fieldName + "' failed: " + e.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Sea gate (R5): inside the boat the game stops rendering the sea
+        /// for a camera by passing an empty custom water list; outside the
+        /// list is cleared back to the default. Idempotent — the lists are
+        /// only touched when the inside state flips.
+        /// </summary>
+        public void SyncWaterRenderList(bool insideBoat)
+        {
+            if (waterListSynced && waterListInside == insideBoat)
+                return;
+            waterListSynced = true;
+            waterListInside = insideBoat;
+            ApplyWaterRenderList(leftWaterCamera, insideBoat);
+            ApplyWaterRenderList(rightWaterCamera, insideBoat);
+        }
+
+        private void ApplyWaterRenderList(WaterCamera cam, bool insideBoat)
+        {
+            if (cam == null)
+                return;
+            try
+            {
+                cam.SetCustomWaterRenderList(insideBoat ? emptyWaterList : null);
+            }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SextantPipFactory.WaterList"))
+                    Debug.LogWarning(LogPrefix + " water list sync failed: " + e.Message);
+            }
         }
 
         private Camera ConfigurePipCamera(string name, RenderTexture target,
@@ -181,6 +419,10 @@ namespace UBOAT.Mods.RadioNavigation
             }
             Camera cam = go.AddComponent<Camera>();
             cam.CopyFrom(viewCamera);
+            // Camera.CopyFrom copies the source name too ("Main Camera"), which
+            // renames the PIP GameObject and makes every PIP-derived lookup
+            // (logs, clones, reflection probes) ambiguous — restore ours.
+            cam.name = name;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Color.black;
             cam.targetTexture = target;
@@ -205,6 +447,24 @@ namespace UBOAT.Mods.RadioNavigation
                 var mainAdd = viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
                 if (mainAdd != null)
                     pipAdd.ShadowDistance = mainAdd.ShadowDistance;
+                // RenderScene is recomputed per frame by the game's camera
+                // controllers (GenericCameraController.PreCull:483 keeps it
+                // false while the interior VirtualSceneRenderer provides the
+                // scene). Seed it from the live view camera here; a PIP stuck
+                // at true renders the exterior scene ON TOP of the interior
+                // composite, and the post stack blooms that into the ocular's
+                // white blob (live paused-frame A/B, 2026-09-18). Refreshed
+                // every frame in SyncRenderScene.
+                if (mainAdd != null)
+                {
+                    pipAdd.RenderScene = mainAdd.RenderScene;
+                    // Same seed for the portal scissor: while a door is in
+                    // view the game masks the exterior render to the portals'
+                    // bbox (ExteriorViewPortalsController.PreCull:109) and
+                    // mirrors only RenderScene would let the PIP draw the
+                    // exterior full-frame.
+                    pipAdd.CullingScissorRect = mainAdd.CullingScissorRect;
+                }
             }
             catch (Exception e)
             {
@@ -212,10 +472,19 @@ namespace UBOAT.Mods.RadioNavigation
                     Debug.LogWarning("[RadioNav][Sextant] ShadowDistance mirror failed: " + e.Message);
             }
 
-            // 1:1 mirror of the main camera's rendering stack: PPv2
-            // PostProcessLayer + legacy PostProcessingBehaviour + SSMSGlobalFog
-            // + SSMS, copied in the exact component order of the FPP camera,
-            // so the SRP renders the PIP views with the same fog/post look.
+            if (rightSide)
+                rightData = pipAdd;
+            else
+                leftData = pipAdd;
+
+            // Mirror of the main camera's rendering stack: PPv2
+            // PostProcessLayer + SSMSGlobalFog + SSMS, copied in the exact
+            // component order of the FPP camera, so the SRP renders the PIP
+            // views with the same fog/post look. The legacy PPv1
+            // PostProcessingBehaviour is mirrored by live profile reference
+            // (per-frame SyncPostProfile, gate RadioNav.Ppv1Mirror): the
+            // §16.10 removal predates the §16.17 root cause, and the eyes
+            // verifiably grade through it (FPP NG profile).
             ResolveMirrorSources(viewCamera);
             effectMirror.AddMirroredEffectComponents(viewCamera, go);
 
@@ -227,6 +496,10 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 WaterCamera waterCam = go.AddComponent<WaterCamera>();
                 Debug.Log(LogPrefix + " WATERCAM added to " + name + ": " + (waterCam != null));
+                if (rightSide)
+                    rightWaterCamera = waterCam;
+                else
+                    leftWaterCamera = waterCam;
 
                 // A raw WaterCamera is empty: PlayWay needs the config the
                 // main camera's component carries (Water reference, custom
@@ -263,6 +536,19 @@ namespace UBOAT.Mods.RadioNavigation
             probe.tracked = cam;
             probe.owner = owner;
 
+            // Single-writer pose follower (§16.22): after the VSR positioned
+            // the interior clone, puts the PIP root at the clone's world
+            // position so the root renders the interior from interior space.
+            // Rotation is untouched (Update set yaw/alidade; the VSR never
+            // writes the root transform).
+            SextantPipInteriorPose poseFollower = go.AddComponent<SextantPipInteriorPose>();
+            poseFollower.Pip = cam;
+            poseFollower.Mirror = interiorMirror;
+
+            // Must run before the first SRP render: DeepCameraData caches the
+            // VirtualSceneRenderer in its constructor.
+            interiorMirror.Attach(cam);
+
             return cam;
         }
 
@@ -272,6 +558,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             sourceSsmsFog = FindComponent(viewCamera, "SSMSGlobalFog");
             sourceSsms = FindComponent(viewCamera, "SSMS");
+            sourcePpv1 = FindComponent(viewCamera, "PostProcessingBehaviour");
         }
 
         private static Component FindComponent(Camera cam, string typeName)

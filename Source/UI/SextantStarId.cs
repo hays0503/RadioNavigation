@@ -61,10 +61,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>
         /// Advances the identification cycle. The controller supplies the
-        /// PIP forward vector, the pain state and the sun reads; the name
-        /// Text is updated here on change.
+        /// PIP forward vector, the pain state, the hull gate and the sun
+        /// reads; the name Text is updated here on change.
+        /// <paramref name="canSight"/> is false inside the boat: the hull
+        /// blocks the sky, so no body may be identified there (R5).
         /// </summary>
-        public void Update(float dt, bool pain, Vector3 pipFwd,
+        public void Update(float dt, bool pain, bool canSight, Vector3 pipFwd,
             bool ownSunOk, Vector3 ownSunDir, float ownSunAlt,
             bool gameSunOk, Vector3 gameSunDir,
             bool positionOk, float lat, float lon,
@@ -75,10 +77,11 @@ namespace UBOAT.Mods.RadioNavigation
             if (tick)
                 tickTimer = TickIntervalSeconds;
 
-            if (pain)
+            if (pain || !canSight)
             {
                 holdTimer = 0f;
                 identifiedAltDeg = 0f;
+                lastFoundBody = CelestialBody.None();
                 identifiedBody = CelestialBody.None();
                 if (nameText != null)
                     nameText.text = "";
