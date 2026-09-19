@@ -21,6 +21,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         // Per-camera caches for the per-frame pass-mask sync (P5.4 slice 4b):
         // the AdditionalCameraData component and the last applied culling mask.
+        // Last good (non-PIP) view camera: fallback for the self-follow
+        // guard below. Reset with the other per-camera caches on teardown.
+        private static Camera lastGoodViewCamera;
         private static readonly Dictionary<Camera, UBOAT.Game.Scene.Rendering.AdditionalCameraData> addCache =
             new Dictionary<Camera, UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
         private static readonly Dictionary<Camera, int> maskCache =
@@ -52,6 +55,26 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             if (!CameraResolver.TryResolve(out viewCamera) || viewCamera == null)
                 return;
+
+            // Never follow our own PIP cameras (stuck-angle guard). The
+            // resolver can transiently return a PIP (Camera.main null window
+            // during transitions: the hook cache holds the last pre-culled
+            // camera) — copying PIP->PIP freezes rotation while the interior
+            // pose follower keeps position live ("stuck angle, can move").
+            // Fall back to the last good view instead.
+            if (SextantController.IsPipCamera(viewCamera))
+            {
+                if (WarnOnce.ShouldLog("SextantPipPose.PipSelfFollow"))
+                    Debug.LogWarning(LogPrefix + " view camera resolved to a PIP camera - keeping last good view");
+                if (lastGoodViewCamera != null)
+                    viewCamera = lastGoodViewCamera;
+                else
+                    return;
+            }
+            else
+            {
+                lastGoodViewCamera = viewCamera;
+            }
 
             Transform mt = viewCamera.transform;
             Vector3 mainEuler = mt.eulerAngles;
@@ -183,6 +206,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             addCache.Clear();
             maskCache.Clear();
+            lastGoodViewCamera = null;
         }
 
         public static Vector3 Forward(SextantPipFactory factory, Camera viewCamera,
