@@ -1,8 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    ".opencode/plugins/graphify.js"
-  ],
+  "plugin": [],
   "references": {
     "uboat-kb": {
       "path": "C:\\Users\\Sergey Pimenov\\AppData\\LocalLow\\Deep Water Studio\\UBOAT\\Mods\\RadioNavigation\\knowledge",
