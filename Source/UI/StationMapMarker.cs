@@ -23,7 +23,16 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected override int MarkerCount => BeaconData.Stations.Length;
 
-        protected override string MarkerRootName(int index) => "RadioNavStationIcon_" + index;
+        protected override string PointKey(int index)
+        {
+            return MapMarkerPoints.StationKey(
+                index < BeaconData.Stations.Length ? BeaconData.Stations[index].Name : null);
+        }
+
+        protected override MapMarkerKind PointKind(int index)
+        {
+            return MapMarkerKind.Station;
+        }
 
         protected override string HoverText(int index) => StationTooltipText.Hover(BeaconData.Stations[index]);
 

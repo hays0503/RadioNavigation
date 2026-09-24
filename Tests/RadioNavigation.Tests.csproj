@@ -93,6 +93,7 @@
     <Compile Include="BodySelectionTests.cs" />
     <Compile Include="SextantStabilizationTests.cs" />
     <Compile Include="SextantConeBoxTests.cs" />
+    <Compile Include="MapMarkerPointsTests.cs" />
     <Compile Include="AimOffsetFormatTests.cs" />
     <Compile Include="FixCardLayoutTests.cs" />
     <Compile Include="ConstellationWidthPolicyTests.cs" />
@@ -228,6 +229,7 @@
     <Compile Include="..\Source\Logic\BodySelection.cs" Link="Source\Logic\BodySelection.cs" />
     <Compile Include="..\Source\Logic\SextantStabilization.cs" Link="Source\Logic\SextantStabilization.cs" />
     <Compile Include="..\Source\Logic\SextantConeBox.cs" Link="Source\Logic\SextantConeBox.cs" />
+    <Compile Include="..\Source\Logic\MapMarkerPoints.cs" Link="Source\Logic\MapMarkerPoints.cs" />
     <Compile Include="..\Source\Logic\AimOffsetFormat.cs" Link="Source\Logic\AimOffsetFormat.cs" />
     <Compile Include="..\Source\Logic\FixCardLayout.cs" Link="Source\Logic\FixCardLayout.cs" />
     <Compile Include="..\Source\Logic\ConstellationWidthPolicy.cs" Link="Source\Logic\ConstellationWidthPolicy.cs" />

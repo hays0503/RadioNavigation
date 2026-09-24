@@ -3389,6 +3389,20 @@ namespace RadioNavigation.SourceCheck
                 .Any(a => a.Name.Identifier.Text == member);
         }
 
+        /// <summary>True when any method body of the type invokes a call named
+        /// <paramref name="name"/> (bare or qualified). Type-level companion
+        /// of the method-level overload above.</summary>
+        private static bool InvokesName(TypeDeclarationSyntax type, string name)
+        {
+            return type.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(inv => (inv.Expression is IdentifierNameSyntax bare
+                        && bare.Identifier.Text == name)
+                    || (inv.Expression is MemberAccessExpressionSyntax qualified
+                        && qualified.Name is IdentifierNameSyntax qname
+                        && qname.Identifier.Text == name));
+        }
+
         private static TypeDeclarationSyntax FindSourceType(
             List<Tuple<string, CompilationUnitSyntax>> roots, string name)
         {
@@ -4268,6 +4282,95 @@ namespace RadioNavigation.SourceCheck
 
             Assert.True(problems.Count == 0,
                 $"{problems.Count} aiming-reticle violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Native map points gate (author 2026-11-05): every mod marker must
+        /// BE a real MapPointUI created through the public
+        /// MapChartingUI.CreatePoint — only then do the game's charting tools,
+        /// the eraser and the drag see it (they key off MapPointUI.HoveredPoint).
+        /// The mod's look is re-hosted as children by MapMarkerPointBridge,
+        /// which also neutralises the game's own visuals and applies the
+        /// static/dynamic policy; the old custom canvas/hitbox must stay gone.
+        /// Rules:
+        ///  A) NavMapMarkerBase reconciles through MapMarkerPoints.Plan and
+        ///     creates points via charting.CreatePoint;
+        ///  B) MapMarkerPointBridge exists and neutralises the point (image
+        ///     colour transparent + label disabled);
+        ///  C) the bridge applies the interaction policy (Interactive) and the
+        ///     static position lock (Position);
+        ///  D) the base no longer builds a custom GraphicRaycaster/hitbox;
+        ///  E) FixMapMarker owns the eraser semantics (OnPointDestroyed).
+        /// Mutations: drop CreatePoint -> FAIL; re-add the raycaster -> FAIL;
+        /// drop the label disable -> FAIL; drop the Interactive policy ->
+        /// FAIL; drop Plan -> FAIL.
+        /// </summary>
+        [Fact]
+        public void MapMarkers_AreNativeMapPoints()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var baseType = FindSourceType(roots, "NavMapMarkerBase");
+            if (baseType == null)
+            {
+                problems.Add("type 'NavMapMarkerBase' not found in Source/");
+            }
+            else
+            {
+                if (!InvokesName(baseType, "CreatePoint"))
+                    problems.Add("NavMapMarkerBase never calls MapChartingUI.CreatePoint — the markers must be native map points");
+                if (!InvokesName(baseType, "Plan"))
+                    problems.Add("NavMapMarkerBase never calls MapMarkerPoints.Plan — the adoption/reconcile is gone");
+                if (!InvokesName(baseType, "Evaluate"))
+                    problems.Add("NavMapMarkerBase never calls MapMarkerPoints.Evaluate — the interaction policy is gone");
+                if (baseType.DescendantNodes().OfType<SimpleNameSyntax>()
+                    .Any(n => n.Identifier.Text == "GraphicRaycaster"))
+                    problems.Add("NavMapMarkerBase creates a GraphicRaycaster again — the custom hitbox must stay gone (the native point is the hitbox)");
+                if (baseType.DescendantNodes().OfType<ObjectCreationExpressionSyntax>()
+                    .Any(c => c.ToString().Contains("\"Hitbox\"")))
+                    problems.Add("NavMapMarkerBase builds a custom Hitbox again — the native point is the hitbox");
+            }
+
+            var bridge = FindSourceType(roots, "MapMarkerPointBridge");
+            if (bridge == null)
+            {
+                problems.Add("type 'MapMarkerPointBridge' not found in Source/");
+            }
+            else
+            {
+                if (FindMethod(bridge, "Attach") == null)
+                    problems.Add("MapMarkerPointBridge.Attach not found");
+                if (!bridge.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                    .Any(m => m.Name.Identifier.Text == "color"))
+                    problems.Add("MapMarkerPointBridge does not touch the point image colour — the game's own look would show through");
+                if (!bridge.DescendantNodes().OfType<AssignmentExpressionSyntax>()
+                    .Any(a => a.Left.ToString().EndsWith(".enabled", StringComparison.Ordinal)
+                        && a.Right.ToString() == "false"))
+                    problems.Add("MapMarkerPointBridge never disables the point label — the adoption key would be visible");
+                if (!bridge.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                    .Any(m => m.Name.Identifier.Text == "Interactive"))
+                    problems.Add("MapMarkerPointBridge never applies the Interactive policy");
+                if (!bridge.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                    .Any(m => m.Name.Identifier.Text == "Position"))
+                    problems.Add("MapMarkerPointBridge never applies the static position lock");
+            }
+
+            var fix = FindSourceType(roots, "FixMapMarker");
+            if (fix == null)
+            {
+                problems.Add("type 'FixMapMarker' not found in Source/");
+            }
+            else if (FindMethod(fix, "OnPointDestroyed") == null)
+            {
+                problems.Add("FixMapMarker does not override OnPointDestroyed — the eraser semantics are gone");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} native-map-point violation(s):\n"
                 + string.Join("\n", problems));
         }
 

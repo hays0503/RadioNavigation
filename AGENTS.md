@@ -123,6 +123,8 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 - AssetBundle built with Unity 2021.3.33f1 вЂ” compatible with game's 2021.3.45f2.
 - Game does no own Harmony patching (0Harmony.dll ships for mods only); mod's `new Harmony("UBOAT.Mods.RadioNavigation")` в†’ `UnpatchAll()` hits only its own patches.
 
+- **Метки карты — родные точки игры (2026-11-05)**: фикс, вершины LOP, маяки и станции — настоящие `MapPointUI` через публичный `MapChartingUI.CreatePoint` (только они видны инструментам/ластику/Delete — те читают статический `MapPointUI.HoveredPoint`); вид мода переехал детьми под GameObject точки (`MapMarkerPointBridge`: нейтрализация `image.color=(0,0,0,0)` + `label.enabled=false`, компенсация масштаба/подъёма в LateUpdate, политика `Interactive`/позиции). Реконсиляция каждые 0.25 с по ключам `RadioNav …` (адопция сохранённых точек, создание, удаление устаревших/дублей; **`FindObjectsOfType<MapPointUI>(true)`** — иначе неактивные (деклаттер) не видны и флот дублируется каждые 0.25 с). Политика: фикс/LOP — динамические (drag/ластик/Delete; после удаления подавление до I/О, расчёты/карточка/проба не трогаются), маяки/станции — статичные (позиция возвращается, ластик глушится `Interactive=false` при Eraser, от Delete — пересоздание); при инструменте «Точки» все наши точки inert (попап переименования ломал бы ключ адопции). Гейт `MapMarkers_AreNativeMapPoints` (5/5 мутаций). План/живые результаты: `MAP_MARKERS_PLAN.md`.
+
 ## Documentation sources
 
 - `SAD/` вЂ” 11-chapter architecture doc (decisions, code smells; приложения A–C и старый roadmap — в `archive/`)

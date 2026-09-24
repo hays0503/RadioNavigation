@@ -1,21 +1,24 @@
+using System.Collections.Generic;
 using UBOAT.Game.Sandbox;
-using UBOAT.Game.UI;
 using DWS.Common.Resources;
 using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Nav-map marker for the sextant running fix (SEXTANT_PLAN v1.12): a
-    /// thin subclass of the shared <see cref="NavMapMarkerBase"/> skeleton
-    /// (same pattern as StationMapMarker). The sextant worksheet publishes
-    /// the last computed fix through the static state below; the marker
-    /// shows it on the map with a hover/pinned tooltip.
+    /// Nav-map markers for the sextant running fix (SEXTANT_PLAN v1.12;
+    /// native game points since 2026-11-05): one marker for the fix pin plus
+    /// one per cocked-hat vertex, all real <c>MapPointUI</c> points through
+    /// <see cref="NavMapMarkerBase"/> — so they can be dragged, erased and
+    /// snapped by the charting tools (Lines/Circles/Angles/Bearing). The
+    /// worksheet publishes the last computed fix through the static state
+    /// below; the base reconciles the points with it every 0.25 s.
     ///
-    /// The game's eraser tool (MapChartingUI.Tool.Eraser) can delete the
-    /// marker: while hovered with the eraser active and LMB held, the fix
-    /// pin is suppressed until the next observation (I) or series reset (O)
-    /// — otherwise the 1 Hz card refresh would republish it instantly.
+    /// Deletion (the map eraser / Delete) removes ONLY the marker: the fix
+    /// data, the worksheet card and the probe are untouched — the markers are
+    /// the visible result of the calculations, not their source. An erased
+    /// marker stays hidden until the next observation (I) or the series reset
+    /// (O), otherwise the 1 Hz card refresh would republish it instantly.
     ///
     /// The tooltip legend is Latin-only ("lat/lon"): the map marker tooltip
     /// uses the game's TMP font without Cyrillic glyphs (boxes in-game
@@ -38,12 +41,13 @@ namespace UBOAT.Mods.RadioNavigation
         private static readonly double[] VertexLat = new double[3];
         private static readonly double[] VertexLon = new double[3];
 
-        /// <summary>Eraser dismissal: Set() is ignored until the next
-        /// observation or series reset republishes the fix.</summary>
+        /// <summary>Eraser dismissal of the fix pin: Set() is ignored until
+        /// the next observation or series reset republishes the fix.</summary>
         public static bool Suppressed { get; private set; }
 
-        private bool hovered;
-        private MapChartingUI charting;
+        // Per-marker dismissal: erasing one LOP vertex hides that vertex
+        // only. Cleared with the pin's suppression on I/O.
+        private static readonly HashSet<int> suppressedIndices = new HashSet<int>();
 
         public static void Set(double latDeg, double lonDeg, string label)
         {
@@ -76,38 +80,56 @@ namespace UBOAT.Mods.RadioNavigation
             HasTriangle = false;
             FixLabel = null;
             Suppressed = false;
+            suppressedIndices.Clear();
         }
 
         /// <summary>New observation recorded (I): a fresh fix may publish again.</summary>
         public static void OnNewObservation()
         {
             Suppressed = false;
-        }
-
-        private void ClearByEraser()
-        {
-            HasFix = false;
-            HasTriangle = false;
-            FixLabel = null;
-            Suppressed = true;
-            Debug.Log(LogPrefix + " fix marker erased by map eraser tool");
+            suppressedIndices.Clear();
         }
 
         // Marker 0 = the fix pin, 1..3 = the cocked-hat vertices (P6).
         protected override int MarkerCount => 4;
 
-        protected override string MarkerRootName(int index) =>
-            index == 0 ? "RadioNavFixIcon" : "RadioNavFixVertex" + index;
+        protected override string PointKey(int index)
+        {
+            return index == 0 ? MapMarkerPoints.FixKey : MapMarkerPoints.LopVertexKey(index - 1);
+        }
 
-        protected override string HoverText(int index) =>
-            index == 0
-                ? (HasFix ? FixLabel : null)
-                : (HasFix && HasTriangle ? VertexLabel(index - 1) : null);
+        protected override MapMarkerKind PointKind(int index)
+        {
+            return index == 0 ? MapMarkerKind.Fix : MapMarkerKind.LopVertex;
+        }
 
-        protected override string PinnedText(int index) => HoverText(index);
+        protected override bool PointSuppressed(int index)
+        {
+            return Suppressed || suppressedIndices.Contains(index);
+        }
 
-        protected override bool HasContent(int index) =>
-            index == 0 ? HasFix : HasFix && HasTriangle;
+        protected override void OnPointDestroyed(int index)
+        {
+            suppressedIndices.Add(index);
+            Debug.Log(LogPrefix + " fix marker erased by the map eraser (index=" + index + ")");
+        }
+
+        protected override string HoverText(int index)
+        {
+            if (index == 0)
+                return HasFix ? FixLabel : null;
+            return HasFix && HasTriangle ? VertexLabel(index - 1) : null;
+        }
+
+        protected override string PinnedText(int index)
+        {
+            return HoverText(index);
+        }
+
+        protected override bool HasContent(int index)
+        {
+            return index == 0 ? HasFix : HasFix && HasTriangle;
+        }
 
         protected override Vector2 GetEncounterPosition(int index)
         {
@@ -121,36 +143,10 @@ namespace UBOAT.Mods.RadioNavigation
         /// Cyrillic): the LOP pair and the coordinates.</summary>
         private static string VertexLabel(int vertex)
         {
-            string pair = vertex == 0 ? "B+C" : (vertex == 1 ? "C+A" : "A+B");
+            string pair = MapMarkerPoints.LopPair(vertex);
             return "LOP " + pair
                 + "\nlat " + SextantDmFormat.FormatLatLonAscii(VertexLat[vertex], true)
                 + " lon " + SextantDmFormat.FormatLatLonAscii(VertexLon[vertex], false);
-        }
-
-        protected override void OnHoverEnter(int index)
-        {
-            hovered = index == 0;
-        }
-
-        protected override void OnHoverExit(int index)
-        {
-            if (index == 0)
-                hovered = false;
-        }
-
-        protected override void OnMarkerPositioned(int index, Vector3 worldPosition,
-            float scale, float iconPx)
-        {
-            if (index != 0)
-                return; // the eraser acts on the fix pin only
-            // Eraser parity with MapChartingUI.UpdateEraserTool: LMB held
-            // over the marker while the eraser tool is active removes it.
-            if (!hovered || Suppressed || !Input.GetMouseButton(0))
-                return;
-            if (charting == null)
-                charting = FindObjectOfType<MapChartingUI>();
-            if (charting != null && charting.CurrentTool == MapChartingUI.Tool.Eraser)
-                ClearByEraser();
         }
 
         /// <summary>

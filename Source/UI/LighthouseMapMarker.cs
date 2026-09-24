@@ -45,8 +45,17 @@ namespace UBOAT.Mods.RadioNavigation
             return index < fleet.Count ? fleet[index].FireHeightM : 0f;
         }
 
-        protected override string MarkerRootName(int index) =>
-            "RadioNavLighthouseMapMarker" + index;
+        protected override string PointKey(int index)
+        {
+            return index < fleet.Count
+                ? MapMarkerPoints.LighthouseKey(fleet[index].Code)
+                : MapMarkerPoints.Prefix + "LH";
+        }
+
+        protected override MapMarkerKind PointKind(int index)
+        {
+            return MapMarkerKind.Lighthouse;
+        }
 
         protected override string HoverText(int index) => Name(index);
 
@@ -68,7 +77,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected override float MaintenanceIntervalSeconds => 1f;
 
-        protected override void OnBeforeBuildViews()
+        protected override void PrepareContent()
         {
             fleet.Clear();
             foreach (LighthouseProfile profile in LighthouseProfiles.EnabledFleet())

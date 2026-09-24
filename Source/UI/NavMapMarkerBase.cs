@@ -1,96 +1,131 @@
 using System;
+using System.Collections.Generic;
 using DWS.Common.InjectionFramework;
 using DWS.Common.Resources;
 using TMPro;
 using UBOAT.Game.Sandbox;
-using UBOAT.Game.Scene;
 using UBOAT.Game.Scene.Camera;
+using UBOAT.Game.UI;
 using UBOAT.Game.UI.Map;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Shared skeleton for the mod's own map markers (ADR-027 pattern):
-    /// world-space canvas under EntityMarkersManager — backdrop + icon +
-    /// invisible hitbox + hover/click tooltip, per-frame zoom-dependent
-    /// sizing via LighthouseMarkerSizing, visibility gated by
-    /// NavMarkerGate.IsMapOpen.
+    /// Shared skeleton for the mod's nav-map markers (lighthouse, station,
+    /// sextant fix). Since 2026-11-05 every marker IS a native game map point
+    /// (<see cref="MapPointUI"/>, created through the public
+    /// <see cref="MapChartingUI.CreatePoint"/>) whose own look is neutralised
+    /// and whose visuals are the mod's children (see
+    /// <see cref="MapMarkerPointBridge"/>). The markers therefore get the
+    /// native behaviour for free — drag, eraser/Delete, snapping by the
+    /// charting tools (Lines/Circles/Angles/Bearing), selection — while the
+    /// look stays exactly as it always was.
     ///
-    /// Screen-space decluttering (ADR-032): subclasses that override
-    /// DeclutterEnabled get greedy min-gap suppression per frame
-    /// (MarkerDeclutter) — overlapping markers collapse onto the highest
-    /// Priority(index) survivor; pinned and hovered views are never
-    /// suppressed so their tooltip can never dangle on a hidden root.
+    /// Lifecycle: a periodic reconciliation (0.25 s) syncs the desired marker
+    /// set (subclass state) with the owned points in the scene — adopting the
+    /// points restored from the save by their "RadioNav …" name key (never
+    /// duplicating them), creating the missing ones and destroying the stale
+    /// ones. The bridge compensates the game's per-frame root position/scale
+    /// writes in LateUpdate; the static policy (lighthouse/station) restores
+    /// the true position and keeps the eraser away.
     ///
-    /// Subclasses provide the marker set and content:
-    /// - MarkerCount / MarkerRootName / GetEncounterPosition / HasContent —
-    ///   what to draw and where (encounter-space km; the base adds the
-    ///   map-surface lift and converts to scene space every frame, because
-    ///   the sandbox origin shifts between sessions);
-    /// - HoverText / PinnedText — tooltip content (hover vs pinned);
-    /// - LoadIconSprite — the icon source;
-    /// - OnBeforeBuildViews — resolve names/profiles before views are built;
-    /// - OnMarkerPositioned — per-frame diagnostics hook;
-    /// - MaintenanceIntervalSeconds / OnMaintenance — periodic upkeep
-    ///   (lighthouse: stale game-marker cleanup), runs even when hidden.
+    /// Subclasses provide the content (abstract members); the base owns the
+    /// points, the declutter, the tooltip/pin and the interaction policy.
     /// </summary>
     public abstract class NavMapMarkerBase : MonoBehaviour
     {
         protected const string LogPrefix = "[RadioNav][Map]";
         // 76 = 1.19× the 64-unit icon: small enough that two hitboxes can
-        // never overlap under the 1.3× declutter gap (96 was 1.5× — hover
-        // targets overlapped and the raycast picked an arbitrary marker).
-        protected const float HitboxSize = 76f;
-        protected const float BackdropSize = 80f;
-        protected const int BackdropTextureSize = 64;
-        protected const float SpriteLiftY = 100f;
-        protected const float TooltipOffsetY = 40f;
-        protected const float TooltipPaddingX = 20f;
-        protected const float TooltipPaddingY = 4f;
-        protected const int TooltipFontSize = 30;
+        // never overlap under the 1.3× declutter gap.
+        internal const float HitboxSizeUnits = 76f;
+        internal const float BackdropSizeUnits = 80f;
+        internal const int BackdropTextureSize = 64;
+        internal const float SpriteLiftYUnits = 100f;
+        internal const float TooltipOffsetYUnits = 40f;
+        internal const float TooltipPaddingXUnits = 20f;
+        internal const float TooltipPaddingYUnits = 4f;
+        internal const int TooltipFontSizeUnits = 30;
+
+        /// <summary>How often the desired set is reconciled with the scene.
+        /// The fix marker appears within this delay after a new result.</summary>
+        private const float ReconcileIntervalSeconds = 0.25f;
 
         [Inject] protected static ResourceManager resourceManager = null;
         [Inject] protected static Sandbox sandbox = null;
 
-        protected sealed class MarkerView
+        private sealed class MarkerView
         {
             public int Index;
-            public GameObject Root;
-            public GameObject Tooltip;
-            public TextMeshProUGUI Text;
-            public Image Background;
+            public string Key;
+            public MapPointUI Point;
+            public MapMarkerPointBridge Bridge;
             public bool Pinned;
+            public bool Visible = true;
+            public bool Interactive = true;
+            public bool PositionLocked;
+            public Vector2 TruePosition;
         }
 
         private static TMP_FontAsset tooltipFont;
         private static Sprite backdropSprite;
         private static Sprite fallbackIconSprite;
 
-        protected EntityMarkersManager markersManager;
         protected MainCamera mainCamera;
         protected Sprite iconSprite;
         protected bool iconWarned;
 
-        private readonly System.Collections.Generic.List<MarkerView> views =
-            new System.Collections.Generic.List<MarkerView>();
-        private readonly System.Collections.Generic.List<MarkerDeclutter.Item> declutterItems =
-            new System.Collections.Generic.List<MarkerDeclutter.Item>();
+        private readonly List<MarkerView> views = new List<MarkerView>();
+        private readonly List<MarkerDeclutter.Item> declutterItems = new List<MarkerDeclutter.Item>();
+        private readonly List<string> desiredKeys = new List<string>();
+        private readonly List<string> existingNames = new List<string>();
+        private readonly List<string> toCreate = new List<string>();
+        private readonly List<string> toAdopt = new List<string>();
+        private readonly List<string> toDestroy = new List<string>();
+        private readonly Dictionary<string, MapPointUI> pointsByName = new Dictionary<string, MapPointUI>();
+        private readonly Dictionary<string, int> indexByKey = new Dictionary<string, int>();
         private bool[] shownBuffer = new bool[0];
-        private bool built;
-        private float maintenanceTimer;
+        private MapChartingUI charting;
+        private bool prepared;
+        private float reconcileTimer;
         private float declutterLogTimer;
+        private float maintenanceTimer;
         private int hoveredIndex = -1;
+        private float lastIconPx = LighthouseMarkerSizing.MinIconPixelSize;
+        private double lastUnitsPerPixel;
 
         protected abstract int MarkerCount { get; }
-        protected abstract string MarkerRootName(int index);
+        /// <summary>Adoption key of the marker (see MapMarkerPoints).</summary>
+        protected abstract string PointKey(int index);
+        /// <summary>Kind driving the static/dynamic interaction policy.</summary>
+        protected abstract MapMarkerKind PointKind(int index);
         protected abstract string HoverText(int index);
         protected abstract string PinnedText(int index);
         protected abstract bool HasContent(int index);
         protected abstract Vector2 GetEncounterPosition(int index);
         protected abstract Sprite LoadIconSprite();
+
+        /// <summary>True when the marker is temporarily suppressed (the fix
+        /// marker after its point was erased — until the next result).</summary>
+        protected virtual bool PointSuppressed(int index)
+        {
+            return false;
+        }
+
+        /// <summary>Called when the player destroys the marker's point (the
+        /// map eraser or the Delete key). The fix marker flips its
+        /// suppression here; the static markers are simply recreated by the
+        /// next reconciliation pass.</summary>
+        protected virtual void OnPointDestroyed(int index)
+        {
+        }
+
+        /// <summary>One-time content preparation before the first reconcile
+        /// (the lighthouse fleet snapshot).</summary>
+        protected virtual void PrepareContent()
+        {
+        }
 
         /// <summary>Declutter hooks (ADR-032). Default: off — markers draw
         /// every frame exactly as before. Overriding DeclutterEnabled turns
@@ -99,11 +134,11 @@ namespace UBOAT.Mods.RadioNavigation
         protected virtual bool DeclutterEnabled => false;
         protected virtual float Priority(int index) => 0f;
 
-        protected virtual void OnBeforeBuildViews() { }
         protected virtual void OnHoverEnter(int index) { }
         protected virtual void OnHoverExit(int index) { }
         protected virtual void OnClick(int index) { }
-        protected virtual void OnMarkerPositioned(int index, Vector3 worldPosition, float scale, float iconPx) { }
+        protected virtual void OnMarkerPositioned(int index, Vector3 worldPosition,
+            float scale, float iconPx) { }
         protected virtual float MaintenanceIntervalSeconds => 0f;
         protected virtual void OnMaintenance() { }
 
@@ -112,10 +147,6 @@ namespace UBOAT.Mods.RadioNavigation
             if (!EnsureDependencies())
                 return;
 
-            EnsureBuilt();
-
-            RunMaintenance();
-
             MapCameraController mapController = mainCamera.MapController;
             bool mapOpen = NavMarkerGate.IsMapOpen(
                 mainCamera.isActiveAndEnabled,
@@ -123,37 +154,31 @@ namespace UBOAT.Mods.RadioNavigation
                 mapController != null,
                 mapController != null ? mapController.Mode : default(MapCameraController.MapDisplayMode));
             if (!mapOpen || sandbox == null)
-            {
-                SetAllActive(false);
                 return;
-            }
 
             float elevation = mapController.CameraElevation;
             if (elevation <= 0f)
-            {
-                SetAllActive(false);
                 return;
+
+            if (!prepared)
+            {
+                prepared = true;
+                PrepareContent();
+                iconSprite = LoadIconSprite();
             }
 
             Camera mapCam = mainCamera.Camera;
             float fov = mapCam != null ? mapCam.fieldOfView : LighthouseMarkerSizing.DefaultFovDegrees;
-            double unitsPerPixel = LighthouseMarkerSizing.UnitsPerPixel(elevation, fov, Screen.height);
-            float iconPx = LighthouseMarkerSizing.IconPixelSizeForElevation(elevation);
-            float parentLossy = markersManager.transform.lossyScale.x;
-            float scale = (float)LighthouseMarkerSizing.MarkerScale(iconPx, unitsPerPixel, parentLossy);
+            lastUnitsPerPixel = LighthouseMarkerSizing.UnitsPerPixel(elevation, fov, Screen.height);
+            lastIconPx = LighthouseMarkerSizing.IconPixelSizeForElevation(elevation);
 
-            UpdateViewPositions(elevation, scale, iconPx, unitsPerPixel);
+            RunMaintenance();
+            RunReconcile();
+            UpdateViews();
         }
 
         private bool EnsureDependencies()
         {
-            if (markersManager == null)
-            {
-                markersManager = FindObjectOfType<EntityMarkersManager>();
-                if (markersManager == null)
-                    return false;
-            }
-
             if (mainCamera == null)
             {
                 mainCamera = FindObjectOfType<MainCamera>();
@@ -163,70 +188,250 @@ namespace UBOAT.Mods.RadioNavigation
             return true;
         }
 
-        private void EnsureBuilt()
-        {
-            if (!built)
-                BuildAll();
-        }
-
         private void RunMaintenance()
         {
-            float maintenanceInterval = MaintenanceIntervalSeconds;
-            if (maintenanceInterval <= 0f)
+            float interval = MaintenanceIntervalSeconds;
+            if (interval <= 0f)
                 return;
             maintenanceTimer += Time.unscaledDeltaTime;
-            if (maintenanceTimer >= maintenanceInterval)
+            if (maintenanceTimer >= interval)
             {
                 maintenanceTimer = 0f;
                 OnMaintenance();
             }
         }
 
+        // ---- native points ---------------------------------------------------
+
         /// <summary>
-        /// Positions every content view, collects declutter candidates and
-        /// applies the final visibility in one pass. Active states are set
-        /// only after the declutter selection (and only on change), so a
-        /// suppressed view never flickers through a frame.
+        /// Syncs the desired marker set with the owned points present in the
+        /// scene: adopt (never duplicate) the ones restored from the save,
+        /// create the missing, destroy the stale. Throttled — cheap per frame.
         /// </summary>
-        private void UpdateViewPositions(float elevation, float scale, float iconPx, double unitsPerPixel)
+        private void RunReconcile()
         {
-            bool declutter = DeclutterEnabled && unitsPerPixel > 0.0;
+            reconcileTimer -= Time.unscaledDeltaTime;
+            if (reconcileTimer > 0f)
+                return;
+            reconcileTimer = ReconcileIntervalSeconds;
+
+            if (charting == null)
+                charting = FindObjectOfType<MapChartingUI>();
+            if (charting == null)
+                return;
+
+            CollectDesiredKeys();
+            CollectExistingPoints();
+            MapMarkerPoints.Plan(desiredKeys, existingNames, toCreate, toAdopt, toDestroy);
+            ApplyPlan();
+            RebuildViews();
+        }
+
+        private void CollectDesiredKeys()
+        {
+            desiredKeys.Clear();
+            indexByKey.Clear();
+            for (int i = 0; i < MarkerCount; i++)
+            {
+                if (!HasContent(i) || PointSuppressed(i))
+                    continue;
+                string key = PointKey(i);
+                if (string.IsNullOrEmpty(key) || indexByKey.ContainsKey(key))
+                    continue;
+                indexByKey.Add(key, i);
+                desiredKeys.Add(key);
+            }
+        }
+
+        private void CollectExistingPoints()
+        {
+            existingNames.Clear();
+            pointsByName.Clear();
+            // includeInactive: the declutter deactivates hidden points, and a
+            // default FindObjectsOfType would not see them — the reconcile
+            // would then treat them as missing and duplicate the fleet.
+            MapPointUI[] all = FindObjectsOfType<MapPointUI>(true);
+            for (int i = 0; i < all.Length; i++)
+            {
+                MapPointUI point = all[i];
+                if (point == null || point.Data == null)
+                    continue;
+                string name = point.Data.Name;
+                if (!MapMarkerPoints.IsOwned(name))
+                    continue;
+                existingNames.Add(name);
+                if (!pointsByName.ContainsKey(name))
+                {
+                    pointsByName.Add(name, point);
+                }
+                else
+                {
+                    // Duplicate of an owned name (a runaway from an earlier
+                    // build): keep the first, destroy the rest.
+                    point.Destroyed -= OnPointDestroyedHandler;
+                    Destroy(point.gameObject);
+                }
+            }
+        }
+
+        private void ApplyPlan()
+        {
+            for (int i = 0; i < toDestroy.Count; i++)
+            {
+                MapPointUI stale;
+                if (pointsByName.TryGetValue(toDestroy[i], out stale) && stale != null)
+                {
+                    stale.Destroyed -= OnPointDestroyedHandler;
+                    Destroy(stale.gameObject);
+                }
+            }
+
+            for (int i = 0; i < toCreate.Count; i++)
+            {
+                int index;
+                if (!indexByKey.TryGetValue(toCreate[i], out index))
+                    continue;
+                MapPointUI created = charting.CreatePoint(GetEncounterPosition(index), toCreate[i]);
+                if (created != null && !pointsByName.ContainsKey(toCreate[i]))
+                    pointsByName.Add(toCreate[i], created);
+            }
+        }
+
+        /// <summary>Rebuilds the view records from the desired keys, keeping
+        /// the per-marker session state (pinned, hover) for the keys that
+        /// already had a view.</summary>
+        private void RebuildViews()
+        {
+            var previous = new Dictionary<string, MarkerView>(StringComparer.Ordinal);
+            for (int i = 0; i < views.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(views[i].Key))
+                    previous[views[i].Key] = views[i];
+            }
+
+            views.Clear();
+            for (int i = 0; i < desiredKeys.Count; i++)
+            {
+                string key = desiredKeys[i];
+                int index;
+                MapPointUI point;
+                if (!indexByKey.TryGetValue(key, out index)
+                    || !pointsByName.TryGetValue(key, out point)
+                    || point == null)
+                {
+                    continue;
+                }
+
+                MarkerView view;
+                if (!previous.TryGetValue(key, out view))
+                    view = new MarkerView();
+                view.Index = index;
+                view.Key = key;
+                view.Point = point;
+                view.TruePosition = GetEncounterPosition(index);
+                view.Bridge = MapMarkerPointBridge.Attach(point, this, index, iconSprite);
+                if (view.Bridge != null)
+                    view.Bridge.ViewSlot = views.Count;
+                point.Destroyed -= OnPointDestroyedHandler;
+                point.Destroyed += OnPointDestroyedHandler;
+                views.Add(view);
+            }
+
+            if (hoveredIndex >= 0)
+            {
+                bool stillThere = false;
+                for (int i = 0; i < views.Count; i++)
+                {
+                    if (views[i].Index == hoveredIndex)
+                    {
+                        stillThere = true;
+                        break;
+                    }
+                }
+                if (!stillThere)
+                    hoveredIndex = -1;
+            }
+        }
+
+        private void OnPointDestroyedHandler(MapPointUI point)
+        {
+            for (int i = 0; i < views.Count; i++)
+            {
+                if (views[i].Point != point)
+                    continue;
+                int index = views[i].Index;
+                views[i].Point = null;
+                views[i].Bridge = null;
+                OnPointDestroyed(index);
+                break;
+            }
+
+            // Reconcile on the next frame: the fix marker stays suppressed,
+            // the static markers are recreated (Delete-key safety net).
+            reconcileTimer = 0f;
+        }
+
+        /// <summary>Called by the bridge from its LateUpdate (after the game's
+        /// own point update): applies the interaction policy, the static
+        /// position lock and the scale/lift compensation with live data.</summary>
+        internal void ApplyBridgeFrame(MapMarkerPointBridge bridge)
+        {
+            if (bridge == null)
+                return;
+            MarkerView view = ViewFor(bridge);
+            if (view == null || view.Point == null)
+                return;
+            bridge.ApplyFrame(lastIconPx, lastUnitsPerPixel, view.Interactive,
+                view.PositionLocked, view.TruePosition, view.Key);
+        }
+
+        private MarkerView ViewFor(MapMarkerPointBridge bridge)
+        {
+            if (bridge == null || bridge.ViewSlot < 0 || bridge.ViewSlot >= views.Count)
+                return null;
+            MarkerView view = views[bridge.ViewSlot];
+            return view.Bridge == bridge ? view : null;
+        }
+
+        // ---- per-frame view update ------------------------------------------
+
+        private void UpdateViews()
+        {
+            bool declutter = DeclutterEnabled && lastUnitsPerPixel > 0.0;
             declutterItems.Clear();
             if (declutter && shownBuffer.Length < views.Count)
-            {
                 shownBuffer = new bool[views.Count];
-            }
+
+            bool pointsTool = charting != null && charting.CurrentTool == MapChartingUI.Tool.Points;
+            bool eraser = charting != null && charting.CurrentTool == MapChartingUI.Tool.Eraser;
 
             for (int i = 0; i < views.Count; i++)
             {
                 MarkerView view = views[i];
-                if (!HasContent(view.Index))
-                {
-                    SetActive(view, false);
+                if (view.Point == null)
                     continue;
-                }
 
-                Vector3 position = sandbox.EncounterToSceneSpace(GetEncounterPosition(view.Index));
-                // Same lift formula as MapPointUI.UpdatePoints plus the
-                // marker lift: the flat canvas plane at y=0 clips the icon.
-                position.y = 1.5f + elevation * 0.0005f + SpriteLiftY;
-                view.Root.transform.position = position;
-                view.Root.transform.localScale = new Vector3(scale, scale, scale);
-                // The icon lies flat on the map plane (horizontal), not
-                // billboarded to the camera — Euler(90,0,0) turns the canvas
-                // +Z (default forward) to face straight up.
-                view.Root.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-                OnMarkerPositioned(view.Index, position, scale, iconPx);
+                view.TruePosition = GetEncounterPosition(view.Index);
+                MapMarkerPolicy policy = MapMarkerPoints.Evaluate(
+                    PointKind(view.Index), PointSuppressed(view.Index), true, pointsTool, eraser);
+                view.Interactive = policy.Interactive;
+                view.PositionLocked = policy.PositionLocked;
+
+                Vector3 position = sandbox.EncounterToSceneSpace(view.TruePosition);
+                OnMarkerPositioned(view.Index, position,
+                    (float)LighthouseMarkerSizing.MarkerScale(lastIconPx, lastUnitsPerPixel, 1f),
+                    lastIconPx);
 
                 if (!declutter)
                 {
-                    SetActive(view, true);
+                    view.Visible = true;
+                    ApplyVisibility(view);
                     continue;
                 }
 
                 declutterItems.Add(new MarkerDeclutter.Item
                 {
-                    ViewIndex = view.Index,
+                    ViewIndex = i,
                     X = position.x,
                     Y = position.z,
                     Priority = Priority(view.Index),
@@ -237,237 +442,101 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             if (declutter)
-            {
-                ApplyDeclutter(iconPx, unitsPerPixel);
-            }
+                ApplyDeclutter();
         }
 
         /// <summary>
-        /// Runs the greedy selection over the collected candidates and
-        /// applies shown/hidden to the roots. The gap is world units:
+        /// Runs the greedy selection over the collected candidates and applies
+        /// the shown/hidden state to the points. The gap is world units:
         /// screen px target × scene units per screen px.
         /// </summary>
-        private void ApplyDeclutter(float iconPx, double unitsPerPixel)
+        private void ApplyDeclutter()
         {
-            double gap = MarkerDeclutter.DefaultGapFactor * iconPx * unitsPerPixel;
+            double gap = MarkerDeclutter.DefaultGapFactor * lastIconPx * lastUnitsPerPixel;
             int shownCount = MarkerDeclutter.Select(declutterItems, gap, shownBuffer);
             for (int i = 0; i < views.Count; i++)
             {
-                MarkerView view = views[i];
-                if (!HasContent(view.Index))
-                {
-                    continue; // hidden during the position pass
-                }
-
-                SetActive(view, shownBuffer[view.Index]);
+                if (views[i].Point == null)
+                    continue;
+                views[i].Visible = i < shownBuffer.Length && shownBuffer[i];
+                ApplyVisibility(views[i]);
             }
 
-            LogDeclutterStats(shownCount, iconPx);
+            LogDeclutterStats(shownCount);
         }
 
-        /// <summary>Sets the root active state, skipping redundant calls.</summary>
-        private void SetActive(MarkerView view, bool active)
+        private void ApplyVisibility(MarkerView view)
         {
-            if (view.Root == null || view.Root.activeSelf == active)
-            {
+            if (view.Point == null)
                 return;
-            }
-
-            view.Root.SetActive(active);
+            if (view.Point.gameObject.activeSelf == view.Visible)
+                return;
+            // The declutter hides the whole point (the bridge included): a
+            // non-pinned tooltip must not come back dangling on re-activation.
+            if (!view.Visible && !view.Pinned && view.Bridge != null)
+                view.Bridge.HideTooltip();
+            view.Point.gameObject.SetActive(view.Visible);
         }
 
         /// <summary>Throttled shown/hidden counter behind a diagnostics key.</summary>
-        private void LogDeclutterStats(int shownCount, float iconPx)
+        private void LogDeclutterStats(int shownCount)
         {
-            if (!RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseDeclutterStatsKey, false))
+            if (!RadioNavDiagnostics.IsEnabledCached(
+                    RadioNavDiagnostics.LighthouseDeclutterStatsKey, false))
             {
                 return;
             }
 
             declutterLogTimer += Time.unscaledDeltaTime;
             if (declutterLogTimer < 2f)
-            {
                 return;
-            }
-
             declutterLogTimer = 0f;
-            Debug.Log(LogPrefix + " declutter: shown=" + shownCount + "/" + views.Count +
-                " iconPx=" + iconPx.ToString("F0"));
+            Debug.Log(LogPrefix + " declutter shown=" + shownCount + "/" + views.Count);
         }
 
-        private void BuildAll()
+        // ---- hover / pin -----------------------------------------------------
+
+        internal void OnBridgeHoverEnter(MapMarkerPointBridge bridge)
         {
-            if (iconSprite == null)
-            {
-                iconSprite = LoadIconSprite();
-                if (iconSprite == null)
-                {
-                    // Fallback: the bundle may predate the marker prefabs (live
-                    // 2026-09-22: all three icons missing) — a procedural glyph
-                    // keeps the markers visible instead of latching them off.
-                    iconSprite = GetFallbackIconSprite();
-                    if (iconSprite == null)
-                    {
-                        built = true;
-                        return;
-                    }
-                }
-            }
-
-            OnBeforeBuildViews();
-
-            int count = MarkerCount;
-            if (count <= 0)
-            {
-                built = true;
+            MarkerView view = ViewFor(bridge);
+            if (view == null)
                 return;
-            }
-
-            for (int i = 0; i < count; i++)
-                views.Add(BuildMarkerView(i));
-
-            built = true;
-            Transform managerParent = markersManager.transform.parent;
-            Debug.Log(LogPrefix + " markers built=" + views.Count +
-                " icon='" + (iconSprite != null ? iconSprite.name : "null") + "'" +
-                " parent='" + (managerParent != null ? managerParent.name : "(root)") +
-                "/" + markersManager.transform.name + "'");
-        }
-
-        private MarkerView BuildMarkerView(int index)
-        {
-            var view = new MarkerView { Index = index };
-
-            view.Root = new GameObject(MarkerRootName(index), typeof(RectTransform));
-            view.Root.transform.SetParent(markersManager.transform, false);
-
-            Canvas canvas = view.Root.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            view.Root.AddComponent<GraphicRaycaster>();
-
-            var rootRect = view.Root.GetComponent<RectTransform>();
-            rootRect.sizeDelta = new Vector2(HitboxSize, HitboxSize);
-
-            var backdropGo = new GameObject("Backdrop", typeof(RectTransform));
-            backdropGo.transform.SetParent(view.Root.transform, false);
-            var backdropImage = backdropGo.AddComponent<Image>();
-            backdropImage.sprite = GetBackdropSprite();
-            // ADR-032: 0.9 was tuned for 5 station markers; at lighthouse
-            // density the cream backdrop washed out the map underneath.
-            backdropImage.color = new Color(0.95f, 0.92f, 0.85f, 0.5f);
-            backdropImage.raycastTarget = false;
-            var backdropRect = backdropGo.GetComponent<RectTransform>();
-            backdropRect.sizeDelta = new Vector2(BackdropSize, BackdropSize);
-            backdropRect.anchoredPosition = Vector2.zero;
-
-            var iconGo = new GameObject("Icon", typeof(RectTransform));
-            iconGo.transform.SetParent(view.Root.transform, false);
-            var iconImage = iconGo.AddComponent<Image>();
-            iconImage.sprite = iconSprite;
-            iconImage.preserveAspect = true;
-            iconImage.raycastTarget = false;
-            var iconRect = iconGo.GetComponent<RectTransform>();
-            iconRect.sizeDelta = new Vector2(
-                LighthouseMarkerSizing.IconSizeCanvasUnits,
-                LighthouseMarkerSizing.IconSizeCanvasUnits);
-            iconRect.anchoredPosition = Vector2.zero;
-
-            var hitGo = new GameObject("Hitbox", typeof(RectTransform));
-            hitGo.transform.SetParent(view.Root.transform, false);
-            var hitImage = hitGo.AddComponent<Image>();
-            hitImage.color = new Color(0f, 0f, 0f, 0f);
-            hitImage.raycastTarget = true;
-            var hitRect = hitGo.GetComponent<RectTransform>();
-            hitRect.sizeDelta = new Vector2(HitboxSize, HitboxSize);
-            hitRect.anchoredPosition = Vector2.zero;
-
-            view.Tooltip = new GameObject("Tooltip", typeof(RectTransform));
-            view.Tooltip.transform.SetParent(view.Root.transform, false);
-            var tooltipRect = view.Tooltip.GetComponent<RectTransform>();
-            tooltipRect.anchorMin = new Vector2(0.5f, 0.5f);
-            tooltipRect.anchorMax = new Vector2(0.5f, 0.5f);
-            tooltipRect.pivot = new Vector2(0.5f, 0f);
-            tooltipRect.anchoredPosition = new Vector2(0f, TooltipOffsetY);
-
-            var bgGo = new GameObject("Background", typeof(RectTransform));
-            bgGo.transform.SetParent(view.Tooltip.transform, false);
-            view.Background = bgGo.AddComponent<Image>();
-            view.Background.color = new Color(0.02f, 0.03f, 0.04f, 0.85f);
-            view.Background.raycastTarget = false;
-
-            var labelGo = new GameObject("Label", typeof(RectTransform));
-            labelGo.transform.SetParent(view.Tooltip.transform, false);
-            view.Text = labelGo.AddComponent<TextMeshProUGUI>();
-            view.Text.font = GetTooltipFont();
-            view.Text.fontSize = TooltipFontSize;
-            view.Text.color = new Color(1f, 0.95f, 0.85f, 1f);
-            view.Text.alignment = TextAlignmentOptions.Center;
-            view.Text.enableWordWrapping = false;
-            view.Text.raycastTarget = false;
-            RefreshTooltipText(view);
-            view.Tooltip.SetActive(false);
-
-            MarkerView captured = view;
-            var pointer = view.Root.AddComponent<MarkerPointerEvents>();
-            pointer.OnHoverEnter = () => OnHoverEnterInternal(captured);
-            pointer.OnHoverExit = () => OnHoverExitInternal(captured);
-            pointer.OnClick = () => OnClickInternal(captured);
-
-            return view;
-        }
-
-        private void RefreshTooltipText(MarkerView view)
-        {
-            if (view.Text == null)
-                return;
-
-            view.Text.text = view.Pinned ? PinnedText(view.Index) : HoverText(view.Index);
-            view.Text.ForceMeshUpdate();
-            Vector2 preferred = view.Text.GetPreferredValues();
-            view.Text.rectTransform.sizeDelta = preferred;
-            if (view.Background != null)
-            {
-                view.Background.rectTransform.sizeDelta =
-                    new Vector2(preferred.x + TooltipPaddingX, preferred.y + TooltipPaddingY);
-            }
-        }
-
-        private void OnHoverEnterInternal(MarkerView view)
-        {
             hoveredIndex = view.Index;
-            RefreshTooltipText(view);
-            view.Tooltip.SetActive(true);
+            RefreshTooltip(view);
             OnHoverEnter(view.Index);
         }
 
-        private void OnHoverExitInternal(MarkerView view)
+        internal void OnBridgeHoverExit(MapMarkerPointBridge bridge)
         {
+            MarkerView view = ViewFor(bridge);
+            if (view == null)
+                return;
             if (hoveredIndex == view.Index)
-            {
                 hoveredIndex = -1;
-            }
-
-            if (!view.Pinned)
-                view.Tooltip.SetActive(false);
+            if (!view.Pinned && bridge != null)
+                bridge.HideTooltip();
             OnHoverExit(view.Index);
         }
 
-        private void OnClickInternal(MarkerView view)
+        internal void OnBridgeClick(MapMarkerPointBridge bridge)
         {
+            MarkerView view = ViewFor(bridge);
+            if (view == null)
+                return;
             view.Pinned = !view.Pinned;
-            RefreshTooltipText(view);
-            view.Tooltip.SetActive(true);
+            RefreshTooltip(view);
             OnClick(view.Index);
         }
 
-        private void SetAllActive(bool active)
+        private void RefreshTooltip(MarkerView view)
         {
-            for (int i = 0; i < views.Count; i++)
-            {
-                if (views[i].Root != null)
-                    views[i].Root.SetActive(active);
-            }
+            if (view.Bridge == null)
+                return;
+            view.Bridge.RefreshTooltip(
+                view.Pinned ? PinnedText(view.Index) : HoverText(view.Index), view.Pinned);
         }
+
+        // ---- shared art ------------------------------------------------------
 
         public static TMP_FontAsset GetTooltipFont()
         {
@@ -481,7 +550,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return tooltipFont;
             }
 
-            Font arial = Font.CreateDynamicFontFromOSFont("Arial", TooltipFontSize)
+            Font arial = Font.CreateDynamicFontFromOSFont("Arial", TooltipFontSizeUnits)
                 ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (arial == null)
                 return null;
@@ -507,12 +576,13 @@ namespace UBOAT.Mods.RadioNavigation
             return fallbackIconSprite;
         }
 
-        protected static Sprite GetBackdropSprite()
+        internal static Sprite GetBackdropSprite()
         {
             if (backdropSprite != null)
                 return backdropSprite;
 
-            var texture = new Texture2D(BackdropTextureSize, BackdropTextureSize, TextureFormat.RGBA32, false);
+            var texture = new Texture2D(BackdropTextureSize, BackdropTextureSize,
+                TextureFormat.RGBA32, false);
             texture.name = "RadioNavMarkerBackdrop";
             texture.hideFlags = HideFlags.DontSave;
             texture.SetPixels32(MarkerArtPixels.RenderBackdropPixels(BackdropTextureSize));
@@ -527,22 +597,10 @@ namespace UBOAT.Mods.RadioNavigation
         {
             for (int i = 0; i < views.Count; i++)
             {
-                if (views[i].Root != null)
-                    Destroy(views[i].Root);
+                if (views[i].Point != null)
+                    views[i].Point.Destroyed -= OnPointDestroyedHandler;
             }
             views.Clear();
-        }
-
-        private sealed class MarkerPointerEvents : MonoBehaviour,
-            IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
-        {
-            public Action OnHoverEnter;
-            public Action OnHoverExit;
-            public Action OnClick;
-
-            public void OnPointerEnter(PointerEventData eventData) { OnHoverEnter?.Invoke(); }
-            public void OnPointerExit(PointerEventData eventData) { OnHoverExit?.Invoke(); }
-            public void OnPointerClick(PointerEventData eventData) { OnClick?.Invoke(); }
         }
     }
 }
