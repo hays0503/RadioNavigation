@@ -109,7 +109,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return Error("create-failed");
 
             StringBuilder sb = new StringBuilder(256);
-            sb.Append("{\"ok\":true,\"name\":\"").Append(RadioNavProbeJson.Escape(name)).Append('"');
+            sb.Append("{\"ok\":true,\"name\":\"").Append(RadioNavProbeJson.Escape(name)).Append("\",");
             AppendPositionFields(sb, position);
             sb.Append('}');
             return sb.ToString();
@@ -133,8 +133,8 @@ namespace UBOAT.Mods.RadioNavigation
             point.Position = position;
 
             StringBuilder sb = new StringBuilder(320);
-            sb.Append("{\"ok\":true,\"name\":\"").Append(RadioNavProbeJson.Escape(name)).Append('"');
-            sb.Append(",\"old\":{");
+            sb.Append("{\"ok\":true,\"name\":\"").Append(RadioNavProbeJson.Escape(name))
+              .Append("\",\"old\":{");
             AppendPositionFields(sb, old);
             sb.Append("},\"new\":{");
             AppendPositionFields(sb, position);
@@ -312,7 +312,13 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             if (point == null)
+            {
+                Debug.LogWarning("[RadioNav][MapProbe] point-not-found name=\"" + name +
+                    "\" collected=" + points.Count +
+                    " first=\"" + (points.Count > 0 && points[0]?.Data != null
+                        ? points[0].Data.Name : "(none)") + "\"");
                 return Error("point-not-found");
+            }
             if (matches > 1)
                 return "{\"ok\":false,\"error\":\"ambiguous-name\",\"matches\":" +
                     matches.ToString(CultureInfo.InvariantCulture) + "}";
@@ -382,7 +388,7 @@ namespace UBOAT.Mods.RadioNavigation
             string name = point.Data != null ? point.Data.Name : null;
             sb.Append("{\"name\":\"").Append(RadioNavProbeJson.Escape(name)).Append('"');
             sb.Append(",\"owned\":").Append(IsOwned(name) ? "true" : "false");
-            sb.Append(",\"kind\":\"").Append(RadioNavProbeJson.Escape(KindOf(name))).Append('"');
+            sb.Append(",\"kind\":\"").Append(RadioNavProbeJson.Escape(KindOf(name))).Append("\",");
             AppendPositionFields(sb, point.Position);
             sb.Append(",\"active\":").Append(point.gameObject.activeSelf ? "true" : "false");
             sb.Append(",\"interactive\":").Append(point.Interactive ? "true" : "false");
@@ -397,7 +403,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static void AppendPositionFields(StringBuilder sb, Vector2 position)
         {
             Vector2 latLon = Coordinates.ToLatLong(position);
-            sb.Append(",\"lat\":").Append(latLon.x.ToString("F5", CultureInfo.InvariantCulture));
+            sb.Append("\"lat\":").Append(latLon.x.ToString("F5", CultureInfo.InvariantCulture));
             sb.Append(",\"lon\":").Append(latLon.y.ToString("F5", CultureInfo.InvariantCulture));
             sb.Append(",\"x\":").Append(position.x.ToString("F1", CultureInfo.InvariantCulture));
             sb.Append(",\"y\":").Append(position.y.ToString("F1", CultureInfo.InvariantCulture));

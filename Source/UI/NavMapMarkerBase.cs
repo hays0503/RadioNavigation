@@ -83,6 +83,7 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<string> toCreate = new List<string>();
         private readonly List<string> toAdopt = new List<string>();
         private readonly List<string> toDestroy = new List<string>();
+        private readonly List<string> explicitRemovals = new List<string>();
         private readonly Dictionary<string, MapPointUI> pointsByName = new Dictionary<string, MapPointUI>();
         private readonly Dictionary<string, int> indexByKey = new Dictionary<string, int>();
         private bool[] shownBuffer = new bool[0];
@@ -124,6 +125,14 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>One-time content preparation before the first reconcile
         /// (the lighthouse fleet snapshot).</summary>
         protected virtual void PrepareContent()
+        {
+        }
+
+        /// <summary>Adoption keys this marker wants REMOVED right now (explicit
+        /// reset: the mod's O clears the fix series). The reconcile consumes
+        /// the request once — stale cleanup by state is deliberately not done,
+        /// see ApplyPlan.</summary>
+        protected virtual void CollectExplicitRemovals(List<string> keys)
         {
         }
 
@@ -223,6 +232,12 @@ namespace UBOAT.Mods.RadioNavigation
             CollectDesiredKeys();
             CollectExistingPoints();
             MapMarkerPoints.Plan(desiredKeys, existingNames, toCreate, toAdopt, toDestroy);
+            if (toDestroy.Count > 0 && RadioNavDiagnostics.IsEnabledCached(
+                    RadioNavDiagnostics.LighthouseDeclutterStatsKey, false))
+            {
+                Debug.Log(LogPrefix + " owned points outside this copy's set left in place=" +
+                    toDestroy.Count + " (double-load safety)");
+            }
             ApplyPlan();
             RebuildViews();
         }
@@ -276,16 +291,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void ApplyPlan()
         {
-            for (int i = 0; i < toDestroy.Count; i++)
-            {
-                MapPointUI stale;
-                if (pointsByName.TryGetValue(toDestroy[i], out stale) && stale != null)
-                {
-                    stale.Destroyed -= OnPointDestroyedHandler;
-                    Destroy(stale.gameObject);
-                }
-            }
-
+            // NOTE: the stale set (owned names that are not in this copy's
+            // desired set) is deliberately NOT destroyed. The mod assembly can
+            // be loaded twice (ProbeTest shim + mod loader); each copy has its
+            // own statics and its own fleet view, so one copy's "stale" set is
+            // the other copy's live set — destroying it made the markers blink
+            // in a 0.25 s create/destroy cycle (live bug 2026-11-05). Only
+            // exact duplicates are removed (CollectExistingPoints), and
+            // explicit resets remove their markers via CollectExplicitRemovals.
             for (int i = 0; i < toCreate.Count; i++)
             {
                 int index;
@@ -294,6 +307,18 @@ namespace UBOAT.Mods.RadioNavigation
                 MapPointUI created = charting.CreatePoint(GetEncounterPosition(index), toCreate[i]);
                 if (created != null && !pointsByName.ContainsKey(toCreate[i]))
                     pointsByName.Add(toCreate[i], created);
+            }
+
+            explicitRemovals.Clear();
+            CollectExplicitRemovals(explicitRemovals);
+            for (int i = 0; i < explicitRemovals.Count; i++)
+            {
+                MapPointUI point;
+                if (pointsByName.TryGetValue(explicitRemovals[i], out point) && point != null)
+                {
+                    point.Destroyed -= OnPointDestroyedHandler;
+                    Destroy(point.gameObject);
+                }
             }
         }
 
@@ -416,6 +441,11 @@ namespace UBOAT.Mods.RadioNavigation
                     PointKind(view.Index), PointSuppressed(view.Index), true, pointsTool, eraser);
                 view.Interactive = policy.Interactive;
                 view.PositionLocked = policy.PositionLocked;
+                // Static markers keep their true position even while the
+                // declutter has them hidden (their bridge's LateUpdate does not
+                // run on an inactive GameObject).
+                if (view.PositionLocked && view.Point.Position != view.TruePosition)
+                    view.Point.Position = view.TruePosition;
 
                 Vector3 position = sandbox.EncounterToSceneSpace(view.TruePosition);
                 OnMarkerPositioned(view.Index, position,

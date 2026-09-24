@@ -49,6 +49,11 @@ namespace UBOAT.Mods.RadioNavigation
         // only. Cleared with the pin's suppression on I/O.
         private static readonly HashSet<int> suppressedIndices = new HashSet<int>();
 
+        // Explicit removal on the series reset (O) / scene start: the base
+        // reconcile consumes it once (stale cleanup by state is off — the
+        // double-load-safe behaviour, see NavMapMarkerBase.ApplyPlan).
+        private static bool clearRequested;
+
         public static void Set(double latDeg, double lonDeg, string label)
         {
             if (Suppressed)
@@ -81,6 +86,7 @@ namespace UBOAT.Mods.RadioNavigation
             FixLabel = null;
             Suppressed = false;
             suppressedIndices.Clear();
+            clearRequested = true;
         }
 
         /// <summary>New observation recorded (I): a fresh fix may publish again.</summary>
@@ -112,6 +118,18 @@ namespace UBOAT.Mods.RadioNavigation
         {
             suppressedIndices.Add(index);
             Debug.Log(LogPrefix + " fix marker erased by the map eraser (index=" + index + ")");
+        }
+
+        /// <summary>O / scene start: hand the fix + LOP keys to the reconcile
+        /// once, so the markers actually disappear (state-driven stale cleanup
+        /// is off by design — double-load safe).</summary>
+        protected override void CollectExplicitRemovals(List<string> keys)
+        {
+            if (!clearRequested)
+                return;
+            clearRequested = false;
+            for (int i = 0; i < MarkerCount; i++)
+                keys.Add(PointKey(i));
         }
 
         protected override string HoverText(int index)
