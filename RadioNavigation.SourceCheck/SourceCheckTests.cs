@@ -4144,6 +4144,119 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Aiming-reticle gate (author 2026-11-04, "из перекрестия вычесть
+        /// круг"): the crosshair gap must mark the identification cone — the
+        /// four arms start at the cone's angular radius and stay short, so
+        /// everything inside the gap is identifiable and the reticle is
+        /// compact at ×6. The old square window lied at its corners and is
+        /// gone. Rules:
+        ///  A) SextantConeBox exposes DiameterUnits/RadiusUnits/ArmLengthUnits;
+        ///  B) UpdateSightLines derives the gap from RadiusUnits, the arm
+        ///     length from ArmLengthUnits and calls ApplyCrossGap;
+        ///  C) ApplyCrossGap places the arms at gap + arm/2 (the gap is real)
+        ///     and sizes all four;
+        ///  D) the square window (ApplyConeBox / ConeBox* fields) is gone;
+        ///  E) the four arm fields exist in SextantOverlay.Result.
+        /// Mutations: fixed gap -> FAIL; drop ArmLengthUnits -> FAIL; arms at
+        /// arm/2 (no gap) -> FAIL; bring the box back -> FAIL.
+        /// </summary>
+        [Fact]
+        public void SextantCone_GapMarksTheTolerance()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var coneBox = FindSourceType(roots, "SextantConeBox");
+            if (coneBox == null)
+            {
+                problems.Add("type 'SextantConeBox' not found in Source/");
+            }
+            else
+            {
+                foreach (string method in new[] { "DiameterUnits", "RadiusUnits", "ArmLengthUnits" })
+                {
+                    if (FindMethod(coneBox, method) == null)
+                        problems.Add("SextantConeBox." + method + " not found");
+                }
+            }
+
+            var overlay = FindSourceType(roots, "SextantOverlay");
+            if (overlay == null)
+            {
+                problems.Add("type 'SextantOverlay' not found in Source/");
+            }
+            else
+            {
+                foreach (string field in new[]
+                {
+                    "SplitTopImage", "SplitBottomImage", "SightLeftImage", "SightRightImage"
+                })
+                {
+                    bool present = overlay.DescendantNodes().OfType<FieldDeclarationSyntax>()
+                        .Any(f => f.Declaration.Variables.Any(v => v.Identifier.Text == field));
+                    if (!present)
+                        problems.Add("SextantOverlay.Result." + field + " not found");
+                }
+                if (overlay.DescendantNodes().OfType<FieldDeclarationSyntax>()
+                    .Any(f => f.Declaration.Variables.Any(v => v.Identifier.Text.StartsWith("ConeBox"))))
+                    problems.Add("the square aiming window is back (ConeBox* fields) — the gap must mark the cone");
+            }
+
+            var builder = FindSourceType(roots, "SextantOcularBuilder");
+            if (builder == null)
+            {
+                problems.Add("type 'SextantOcularBuilder' not found in Source/");
+            }
+            else
+            {
+                if (FindMethod(builder, "ApplyConeBox") != null)
+                    problems.Add("SextantOcularBuilder.ApplyConeBox is back — the square window must stay gone");
+                var apply = FindMethod(builder, "ApplyCrossGap");
+                if (apply == null)
+                {
+                    problems.Add("SextantOcularBuilder.ApplyCrossGap not found");
+                }
+                else
+                {
+                    // The arms must sit OUTSIDE the gap: centre = gap + arm/2.
+                    bool gapInCentre = apply.DescendantNodes().OfType<BinaryExpressionSyntax>()
+                        .Any(b => b.ToString().Contains("gapRadiusUnits + armLengthUnits"));
+                    if (!gapInCentre)
+                        problems.Add("ApplyCrossGap places the arms without the gap — the gap must mark the cone");
+                }
+            }
+
+            var controller = FindSourceType(roots, "SextantController");
+            if (controller == null)
+            {
+                problems.Add("type 'SextantController' not found in Source/");
+            }
+            else
+            {
+                var lines = FindMethod(controller, "UpdateSightLines");
+                if (lines == null)
+                {
+                    problems.Add("SextantController.UpdateSightLines not found");
+                }
+                else
+                {
+                    if (!InvokesName(lines, "RadiusUnits"))
+                        problems.Add("UpdateSightLines does not derive the gap from SextantConeBox.RadiusUnits");
+                    if (!InvokesName(lines, "ArmLengthUnits"))
+                        problems.Add("UpdateSightLines does not size the arms via SextantConeBox.ArmLengthUnits");
+                    if (!InvokesName(lines, "ApplyCrossGap"))
+                        problems.Add("UpdateSightLines does not call SextantOcularBuilder.ApplyCrossGap");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} aiming-reticle violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Visibility gate (SRP slice BeamGate): flare/dot decisions flow
         /// LighthouseBeamGlow.IsFlareTakingOver -&gt; FlareTakesOver and
         /// GetBeamVisibilityFactor -&gt; BeamFactor. A re-inline of the cone

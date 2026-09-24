@@ -70,5 +70,37 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             Assert.Equal(6, SextantZoom.Steps.Length);
         }
+
+        [Fact]
+        public void Label_ReadsTheCurrentStep()
+        {
+            var zoom = new SextantZoom();
+
+            // Default is the no-zoom end.
+            Assert.Equal("x1", zoom.Label);
+            Assert.True(zoom.ZoomIn());
+            Assert.Equal("x1.5", zoom.Label);
+            Assert.True(zoom.ZoomIn());
+            Assert.Equal("x2", zoom.Label);
+            Assert.True(zoom.ZoomIn());
+            Assert.Equal("x3", zoom.Label);
+            Assert.True(zoom.ZoomIn());
+            Assert.Equal("x4.5", zoom.Label);
+            Assert.True(zoom.ZoomIn());
+            Assert.Equal("x6", zoom.Label);
+            // Clamped at the tight end: the label stays.
+            Assert.False(zoom.ZoomIn());
+            Assert.Equal("x6", zoom.Label);
+        }
+
+        [Fact]
+        public void Label_UsesInvariantDecimalSeparator()
+        {
+            // The OS locale may be Russian ("4,5" would break the readout).
+            var zoom = new SextantZoom();
+            while (zoom.FovDivisor != 4.5f)
+                Assert.True(zoom.ZoomIn());
+            Assert.Equal("x4.5", zoom.Label);
+        }
     }
 }

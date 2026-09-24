@@ -128,34 +128,19 @@ namespace UBOAT.Mods.RadioNavigation
                 result.RightViewImage.material = result.OpaqueViewMaterial;
             }
 
-            // Vertical sight line (1 physical pixel — drum alignment hairline
-            // between the direct/mirror halves).
-            GameObject splitGo = new GameObject("VerticalSplit", typeof(Image));
-            splitGo.transform.SetParent(pipGo.transform, false);
-            Image splitImage = splitGo.GetComponent<Image>();
-            splitImage.color = new Color(1f, 1f, 1f, 0.5f);
-            splitImage.raycastTarget = false;
-            AnchorCenter(splitImage.rectTransform, 1f / canvasScaleFactor, ocularSizeUnits);
-            result.VerticalSplitImage = splitImage;
-
-            // Horizontal sight line (1 physical pixel, crosshair) — line of
-            // sight, drawn above the views/below filter dims so it stays
-            // subtle and never interferes with the lenses.
-            GameObject horizGo = new GameObject("HorizontalSight", typeof(Image));
-            horizGo.transform.SetParent(pipGo.transform, false);
-            Image horizImage = horizGo.GetComponent<Image>();
-            horizImage.color = new Color(1f, 1f, 1f, 0.5f);
-            horizImage.raycastTarget = false;
-            AnchorCenter(horizImage.rectTransform, ocularSizeUnits, 1f / canvasScaleFactor);
-            result.HorizontalSightImage = horizImage;
-
-            // Centred aiming window (PU-style: top + sides, no bottom line)
-            // whose size equals the identification cone (author 2026-09-22):
-            // three 1-px bars so the outline stays crisp at 9-12 px.
+            // Sight crosshair (1 physical pixel): the vertical drum-alignment
+            // hairline between the direct/mirror halves and the horizontal line
+            // of sight, each SPLIT into two arms by the aiming gap (author
+            // 2026-11-04: "из перекрестия вычесть круг"). The gap radius
+            // equals the identification cone, so every body inside it is
+            // identifiable; the arms stay short (SextantConeBox.ArmLengthUnits)
+            // so the reticle is compact at ×6. Sized every frame by
+            // ApplyCrossGap (UpdateSightLines) — zero-size until the first.
             result.SightLineThicknessUnits = 1f / canvasScaleFactor;
-            result.ConeBoxTopImage = MakeSightBar(pipGo.transform, "ConeBoxTop");
-            result.ConeBoxLeftImage = MakeSightBar(pipGo.transform, "ConeBoxLeft");
-            result.ConeBoxRightImage = MakeSightBar(pipGo.transform, "ConeBoxRight");
+            result.SplitTopImage = MakeSightBar(pipGo.transform, "SplitTop");
+            result.SplitBottomImage = MakeSightBar(pipGo.transform, "SplitBottom");
+            result.SightLeftImage = MakeSightBar(pipGo.transform, "SightLeft");
+            result.SightRightImage = MakeSightBar(pipGo.transform, "SightRight");
 
             // Shade filters dim the scope view (v1.5): separate left (horizon)
             // and right (sun) half dimmers - like the separate shade glasses
@@ -238,29 +223,48 @@ namespace UBOAT.Mods.RadioNavigation
             return image;
         }
 
-        /// <summary>Sizes and colours the aiming window (P7 follow-up): the
-        /// side equals the identification cone in canvas units, the outline is
-        /// one physical pixel, the colour follows the day/night policy. Called
-        /// every frame while the sextant is open — every write is guarded.</summary>
-        public static void ApplyConeBox(SextantOverlay.Result result, float sideUnits,
-            Color color)
+        /// <summary>
+        /// Sizes and colours the aiming crosshair (author 2026-11-04): the four
+        /// 1-physical-pixel arms start at the cone's angular radius (the gap —
+        /// every body inside it is identifiable) and run <paramref name="armLengthUnits"/>
+        /// outward, so the reticle stays compact at ×6. The arms are clamped so
+        /// they never leave the ocular; a degenerate gap hides them. Called
+        /// every frame while the sextant is open — every write is guarded.
+        /// </summary>
+        public static void ApplyCrossGap(SextantOverlay.Result result, float gapRadiusUnits,
+            float armLengthUnits, Color color)
         {
-            if (result == null || result.ConeBoxTopImage == null)
+            if (result == null || result.SplitTopImage == null)
                 return;
 
-            float half = sideUnits * 0.5f;
+            result.ConeGapRadiusUnits = gapRadiusUnits;
+            result.ConeArmUnits = armLengthUnits;
             float thickness = result.SightLineThicknessUnits;
-            ApplyBar(result.ConeBoxTopImage, sideUnits, thickness, 0f, half, color);
-            ApplyBar(result.ConeBoxLeftImage, thickness, sideUnits, -half, 0f, color);
-            ApplyBar(result.ConeBoxRightImage, thickness, sideUnits, half, 0f, color);
+            if (gapRadiusUnits < 0f || float.IsNaN(gapRadiusUnits))
+                gapRadiusUnits = 0f;
+            if (armLengthUnits < 0f || float.IsNaN(armLengthUnits))
+                armLengthUnits = 0f;
+            float ocular = result.OcularSizeUnits > 0f ? result.OcularSizeUnits : 600f;
+            float maxArm = ocular * 0.5f - gapRadiusUnits;
+            if (maxArm <= 0f)
+                armLengthUnits = 0f;
+            else if (armLengthUnits > maxArm)
+                armLengthUnits = maxArm;
+
+            float centre = gapRadiusUnits + armLengthUnits * 0.5f;
+            ApplyBar(result.SplitTopImage, thickness, armLengthUnits, 0f, centre, color);
+            ApplyBar(result.SplitBottomImage, thickness, armLengthUnits, 0f, -centre, color);
+            ApplyBar(result.SightLeftImage, armLengthUnits, thickness, -centre, 0f, color);
+            ApplyBar(result.SightRightImage, armLengthUnits, thickness, centre, 0f, color);
         }
 
         /// <summary>
         /// Re-applies the 1-physical-pixel hairline thickness (2026-09-22):
         /// the overlay follows the game's UI scale, so the unit thickness
-        /// changes with it (1 unit = uiScale pixels). The cone bars read the
-        /// value from the result every frame; the two sight lines are sized
-        /// here.
+        /// changes with it (1 unit = uiScale pixels). The crosshair arms are
+        /// re-sized immediately with the stored gap/arm so a PgUp/PgDn scale
+        /// change never leaves a stale frame (UpdateSightLines re-applies every
+        /// frame anyway).
         /// </summary>
         public static void ApplySightLineThickness(SextantOverlay.Result result,
             float thicknessUnits)
@@ -269,17 +273,9 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             result.SightLineThicknessUnits = thicknessUnits;
-            float ocular = result.OcularSizeUnits > 0f ? result.OcularSizeUnits : 600f;
-            if (result.VerticalSplitImage != null)
-            {
-                AnchorCenter(result.VerticalSplitImage.rectTransform, thicknessUnits,
-                    ocular);
-            }
-            if (result.HorizontalSightImage != null)
-            {
-                AnchorCenter(result.HorizontalSightImage.rectTransform,
-                    ocular, thicknessUnits);
-            }
+            Color color = result.SplitTopImage != null
+                ? result.SplitTopImage.color : Color.white;
+            ApplyCrossGap(result, result.ConeGapRadiusUnits, result.ConeArmUnits, color);
         }
 
         private static void ApplyBar(Image bar, float width, float height,

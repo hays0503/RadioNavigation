@@ -28,13 +28,18 @@ namespace UBOAT.Mods.RadioNavigation
             public Image FilterDimLeftImage;
             public Image FilterDimRightImage;
             public Image GlareImage;
-            // Sight lines + the centred aiming window (P7 follow-up): both are
-            // recoloured day/night and the window is resized with the cone.
-            public Image VerticalSplitImage;
-            public Image HorizontalSightImage;
-            public Image ConeBoxTopImage;
-            public Image ConeBoxLeftImage;
-            public Image ConeBoxRightImage;
+            // Aiming crosshair (author 2026-11-04): four 1-physical-pixel arms
+            // split by the gap whose radius equals the identification cone —
+            // recoloured day/night and re-sized with the cone every frame.
+            public Image SplitTopImage;
+            public Image SplitBottomImage;
+            public Image SightLeftImage;
+            public Image SightRightImage;
+            /// <summary>Last applied gap radius / arm length (canvas units):
+            /// re-applied when the UI scale changes
+            /// (SextantOcularBuilder.ApplySightLineThickness).</summary>
+            public float ConeGapRadiusUnits;
+            public float ConeArmUnits;
             /// <summary>Thickness of a 1-physical-pixel line in canvas units.</summary>
             public float SightLineThicknessUnits;
             /// <summary>Live ocular side in canvas units (SextantOcularSize):
@@ -42,6 +47,10 @@ namespace UBOAT.Mods.RadioNavigation
             /// derive from it (2026-11-04).</summary>
             public float OcularSizeUnits;
             public Text AngleText;
+            /// <summary>Current zoom label ("x6"…"x1") above the altitude
+            /// (author 2026-11-04); the controller refreshes it on open and on
+            /// every zoom step.</summary>
+            public Text ZoomText;
             public Text NameText;
             public Text PainText;
             public Text FilterText;

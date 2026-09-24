@@ -111,6 +111,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// top-left F-Tafel card cannot collide with it (2026-09-22).</summary>
         private Text debugAimText;
         private Text angleText;
+        private Text zoomText;
         private Text nameText;
         private Text painText;
         private Text filterText;
@@ -334,6 +335,7 @@ namespace UBOAT.Mods.RadioNavigation
             UpdateFilterDim();
             if (painText != null) painText.enabled = false;
             UpdateReadout(true);
+            UpdateZoomLabel();
             Debug.Log(LogPrefix + " opened (two-camera split ocular)");
         }
 
@@ -861,13 +863,19 @@ namespace UBOAT.Mods.RadioNavigation
         private void ZoomIn()
         {
             if (zoom.ZoomIn())
+            {
                 LogZoom();
+                UpdateZoomLabel();
+            }
         }
 
         private void ZoomOut()
         {
             if (zoom.ZoomOut())
+            {
                 LogZoom();
+                UpdateZoomLabel();
+            }
         }
 
         private void LogZoom()
@@ -953,11 +961,11 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Sight lines and aiming window (P7 follow-up): thin black by day,
-        /// greenish luminous paint at night; the window's size equals the
-        /// identification cone, so it grows with the zoom (the cone is fixed
-        /// at 1.0°). Every write is
-        /// guarded (called every frame while open).
+        /// Aiming crosshair (P7 follow-up, author 2026-11-04): thin black by
+        /// day, greenish luminous paint at night; the four arms are split by
+        /// the gap whose radius equals the identification cone (fixed 1.0°, so
+        /// the gap grows with the zoom) and stay short (compact at ×6). Every
+        /// write is guarded (called every frame while open).
         /// </summary>
         private void UpdateSightLines()
         {
@@ -965,18 +973,12 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             Color color = SextantSightLineColor.For(SkyVisibilityResolver.GetVisibility());
-            Image split = overlayResult.VerticalSplitImage;
-            if (split != null && split.color != color)
-                split.color = color;
-            Image horizontal = overlayResult.HorizontalSightImage;
-            if (horizontal != null && horizontal.color != color)
-                horizontal.color = color;
-
             float fov = viewCamera != null ? viewCamera.fieldOfView : 0f;
             double pipFov = fov / zoom.FovDivisor;
             double cone = SightabilityGate.EffectiveConeDeg();
-            SextantOcularBuilder.ApplyConeBox(overlayResult,
-                SextantConeBox.BoxUnits(cone, pipFov, overlayResult.OcularSizeUnits), color);
+            float gap = SextantConeBox.RadiusUnits(cone, pipFov, overlayResult.OcularSizeUnits);
+            SextantOcularBuilder.ApplyCrossGap(overlayResult, gap,
+                SextantConeBox.ArmLengthUnits(gap), color);
         }
 
         private void UpdateBodiesReadout(float dt)
@@ -1133,6 +1135,18 @@ namespace UBOAT.Mods.RadioNavigation
                 angleText.text = text;
         }
 
+        /// <summary>Readout label of the current zoom ("x6"…"x1") above the
+        /// altitude (author 2026-11-04). Called on open and on every zoom step;
+        /// the write is guarded so the 1 Hz refresh never touches it.</summary>
+        private void UpdateZoomLabel()
+        {
+            if (zoomText == null)
+                return;
+            string label = zoom.Label;
+            if (zoomText.text != label)
+                zoomText.text = label;
+        }
+
         private void UpdateFilterLabel()
         {
             if (filterText == null)
@@ -1160,6 +1174,7 @@ namespace UBOAT.Mods.RadioNavigation
             filterDimRightImage = ui.FilterDimRightImage;
             glareImage = ui.GlareImage;
             angleText = ui.AngleText;
+            zoomText = ui.ZoomText;
             nameText = ui.NameText;
             debugAimText = ui.DebugAimText;
             painText = ui.PainText;

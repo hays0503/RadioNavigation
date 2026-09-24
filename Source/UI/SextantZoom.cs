@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
@@ -18,6 +20,15 @@ namespace UBOAT.Mods.RadioNavigation
         public int Index => index;
 
         public float FovDivisor => Steps[index];
+
+        /// <summary>Readout label of the CURRENT step ("x6"…"x1"), invariant
+        /// decimal separator ("x4.5" must not become "x4,5" under a comma
+        /// locale) — shown above the altitude in the ocular (author
+        /// 2026-11-04).</summary>
+        public string Label
+        {
+            get { return "x" + Steps[index].ToString(CultureInfo.InvariantCulture); }
+        }
 
         public bool ZoomIn()
         {

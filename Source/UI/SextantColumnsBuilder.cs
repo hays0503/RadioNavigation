@@ -53,6 +53,12 @@ namespace UBOAT.Mods.RadioNavigation
 
             result.AngleText = MakeLabel(canvasRoot, "AngleText", 22, TextAnchor.MiddleRight, Color.white);
             SetChild(column, result.AngleText, 160f);
+            // Current zoom above the altitude (author 2026-11-04): the selected
+            // step of SextantZoom ("x6"…"x1"), refreshed by the controller on
+            // open and on every zoom key — dimmer than the height it labels.
+            result.ZoomText = MakeLabel(canvasRoot, "ZoomText", 18, TextAnchor.MiddleRight,
+                new Color(0.8f, 0.86f, 0.92f));
+            SetChild(column, result.ZoomText, 202f);
             result.NameText = MakeLabel(canvasRoot, "NameText", 16, TextAnchor.MiddleRight, new Color(0.75f, 0.9f, 1f));
             SetChild(column, result.NameText, 116f);
             result.PainText = MakeLabel(canvasRoot, "PainText", 14, TextAnchor.MiddleCenter, new Color(1f, 0.45f, 0.35f));
