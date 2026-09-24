@@ -978,7 +978,7 @@ namespace UBOAT.Mods.RadioNavigation
             double cone = SightabilityGate.EffectiveConeDeg();
             float gap = SextantConeBox.RadiusUnits(cone, pipFov, overlayResult.OcularSizeUnits);
             SextantOcularBuilder.ApplyCrossGap(overlayResult, gap,
-                SextantConeBox.ArmLengthUnits(gap), color);
+                SextantConeBox.ArmLengthUnits(gap, overlayResult.OcularSizeUnits), color);
         }
 
         private void UpdateBodiesReadout(float dt)

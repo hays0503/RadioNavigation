@@ -224,12 +224,13 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Sizes and colours the aiming crosshair (author 2026-11-04): the four
-        /// 1-physical-pixel arms start at the cone's angular radius (the gap —
-        /// every body inside it is identifiable) and run <paramref name="armLengthUnits"/>
-        /// outward, so the reticle stays compact at ×6. The arms are clamped so
-        /// they never leave the ocular; a degenerate gap hides them. Called
-        /// every frame while the sextant is open — every write is guarded.
+        /// Sizes and colours the aiming crosshair (author 2026-11-04/05): the
+        /// four 1-physical-pixel arms start at the cone's angular radius (the
+        /// gap — every body inside it is identifiable) and run to the ocular
+        /// rim (author: "хочу, чтобы линии шли дальше по сторонам"). The arms
+        /// are clamped so they never leave the ocular; a degenerate gap hides
+        /// them. Called every frame while the sextant is open — every write is
+        /// guarded.
         /// </summary>
         public static void ApplyCrossGap(SextantOverlay.Result result, float gapRadiusUnits,
             float armLengthUnits, Color color)

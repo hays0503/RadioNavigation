@@ -65,28 +65,28 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void Arm_ScalesWithTheGapAndStaysCompact()
+        public void Arm_ReachesTheOcularEdge()
         {
             float ocular = LiveOcular();
-            // ×1: 1.5 × 8.19 = 12.3 units (just above the floor); ×6: 82.5.
+            // ×1: 597.7/2 − 8.19 = 290.7; ×6: 597.7/2 − 55.01 = 243.8 — the arm
+            // plus the gap is exactly half the ocular (the arms meet the rim).
             float arm1 = SextantConeBox.ArmLengthUnits(
-                SextantConeBox.RadiusUnits(1.0, MainFov, ocular));
+                SextantConeBox.RadiusUnits(1.0, MainFov, ocular), ocular);
             float arm6 = SextantConeBox.ArmLengthUnits(
-                SextantConeBox.RadiusUnits(1.0, MainFov / 6.0, ocular));
-            Assert.InRange(arm1, 12.0f, 13.0f);
-            Assert.InRange(arm6, 82.0f, 83.0f);
-            // The whole reticle at ×6 is 2*(gap + arm) ≈ 275 units — a quarter
-            // of the old full-length lines (597.7).
-            Assert.True(2f * (55.0f + arm6) < 300f);
+                SextantConeBox.RadiusUnits(1.0, MainFov / 6.0, ocular), ocular);
+            Assert.InRange(arm1, 290.0f, 291.5f);
+            Assert.InRange(arm6, 243.0f, 244.5f);
+            Assert.Equal(ocular * 0.5f,
+                arm1 + SextantConeBox.RadiusUnits(1.0, MainFov, ocular), 2);
         }
 
         [Fact]
-        public void Arm_HasAVisibilityFloor()
+        public void Arm_DegenerateGap_IsZero()
         {
-            // A tiny gap (small ocular at ×1) must not make the arms vanish.
-            Assert.Equal(SextantConeBox.MinArmUnits, SextantConeBox.ArmLengthUnits(0.5f));
-            Assert.Equal(SextantConeBox.MinArmUnits, SextantConeBox.ArmLengthUnits(0f));
-            Assert.Equal(SextantConeBox.MinArmUnits, SextantConeBox.ArmLengthUnits(float.NaN));
+            // A gap wider than the ocular must hide the arms, never invert them.
+            Assert.Equal(0f, SextantConeBox.ArmLengthUnits(400f, 600f));
+            Assert.Equal(0f, SextantConeBox.ArmLengthUnits(float.NaN, 600f));
+            Assert.Equal(300f, SextantConeBox.ArmLengthUnits(0f, 600f));
         }
 
         [Fact]

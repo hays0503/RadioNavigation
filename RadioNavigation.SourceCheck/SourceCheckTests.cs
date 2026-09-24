@@ -4144,21 +4144,25 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
-        /// Aiming-reticle gate (author 2026-11-04, "из перекрестия вычесть
-        /// круг"): the crosshair gap must mark the identification cone — the
-        /// four arms start at the cone's angular radius and stay short, so
-        /// everything inside the gap is identifiable and the reticle is
-        /// compact at ×6. The old square window lied at its corners and is
-        /// gone. Rules:
+        /// Aiming-reticle gate (author 2026-11-04/05, "из перекрестия вычесть
+        /// круг", "линии должны идти дальше по сторонам"): the crosshair gap
+        /// must mark the identification cone — the four arms start at the
+        /// cone's angular radius and run to the ocular rim, so everything
+        /// inside the gap is identifiable and the reticle reads like the
+        /// classic split/sight lines. The old square window lied at its
+        /// corners and is gone. Rules:
         ///  A) SextantConeBox exposes DiameterUnits/RadiusUnits/ArmLengthUnits;
-        ///  B) UpdateSightLines derives the gap from RadiusUnits, the arm
-        ///     length from ArmLengthUnits and calls ApplyCrossGap;
+        ///  B) UpdateSightLines derives the gap from RadiusUnits, passes the
+        ///     live ocular to ArmLengthUnits and calls ApplyCrossGap;
         ///  C) ApplyCrossGap places the arms at gap + arm/2 (the gap is real)
         ///     and sizes all four;
         ///  D) the square window (ApplyConeBox / ConeBox* fields) is gone;
-        ///  E) the four arm fields exist in SextantOverlay.Result.
+        ///  E) the four arm fields exist in SextantOverlay.Result;
+        ///  F) ArmLengthUnits derives the arm from the ocular (rim-to-rim),
+        ///     not from a fixed multiple of the gap.
         /// Mutations: fixed gap -> FAIL; drop ArmLengthUnits -> FAIL; arms at
-        /// arm/2 (no gap) -> FAIL; bring the box back -> FAIL.
+        /// arm/2 (no gap) -> FAIL; bring the box back -> FAIL; arm as a gap
+        /// multiple -> FAIL; a constant ocular at the call site -> FAIL.
         /// </summary>
         [Fact]
         public void SextantCone_GapMarksTheTolerance()
@@ -4179,6 +4183,13 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (FindMethod(coneBox, method) == null)
                         problems.Add("SextantConeBox." + method + " not found");
+                }
+                var arm = FindMethod(coneBox, "ArmLengthUnits");
+                if (arm != null
+                    && !arm.DescendantNodes().OfType<BinaryExpressionSyntax>()
+                        .Any(b => b.ToString().Contains("ocular * 0.5f")))
+                {
+                    problems.Add("SextantConeBox.ArmLengthUnits does not derive the arm from the ocular (rim − gap) — the arms must reach the rim");
                 }
             }
 
@@ -4244,8 +4255,12 @@ namespace RadioNavigation.SourceCheck
                 {
                     if (!InvokesName(lines, "RadiusUnits"))
                         problems.Add("UpdateSightLines does not derive the gap from SextantConeBox.RadiusUnits");
-                    if (!InvokesName(lines, "ArmLengthUnits"))
+                    var armCall = lines.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                        .FirstOrDefault(i => i.Expression.ToString() == "SextantConeBox.ArmLengthUnits");
+                    if (armCall == null)
                         problems.Add("UpdateSightLines does not size the arms via SextantConeBox.ArmLengthUnits");
+                    else if (!armCall.ArgumentList.ToString().Contains("OcularSizeUnits"))
+                        problems.Add("UpdateSightLines passes no live ocular to ArmLengthUnits — the arms would not reach the rim");
                     if (!InvokesName(lines, "ApplyCrossGap"))
                         problems.Add("UpdateSightLines does not call SextantOcularBuilder.ApplyCrossGap");
                 }

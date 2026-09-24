@@ -11,21 +11,13 @@ namespace UBOAT.Mods.RadioNavigation
     /// inside the box but outside the cone). The projection is exact
     /// perspective (tan(cone)/tan(pipFov/2) — the linear form overstated the
     /// window by 12.3% at ×1); the render-target resolution cancels out. The
-    /// arms are short (1.5 × the gap radius, floor MinArmUnits) so the reticle
-    /// stays compact at ×6 (author: "из перекрестия вычесть круг"). Pure,
+    /// arms run from the gap to the ocular edge (author 2026-11-05: "хочу,
+    /// чтобы линии шли дальше по сторонам"), so the reticle reads like the
+    /// classic split/sight lines with a tolerance hole in the middle. Pure,
     /// no Unity.
     /// </summary>
     public static class SextantConeBox
     {
-        /// <summary>Arm length as a multiple of the gap radius (author
-        /// 2026-11-04).</summary>
-        public const float ArmRadiusMultiplier = 1.5f;
-
-        /// <summary>Floor for the arm length in canvas units: at ×1 (or on a
-        /// small ocular) 1.5 × the gap radius would be a few pixels — the
-        /// reticle must stay visible.</summary>
-        public const float MinArmUnits = 12f;
-
         /// <summary>Diameter of the tolerance circle in canvas units for a
         /// cone, a PIP FOV (degrees) and the live ocular side — the gap
         /// between opposite arms. 0 when the FOV is unknown (the caller then
@@ -48,14 +40,17 @@ namespace UBOAT.Mods.RadioNavigation
             return DiameterUnits(coneDeg, pipFovDeg, ocularSizeUnits) * 0.5f;
         }
 
-        /// <summary>Length of one crosshair arm for a gap radius: 1.5 × the
-        /// radius, floored at MinArmUnits so the reticle never vanishes.</summary>
-        public static float ArmLengthUnits(float gapRadiusUnits)
+        /// <summary>Length of one crosshair arm: from the gap edge to the
+        /// ocular rim (author 2026-11-05). A degenerate gap (negative/NaN, or
+        /// wider than the ocular) returns 0 — the caller hides the arms.</summary>
+        public static float ArmLengthUnits(float gapRadiusUnits, float ocularSizeUnits)
         {
-            if (gapRadiusUnits <= 0f || float.IsNaN(gapRadiusUnits))
-                return MinArmUnits;
-            float arm = gapRadiusUnits * ArmRadiusMultiplier;
-            return arm < MinArmUnits ? MinArmUnits : arm;
+            float ocular = ocularSizeUnits > 0f && !float.IsNaN(ocularSizeUnits)
+                ? ocularSizeUnits : 600f;
+            if (gapRadiusUnits < 0f || float.IsNaN(gapRadiusUnits))
+                return 0f;
+            float arm = ocular * 0.5f - gapRadiusUnits;
+            return arm > 0f ? arm : 0f;
         }
     }
 }
