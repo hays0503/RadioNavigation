@@ -49,7 +49,7 @@ namespace UBOAT.Mods.RadioNavigation
             return SextantArc.Quantize(arc + dir * rate * dt);
         }
 
-        /// <summary>One fine-adjustment step (0.2' drum tick), always on-grid.</summary>
+        /// <summary>One fine-adjustment step (0.1' vernier tick), always on-grid.</summary>
         public static double StepFine(double arc, float dir)
         {
             return SextantArc.Quantize(arc + dir * FineStepQuant / SextantArc.StepsPerDeg);

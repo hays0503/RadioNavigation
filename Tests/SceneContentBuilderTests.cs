@@ -13,6 +13,7 @@ namespace UBOAT.Mods.RadioNavigation
     public sealed class StarsMesh { }
     public sealed class ConstellationMesh { }
     public sealed class PlanetRenderer { }
+    public sealed class MoonDiscRenderer { }
     public sealed class SunDiscRenderer { }
     public sealed class StationMapOverlay { }
     public sealed class LighthouseMapMarker { }
@@ -42,14 +43,14 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void SkyRoots_HasFourExpectedNamesInOrder()
+        public void SkyRoots_HasFiveExpectedNamesInOrder()
         {
             var names = new List<string>();
             foreach (var root in SceneContentBuilder.SkyRoots)
                 names.Add(root.Name);
 
             Assert.Equal(
-                new[] { "StarSkyRoot", "ConstellationRoot", "PlanetRoot", "SunDiscRoot" },
+                new[] { "StarSkyRoot", "ConstellationRoot", "PlanetRoot", "MoonDiscRoot", "SunDiscRoot" },
                 names);
         }
 
@@ -66,6 +67,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                     "StarSkyRoot:StarsMesh",
                     "ConstellationRoot:ConstellationMesh",
                     "PlanetRoot:PlanetRenderer",
+                    "MoonDiscRoot:MoonDiscRenderer",
                     "SunDiscRoot:SunDiscRenderer"
                 },
                 pairs);
@@ -106,8 +108,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             SceneContentBuilder.EnsureSkyRoots(host);
             SceneContentBuilder.EnsureSkyRoots(host);
 
-            Assert.Equal(4, host.Created.Count);
+            Assert.Equal(5, host.Created.Count);
             Assert.Contains("StarSkyRoot:StarsMesh", host.Created);
+            Assert.Contains("MoonDiscRoot:MoonDiscRenderer", host.Created);
             Assert.Contains("SunDiscRoot:SunDiscRenderer", host.Created);
         }
 

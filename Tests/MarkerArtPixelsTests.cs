@@ -73,5 +73,22 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(1, pixels.Length);
             Assert.True(pixels[0].a > 200);
         }
+
+        [Fact]
+        public void RenderIconPixels_HasACoreAndARing()
+        {
+            const int size = 64;
+            Color32[] pixels = MarkerArtPixels.RenderIconPixels(size);
+            Assert.Equal(size * size, pixels.Length);
+
+            // Center: the opaque core.
+            Assert.True(pixels[32 * size + 32].a > 200);
+            // r ≈ 0.45: the transparent gap between core and ring.
+            Assert.True(pixels[32 * size + 46].a < 40);
+            // r ≈ 0.7: the ring.
+            Assert.True(pixels[32 * size + 54].a > 200);
+            // Corner: outside the glyph.
+            Assert.Equal(0, pixels[0].a);
+        }
     }
 }

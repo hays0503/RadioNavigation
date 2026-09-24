@@ -26,7 +26,10 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             double jd = AstroMath.ToJulianDay(utc);
             ghaAriesDeg = RunningFixCalculator.Normalize360(AstroMath.GmstDeg(jd));
             double raRad, decRad;
-            AstroMath.SunRaDec(jd, out raRad, out decRad);
+            // TT/UT split (P1): the synthetic truth must mirror the production
+            // path (SunRaDec on TT), else the fix error picks up ~0.6 NM.
+            AstroMath.SunRaDec(jd + SunEphemerisCalibration.DeltaTSeconds / 86400.0,
+                out raRad, out decRad);
             decDeg = decRad * 180.0 / Math.PI;
             ghaSunDeg = RunningFixCalculator.Normalize360(
                 ghaAriesDeg - raRad * 180.0 / Math.PI);
@@ -307,7 +310,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void Record_Sequence_FirstTwo_ThenReplace()
+        public void Record_Sequence_KeepsFirstTwo_PinsThirdSlot()
         {
             RunningFixCalculator calc = new RunningFixCalculator();
             Assert.False(calc.CanSolve);
@@ -323,12 +326,25 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             calc.Record(o2);
             Assert.True(calc.CanSolve);
             Assert.Same(o2, calc.Observation2);
+            Assert.False(calc.HasThird);
 
+            // P6: the third sight fills its own slot (cocked hat); the first
+            // two stay pinned so the Versetzung baseline is stable.
             SextantObservation o3 = RunningFixCalculator.BuildObservation(
                 SightTime.AddMinutes(60), 30.0, TrueLat, TrueLon);
             calc.Record(o3);
-            Assert.Same(o3, calc.Observation2);
+            Assert.Same(o3, calc.Observation3);
             Assert.Same(o1, calc.Observation1);
+            Assert.Same(o2, calc.Observation2);
+            Assert.True(calc.HasThird);
+
+            // A fourth sight replaces the third (first two still pinned).
+            SextantObservation o4 = RunningFixCalculator.BuildObservation(
+                SightTime.AddMinutes(90), 30.0, TrueLat, TrueLon);
+            calc.Record(o4);
+            Assert.Same(o4, calc.Observation3);
+            Assert.Same(o1, calc.Observation1);
+            Assert.Same(o2, calc.Observation2);
         }
 
         [Fact]
@@ -339,12 +355,17 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 SightTime, 30.0, TrueLat, TrueLon));
             calc.Record(RunningFixCalculator.BuildObservation(
                 SightTime.AddMinutes(30), 30.0, TrueLat, TrueLon));
+            calc.Record(RunningFixCalculator.BuildObservation(
+                SightTime.AddMinutes(60), 30.0, TrueLat, TrueLon));
             Assert.True(calc.CanSolve);
+            Assert.True(calc.HasThird);
 
             calc.Reset();
             Assert.False(calc.CanSolve);
+            Assert.False(calc.HasThird);
             Assert.Null(calc.Observation1);
             Assert.Null(calc.Observation2);
+            Assert.Null(calc.Observation3);
         }
 
         [Fact]

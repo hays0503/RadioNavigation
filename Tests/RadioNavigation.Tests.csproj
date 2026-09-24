@@ -25,6 +25,7 @@
     <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />
     <Compile Include="Stubs\UnityEngineTransform.cs" />
     <Compile Include="Stubs\UnityEngineTexture.cs" />
+    <Compile Include="Stubs\UnityEngineColor.cs" />
     <Compile Include="Stubs\UnityEngineGameObject.cs" />
     <Compile Include="Stubs\UnityEngineTime.cs" />
     <Compile Include="Stubs\GameStubs.cs" />
@@ -67,6 +68,37 @@
     <Compile Include="DspPipelineTests.cs" />
     <Compile Include="ShieldTests.cs" />
     <Compile Include="AstroMathTests.cs" />
+    <Compile Include="SunAccuracyTests.cs" />
+    <Compile Include="StarPrecessionTests.cs" />
+    <Compile Include="StarBrightnessTests.cs" />
+    <Compile Include="StarSpriteMathTests.cs" />
+    <Compile Include="AtmosphericExtinctionTests.cs" />
+    <Compile Include="SkyBrightnessTests.cs" />
+    <Compile Include="DarkAdaptationTests.cs" />
+    <Compile Include="MoonAccuracyTests.cs" />
+    <Compile Include="HoldTrackerTests.cs" />
+    <Compile Include="SightabilityGateTests.cs" />
+    <Compile Include="BodyRowFormatterTests.cs" />
+    <Compile Include="SextantBurstSamplerTests.cs" />
+    <Compile Include="CockedHatTests.cs" />
+    <Compile Include="RebuildDriftTests.cs" />
+    <Compile Include="FixCardBurstTests.cs" />
+    <Compile Include="ConstellationLineMathTests.cs" />
+    <Compile Include="IndexErrorCorrectionTests.cs" />
+    <Compile Include="CelestialForecastTests.cs" />
+    <Compile Include="StarAltAzEtalonTests.cs" />
+    <Compile Include="SextantPipSizeTests.cs" />
+    <Compile Include="SextantOcularSizeTests.cs" />
+    <Compile Include="SextantYawInputTests.cs" />
+    <Compile Include="BodySelectionTests.cs" />
+    <Compile Include="SextantStabilizationTests.cs" />
+    <Compile Include="SextantConeBoxTests.cs" />
+    <Compile Include="AimOffsetFormatTests.cs" />
+    <Compile Include="FixCardLayoutTests.cs" />
+    <Compile Include="ConstellationWidthPolicyTests.cs" />
+    <Compile Include="ForecastLineTextTests.cs" />
+    <Compile Include="SextantSightLineColorTests.cs" />
+    <Compile Include="MoonPhaseDiscTests.cs" />
     <Compile Include="StarCatalogTests.cs" />
     <Compile Include="NavStarNamesTests.cs" />
     <Compile Include="SextantDmFormatTests.cs" />
@@ -177,6 +209,31 @@
     <Compile Include="..\Source\Logic\LighthouseScale.cs" Link="Source\Logic\LighthouseScale.cs" />
     <Compile Include="..\Source\Logic\LighthouseAlignment.cs" Link="Source\Logic\LighthouseAlignment.cs" />
     <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />
+    <Compile Include="..\Source\Logic\StarBrightness.cs" Link="Source\Logic\StarBrightness.cs" />
+    <Compile Include="..\Source\Logic\StarSpriteMath.cs" Link="Source\Logic\StarSpriteMath.cs" />
+    <Compile Include="..\Source\Logic\AtmosphericExtinction.cs" Link="Source\Logic\AtmosphericExtinction.cs" />
+    <Compile Include="..\Source\Logic\SkyBrightness.cs" Link="Source\Logic\SkyBrightness.cs" />
+    <Compile Include="..\Source\Logic\DarkAdaptation.cs" Link="Source\Logic\DarkAdaptation.cs" />
+    <Compile Include="..\Source\Logic\HoldTracker.cs" Link="Source\Logic\HoldTracker.cs" />
+    <Compile Include="..\Source\Logic\SightabilityGate.cs" Link="Source\Logic\SightabilityGate.cs" />
+    <Compile Include="..\Source\Logic\BodyRowFormatter.cs" Link="Source\Logic\BodyRowFormatter.cs" />
+    <Compile Include="..\Source\Logic\SextantBurstSampler.cs" Link="Source\Logic\SextantBurstSampler.cs" />
+    <Compile Include="..\Source\Logic\RebuildDrift.cs" Link="Source\Logic\RebuildDrift.cs" />
+    <Compile Include="..\Source\Logic\ConstellationLineMath.cs" Link="Source\Logic\ConstellationLineMath.cs" />
+    <Compile Include="..\Source\Logic\IndexErrorCorrection.cs" Link="Source\Logic\IndexErrorCorrection.cs" />
+    <Compile Include="..\Source\Logic\CelestialForecast.cs" Link="Source\Logic\CelestialForecast.cs" />
+    <Compile Include="..\Source\Logic\SextantPipSize.cs" Link="Source\Logic\SextantPipSize.cs" />
+    <Compile Include="..\Source\Logic\SextantOcularSize.cs" Link="Source\Logic\SextantOcularSize.cs" />
+    <Compile Include="..\Source\Logic\SextantYawInput.cs" Link="Source\Logic\SextantYawInput.cs" />
+    <Compile Include="..\Source\Logic\BodySelection.cs" Link="Source\Logic\BodySelection.cs" />
+    <Compile Include="..\Source\Logic\SextantStabilization.cs" Link="Source\Logic\SextantStabilization.cs" />
+    <Compile Include="..\Source\Logic\SextantConeBox.cs" Link="Source\Logic\SextantConeBox.cs" />
+    <Compile Include="..\Source\Logic\AimOffsetFormat.cs" Link="Source\Logic\AimOffsetFormat.cs" />
+    <Compile Include="..\Source\Logic\FixCardLayout.cs" Link="Source\Logic\FixCardLayout.cs" />
+    <Compile Include="..\Source\Logic\ConstellationWidthPolicy.cs" Link="Source\Logic\ConstellationWidthPolicy.cs" />
+    <Compile Include="..\Source\Logic\ForecastLineText.cs" Link="Source\Logic\ForecastLineText.cs" />
+    <Compile Include="..\Source\Logic\SextantSightLineColor.cs" Link="Source\Logic\SextantSightLineColor.cs" />
+    <Compile Include="..\Source\Logic\MoonPhaseDisc.cs" Link="Source\Logic\MoonPhaseDisc.cs" />
     <Compile Include="..\Source\Data\StarCatalog.cs" Link="Source\Data\StarCatalog.cs" />
     <Compile Include="..\Source\Data\NavStarNames.cs" Link="Source\Data\NavStarNames.cs" />
     <Compile Include="..\Source\Logic\StoryDecisionGateway.cs" Link="Source\Logic\StoryDecisionGateway.cs" />
@@ -244,3 +301,7 @@
   </ItemGroup>
 
 </Project>
+
+
+
+

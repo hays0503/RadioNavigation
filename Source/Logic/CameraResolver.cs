@@ -33,6 +33,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         private const float WorldRadiusM = 3900f;
 
+        /// <summary>Sky-shell radius frozen while the sextant is open (P7).</summary>
+        private static float? frozenRadius;
+
         /// <summary>
         /// Резолвит камеру текущего вида. Приоритет:
         /// 1. Periscope/device camera (Generic mode) — она реально рисует
@@ -92,8 +95,26 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static float SafeRadius(Camera cam)
         {
+            // Frozen while the sextant is open (P7): the PIP mirrors its far
+            // clip per frame, so a live radius would breathe and make the star
+            // shell jump mid-sight.
+            if (frozenRadius.HasValue)
+                return frozenRadius.Value;
             if (cam == null) return WorldRadiusM;
             return Mathf.Min(WorldRadiusM, cam.farClipPlane * 0.85f);
+        }
+
+        /// <summary>Freezes the sky-shell radius at the current view camera's
+        /// value (sextant open).</summary>
+        public static void FreezeRadius(Camera cam)
+        {
+            frozenRadius = SafeRadius(cam);
+        }
+
+        /// <summary>Releases the frozen radius (sextant closed).</summary>
+        public static void UnfreezeRadius()
+        {
+            frozenRadius = null;
         }
 
         /// <summary>
@@ -149,6 +170,7 @@ namespace UBOAT.Mods.RadioNavigation
             mainCameraProbeFrame = -1;
             genericModeResolved = false;
             genericModeValue = null;
+            frozenRadius = null;
         }
 
         private static Camera ResolveDeviceCamera()
@@ -228,6 +250,10 @@ namespace UBOAT.Mods.RadioNavigation
         private static void OnAnyCameraPreCull(Camera cam)
         {
             if (cam.orthographic || IsUtilityCamera(cam)) return;
+            // Never anchor the sky to a sextant PIP camera (P7): its pose is
+            // yaw-only and its far clip is mirrored per frame, so a frame that
+            // resolves to it would snap the whole star shell.
+            if (SextantController.IsPipCamera(cam)) return;
             renderingCamera = cam;
         }
     }

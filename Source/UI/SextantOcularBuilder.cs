@@ -26,14 +26,19 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>
         /// Builds veil, eyecup, ocular, views, sights, dimmers, glare and
         /// ring under canvasRoot. canvasScaleFactor sizes the 1-pixel sight
-        /// lines; resourceManager/assetContext resolve the opaque view
-        /// material (may yield null — views keep the stock UI shader).
+        /// lines; ocularSizeUnits is the live ocular side (SextantOcularSize);
+        /// resourceManager/assetContext resolve the opaque view material (may
+        /// yield null — views keep the stock UI shader).
         /// </summary>
         public static void BuildOcular(GameObject canvasRoot, float canvasScaleFactor,
             RenderTexture leftRt, RenderTexture rightRt,
             ResourceManager resourceManager, UnityEngine.Object assetContext,
-            SextantOverlay.Result result)
+            SextantOverlay.Result result, float ocularSizeUnits)
         {
+            if (ocularSizeUnits <= 0f || float.IsNaN(ocularSizeUnits))
+                ocularSizeUnits = 600f;
+            result.OcularSizeUnits = ocularSizeUnits;
+
             // Veil: solid dark layer, no cut-out (§13.3 - aspect-safe).
             GameObject veilGo = new GameObject("Veil", typeof(Image));
             veilGo.transform.SetParent(canvasRoot.transform, false);
@@ -63,7 +68,7 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject pipGo = new GameObject("Ocular", typeof(Image), typeof(Mask));
             pipGo.transform.SetParent(canvasRoot.transform, false);
             result.PipRect = pipGo.GetComponent<RectTransform>();
-            AnchorCenter(result.PipRect, SextantOverlayLayout.OcularSizeUnits, SextantOverlayLayout.OcularSizeUnits);
+            AnchorCenter(result.PipRect, ocularSizeUnits, ocularSizeUnits);
             Image maskGraphic = pipGo.GetComponent<Image>();
             result.CircleMaskTexture = SextantSprites.CreateCircleMaskTexture();
             Sprite circleMaskSprite = SextantSprites.CreateCircleMaskSprite(result.CircleMaskTexture);
@@ -130,7 +135,8 @@ namespace UBOAT.Mods.RadioNavigation
             Image splitImage = splitGo.GetComponent<Image>();
             splitImage.color = new Color(1f, 1f, 1f, 0.5f);
             splitImage.raycastTarget = false;
-            AnchorCenter(splitImage.rectTransform, 1f / canvasScaleFactor, SextantOverlayLayout.OcularSizeUnits);
+            AnchorCenter(splitImage.rectTransform, 1f / canvasScaleFactor, ocularSizeUnits);
+            result.VerticalSplitImage = splitImage;
 
             // Horizontal sight line (1 physical pixel, crosshair) — line of
             // sight, drawn above the views/below filter dims so it stays
@@ -140,7 +146,16 @@ namespace UBOAT.Mods.RadioNavigation
             Image horizImage = horizGo.GetComponent<Image>();
             horizImage.color = new Color(1f, 1f, 1f, 0.5f);
             horizImage.raycastTarget = false;
-            AnchorCenter(horizImage.rectTransform, SextantOverlayLayout.OcularSizeUnits, 1f / canvasScaleFactor);
+            AnchorCenter(horizImage.rectTransform, ocularSizeUnits, 1f / canvasScaleFactor);
+            result.HorizontalSightImage = horizImage;
+
+            // Centred aiming window (PU-style: top + sides, no bottom line)
+            // whose size equals the identification cone (author 2026-09-22):
+            // three 1-px bars so the outline stays crisp at 9-12 px.
+            result.SightLineThicknessUnits = 1f / canvasScaleFactor;
+            result.ConeBoxTopImage = MakeSightBar(pipGo.transform, "ConeBoxTop");
+            result.ConeBoxLeftImage = MakeSightBar(pipGo.transform, "ConeBoxLeft");
+            result.ConeBoxRightImage = MakeSightBar(pipGo.transform, "ConeBoxRight");
 
             // Shade filters dim the scope view (v1.5): separate left (horizon)
             // and right (sun) half dimmers - like the separate shade glasses
@@ -209,6 +224,79 @@ namespace UBOAT.Mods.RadioNavigation
             result.OwnedSprites.Add(ringSprite);
             ring.raycastTarget = false;
             Stretch(ring.rectTransform);
+        }
+
+        /// <summary>Creates one 1-px aiming-window bar (top/left/right).</summary>
+        private static Image MakeSightBar(Transform parent, string name)
+        {
+            GameObject go = new GameObject(name, typeof(Image));
+            go.transform.SetParent(parent, false);
+            Image image = go.GetComponent<Image>();
+            image.color = new Color(1f, 1f, 1f, 0.5f);
+            image.raycastTarget = false;
+            AnchorCenter(image.rectTransform, 0f, 0f);
+            return image;
+        }
+
+        /// <summary>Sizes and colours the aiming window (P7 follow-up): the
+        /// side equals the identification cone in canvas units, the outline is
+        /// one physical pixel, the colour follows the day/night policy. Called
+        /// every frame while the sextant is open — every write is guarded.</summary>
+        public static void ApplyConeBox(SextantOverlay.Result result, float sideUnits,
+            Color color)
+        {
+            if (result == null || result.ConeBoxTopImage == null)
+                return;
+
+            float half = sideUnits * 0.5f;
+            float thickness = result.SightLineThicknessUnits;
+            ApplyBar(result.ConeBoxTopImage, sideUnits, thickness, 0f, half, color);
+            ApplyBar(result.ConeBoxLeftImage, thickness, sideUnits, -half, 0f, color);
+            ApplyBar(result.ConeBoxRightImage, thickness, sideUnits, half, 0f, color);
+        }
+
+        /// <summary>
+        /// Re-applies the 1-physical-pixel hairline thickness (2026-09-22):
+        /// the overlay follows the game's UI scale, so the unit thickness
+        /// changes with it (1 unit = uiScale pixels). The cone bars read the
+        /// value from the result every frame; the two sight lines are sized
+        /// here.
+        /// </summary>
+        public static void ApplySightLineThickness(SextantOverlay.Result result,
+            float thicknessUnits)
+        {
+            if (result == null || thicknessUnits <= 0f)
+                return;
+
+            result.SightLineThicknessUnits = thicknessUnits;
+            float ocular = result.OcularSizeUnits > 0f ? result.OcularSizeUnits : 600f;
+            if (result.VerticalSplitImage != null)
+            {
+                AnchorCenter(result.VerticalSplitImage.rectTransform, thicknessUnits,
+                    ocular);
+            }
+            if (result.HorizontalSightImage != null)
+            {
+                AnchorCenter(result.HorizontalSightImage.rectTransform,
+                    ocular, thicknessUnits);
+            }
+        }
+
+        private static void ApplyBar(Image bar, float width, float height,
+            float x, float y, Color color)
+        {
+            if (bar == null)
+                return;
+
+            RectTransform rt = bar.rectTransform;
+            Vector2 size = new Vector2(width, height);
+            if (rt.sizeDelta != size)
+                rt.sizeDelta = size;
+            Vector2 position = new Vector2(x, y);
+            if (rt.anchoredPosition != position)
+                rt.anchoredPosition = position;
+            if (bar.color != color)
+                bar.color = color;
         }
 
         /// <summary>

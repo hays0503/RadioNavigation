@@ -27,8 +27,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [Fact]
         public void Compute_Sun_MatchesSunRaDec()
         {
-            double jd = CelestialEphemeris.JdFor(CelestialBody.Sun(), T0);
-            AstroMath.SunRaDec(jd, out double expectedRa, out double expectedDec);
+            // The Sun is evaluated on TT (UT + ΔT) while its LST stays UT.
+            AstroMath.SunRaDec(SunEphemerisCalibration.JdTt(T0),
+                out double expectedRa, out double expectedDec);
 
             Assert.True(CelestialEphemeris.Compute(CelestialBody.Sun(), T0,
                 out double ra, out double dec));
@@ -51,23 +52,22 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void Compute_Star_MatchesCatalogRow()
+        public void Compute_Star_MatchesPrecessedCatalogRow()
         {
+            // The catalog's effective epoch is 1926.0; Compute must return the
+            // row precessed to the sight date, never the raw row (P1b).
             const int hip = 91262; // Vega
+            double jd = CelestialEphemeris.JdFor(CelestialBody.Star(hip, "Vega"), T0);
             Assert.True(CelestialEphemeris.Compute(CelestialBody.Star(hip, "Vega"), T0,
                 out double ra, out double dec));
+            Assert.True(CelestialEphemeris.TryGetStarRaDec(hip, jd,
+                out double expectedRa, out double expectedDec));
+            Assert.Equal(expectedRa, ra, 12);
+            Assert.Equal(expectedDec, dec, 12);
 
-            bool found = false;
-            foreach (StarEntry star in StarCatalog.Stars)
-            {
-                if (star.Hip != hip)
-                    continue;
-                Assert.Equal(star.RaDeg * Math.PI / 180.0, ra, 9);
-                Assert.Equal(star.DecDeg * Math.PI / 180.0, dec, 9);
-                found = true;
-                break;
-            }
-            Assert.True(found, "HIP " + hip + " not in catalog");
+            // And it must differ from the raw catalog row (pre-1926 fix it did not).
+            Assert.True(CelestialEphemeris.TryGetStarRaDec(hip, out double rawRa, out _));
+            Assert.True(Math.Abs(rawRa - ra) > 0.001, "Compute must precess the catalog row");
         }
 
         [Fact]

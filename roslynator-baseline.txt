@@ -31,11 +31,16 @@
   Source\Logic\LighthouseVisualModel.cs : warning RCS1238: 
   Source\Logic\Main.cs : warning RCS1129: 
   Source\Logic\Main.cs : warning RCS1169: 
+  Source\Logic\MoonDiscRenderer.cs : warning RCS1128: 
+  Source\Logic\MoonDiscRenderer.cs : warning RCS1146: 
+  Source\Logic\MoonDiscRenderer.cs : warning RCS1213: 
   Source\Logic\MorseKeyer.cs : warning RCS1161: 
   Source\Logic\PlanetRenderer.cs : warning RCS1128: 
   Source\Logic\PlanetRenderer.cs : warning RCS1146: 
   Source\Logic\PlanetRenderer.cs : warning RCS1213: 
   Source\Logic\RadioStoryIntegration.cs : warning RCS1163: 
+  Source\Logic\SextantSightLineColor.cs : warning RCS1238: 
+  Source\Logic\SkyBrightness.cs : warning RCS1238: 
   Source\Logic\SkyVisibilityResolver.cs : warning RCS1146: 
   Source\Logic\SkyVisibilityResolver.cs : warning RCS1169: 
   Source\Logic\SonneController.cs : warning RCS1169: 
@@ -62,7 +67,9 @@
   Source\UI\CursorHandler.cs : warning RCS1213: 
   Source\UI\DebugAngleHandler.cs : warning RCS1213: 
   Source\UI\ExpanderHandler.cs : warning RCS1213: 
+  Source\UI\FixCardComposer.cs : warning RCS1238: 
   Source\UI\FixMapMarker.cs : warning RCS1146: 
+  Source\UI\FixMapMarker.cs : warning RCS1238: 
   Source\UI\GroundHandler.cs : warning RCS1213: 
   Source\UI\InformationPanelHandler.cs : warning RCS1213: 
   Source\UI\InformationPanelHandler.cs : warning RCS1238: 
@@ -78,15 +85,17 @@
   Source\UI\SextantController.cs : warning RCS1146: 
   Source\UI\SextantController.cs : warning RCS1169: 
   Source\UI\SextantController.cs : warning RCS1213: 
+  Source\UI\SextantController.cs : warning RCS1221: 
   Source\UI\SextantDmFormat.cs : warning RCS1238: 
   Source\UI\SextantEffectMirror.cs : warning RCS1146: 
   Source\UI\SextantGameSun.cs : warning RCS1173: 
+  Source\UI\SextantInteriorMirror.cs : warning RCS1146: 
   Source\UI\SextantInteriorPoseFollower.cs : warning RCS1213: 
   Source\UI\SextantPipFactory.cs : warning RCS1128: 
   Source\UI\SextantPipFactory.cs : warning RCS1146: 
   Source\UI\SextantPipInteriorPose.cs : warning RCS1213: 
-  Source\UI\SextantPipPose.cs : warning RCS1146: 
   Source\UI\SextantRenderPasses.cs : warning RCS1146: 
+  Source\UI\SextantWorksheet.cs : warning RCS1238: 
   Source\UI\ShipControlUIBridge.cs : warning RCS1146: 
   Source\UI\SpinnerHandlerBase.cs : warning RCS1129: 
   Source\UI\StationMapMarker.cs : warning RCS1146: 

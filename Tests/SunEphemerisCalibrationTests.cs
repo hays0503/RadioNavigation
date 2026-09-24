@@ -21,11 +21,14 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
         private static double[] OwnDirAt(double deltaMinutes)
         {
-            double jd = AstroMath.ToJulianDay(Utc) + deltaMinutes / 1440.0;
+            // Mirror the production TT/UT split (P1): LST on UT, coordinates
+            // on TT — a target built the old way would bias the solved Δt.
+            double jdUt = AstroMath.ToJulianDay(Utc) + deltaMinutes / 1440.0;
+            double jdTt = jdUt + SunEphemerisCalibration.DeltaTSeconds / 86400.0;
             double raRad, decRad;
-            AstroMath.SunRaDec(jd, out raRad, out decRad);
+            AstroMath.SunRaDec(jdTt, out raRad, out decRad);
             double altRad, azRad, e, n, u;
-            AstroMath.RaDecToEnu(raRad, decRad, AstroMath.LstDeg(jd, Lon), Lat,
+            AstroMath.RaDecToEnu(raRad, decRad, AstroMath.LstDeg(jdUt, Lon), Lat,
                 out altRad, out azRad, out e, out n, out u);
             double len = Math.Sqrt(e * e + n * n + u * u);
             return new[] { e / len, u / len, n / len };

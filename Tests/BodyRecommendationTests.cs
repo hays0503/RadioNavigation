@@ -20,6 +20,18 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             };
         }
 
+        private static BodyRecommendation.Candidate H(string name, double alt, double az,
+            int hip)
+        {
+            return new BodyRecommendation.Candidate
+            {
+                Name = name,
+                AltDeg = alt,
+                AzDeg = az,
+                Hip = hip
+            };
+        }
+
         [Fact]
         public void Separation_IsUndirected_0To90()
         {
@@ -108,6 +120,61 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             };
 
             Assert.False(BodyRecommendation.Recommend(10.0, candidates, "Sun").Found);
+        }
+
+        [Fact]
+        public void RecommendThird_MaximizesMinToBothRecorded()
+        {
+            // Recorded azimuths 0 and 80: "Balanced" sits 40° from each,
+            // "Wide" is 80° from one but only 20° from the other.
+            var candidates = new List<BodyRecommendation.Candidate>
+            {
+                H("Balanced", 40.0, 40.0, 1),
+                H("Wide", 40.0, 100.0, 2)
+            };
+
+            BodyRecommendation.Result r =
+                BodyRecommendation.RecommendThird(0.0, 80.0, candidates, 0, 0);
+
+            Assert.True(r.Found);
+            Assert.Equal("Balanced", r.Name);
+            Assert.Equal(40.0, r.SeparationDeg, 6);
+        }
+
+        [Fact]
+        public void RecommendThird_ExcludesRecordedHips()
+        {
+            var candidates = new List<BodyRecommendation.Candidate>
+            {
+                H("Recorded1", 40.0, 40.0, 111),
+                H("Recorded2", 40.0, 30.0, 222),
+                H("Fresh", 40.0, 20.0, 333)
+            };
+
+            BodyRecommendation.Result r =
+                BodyRecommendation.RecommendThird(0.0, 80.0, candidates, 111, 222);
+
+            Assert.True(r.Found);
+            Assert.Equal("Fresh", r.Name);
+        }
+
+        [Fact]
+        public void RecommendThird_BelowAccept_NotFound()
+        {
+            var candidates = new List<BodyRecommendation.Candidate>
+            {
+                H("NearlySame", 40.0, 85.0, 1)
+            };
+
+            Assert.False(BodyRecommendation.RecommendThird(0.0, 80.0, candidates, 0, 0).Found);
+        }
+
+        [Fact]
+        public void RecommendThird_NullEmpty_NotFound()
+        {
+            Assert.False(BodyRecommendation.RecommendThird(0.0, 80.0, null, 0, 0).Found);
+            Assert.False(BodyRecommendation.RecommendThird(0.0, 80.0,
+                new List<BodyRecommendation.Candidate>(), 0, 0).Found);
         }
     }
 }

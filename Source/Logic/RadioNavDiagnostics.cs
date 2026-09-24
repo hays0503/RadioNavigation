@@ -22,6 +22,11 @@ namespace UBOAT.Mods.RadioNavigation
         // panel visibility, flare over-range). OFF by default — these are
         // diagnostics, not errors; enable with PlayerPrefs RadioNav.VerboseLog=1.
         public const string VerboseLogKey = "RadioNav.VerboseLog";
+        // Debug aim readout in the ocular (RadioNav.DebugAim): the total,
+        // vertical and horizontal offsets between the line of sight and the
+        // identified body, appended to the identification line. OFF by
+        // default — it is an aiming aid for nulling the intercept.
+        public const string AimDebugKey = "RadioNav.DebugAim";
 
         private const int CacheMs = 250;
         // Environment.TickCount instead of Stopwatch: System.Diagnostics is
@@ -59,6 +64,8 @@ namespace UBOAT.Mods.RadioNavigation
                     IsEnabled(LighthouseDeclutterStatsKey, false);
                 cachedValue[VerboseLogKey] =
                     IsEnabled(VerboseLogKey, false);
+                cachedValue[AimDebugKey] =
+                    IsEnabled(AimDebugKey, false);
                 cacheRefreshedAt = now;
                 cacheInitialized = true;
             }

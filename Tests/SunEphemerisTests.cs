@@ -53,10 +53,11 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             SunEphemerisCalibration.SetDelta(0.0);
             DateTime utc = new DateTime(2026, 8, 1, 12, 0, 0, DateTimeKind.Utc);
 
-            double jd = SunEphemerisCalibration.CalibratedJd(utc);
-            double lstDeg = AstroMath.LstDeg(jd, 18.0);
+            double jdUt = SunEphemerisCalibration.JdUt(utc);
+            double jdTt = SunEphemerisCalibration.JdTt(utc);
+            double lstDeg = AstroMath.LstDeg(jdUt, 18.0);
             double raRad, decRad;
-            AstroMath.SunRaDec(jd, out raRad, out decRad);
+            AstroMath.SunRaDec(jdTt, out raRad, out decRad);
             double altRad, azRad, e, n, u;
             AstroMath.RaDecToEnu(raRad, decRad, lstDeg, 54.0, out altRad, out azRad, out e, out n, out u);
             double len = Math.Sqrt(e * e + n * n + u * u);

@@ -25,7 +25,6 @@ namespace UBOAT.Mods.RadioNavigation
         public Image FilterDimLeft;
         public Image FilterDimRight;
         public Text PainText;
-        public Action<bool, float> SunReadout;
         public Action<float> SunDriftLog;
         public Action PainStarIdReset;
     }
@@ -78,8 +77,6 @@ namespace UBOAT.Mods.RadioNavigation
                 // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6°),
                 // so position it on the game direction when available.
                 SunDiscRenderer.SunDirection = frame.GameOk ? frame.GameDir : frame.OwnDir;
-                if (frame.SunReadout != null)
-                    frame.SunReadout(true, frame.OwnAlt);
                 if (!sunDiscSourceLogged && SunDiscRenderer.Active)
                 {
                     sunDiscSourceLogged = true;
@@ -89,11 +86,6 @@ namespace UBOAT.Mods.RadioNavigation
                         LogPrefix, frame.GameOk ? "game" : "own", sep, frame.OwnAlt, frame.OwnAz,
                         frame.GameOk ? SextantVectorLog.V3(frame.GameDir) : " n/a"));
                 }
-            }
-            else
-            {
-                if (frame.SunReadout != null)
-                    frame.SunReadout(false, 0f);
             }
             ApplyGlare(g, frame.GlareImage, frame.PainText, frame.PainStarIdReset);
             if (frame.SunDriftLog != null)
@@ -142,6 +134,8 @@ namespace UBOAT.Mods.RadioNavigation
                 if (painStarIdReset != null)
                     painStarIdReset();
                 if (painText.IsNotNull()) painText.enabled = true;
+                // White flash: the lookout's dark adaptation is gone (P4).
+                StarsMesh.NotifyWhiteFlash();
             }
             else if (pain && g < PainOffGlare)
             {

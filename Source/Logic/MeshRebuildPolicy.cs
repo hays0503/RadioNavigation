@@ -12,8 +12,26 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public const float MaxCameraMoveM = 10f;
         public const float MaxCameraRotationDeg = 5f;
-        public const double MaxLstDriftDeg = 0.1;
-        public const float MaxLatitudeDriftDeg = 0.01f;
+        public const double MaxLstDriftDeg = RebuildDrift.MaxLstDriftDeg;
+        public const float MaxLatitudeDriftDeg = RebuildDrift.MaxLatitudeDriftDeg;
+
+        /// <summary>Minimum realtime interval between full mesh rebuilds (P7):
+        /// at ×32 the 0.1° LST threshold alone fires ~1.3×/s per mesh.</summary>
+        public const float MinRebuildIntervalSeconds = RebuildDrift.MinRebuildIntervalSeconds;
+
+        /// <summary>True when enough realtime passed since the last rebuild
+        /// (the throttling half of the policy; trip conditions are separate).</summary>
+        public static bool RebuildIntervalElapsed(float lastRebuildRealtime, float nowRealtime)
+        {
+            return RebuildDrift.RebuildIntervalElapsed(lastRebuildRealtime, nowRealtime);
+        }
+
+        /// <summary>Signed angular difference wrapped into [−180, 180]: the
+        /// 359.9° → 0.1° wrap must not read as a 359.8° jump (P7).</summary>
+        public static double AngularDifferenceDeg(double a, double b)
+        {
+            return RebuildDrift.AngularDifferenceDeg(a, b);
+        }
 
         public static bool NeedsRebuild(Vector3 camPos, Vector3 lastCamPos,
             Quaternion camRot, Quaternion lastCamRot,
@@ -39,9 +57,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static bool LstLatDrifted(double lstDeg, double lastLstDeg, float lat, float lastLat)
         {
-            if (System.Math.Abs(lstDeg - lastLstDeg) > MaxLstDriftDeg)
-                return true;
-            return System.Math.Abs(lat - lastLat) > MaxLatitudeDriftDeg;
+            return RebuildDrift.LstLatDrifted(lstDeg, lastLstDeg, lat, lastLat);
         }
     }
 }

@@ -25,7 +25,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [Fact]
         public void StepFine_OneTickIsOneQuantum()
         {
-            Assert.Equal(1.0 / 300.0, SextantArcInput.StepFine(0.0, 1f), 9);
+            Assert.Equal(1.0 / 600.0, SextantArcInput.StepFine(0.0, 1f), 9);
         }
 
         [Fact]

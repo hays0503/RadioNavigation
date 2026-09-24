@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text;
 using DWS.Common.InjectionFramework;
 using DWS.Common.Resources;
+using UBOAT.Game.Core.Data;
 using UBOAT.Game.Core.Input;
 using UBOAT.Game.Scene.Camera;
 using UBOAT.Game.Scene.Environment;
@@ -99,6 +100,16 @@ namespace UBOAT.Mods.RadioNavigation
         private Image filterDimLeftImage;
         private Image filterDimRightImage;
         private Image glareImage;
+        /// <summary>Overlay DTO (sight lines + aiming window live here).</summary>
+        private SextantOverlay.Result overlayResult;
+        // Last UI scale / screen size applied to the overlay (PollUiScale).
+        private float appliedUiScale = -1f;
+        private int appliedScreenWidth;
+        private int appliedScreenHeight;
+        /// <summary>Debug aim readout (RadioNav.DebugAim): a separate line under
+        /// the aiming window, so the identification line stays clean and the
+        /// top-left F-Tafel card cannot collide with it (2026-09-22).</summary>
+        private Text debugAimText;
         private Text angleText;
         private Text nameText;
         private Text painText;
@@ -118,7 +129,6 @@ namespace UBOAT.Mods.RadioNavigation
         private Action zoomOutDelegate;
         private Action resetArcDelegate;
         private Action manualRenderDelegate;
-        private Action<bool, float> sunReadoutDelegate;
         private Action<float> sunDriftLogDelegate;
         private Action painStarIdResetDelegate;
 
@@ -148,13 +158,93 @@ namespace UBOAT.Mods.RadioNavigation
             zoomOutDelegate = ZoomOut;
             resetArcDelegate = ResetArc;
             manualRenderDelegate = () => vectorLog.OnManualRender(arcAngle);
-            sunReadoutDelegate = UpdateSunReadout;
             sunDriftLogDelegate = LogSunDrift;
             painStarIdResetDelegate = starId.Reset;
             calibrator.Load();
         }
 
         [Inject] private static ResourceManager resourceManager = null;
+        // Game UI scale source (2026-09-22): the overlay matches the HUD's
+        // apparent size, exactly like CanvasUserSettings does for the game's
+        // own canvases. Null in tests/headless — UiScale() falls back to 1.
+        [Inject] private static UserSettings userSettings = null;
+
+        /// <summary>Game UI scale (0.5…4, default 1); 1 when unavailable.
+        /// Internal since 2026-09-22: ConstellationMesh sizes the ocular line
+        /// width from the on-screen ocular height (600 units × uiScale).</summary>
+        internal static float UiScale()
+        {
+            if (userSettings == null || userSettings.ControlSettings == null)
+                return 1f;
+            float scale = userSettings.ControlSettings.uiScale;
+            if (scale <= 0f || float.IsNaN(scale))
+                return 1f;
+            return scale;
+        }
+
+        /// <summary>Live ocular zoom divisor (SextantZoom steps 1…6; 1 when
+        /// closed/headless). ConstellationMesh needs it to convert the main
+        /// camera FOV into the ocular FOV without touching the PIP cameras.</summary>
+        internal static float CurrentFovDivisor
+        {
+            get { return Instance != null ? Instance.zoom.FovDivisor : 1f; }
+        }
+
+        /// <summary>Live ocular side in canvas units (2026-11-04): the built
+        /// overlay's size, or the policy default when closed/headless.
+        /// ConstellationMesh and the cone box derive from it.</summary>
+        internal static float OcularSizeUnits()
+        {
+            if (Instance != null && Instance.overlayResult != null
+                && Instance.overlayResult.OcularSizeUnits > 0f)
+            {
+                return Instance.overlayResult.OcularSizeUnits;
+            }
+            return SextantOcularSize.UnitsForScreen(Screen.width, Screen.height, UiScale(),
+                SextantOcularSize.DefaultFraction, SextantOverlayLayout.SideColumnsUnits);
+        }
+
+        /// <summary>
+        /// Live UI-scale/resolution reaction (2026-09-22): PgUp/PgDn reach the
+        /// game even with the sextant open (its input-blockade check runs
+        /// after the scale handling), and the overlay's layout space is the
+        /// screen divided by the scale — so both must be re-applied. Checked
+        /// every frame (three cheap compares; the settings field read and the
+        /// two Screen getters allocate nothing), so the sextant follows the
+        /// HUD with no visible lag; the expensive re-layout only runs on an
+        /// actual change, and the card is re-bound/invalidated by BindCard
+        /// itself (it compares its inputs).
+        /// </summary>
+        private void PollUiScale()
+        {
+            if (overlayResult == null)
+                return;
+
+            float scale = UiScale();
+            if (Mathf.Approximately(scale, appliedUiScale)
+                && Screen.width == appliedScreenWidth
+                && Screen.height == appliedScreenHeight)
+            {
+                return;
+            }
+
+            bool scaleChanged = !Mathf.Approximately(scale, appliedUiScale);
+            appliedUiScale = scale;
+            appliedScreenWidth = Screen.width;
+            appliedScreenHeight = Screen.height;
+            SextantOverlay.ApplyScale(overlayResult, scale);
+            worksheet.BindCard(overlayResult.FixCardText,
+                overlayResult.FixCardAvailableUnits, overlayResult.FixCardBaseFontSize);
+            // The bodies block refits its font to the new room immediately
+            // (the uncapped star list may run into the game's bottom UI).
+            bodiesReadout.Invalidate();
+            if (scaleChanged)
+            {
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "[RadioNav][Sextant] UISCALE applied={0:F2} screen={1}x{2} cardUnits={3:F0}",
+                    scale, Screen.width, Screen.height, overlayResult.FixCardAvailableUnits));
+            }
+        }
 
         private void Update()
         {
@@ -168,6 +258,7 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
                 }
                 inputPoller.PollArc(Time.unscaledDeltaTime, ref arcAngle, ShiftHeld(), logArcInputDelegate);
+                inputPoller.PollYawTrim(Time.unscaledDeltaTime, ShiftHeld());
                 inputPoller.PollFilters(setFiltersDelegate);
                 inputPoller.PollZoom(zoomInDelegate, zoomOutDelegate, resetArcDelegate);
                 UpdatePipPose();
@@ -176,13 +267,16 @@ namespace UBOAT.Mods.RadioNavigation
                 renderCheck.Update(Time.unscaledDeltaTime, arcAngle, pipFactory.LeftRt, pipFactory.RightRt);
                 UpdateGlare(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
+                UpdateSightLines();
                 UpdateReadout(false);
                 UpdateBodiesReadout(Time.unscaledDeltaTime);
                 UpdateMoonParity(Time.unscaledDeltaTime);
                 inputPoller.PollFix(arcAngle);
+                inputPoller.PollIndexError(arcAngle);
                 if (Input.GetKeyDown(KeyCode.P))
                     ToggleHelp();
                 worksheet.UpdateCourseSampler(Time.unscaledDeltaTime);
+                PollUiScale();
                 worksheet.UpdatePanel(Time.unscaledDeltaTime);
             }
             else if (Input.GetKeyDown(KeyCode.Z) && !ShiftHeld())
@@ -201,6 +295,7 @@ namespace UBOAT.Mods.RadioNavigation
             SextantPipPose.Reset();
             SextantPipPose.ClearTestAim();
             IsOpen = false;
+            CameraResolver.UnfreezeRadius();
 
             if (canvasRoot != null) Destroy(canvasRoot);
             bloomCut.Destroy();
@@ -228,7 +323,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             EnsureOverlay();
             pipFactory.Ensure(viewCamera, zoom.FovDivisor, leftViewImage, rightViewImage,
-                effectMirror, bloomCut, this);
+                effectMirror, bloomCut, this, UiScale());
             calibrator.Solve(positionProvider, gameSun, worksheet);
 
             ResetReadingState();
@@ -319,9 +414,15 @@ namespace UBOAT.Mods.RadioNavigation
                 pipFactory.RightCamera != null && pipFactory.RightCamera.enabled,
                 viewCamera != null ? viewCamera.fieldOfView : 0f,
                 viewCamera != null ? viewCamera.fieldOfView / zoom.FovDivisor : 0f));
+            // Fresh filters each session: the first pose below snaps instead
+            // of gliding from the pose frozen at Close (swarm review 2026-11-04).
+            SextantPipPose.ResetFilters();
             UpdatePipPose();
             LogVectorState("open");
             IsOpen = true;
+            // Freeze the sky-shell radius (P7): the PIP mirrors its far clip
+            // every frame, so a live radius would make the stars jump mid-sight.
+            CameraResolver.FreezeRadius(viewCamera);
             // Bloom-cut is always-on while open (512x512 PIP: halos + NaN
             // black blocks from the 1080p-tuned bloom) - arm it on the open
             // edge, otherwise it would wait for the first filter keypress.
@@ -349,6 +450,10 @@ namespace UBOAT.Mods.RadioNavigation
 
             IsOpen = false;
             SextantPipPose.ClearTestAim();
+            // The sky shell may breathe again (P7), and the shade filters no
+            // longer shield the lookout's dark adaptation (P4).
+            CameraResolver.UnfreezeRadius();
+            StarsMesh.Shielded = false;
             if (gameInput != null)
                 gameInput.RemoveBlockade(this);
             pipFactory.Detach();
@@ -741,6 +846,9 @@ namespace UBOAT.Mods.RadioNavigation
         private void ResetArc()
         {
             arcAngle = 0.0;
+            // R also re-centres the keyboard aim trim (the same "back to the
+            // start" action; 2026-11-04).
+            SextantPipPose.ResetYawTrim();
             Debug.Log(LogPrefix + " ARC reset to 0");
         }
 
@@ -788,6 +896,9 @@ namespace UBOAT.Mods.RadioNavigation
             // filter only. The left filter dims the horizon view.
             SunDiscRenderer.Active = IsOpen && rightFilterCount > 0;
 
+            // Shade filters preserve the eye's dark adaptation (P4).
+            StarsMesh.Shielded = leftFilterCount + rightFilterCount > 0;
+
             bloomCut.Update(IsOpen, leftFilterCount, rightFilterCount);
             bloomCut.LogAppliedOnce(pipFactory.LeftCamera, pipFactory.RightCamera, viewCamera, leftFilterCount, rightFilterCount);
         }
@@ -799,11 +910,12 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         // Per-frame pose lives in SextantPipPose (extracted, P5.4 slice
-        // 4b); the manual-render telemetry closure stays here.
+        // 4b); the manual-render telemetry closure stays here. dt feeds the
+        // binocular-like stabilization low-pass (2026-11-04).
         private void UpdatePipPose()
         {
             SextantPipPose.Update(pipFactory, arcAngle, zoom.FovDivisor,
-                ref viewCamera, manualRenderDelegate);
+                ref viewCamera, manualRenderDelegate, Time.unscaledDeltaTime);
         }
 
         // ---- glare application lives in SextantGlareCoordinator
@@ -835,25 +947,59 @@ namespace UBOAT.Mods.RadioNavigation
             frame.FilterDimLeft = filterDimLeftImage;
             frame.FilterDimRight = filterDimRightImage;
             frame.PainText = painText;
-            frame.SunReadout = sunReadoutDelegate;
             frame.SunDriftLog = sunDriftLogDelegate;
             frame.PainStarIdReset = painStarIdResetDelegate;
             glare.Update(dt, frame);
         }
 
-        // Sun/bodies readout lives in SextantBodiesReadout (extracted);
-        // these wrappers keep the call sites.
-        private void UpdateSunReadout(bool available, float sunAltDeg)
+        /// <summary>
+        /// Sight lines and aiming window (P7 follow-up): thin black by day,
+        /// greenish luminous paint at night; the window's size equals the
+        /// identification cone, so it grows with the zoom (the cone is fixed
+        /// at 1.0°). Every write is
+        /// guarded (called every frame while open).
+        /// </summary>
+        private void UpdateSightLines()
         {
-            bodiesReadout.UpdateSunLine(available, sunAltDeg);
+            if (overlayResult == null)
+                return;
+
+            Color color = SextantSightLineColor.For(SkyVisibilityResolver.GetVisibility());
+            Image split = overlayResult.VerticalSplitImage;
+            if (split != null && split.color != color)
+                split.color = color;
+            Image horizontal = overlayResult.HorizontalSightImage;
+            if (horizontal != null && horizontal.color != color)
+                horizontal.color = color;
+
+            float fov = viewCamera != null ? viewCamera.fieldOfView : 0f;
+            double pipFov = fov / zoom.FovDivisor;
+            double cone = SightabilityGate.EffectiveConeDeg();
+            SextantOcularBuilder.ApplyConeBox(overlayResult,
+                SextantConeBox.BoxUnits(cone, pipFov, overlayResult.OcularSizeUnits), color);
         }
 
         private void UpdateBodiesReadout(float dt)
         {
             float eyeHeightM = viewCamera != null
                 ? viewCamera.transform.position.y : 0f;
+            // The camera's world Y is not a height above the sea: on the map the
+            // map camera sits at ~1.25e6 m (live 2026-09-22 the card showed
+            // "Глаз 1250000.0 м"). Validate before showing it or feeding a dip.
+            if (eyeHeightM < 0.5f || eyeHeightM > 60f)
+                eyeHeightM = float.NaN;
+            // Outside the boat AND not on the map: the same gate the star sky
+            // uses, so the map camera cannot leak into the readout.
+            bool canSight = SkyVisibilityResolver.IsPlayerOutside();
+            // Vertical room for the uncapped star list: from the block's top
+            // down to the game's bottom UI at the live UI scale (the readout
+            // shrinks its font to fit — 2026-11-04).
+            float bodiesRoom = SextantOverlayLayout.BodiesTextAvailableUnits(
+                Screen.height, UiScale());
             bodiesReadout.UpdateBodies(dt, eyeHeightM,
-                worksheet.Observation1AzDeg, worksheet.Observation1Name);
+                worksheet.Observation1AzDeg, worksheet.Observation1Name,
+                SextantPipPose.Forward(pipFactory, viewCamera, gameMainCamera, arcAngle),
+                canSight, bodiesRoom);
         }
 
         /// <summary>
@@ -947,8 +1093,32 @@ namespace UBOAT.Mods.RadioNavigation
             MainCamera main = MainCamera.Instance;
             bool canSight = main == null || !main.IsInsideBoat;
             starId.Update(dt, glare.IsPained, canSight, SextantPipPose.Forward(pipFactory, viewCamera, gameMainCamera, arcAngle),
-                ownOk, ownDir, ownAlt, gameOk, gameDir, posOk, lat, lon,
+                ownOk, ownDir, ownAlt, gameOk, gameDir, gameAlt, posOk, lat, lon,
                 nameText, arcAngle);
+            UpdateDebugAimText();
+        }
+
+        /// <summary>
+        /// Debug aim readout (RadioNav.DebugAim, 2026-09-22): renders the
+        /// line-of-sight offsets into a dedicated text under the aiming window
+        /// and shows/hides it with the gate. Write-on-change only.
+        /// </summary>
+        private void UpdateDebugAimText()
+        {
+            if (debugAimText == null)
+                return;
+
+            bool enabled = RadioNavDiagnostics.IsEnabledCached(
+                RadioNavDiagnostics.AimDebugKey, false);
+            if (debugAimText.gameObject.activeSelf != enabled)
+                debugAimText.gameObject.SetActive(enabled);
+            if (!enabled)
+                return;
+
+            string text = AimOffsetFormat.Format(starId.AimTotalArcMin,
+                starId.AimVerticalArcMin, starId.AimHorizontalArcMin);
+            if (debugAimText.text != text)
+                debugAimText.text = text;
         }
 
 
@@ -977,7 +1147,12 @@ namespace UBOAT.Mods.RadioNavigation
             if (canvasRoot != null)
                 return;
 
-            var ui = SextantOverlay.Build(pipFactory.LeftRt, pipFactory.RightRt, resourceManager, this);
+            var ui = SextantOverlay.Build(pipFactory.LeftRt, pipFactory.RightRt,
+                resourceManager, this, UiScale());
+            overlayResult = ui;
+            appliedUiScale = UiScale();
+            appliedScreenWidth = Screen.width;
+            appliedScreenHeight = Screen.height;
             canvasRoot = ui.CanvasRoot;
             leftViewImage = ui.LeftViewImage;
             rightViewImage = ui.RightViewImage;
@@ -986,6 +1161,7 @@ namespace UBOAT.Mods.RadioNavigation
             glareImage = ui.GlareImage;
             angleText = ui.AngleText;
             nameText = ui.NameText;
+            debugAimText = ui.DebugAimText;
             painText = ui.PainText;
             filterText = ui.FilterText;
             ringTexture = ui.RingTexture;
@@ -996,8 +1172,9 @@ namespace UBOAT.Mods.RadioNavigation
             // ocular images already hold it (SextantOcularBuilder assigns
             // Left/RightViewImage.material), so no extra reference is needed
             // to keep Unity from unloading it.
-            bodiesReadout.BindLabels(ui.SunAltText, ui.BodiesAltText);
-            worksheet.BindCard(ui.FixCardText);
+            bodiesReadout.BindLabels(ui.BodiesAltText);
+            worksheet.BindCard(ui.FixCardText, ui.FixCardAvailableUnits,
+                ui.FixCardBaseFontSize);
             helpPanel = SextantHelpPanel.Build(canvasRoot);
         }
 

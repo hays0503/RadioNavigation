@@ -6,23 +6,17 @@ namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
     /// Builds the sextant overlay UI (SEXTANT_PLAN §13.3): own canvas with
-    /// scaler, the lens assembly (SextantOcularBuilder), the text columns
-    /// (SextantColumnsBuilder) and the bottom hint line. Resolution-
-    /// independent: own canvas + CanvasScaler (1920x1080 reference, match
-    /// height). Extracted from SextantController (SRP: UI construction is
-    /// not device logic). Pure orchestrator: creates the root, delegates
-    /// the two halves, hands the references back; the controller owns the
-    /// lifetime.
+    /// scaler, the lens assembly (SextantOcularBuilder) and the text columns
+    /// (SextantColumnsBuilder). Resolution-independent: own canvas +
+    /// CanvasScaler (1920x1080 reference, match height). Extracted from
+    /// SextantController (SRP: UI construction is not device logic). Pure
+    /// orchestrator: creates the root, delegates the two halves, hands the
+    /// references back; the controller owns the lifetime. The key list lives
+    /// in the help panel (P) since 2026-11-04 — the old bottom hint line was
+    /// overlapped by the game's own bottom UI.
     /// </summary>
     internal static class SextantOverlay
     {
-        private const string HintText =
-            "\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0443\u0433\u043E\u043B \u00B7 Shift: \u0431\u044B\u0441\u0442\u0440\u0435\u0435 \u00B7 " +
-            "Ctrl+\u0421\u0442\u0440\u0435\u043B\u043A\u0438: \u0442\u043E\u0447\u043D\u043E (0,2\u2032) \u00B7 " +
-            "1\u20133: \u0444\u0438\u043B\u044C\u0442\u0440 \u043F\u0440\u0430\u0432\u044B\u0439 \u00B7 Ctrl+1\u20133: \u043B\u0435\u0432\u044B\u0439 \u00B7 " +
-            "0: \u0441\u043D\u044F\u0442\u044C \u00B7 R: 0\u00B0 \u00B7 +/\u2212: \u0437\u0443\u043C \u00B7 " +
-            "I: \u0437\u0430\u043C\u0435\u0440 \u00B7 O: \u0441\u0435\u0440\u0438\u044F \u00B7 " +
-            "P: \u0441\u043F\u0440\u0430\u0432\u043A\u0430 \u00B7 Z: \u0432\u044B\u0445\u043E\u0434";
 
         /// <summary>All references the controller needs after the build.</summary>
         public sealed class Result
@@ -34,13 +28,41 @@ namespace UBOAT.Mods.RadioNavigation
             public Image FilterDimLeftImage;
             public Image FilterDimRightImage;
             public Image GlareImage;
+            // Sight lines + the centred aiming window (P7 follow-up): both are
+            // recoloured day/night and the window is resized with the cone.
+            public Image VerticalSplitImage;
+            public Image HorizontalSightImage;
+            public Image ConeBoxTopImage;
+            public Image ConeBoxLeftImage;
+            public Image ConeBoxRightImage;
+            /// <summary>Thickness of a 1-physical-pixel line in canvas units.</summary>
+            public float SightLineThicknessUnits;
+            /// <summary>Live ocular side in canvas units (SextantOcularSize):
+            /// the sight lines, the cone box and the debug-aim offset all
+            /// derive from it (2026-11-04).</summary>
+            public float OcularSizeUnits;
             public Text AngleText;
             public Text NameText;
             public Text PainText;
             public Text FilterText;
-            public Text SunAltText;
             public Text BodiesAltText;
             public Text FixCardText;
+            /// <summary>Aim diagnostics readout (RadioNav.DebugAim): hidden by
+            /// default, the controller enables it when the gate is on and the
+            /// aim values are written elsewhere.</summary>
+            public Text DebugAimText;
+            /// <summary>The worksheet column rect (re-placed when the game's
+            /// UI scale changes, 2026-09-22).</summary>
+            public RectTransform FixColumn;
+            /// <summary>Reading and sun column rects (re-placed when the ocular
+            /// size changes, 2026-11-04).</summary>
+            public RectTransform ReadingColumn;
+            public RectTransform SunColumn;
+            /// <summary>Usable card height (canvas units) and the base font
+            /// size: the worksheet shrinks the font so the whole card fits
+            /// (2026-09-22, FixCardLayout).</summary>
+            public float FixCardAvailableUnits;
+            public int FixCardBaseFontSize;
             public Texture2D RingTexture;
             public Texture2D CircleMaskTexture;
             public Texture2D EyecupTexture;
@@ -56,9 +78,16 @@ namespace UBOAT.Mods.RadioNavigation
         /// resourceManager may be null (views keep the stock UI shader).
         /// </summary>
         public static Result Build(RenderTexture leftRt, RenderTexture rightRt,
-            ResourceManager resourceManager, UnityEngine.Object assetContext)
+            ResourceManager resourceManager, UnityEngine.Object assetContext, float uiScale)
         {
             var result = new Result();
+            if (uiScale <= 0f || float.IsNaN(uiScale))
+                uiScale = 1f;
+
+            // Ocular side: a fraction of the unit height (SextantOcularSize),
+            // clamped by the unit width so the side columns keep their space.
+            float ocularSize = SextantOcularSize.UnitsForScreen(Screen.width, Screen.height,
+                uiScale, OcularFraction(), SextantOverlayLayout.SideColumnsUnits);
 
             GameObject canvasRoot = new GameObject("RadioNavSextantOverlay", typeof(Canvas), typeof(GraphicRaycaster));
             Canvas canvas = canvasRoot.GetComponent<Canvas>();
@@ -67,30 +96,99 @@ namespace UBOAT.Mods.RadioNavigation
 
             CanvasScaler scaler = canvasRoot.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            // Game convention (2026-09-22): the layout space is the screen
+            // divided by the UI scale, exactly like the HUD canvases
+            // (CanvasUserSettings + FullscreenRect), so the sextant matches the
+            // HUD's apparent size at any resolution and UI scale.
+            scaler.referenceResolution = new Vector2(Screen.width, Screen.height) / uiScale;
             scaler.matchWidthOrHeight = 1f;
 
             SextantOcularBuilder.BuildOcular(canvasRoot, canvas.scaleFactor,
-                leftRt, rightRt, resourceManager, assetContext, result);
-            SextantColumnsBuilder.BuildColumns(canvasRoot, result);
+                leftRt, rightRt, resourceManager, assetContext, result, ocularSize);
+            SextantColumnsBuilder.BuildColumns(canvasRoot, result, uiScale, ocularSize);
 
-            // Bottom hint line.
-            Text hint = SextantColumnsBuilder.MakeLabel(canvasRoot, "HintText", 13,
-                TextAnchor.MiddleCenter, new Color(0.75f, 0.75f, 0.75f));
-            hint.text = HintText;
-            RectTransform hr = hint.rectTransform;
-            hr.anchorMin = new Vector2(0.5f, 0f);
-            hr.anchorMax = new Vector2(0.5f, 0f);
-            hr.pivot = new Vector2(0.5f, 0f);
-            hr.sizeDelta = new Vector2(1100f, 40f);
-            hr.anchoredPosition = new Vector2(0f, SextantOverlayLayout.HintYUnits);
+            // Debug aim readout (RadioNav.DebugAim): centred just below the
+            // aiming window; off until the controller enables it.
+            Text debugAim = SextantColumnsBuilder.MakeLabel(canvasRoot, "DebugAimText", 14,
+                TextAnchor.MiddleCenter, new Color(0.6f, 1f, 0.7f));
+            debugAim.text = "";
+            RectTransform debugAimRect = debugAim.rectTransform;
+            debugAimRect.anchorMin = new Vector2(0.5f, 0.5f);
+            debugAimRect.anchorMax = new Vector2(0.5f, 0.5f);
+            debugAimRect.pivot = new Vector2(0.5f, 1f);
+            debugAimRect.anchoredPosition = new Vector2(0f, -60f);
+            debugAimRect.sizeDelta = new Vector2(600f, 30f);
+            debugAim.gameObject.SetActive(false);
+            result.DebugAimText = debugAim;
 
             // No on-screen control buttons: zoom is +/- keys, arc reset is R
-            // (see HintText). Mouse stays free for aiming.
+            // (the full key list lives in the help panel, P). Mouse stays free
+            // for aiming.
             canvasRoot.SetActive(false);
             result.CanvasRoot = canvasRoot;
             Debug.Log("[RadioNav][Sextant] overlay built");
             return result;
+        }
+
+        /// <summary>
+        /// Follows the game's UI scale live (2026-09-22): PgUp/PgDn change
+        /// userSettings.ControlSettings.uiScale even while the sextant is open
+        /// (the game handles the scale before its input-blockade check), so the
+        /// overlay must re-derive its reference resolution, its ocular size
+        /// (a fraction of the unit height, 2026-11-04) and the worksheet
+        /// column placement — the unit space shrinks as the scale grows, which
+        /// is what the card auto-font then works against.
+        /// </summary>
+        public static void ApplyScale(Result result, float uiScale)
+        {
+            if (result == null || result.CanvasRoot == null)
+                return;
+            if (uiScale <= 0f || float.IsNaN(uiScale))
+                uiScale = 1f;
+
+            CanvasScaler scaler = result.CanvasRoot.GetComponent<CanvasScaler>();
+            if (scaler != null)
+            {
+                Vector2 reference = new Vector2(Screen.width, Screen.height) / uiScale;
+                if (scaler.referenceResolution != reference)
+                    scaler.referenceResolution = reference;
+            }
+
+            // Ocular side follows the unit height: re-derive and re-place the
+            // circle, its sight lines and the columns that hug it.
+            float ocularSize = SextantOcularSize.UnitsForScreen(Screen.width, Screen.height,
+                uiScale, OcularFraction(), SextantOverlayLayout.SideColumnsUnits);
+            result.OcularSizeUnits = ocularSize;
+            if (result.PipRect != null)
+            {
+                result.PipRect.sizeDelta = new Vector2(ocularSize, ocularSize);
+                result.PipRect.anchoredPosition = Vector2.zero;
+            }
+            SextantColumnsBuilder.PlaceColumns(result, ocularSize);
+
+            SextantOverlayLayout.FixColumnPlacement placement =
+                SextantOverlayLayout.ComputeFixColumnPlacement(
+                    Screen.width, Screen.height, uiScale, ocularSize);
+            if (result.FixColumn != null)
+            {
+                result.FixColumn.sizeDelta = new Vector2(
+                    SextantOverlayLayout.FixColumnWidthUnits, placement.maxHeightUnits);
+                result.FixColumn.pivot = new Vector2(placement.pivotX, placement.pivotY);
+                result.FixColumn.anchoredPosition = new Vector2(
+                    placement.anchorX, placement.anchorY);
+            }
+            result.FixCardAvailableUnits = placement.maxHeightUnits;
+            // The overlay units follow the scale, so the 1-physical-pixel
+            // hairlines must be re-derived (1 unit = uiScale pixels).
+            SextantOcularBuilder.ApplySightLineThickness(result, 1f / uiScale);
+        }
+
+        /// <summary>Ocular fraction from PlayerPrefs (RadioNav.OcularScale),
+        /// clamped into the slider band; the default when unset.</summary>
+        private static float OcularFraction()
+        {
+            return SextantOcularSize.ClampFraction(
+                PlayerPrefs.GetFloat(SextantOcularSize.PrefsKey, SextantOcularSize.DefaultFraction));
         }
     }
 }

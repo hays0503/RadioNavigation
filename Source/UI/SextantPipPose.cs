@@ -35,9 +35,33 @@ namespace UBOAT.Mods.RadioNavigation
         private static float testAimYawDeg;
         private static bool testAimActive;
 
-        /// <summary>Test override: both PIP cameras yaw to the given azimuth.</summary>
+        // Stabilization state (author decisions 2026-11-04): the aim is RAW +
+        // washout offset — no yaw low-pass (it made the view slide behind the
+        // mouse). The offset freezes the world yaw while the mouse rests and
+        // bleeds out slowly afterwards. The POSITION is never touched (bino
+        // parity: the game's bridge binocular keeps the camera at the
+        // character's head undamped; filtering it showed as height jumps).
+        // Synced (snapped) whenever the filter is bypassed — test aim,
+        // disabled. Reset on the open edge and on teardown (ResetFilters).
+        private static float yawOffset;
+        // Keyboard aim trim (author request 2026-11-04): the left/right arrows
+        // rotate the view like the bridge binocular's arrow rotation; reset by
+        // R (with the arc) and on open.
+        private static float yawTrimDeg;
+        // Aim freeze: while the mouse is still the world yaw is frozen, so the
+        // boat's wobble cannot move the star across the crosshair. The raw
+        // mouse axes drive the idle timer — the game's input blockade does not
+        // touch them.
+        private static float idleSeconds;
+        private static bool wasLocked;
+        private static float lockedYaw;
+
+        /// <summary>Test override: both PIP cameras yaw to the given azimuth.
+        /// The keyboard trim resets with it so an agent's absolute aim is not
+        /// offset by a leftover trim (2026-11-04).</summary>
         public static void SetTestAim(float yawDeg)
         {
+            ResetYawTrim();
             testAimYawDeg = yawDeg;
             testAimActive = true;
         }
@@ -49,7 +73,7 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         public static void Update(SextantPipFactory factory, double arcAngle,
-            float fovDivisor, ref Camera viewCamera, Action manualRender)
+            float fovDivisor, ref Camera viewCamera, Action manualRender, float dt)
         {
             if (factory.LeftCamera == null || factory.RightCamera == null)
                 return;
@@ -76,12 +100,27 @@ namespace UBOAT.Mods.RadioNavigation
                 lastGoodViewCamera = viewCamera;
             }
 
+            MainCamera interiorMain = MainCamera.Instance;
+            bool insideBoat = interiorMain?.IsInsideBoat == true;
+
+            // Stabilization inputs (2026-11-04): the smoothing gate, the aim
+            // freeze gate and the raw mouse motion (read once per frame).
+            bool stabilizationOn;
+            bool locked = UpdateAimFreeze(insideBoat, dt, out stabilizationOn);
+            Locked = locked;
+
             Transform mt = viewCamera.transform;
             Vector3 mainEuler = mt.eulerAngles;
-            float yaw = testAimActive ? testAimYawDeg : mainEuler.y;
-            factory.LeftCamera.transform.position = mt.position;
+            float targetYaw = (testAimActive ? testAimYawDeg : mainEuler.y) + yawTrimDeg;
+            float yaw = StabilizeYaw(targetYaw, dt, stabilizationOn, locked);
+            // Position: bino parity (author decision 2026-11-04) — the game's
+            // bridge binocular keeps its camera at the character's head with
+            // no damping, and any position filtering/freeze showed as height
+            // jumps in the ocular. Raw 1:1, always.
+            Vector3 position = mt.position;
+            factory.LeftCamera.transform.position = position;
             factory.LeftCamera.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-            factory.RightCamera.transform.position = mt.position;
+            factory.RightCamera.transform.position = position;
             // Positive Euler X pitches DOWN in Unity; the alidade looks UP.
             factory.RightCamera.transform.rotation = Quaternion.Euler(-(float)arcAngle, yaw, 0f);
 
@@ -91,8 +130,6 @@ namespace UBOAT.Mods.RadioNavigation
             // Single GBuffer writer per pass, whose depth matches the lighting
             // camera — the shared-_GBufferZ mismatch that corrupted one ocular
             // half (SEXTANT_PLAN §16.17) is gone by construction.
-            MainCamera interiorMain = MainCamera.Instance;
-            bool insideBoat = interiorMain?.IsInsideBoat == true;
             int interiorMask = insideBoat ? factory.InteriorMirror.InteriorMask : 0;
 
             SyncCameraState(factory.LeftCamera, viewCamera, fovDivisor, interiorMask);
@@ -199,14 +236,145 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Drops per-camera caches (PIP cameras are recreated per open).
-        /// Called from the controller's teardown.
+        /// Drops per-camera caches and the stabilization filters. Called from
+        /// the controller's teardown; the open edge resets the filters via
+        /// <see cref="ResetFilters"/> (the PIP cameras live for the whole
+        /// scene session, so their caches survive an open/close cycle).
         /// </summary>
         public static void Reset()
         {
             addCache.Clear();
             maskCache.Clear();
             lastGoodViewCamera = null;
+            ResetFilters();
+        }
+
+        /// <summary>
+        /// Drops the stabilization state and the aim-freeze state (the
+        /// per-camera caches stay). Called on the session-open edge
+        /// (AttachAndConfigureCameras) and from <see cref="Reset"/>: the first
+        /// pose of a session snaps instead of gliding from the pose frozen at
+        /// Close (swarm review 2026-11-04).
+        /// </summary>
+        public static void ResetFilters()
+        {
+            yawOffset = 0f;
+            yawTrimDeg = 0f;
+            idleSeconds = 0f;
+            wasLocked = false;
+            lockedYaw = 0f;
+            Locked = false;
+        }
+
+        /// <summary>Keyboard aim trim (author request 2026-11-04): the
+        /// left/right arrows rotate the view like the bridge binocular's arrow
+        /// rotation. Additive to the camera yaw, wrapped to ±180°. While the
+        /// aim is frozen the trim moves the FROZEN pose instead of releasing
+        /// the freeze (author feedback: the star must stay steady during the
+        /// fine adjustment — the arc drum works the same way); the offset
+        /// invariant keeps the boat-induced delta unchanged.</summary>
+        public static void AddYawTrim(float deltaDeg)
+        {
+            if (float.IsNaN(deltaDeg))
+                return;
+            yawTrimDeg = (float)BodyRowFormatter.Wrap180(yawTrimDeg + deltaDeg);
+            if (Locked)
+                lockedYaw = (float)BodyRowFormatter.Wrap180(lockedYaw + deltaDeg);
+        }
+
+        /// <summary>Drops the keyboard trim (R key, sextant open). While the
+        /// aim is frozen the frozen pose shifts back by the trim, so R centres
+        /// the view immediately (the offset is deliberately NOT reset — that
+        /// would snap the boat's wobble back in).</summary>
+        public static void ResetYawTrim()
+        {
+            if (Locked)
+                lockedYaw = (float)BodyRowFormatter.Wrap180(lockedYaw - yawTrimDeg);
+            yawTrimDeg = 0f;
+        }
+
+        /// <summary>Current keyboard aim trim (degrees) — the readout/probe.</summary>
+        public static float YawTrimDeg
+        {
+            get { return yawTrimDeg; }
+        }
+
+        /// <summary>Per-frame stabilization inputs (extracted from Update for
+        /// the complexity gate): the smoothing gate, the raw mouse motion, the
+        /// idle timer and the resulting aim-freeze flag. The freeze is off
+        /// under the test aim, inside the boat and when either gate is off.</summary>
+        private static bool UpdateAimFreeze(bool insideBoat, float dt,
+            out bool stabilizationOn)
+        {
+            stabilizationOn = RadioNavDiagnostics.IsEnabledCached(
+                SextantStabilization.PrefsKey, true);
+            bool canLock = stabilizationOn && !testAimActive && !insideBoat
+                && RadioNavDiagnostics.IsEnabledCached(
+                    SextantStabilization.LockPrefsKey, true);
+            if (!canLock)
+            {
+                idleSeconds = 0f;
+                return false;
+            }
+
+            float mouseMotion = Mathf.Abs(Input.GetAxis("Mouse X"))
+                + Mathf.Abs(Input.GetAxis("Mouse Y"));
+            idleSeconds = SextantStabilization.AdvanceIdle(idleSeconds, mouseMotion, dt);
+            return SextantStabilization.ShouldLock(idleSeconds);
+        }
+
+        /// <summary>True while the aim freeze is active (verification/MCP).</summary>
+        public static bool Locked { get; private set; }
+
+        /// <summary>Mouse-idle time driving the aim freeze (seconds).</summary>
+        public static float IdleSeconds
+        {
+            get { return idleSeconds; }
+        }
+
+        /// <summary>Aim-stabilized yaw (2026-11-04, author feedback): RAW plus
+        /// a washout offset — no low-pass, so moving the mouse moves the view
+        /// exactly (a filtered yaw made it slide behind the hand). While the
+        /// aim rests the offset freezes the world yaw at the captured value;
+        /// while moving the offset bleeds out with the washout constant (no
+        /// fast catch-up). Bypasses (gate off, test aim) snap the offset to
+        /// zero.</summary>
+        private static float StabilizeYaw(float target, float dt, bool enabled, bool locked)
+        {
+            if (!enabled || testAimActive)
+            {
+                yawOffset = 0f;
+                wasLocked = false;
+                return target;
+            }
+
+            if (locked)
+            {
+                // Freeze the world yaw: the offset tracks the live target so
+                // the output stays exactly at the value captured on the edge.
+                if (!wasLocked)
+                    lockedYaw = target + yawOffset;
+                float delta = (float)BodyRowFormatter.Wrap180(lockedYaw - target);
+                // A live pose that jumped far away (teleport, camera
+                // transition) invalidates the freeze — follow the live view.
+                if (!SextantStabilization.OffsetUsable(delta,
+                        SextantStabilization.MaxYawOffsetDeg))
+                {
+                    wasLocked = false;
+                    yawOffset = 0f;
+                    return target;
+                }
+                wasLocked = true;
+                yawOffset = delta;
+                return lockedYaw;
+            }
+
+            wasLocked = false;
+            yawOffset = SextantStabilization.DecayOffset(yawOffset, dt);
+            if (!SextantStabilization.OffsetUsable(yawOffset,
+                    SextantStabilization.MaxYawOffsetDeg))
+                yawOffset = 0f;
+            return target + yawOffset;
         }
 
         public static Vector3 Forward(SextantPipFactory factory, Camera viewCamera,

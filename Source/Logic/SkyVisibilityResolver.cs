@@ -73,6 +73,30 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        /// <summary>Sun zenith distance (degrees) from the game sky
+        /// (TOD_Sky.SunZenith). The sky-brightness model (P4) uses it for the
+        /// twilight curve. Fallback 108° = astronomical night, so a reflection
+        /// failure cannot wash the star field out.</summary>
+        public static double GetSunZenithDeg()
+        {
+            try
+            {
+                if (weather == null)
+                    return 108.0;
+                object sky = ReadMember(weather, "Sky");
+                if (sky == null)
+                    return 108.0;
+                object value = ReadMember(sky, "SunZenith");
+                return value == null ? 108.0 : Convert.ToDouble(value);
+            }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SkyVisibilityResolver.GetSunZenithDeg"))
+                    Debug.LogWarning("[RadioNav][Sky] GetSunZenithDeg failed: " + e.Message);
+                return 108.0;
+            }
+        }
+
         /// <summary>
         /// True when the player is outside the boat (bridge/deck) and not on
         /// the map. Star sky renders only then: binoculars/UZO used from the

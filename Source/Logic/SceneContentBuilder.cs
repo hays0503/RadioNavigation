@@ -40,6 +40,7 @@ namespace UBOAT.Mods.RadioNavigation
             new SkyRoot("StarSkyRoot", typeof(StarsMesh)),
             new SkyRoot("ConstellationRoot", typeof(ConstellationMesh)),
             new SkyRoot("PlanetRoot", typeof(PlanetRenderer)),
+            new SkyRoot("MoonDiscRoot", typeof(MoonDiscRenderer)),
             new SkyRoot("SunDiscRoot", typeof(SunDiscRenderer))
         };
 

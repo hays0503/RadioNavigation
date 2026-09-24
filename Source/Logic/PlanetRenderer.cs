@@ -6,12 +6,14 @@ namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
     /// Renders the four supported planets as distant camera-facing quads.
+    /// The Moon has its own renderer (MoonDiscRenderer) since P2: it needs a
+    /// baked phase texture, not a flat additive quad.
     /// </summary>
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
     public sealed class PlanetRenderer : MonoBehaviour
     {
-        private const int PlanetCount = 5;
+        private const int PlanetCount = 4;
         private const float MinPlanetSize = 0.35f;
         private const float MaxPlanetSize = 1.25f;
 
@@ -20,8 +22,7 @@ namespace UBOAT.Mods.RadioNavigation
             new Color(1.00f, 0.98f, 0.92f, 0.95f), // Venus
             new Color(1.00f, 0.42f, 0.24f, 0.95f), // Mars
             new Color(1.00f, 0.88f, 0.62f, 0.95f), // Jupiter
-            new Color(1.00f, 0.82f, 0.48f, 0.95f), // Saturn
-            new Color(0.85f, 0.88f, 0.95f, 1.00f)  // Moon
+            new Color(1.00f, 0.82f, 0.48f, 0.95f)  // Saturn
         };
 
         private MeshFilter meshFilter;
@@ -37,6 +38,7 @@ namespace UBOAT.Mods.RadioNavigation
         private Quaternion lastCameraRotation;
         private double lastLstDeg = double.NaN;
         private float lastLatitude = float.NaN;
+        private float lastRebuildRealtime;
 
         private void Awake()
         {
@@ -93,16 +95,16 @@ namespace UBOAT.Mods.RadioNavigation
             DateTime utc = GameTimeResolver.GetUtcNow();
             double jd = AstroMath.ToJulianDay(utc);
             double lstDeg = AstroMath.LstDeg(jd, longitude);
-            // The Moon shares the game's sky time shift (ADR-033 v2.4): render
-            // it at the calibrated hour angle so the mod disc sits on the
-            // game's moon instead of ~1.6° away.
-            double moonJd = CelestialEphemeris.JdFor(CelestialBody.Moon(), utc);
-            double moonLst = AstroMath.LstDeg(moonJd, longitude);
-            bool needsRebuild = !meshRenderer.enabled
-                || MeshRebuildPolicy.NeedsRebuild(
-                    cam.transform.position, lastCameraPosition,
-                    cam.transform.rotation, lastCameraRotation,
-                    lstDeg, lastLstDeg, latitude, lastLatitude, true);
+            bool cameraMoved = Vector3.Distance(cam.transform.position, lastCameraPosition)
+                    > MeshRebuildPolicy.MaxCameraMoveM
+                || Quaternion.Angle(cam.transform.rotation, lastCameraRotation)
+                    > MeshRebuildPolicy.MaxCameraRotationDeg;
+            bool timeDrift = Math.Abs(MeshRebuildPolicy.AngularDifferenceDeg(lstDeg, lastLstDeg))
+                    > MeshRebuildPolicy.MaxLstDriftDeg
+                || Math.Abs(latitude - lastLatitude) > MeshRebuildPolicy.MaxLatitudeDriftDeg;
+            bool needsRebuild = !meshRenderer.enabled || cameraMoved
+                || (timeDrift && MeshRebuildPolicy.RebuildIntervalElapsed(
+                        lastRebuildRealtime, Time.realtimeSinceStartup));
 
             if (!needsRebuild)
                 return;
@@ -111,12 +113,12 @@ namespace UBOAT.Mods.RadioNavigation
             lastCameraRotation = cam.transform.rotation;
             lastLstDeg = lstDeg;
             lastLatitude = latitude;
-            RebuildMesh(cam, latitude, lstDeg, jd, moonLst, moonJd);
+            lastRebuildRealtime = Time.realtimeSinceStartup;
+            RebuildMesh(cam, latitude, lstDeg, jd);
             meshRenderer.enabled = true;
         }
 
-        private void RebuildMesh(Camera cam, float latitude, double lstDeg, double jd,
-            double moonLst, double moonJd)
+        private void RebuildMesh(Camera cam, float latitude, double lstDeg, double jd)
         {
             vertices.Clear();
             triangles.Clear();
@@ -127,21 +129,11 @@ namespace UBOAT.Mods.RadioNavigation
             for (int planetId = 0; planetId < PlanetCount; planetId++)
             {
                 double ra, dec;
-                double bodyLst = lstDeg;
-                bool hasCoordinates;
-                if (planetId == 4)
-                {
-                    hasCoordinates = AstroMath.MoonRaDec(moonJd, out ra, out dec);
-                    bodyLst = moonLst;
-                }
-                else
-                {
-                    hasCoordinates = AstroMath.PlanetRaDec(planetId, jd, out ra, out dec);
-                }
+                bool hasCoordinates = AstroMath.PlanetRaDec(planetId, jd, out ra, out dec);
                 if (!hasCoordinates)
                     continue;
 
-                AstroMath.RaDecToEnu(ra, dec, bodyLst, latitude,
+                AstroMath.RaDecToEnu(ra, dec, lstDeg, latitude,
                     out double altitude, out _, out double e, out double n, out double u);
                 if (altitude <= 0)
                     continue;
@@ -149,8 +141,6 @@ namespace UBOAT.Mods.RadioNavigation
                 Vector3 direction = new Vector3((float)e, (float)u, (float)n).normalized;
                 Vector3 center = cam.transform.position + direction * radius;
                 Color color = PlanetColors[planetId];
-                if (planetId == 4)
-                    color.a *= (float)AstroMath.MoonIllumination(jd);
                 BillboardQuadBuilder.AddQuad(vertices, triangles, colors, uvs, center, direction, SizeForPlanet(planetId), color);
             }
 
@@ -171,7 +161,6 @@ namespace UBOAT.Mods.RadioNavigation
                 case 0: return MaxPlanetSize;
                 case 2: return 1.05f;
                 case 3: return 0.8f;
-                case 4: return 1.5f;
                 default: return MinPlanetSize;
             }
         }

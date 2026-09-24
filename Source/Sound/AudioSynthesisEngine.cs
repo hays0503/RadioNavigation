@@ -58,8 +58,16 @@ namespace UBOAT.Mods.RadioNavigation
         public ReceiverDsp Dsp => dsp;
 
         public AudioSynthesisEngine()
+            : this(Environment.TickCount)
         {
-            atmosphere = new Atmosphere(Environment.TickCount);
+        }
+
+        /// <summary>Test seam: the atmosphere noise is seeded with the wall
+        /// clock in production (Environment.TickCount), which made the offline
+        /// render goldens flaky — a fixed seed makes the burst deterministic.</summary>
+        public AudioSynthesisEngine(int atmosphereSeed)
+        {
+            atmosphere = new Atmosphere(atmosphereSeed);
             dsp = new ReceiverDsp(SampleRate);
         }
 

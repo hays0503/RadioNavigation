@@ -18,11 +18,19 @@ namespace UBOAT.Mods.RadioNavigation
 
         public const double IdealSeparationDeg = 90.0;
 
+        /// <summary>Below this minimum separation a third sight adds no
+        /// geometry: the crossing to one of the recorded sights is too
+        /// shallow to trust.</summary>
+        public const double MinThirdSeparationDeg = 15.0;
+
         public struct Candidate
         {
             public string Name;
             public double AltDeg;
             public double AzDeg;
+            /// <summary>Catalog HIP (0 for the Sun/Moon and no-HIP rows), so a
+            /// recommendation can exclude an already-recorded body.</summary>
+            public int Hip;
         }
 
         public struct Result
@@ -63,6 +71,47 @@ namespace UBOAT.Mods.RadioNavigation
                     best.SeparationDeg = sep;
                 }
             }
+            return best;
+        }
+
+        /// <summary>Best third body for a three-sight series: maximizes the
+        /// SMALLEST separation to the two recorded azimuths, so the new line
+        /// crosses both existing lines well. Recorded bodies are skipped by
+        /// their HIP (a non-zero exclude; 0 never matches). Found=false when
+        /// the best minimum stays below MinThirdSeparationDeg.</summary>
+        public static Result RecommendThird(double firstAzDeg, double secondAzDeg,
+            IList<Candidate> candidates, int excludeHipA, int excludeHipB)
+        {
+            Result best = new Result();
+            best.Found = false;
+            best.Name = null;
+            best.SeparationDeg = 0.0;
+            if (candidates == null)
+                return best;
+
+            double bestMin = -1.0;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                Candidate c = candidates[i];
+                if (c.Hip != 0 && (c.Hip == excludeHipA || c.Hip == excludeHipB))
+                    continue;
+                double min = Math.Min(
+                    SeparationDeg(firstAzDeg, c.AzDeg),
+                    SeparationDeg(secondAzDeg, c.AzDeg));
+                if (min > bestMin)
+                {
+                    bestMin = min;
+                    best.Name = c.Name;
+                    best.SeparationDeg = min;
+                }
+            }
+            if (bestMin < MinThirdSeparationDeg)
+            {
+                best.Name = null;
+                best.SeparationDeg = 0.0;
+                return best;
+            }
+            best.Found = true;
             return best;
         }
 

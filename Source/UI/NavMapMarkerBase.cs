@@ -67,6 +67,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static TMP_FontAsset tooltipFont;
         private static Sprite backdropSprite;
+        private static Sprite fallbackIconSprite;
 
         protected EntityMarkersManager markersManager;
         protected MainCamera mainCamera;
@@ -301,12 +302,15 @@ namespace UBOAT.Mods.RadioNavigation
                 iconSprite = LoadIconSprite();
                 if (iconSprite == null)
                 {
-                    // Latch the failure: without this EnsureBuilt retries
-                    // LoadIconSprite (bundle lookup) every frame and the
-                    // derived marker's warning floods Player.log. The derived
-                    // class has already logged the reason once.
-                    built = true;
-                    return;
+                    // Fallback: the bundle may predate the marker prefabs (live
+                    // 2026-09-22: all three icons missing) — a procedural glyph
+                    // keeps the markers visible instead of latching them off.
+                    iconSprite = GetFallbackIconSprite();
+                    if (iconSprite == null)
+                    {
+                        built = true;
+                        return;
+                    }
                 }
             }
 
@@ -483,6 +487,24 @@ namespace UBOAT.Mods.RadioNavigation
                 return null;
             tooltipFont = TMP_FontAsset.CreateFontAsset(arial);
             return tooltipFont;
+        }
+
+        /// <summary>Procedural fallback icon (core + ring) for markers whose
+        /// bundle prefab is missing. Cached like the backdrop sprite.</summary>
+        protected static Sprite GetFallbackIconSprite()
+        {
+            if (fallbackIconSprite != null)
+                return fallbackIconSprite;
+
+            const int size = 64;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.name = "RadioNavMarkerFallbackIcon";
+            texture.hideFlags = HideFlags.DontSave;
+            texture.SetPixels32(MarkerArtPixels.RenderIconPixels(size));
+            texture.Apply();
+            fallbackIconSprite = Sprite.Create(texture,
+                new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f));
+            return fallbackIconSprite;
         }
 
         protected static Sprite GetBackdropSprite()

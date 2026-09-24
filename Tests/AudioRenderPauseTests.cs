@@ -29,7 +29,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             double expectedPostNavMs = dashSector ? 800 + 3000 + 50 : 400 + 3000 + 50;
 
-            var engine = new AudioSynthesisEngine();
+            var engine = new AudioSynthesisEngine(20260922);
             engine.Atmosphere.NoiseFloor = 0f;
             engine.Atmosphere.ImpulseProbability = 0f;
             engine.Atmosphere.QsbDepth = 0f;

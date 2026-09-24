@@ -34,6 +34,9 @@ namespace UBOAT.Mods.RadioNavigation
                   .Append(",\"right\":").Append(controller.RightFilterCount).Append('}');
                 sb.Append(",\"calibrationMin\":").Append(Num(SunEphemerisCalibration.DeltaMinutes));
                 sb.Append(",\"moonDiag\":").Append(MoonDiagEnabled() ? "true" : "false");
+                // Keyboard aim trim (2026-11-04): visible so the live check can
+                // read the exact value the ←→ keys produce.
+                sb.Append(",\"yawTrimDeg\":").Append(Num(SextantPipPose.YawTrimDeg));
                 AppendIdentified(sb, controller.StarIdForProbe);
                 AppendOwnBodies(sb, controller);
                 AppendSight(sb, "sight1", worksheet.Calculator.Observation1);
@@ -238,10 +241,26 @@ namespace UBOAT.Mods.RadioNavigation
             SextantWorksheet worksheet = controller.WorksheetForProbe;
             if (!worksheet.CaptureObservation(body, controller.ArcAngle))
                 return "{\"ok\":false,\"error\":\"no-body\"}";
-            int index = worksheet.Calculator.Observation2 != null ? 2 : 1;
-            SextantObservation sight = index == 2
-                ? worksheet.Calculator.Observation2
-                : worksheet.Calculator.Observation1;
+            // The third slot was reported as "2" (swarm review 2026-11-04):
+            // the cocked-hat validation reads this body, so it must name the
+            // observation that was actually just recorded.
+            int index;
+            SextantObservation sight;
+            if (worksheet.Calculator.Observation3 != null)
+            {
+                index = 3;
+                sight = worksheet.Calculator.Observation3;
+            }
+            else if (worksheet.Calculator.Observation2 != null)
+            {
+                index = 2;
+                sight = worksheet.Calculator.Observation2;
+            }
+            else
+            {
+                index = 1;
+                sight = worksheet.Calculator.Observation1;
+            }
             StringBuilder sb = new StringBuilder(512);
             sb.Append("{\"ok\":true,\"recorded\":").Append(index);
             sb.Append(",\"body\":\"").Append(RadioNavProbeJson.Escape(body.DisplayName)).Append('"');
@@ -253,13 +272,15 @@ namespace UBOAT.Mods.RadioNavigation
             return sb.ToString();
         }
 
-        /// <summary>O-key equivalent: starts a new worksheet series.</summary>
+        /// <summary>O-key equivalent: starts a new worksheet series and drops
+        /// the sticky body selection (2026-11-04).</summary>
         public static string Reset()
         {
             SextantController controller = ResolveController();
             if (controller == null)
                 return "{\"ok\":false,\"error\":\"no-live-probe\"}";
             controller.WorksheetForProbe.ResetSeries();
+            controller.StarIdForProbe.ClearSelection();
             return "{\"ok\":true,\"cleared\":true}";
         }
 
@@ -339,6 +360,9 @@ namespace UBOAT.Mods.RadioNavigation
               .Append(RadioNavProbeJson.Escape(body.IsNone ? "" : body.DisplayName)).Append('"');
             sb.Append(",\"hip\":").Append(body.Hip.ToString(CultureInfo.InvariantCulture));
             sb.Append(",\"altDeg\":").Append(body.IsNone ? "null" : Num(starId.IdentifiedAltDeg));
+            // Sticky selection (2026-11-04): the body stays identified after
+            // leaving the cone; inCone tells whether it is actually sighted.
+            sb.Append(",\"inCone\":").Append(starId.InCone ? "true" : "false");
             sb.Append('}');
         }
 

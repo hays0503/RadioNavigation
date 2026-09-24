@@ -17,6 +17,13 @@ namespace UBOAT.Mods.RadioNavigation
         private const float LineWidthArcMin = 2f; // angular width in arcminutes
         private static readonly Color LineColor = new Color(0.55f, 0.22f, 0.15f, 0.4f); // reddish-brown
 
+        /// <summary>Minimum on-screen line width (P7): the 2′ angular width is
+        /// sub-pixel in the 512² ocular at ×1.</summary>
+        private const float MinLinePixels = 1.5f;
+
+        /// <summary>Altitude above which a line vertex reaches full alpha (P7).</summary>
+        private const double HorizonFadeDeg = 3.0;
+
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
         private Material material;
@@ -25,7 +32,10 @@ namespace UBOAT.Mods.RadioNavigation
         private Vector3 lastCamPos;
         private double lastLstDeg;
         private float lastLat;
+        private ConstellationViewKey lastViewKey;
+        private bool hasViewKey;
         private float lastLogTime;
+        private float lastRebuildRealtime;
 
         private readonly List<Vector3> vertices = new List<Vector3>();
         private readonly List<int> triangles = new List<int>();
@@ -33,6 +43,8 @@ namespace UBOAT.Mods.RadioNavigation
         // RebuildMesh scratch: one polyline at a time, reused across
         // rebuilds — no per-polyline List alloc (class contract above).
         private readonly List<Vector3> worldPointsScratch = new List<Vector3>(64);
+        private readonly List<float> altitudeScratch = new List<float>(64);
+        private Vector3 rebuildCamPos;
 
         /// <summary>Base key of the constellation toggle combo; effective binding is Shift+Z (SEXTANT_PLAN v1.2 — plain Z opens the sextant). Game occupies F4-F10/F11; Z verified free (source grep + 80-axis dump).</summary>
         private const KeyCode ToggleKey = KeyCode.Z;
@@ -123,10 +135,22 @@ namespace UBOAT.Mods.RadioNavigation
             double jd = AstroMath.ToJulianDay(utc);
             double lstDeg = AstroMath.LstDeg(jd, lon);
 
+            // Ocular-aware width: capture the view key (open edge, zoom step,
+            // UI scale) and rebuild immediately when it changes, so the line
+            // width follows the view the player is actually looking at.
+            ConstellationViewKey key = ConstellationWidthPolicy.Capture(
+                SextantController.IsOpen, SextantController.CurrentFovDivisor, SextantController.UiScale());
+            bool keyChanged = ConstellationWidthPolicy.KeyChanged(key, lastViewKey);
+
             // Rebuild mesh only if camera/position/LST changed significantly
-            bool needsRebuild = MeshRebuildPolicy.NeedsRebuild(
-                cam.transform.position, lastCamPos,
-                lstDeg, lastLstDeg, lat, lastLat);
+            bool cameraMoved = Vector3.Distance(cam.transform.position, lastCamPos)
+                > MeshRebuildPolicy.MaxCameraMoveM;
+            bool timeDrift = Math.Abs(MeshRebuildPolicy.AngularDifferenceDeg(lstDeg, lastLstDeg))
+                    > MeshRebuildPolicy.MaxLstDriftDeg
+                || Math.Abs(lat - lastLat) > MeshRebuildPolicy.MaxLatitudeDriftDeg;
+            bool needsRebuild = !hasViewKey || ConstellationWidthPolicy.NeedsRebuild(
+                cameraMoved, keyChanged, timeDrift,
+                MeshRebuildPolicy.RebuildIntervalElapsed(lastRebuildRealtime, Time.realtimeSinceStartup));
 
             if (!needsRebuild && meshFilter.mesh != null && meshFilter.mesh.vertexCount > 0)
                 return;
@@ -134,11 +158,14 @@ namespace UBOAT.Mods.RadioNavigation
             lastCamPos = cam.transform.position;
             lastLstDeg = lstDeg;
             lastLat = lat;
+            lastViewKey = key;
+            hasViewKey = true;
+            lastRebuildRealtime = Time.realtimeSinceStartup;
 
-            RebuildMesh(cam, lat, lstDeg);
+            RebuildMesh(cam, lat, lstDeg, jd);
         }
 
-        private void RebuildMesh(Camera cam, float latDeg, double lstDeg)
+        private void RebuildMesh(Camera cam, float latDeg, double lstDeg, double jd)
         {
             vertices.Clear();
             triangles.Clear();
@@ -146,39 +173,66 @@ namespace UBOAT.Mods.RadioNavigation
 
             int visibleSegments = 0;
             float safeRadius = CameraResolver.SafeRadius(cam);
+            rebuildCamPos = cam.transform.position;
+            // The width follows the view the player is looking at: ocular FOV
+            // (main FOV / zoom divisor) + 600-unit on-screen height x uiScale
+            // while the sextant is open, the main camera otherwise.
+            ConstellationWidthPolicy.WidthInputs(SextantController.IsOpen, cam.fieldOfView,
+                SextantController.CurrentFovDivisor, SextantController.UiScale(), cam.pixelHeight,
+                SextantController.OcularSizeUnits(),
+                out double fovRad, out double screenPixels);
             float lineWidthRad = LineWidthArcMin / 60f * Mathf.Deg2Rad; // convert arcmin to radians
+            // Minimum on-screen width (P7): at 2′ the line is ~0.26 px in the
+            // 512² ocular at ×1 — invisible without this floor.
+            float lineWidth = ConstellationLineMath.WorldWidth(lineWidthRad, safeRadius,
+                fovRad, screenPixels, MinLinePixels);
+
+            var points = worldPointsScratch;
+            var alts = altitudeScratch;
 
             foreach (var polyline in ConstellationLines.Polylines)
             {
                 if (polyline.Length < 2) continue;
 
-                // Convert all points to world positions
-                worldPointsScratch.Clear();
+                // Convert all points to world positions, keeping the altitude
+                // so the segments can be CLIPPED at the horizon instead of
+                // joined across it (P7).
+                points.Clear();
+                alts.Clear();
                 for (int i = 0; i < polyline.Length; i++)
                 {
                     int starIdx = polyline[i];
                     if (starIdx < 0 || starIdx >= StarCatalog.Stars.Length) continue;
 
                     var star = StarCatalog.Stars[starIdx];
-                    double raRad = star.RaDeg * Mathf.Deg2Rad;
-                    double decRad = star.DecDeg * Mathf.Deg2Rad;
+                    // Precess the catalog row to the sight date (P1b).
+                    CelestialEphemeris.PrecessCatalog(star.RaDeg, star.DecDeg, jd,
+                        out double raRad, out double decRad);
 
                     AstroMath.RaDecToEnu(raRad, decRad, lstDeg, latDeg,
                         out double altRad, out _, out double e, out double n, out double u);
 
-                    if (altRad <= 0) continue; // below horizon
-
                     Vector3 dir = new Vector3((float)e, (float)u, (float)n).normalized;
                     Vector3 worldPos = cam.transform.position + dir * safeRadius;
-                    worldPointsScratch.Add(worldPos);
+                    points.Add(worldPos);
+                    alts.Add((float)(altRad * Mathf.Rad2Deg));
                 }
 
-                // Draw segments between consecutive visible points
-                for (int i = 0; i < worldPointsScratch.Count - 1; i++)
+                for (int i = 0; i < points.Count - 1; i++)
                 {
-                    Vector3 p0 = worldPointsScratch[i];
-                    Vector3 p1 = worldPointsScratch[i + 1];
-                    AddLineSegment(p0, p1, lineWidthRad * safeRadius);
+                    if (!ConstellationLineMath.ClipToHorizon(alts[i], alts[i + 1],
+                            out double t0, out double t1))
+                        continue; // the whole segment is below the horizon
+                    if (t1 - t0 < 1e-4)
+                        continue;
+
+                    Vector3 a = Vector3.Lerp(points[i], points[i + 1], (float)t0);
+                    Vector3 b = Vector3.Lerp(points[i], points[i + 1], (float)t1);
+                    float altA = (float)(alts[i] + (alts[i + 1] - alts[i]) * t0);
+                    float altB = (float)(alts[i] + (alts[i + 1] - alts[i]) * t1);
+                    AddLineSegment(a, b, lineWidth,
+                        ConstellationLineMath.HorizonFade(altA, HorizonFadeDeg),
+                        ConstellationLineMath.HorizonFade(altB, HorizonFadeDeg));
                     visibleSegments++;
                 }
             }
@@ -201,11 +255,15 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private void AddLineSegment(Vector3 p0, Vector3 p1, float width)
+        private void AddLineSegment(Vector3 p0, Vector3 p1, float width,
+            float alpha0, float alpha1)
         {
-            // Create quad between p0 and p1 with given width
+            // Create quad between p0 and p1 with given width. The perpendicular
+            // is built against the VIEW direction (p0.normalized included the
+            // camera's world offset — P7).
             Vector3 direction = (p1 - p0).normalized;
-            Vector3 perpendicular = Vector3.Cross(direction, p0.normalized).normalized;
+            Vector3 viewDir = (p0 - rebuildCamPos).normalized;
+            Vector3 perpendicular = Vector3.Cross(direction, viewDir).normalized;
             if (perpendicular.sqrMagnitude < 0.001f)
                 perpendicular = Vector3.up;
 
@@ -228,10 +286,15 @@ namespace UBOAT.Mods.RadioNavigation
             triangles.Add(baseIdx + 2);
             triangles.Add(baseIdx + 3);
 
-            colors.Add(LineColor);
-            colors.Add(LineColor);
-            colors.Add(LineColor);
-            colors.Add(LineColor);
+            // Per-vertex horizon fade: each end carries its own alpha.
+            Color c0 = LineColor;
+            c0.a *= alpha0;
+            Color c1 = LineColor;
+            c1.a *= alpha1;
+            colors.Add(c0);
+            colors.Add(c0);
+            colors.Add(c1);
+            colors.Add(c1);
         }
     }
 }

@@ -17,6 +17,27 @@ namespace UBOAT.Mods.RadioNavigation
         /// utc + Δt). Zero until a calibration is solved and applied.</summary>
         public static double DeltaMinutes { get; private set; }
 
+        /// <summary>ΔT = TT − UT для окна кампании 1939–1945, секунды
+        /// (NASA/Espenak: 1940 ≈ 24.3 s, 1945 ≈ 26.8 s). Константа держит
+        /// сплит детерминированным; остаток по войне ≤1.5 s ≈ 0.006°.
+        /// Без него эфемерида, вычисленная на UT, даёт до 6′ GHA (P1).</summary>
+        public const double DeltaTSeconds = 24.0;
+
+        /// <summary>UT-часть шкалы: калиброванный JD для LST/GHA. Игровое
+        /// время — это UT (ADR-033), прецессия/часовой угол живут здесь.</summary>
+        public static double JdUt(DateTime utc)
+        {
+            return CalibratedJd(utc);
+        }
+
+        /// <summary>TT-часть шкалы: тот же JD + ΔT — аргумент эфемерид
+        /// (SunRaDec/MoonRaDec/PlanetRaDec). Никогда не смешивать с JdUt:
+        /// LST считается на UT, координаты — на TT.</summary>
+        public static double JdTt(DateTime utc)
+        {
+            return CalibratedJd(utc) + DeltaTSeconds / 86400.0;
+        }
+
         public static void SetDelta(double minutes)
         {
             DeltaMinutes = minutes;
@@ -95,11 +116,12 @@ namespace UBOAT.Mods.RadioNavigation
         public static double AngleFor(double deltaMinutes, DateTime utc,
             double latDeg, double lonDeg, double tx, double ty, double tz)
         {
-            double jd = AstroMath.ToJulianDay(utc) + deltaMinutes / 1440.0;
+            double jdUt = AstroMath.ToJulianDay(utc) + deltaMinutes / 1440.0;
+            double jdTt = jdUt + DeltaTSeconds / 86400.0;
             double raRad, decRad;
-            AstroMath.SunRaDec(jd, out raRad, out decRad);
+            AstroMath.SunRaDec(jdTt, out raRad, out decRad);
             double altRad, azRad, e, n, u;
-            AstroMath.RaDecToEnu(raRad, decRad, AstroMath.LstDeg(jd, lonDeg), latDeg,
+            AstroMath.RaDecToEnu(raRad, decRad, AstroMath.LstDeg(jdUt, lonDeg), latDeg,
                 out altRad, out azRad, out e, out n, out u);
             double len = Math.Sqrt(e * e + n * n + u * u);
             if (len < 1e-9)

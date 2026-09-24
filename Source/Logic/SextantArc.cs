@@ -5,7 +5,9 @@ namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
     /// Pure math of the sextant arc (SEXTANT_PLAN §6.1): clamp to 0..130°,
-    /// quantize to 0.2′ (12″, 1/300°) and format marine-style "45°23.4′".
+    /// quantize to 0.1′ (6″, 1/600°) — the 10-part vernier of the best period
+    /// instruments (Bowditch Ch.15 §1502), matching the German F-Tafel's
+    /// tenths of a minute — and format marine-style "45°23.4′".
     /// No Unity — unit-tested offline.
     /// </summary>
     public static class SextantArc
@@ -13,8 +15,9 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Arc limit, clamped from both sides (SEXTANT_PLAN §2.2).</summary>
         public const double MaxDeg = 130.0;
 
-        /// <summary>Display/storage quantum: 0.2′ = 12″ = 1/300° (SEXTANT_PLAN §2.4).</summary>
-        public const double StepsPerDeg = 300.0;
+        /// <summary>Display/storage quantum: 0.1′ = 6″ = 1/600° (a 10-part vernier,
+        /// Bowditch §1502; the F-Tafel worksheet is written in tenths of a minute).</summary>
+        public const double StepsPerDeg = 600.0;
 
         public static double Clamp(double deg)
         {
@@ -26,7 +29,8 @@ namespace UBOAT.Mods.RadioNavigation
         public static double Quantize(double deg)
         {
             // Round-half-down at exact half-steps (SEXTANT_PLAN §8 pins
-            // 0.005° -> 1/300°); everything above the tie rounds up normally.
+            // the 1/1200° tie -> rounds down); everything above the tie
+            // rounds up normally.
             double scaled = Clamp(deg) * StepsPerDeg;
             return Math.Ceiling(scaled - 0.5) / StepsPerDeg;
         }

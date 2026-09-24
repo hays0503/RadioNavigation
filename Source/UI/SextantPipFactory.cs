@@ -18,9 +18,9 @@ namespace UBOAT.Mods.RadioNavigation
     /// </summary>
     public sealed class SextantPipFactory
     {
-        // RT size stays with creation (was SextantController.RtWidth/Height).
-        public const int RtWidth = 512;
-        public const int RtHeight = 512;
+        // RT size follows the screen (P7): half the screen height, clamped by
+        // SextantPipSize. Recreated on open when the resolution changed.
+        public int RtSize { get; private set; } = SextantPipSize.FallbackSize;
 
         // NOTE (2026-09-18): the PIP scene render intermittently loses its
         // lighting (one whole RT goes dark, ~3-7% of frames, either eye at
@@ -85,17 +85,27 @@ namespace UBOAT.Mods.RadioNavigation
         internal void Ensure(Camera viewCamera, float fovDivisor,
             RawImage leftViewImage, RawImage rightViewImage,
             SextantEffectMirror mirror, SextantBloomCut bloomCut,
-            SextantController owner)
+            SextantController owner, float uiScale)
         {
+            // The ocular is a fraction of the screen height (2026-11-04), so
+            // the render target follows its on-screen pixel size; SextantPipSize
+            // clamps the band (256…1536).
+            int desired = SextantPipSize.ForOcularPixels(
+                SextantController.OcularSizeUnits() * (uiScale <= 0f ? 1f : uiScale));
             if (LeftCamera != null && RightCamera != null)
+            {
+                // Same cameras, possibly a new screen size (P7): recreate the
+                // targets on open, never mid-sight.
+                if (RtSize != desired)
+                    ResizeTargets(desired, leftViewImage, rightViewImage);
                 return;
+            }
 
             effectMirror = mirror;
+            RtSize = desired;
 
-            LeftRt = new RenderTexture(RtWidth, RtHeight, 32, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
-            LeftRt.name = "RadioNavSextantLeftRT";
-            RightRt = new RenderTexture(RtWidth, RtHeight, 32, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
-            RightRt.name = "RadioNavSextantRightRT";
+            LeftRt = CreateTarget("RadioNavSextantLeftRT", desired);
+            RightRt = CreateTarget("RadioNavSextantRightRT", desired);
 
             LeftCamera = ConfigurePipCamera("RadioNavSextantLeftCamera", LeftRt,
                 viewCamera, fovDivisor, false, bloomCut, owner);
@@ -105,7 +115,44 @@ namespace UBOAT.Mods.RadioNavigation
             if (leftViewImage != null) leftViewImage.texture = LeftRt;
             if (rightViewImage != null) rightViewImage.texture = RightRt;
 
-            Debug.Log(LogPrefix + " PIP cameras created, RT=" + RtWidth + "x" + RtHeight);
+            Debug.Log(LogPrefix + " PIP cameras created, RT=" + desired + "x" + desired);
+        }
+
+        private static RenderTexture CreateTarget(string name, int size)
+        {
+            RenderTexture rt = new RenderTexture(size, size, 32,
+                RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+            rt.name = name;
+            return rt;
+        }
+
+        /// <summary>Swaps both PIP targets for a new screen size (P7). The
+        /// cameras and the view images are repointed before the old targets
+        /// are released, so no frame renders into a destroyed texture.</summary>
+        private void ResizeTargets(int desired, RawImage leftViewImage, RawImage rightViewImage)
+        {
+            RenderTexture oldLeft = LeftRt;
+            RenderTexture oldRight = RightRt;
+
+            LeftRt = CreateTarget("RadioNavSextantLeftRT", desired);
+            RightRt = CreateTarget("RadioNavSextantRightRT", desired);
+            if (LeftCamera != null) LeftCamera.targetTexture = LeftRt;
+            if (RightCamera != null) RightCamera.targetTexture = RightRt;
+            if (leftViewImage != null) leftViewImage.texture = LeftRt;
+            if (rightViewImage != null) rightViewImage.texture = RightRt;
+
+            ReleaseTarget(oldLeft);
+            ReleaseTarget(oldRight);
+            RtSize = desired;
+            Debug.Log(LogPrefix + " PIP RT resized to " + desired + "x" + desired);
+        }
+
+        private static void ReleaseTarget(RenderTexture rt)
+        {
+            if (rt == null)
+                return;
+            rt.Release();
+            UnityEngine.Object.Destroy(rt);
         }
 
         public int AttachedCount()

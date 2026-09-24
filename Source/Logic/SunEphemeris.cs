@@ -35,11 +35,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static SunFix Compute(double latDeg, double lonDeg, DateTime utc)
         {
-            double jd = SunEphemerisCalibration.CalibratedJd(utc);
-            double lstDeg = AstroMath.LstDeg(jd, lonDeg);
+            // TT/UT-сплит (CELESTIAL_REALISM_PLAN P1): LST — на UT, координаты
+            // Солнца — на TT (UT + ΔT). Смешение давало бы ~6′ GHA.
+            double jdUt = SunEphemerisCalibration.JdUt(utc);
+            double jdTt = SunEphemerisCalibration.JdTt(utc);
+            double lstDeg = AstroMath.LstDeg(jdUt, lonDeg);
 
             double raRad, decRad;
-            AstroMath.SunRaDec(jd, out raRad, out decRad);
+            AstroMath.SunRaDec(jdTt, out raRad, out decRad);
             double altRad, azRad, e, n, u;
             AstroMath.RaDecToEnu(raRad, decRad, lstDeg, latDeg, out altRad, out azRad, out e, out n, out u);
 

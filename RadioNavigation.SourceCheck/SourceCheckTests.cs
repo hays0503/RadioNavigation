@@ -2578,6 +2578,227 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Fix-card snapshot gate (v3, CELESTIAL_REALISM_PLAN.md): the F-Tafel
+        /// card is a frozen snapshot assembled at record time
+        /// (CaptureObservation -&gt; RecomputeFixSnapshot); the 1 Hz refresh
+        /// path — every FixCardComposer member plus
+        /// SextantWorksheet.BuildCard — must never read a live clock, or the
+        /// card text mutates and the text caches thrash. Record-time clock use
+        /// in CaptureObservation/RecomputeFixSnapshot stays legal.
+        /// </summary>
+        [Fact]
+        public void FixCard_SnapshotPurity()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax composer = null;
+            MethodDeclarationSyntax build = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "FixCardComposer")
+                        composer = type;
+                    if (type.Identifier.Text == "SextantWorksheet")
+                    {
+                        build = type.Members.OfType<MethodDeclarationSyntax>()
+                            .FirstOrDefault(m => m.Identifier.Text == "BuildCard");
+                    }
+                }
+            }
+
+            if (composer == null)
+            {
+                problems.Add("type 'FixCardComposer' not found in Source/ — card assembly regressed into the worksheet");
+            }
+            else
+            {
+                CollectLiveClockReads(composer, problems);
+            }
+
+            if (build == null)
+            {
+                problems.Add("SextantWorksheet.BuildCard not found");
+            }
+            else
+            {
+                CollectLiveClockReads(build, problems);
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} snapshot-purity violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Live-clock reads banned from the card assembly: member accesses on
+        /// GameTimeResolver (GetUtcNow today, GetUtcAt tomorrow) and any
+        /// UtcNow/Now/Today member (DateTime.UtcNow and friends). One problem
+        /// line per hit, formatted "live clock in card assembly: Type.member".
+        /// </summary>
+        private static void CollectLiveClockReads(SyntaxNode scope, List<string> problems)
+        {
+            foreach (var access in scope.DescendantNodes().OfType<MemberAccessExpressionSyntax>())
+            {
+                bool resolverRead = access.Expression is IdentifierNameSyntax receiver
+                    && receiver.Identifier.Text == "GameTimeResolver";
+                string member = access.Name.Identifier.Text;
+                bool clockMember = member == "UtcNow" || member == "Now" || member == "Today";
+                if (resolverRead || clockMember)
+                    problems.Add($"live clock in card assembly: {access.Expression}.{member}");
+            }
+        }
+
+        /// <summary>
+        /// Font-fit measurement ownership (2026-09-22, swarm review): the card
+        /// font fit may only consume the base-size measurement cached in
+        /// SextantWorksheet.RefreshCard (cardHeightAtBase /
+        /// cardCompactHeightAtBase), never the live preferredHeight — that one
+        /// is measured at whatever font is currently applied, and feeding it
+        /// back flipped the font every 1 Hz refresh (live 9/11, "текст
+        /// пляшет"). Rules:
+        ///  A. no preferredHeight read inside ApplyCardFontSize;
+        ///  B. every preferredHeight read in the type lives in RefreshCard as
+        ///     the RHS of an assignment to a *HeightAtBase field;
+        ///  C. each such read is preceded in RefreshCard by the base-font and
+        ///     the text writes of the measurement block;
+        ///  D. the fit applies the status-line reserve via
+        ///     FixCardLayout.CardFontSize, never the bare FontSize.
+        /// Mutation checks: swap CardFontSize for FontSize (D); replace the
+        /// cached height with cardText.preferredHeight in ApplyCardFontSize
+        /// (A/B); move a measurement into UpdatePanel (B/C); reorder the
+        /// measurement before the base-font write (C).
+        /// </summary>
+        [Fact]
+        public void FixCard_FitMeasurementOwnership()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            TypeDeclarationSyntax worksheet = null;
+            foreach (var path in ModCompiler.EnumerateSources())
+            {
+                var root = (CompilationUnitSyntax)CSharpSyntaxTree.ParseText(
+                    File.ReadAllText(path), path: path).GetRoot();
+                foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    if (type.Identifier.Text == "SextantWorksheet")
+                        worksheet = type;
+                }
+            }
+
+            if (worksheet == null)
+            {
+                problems.Add("type 'SextantWorksheet' not found in Source/ — the card fit left its home");
+            }
+            else
+            {
+                CollectFontFitViolations(worksheet, problems);
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} font-fit ownership violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>Live-measurement reads: member accesses named
+        /// preferredHeight (UnityEngine.UI.Text).</summary>
+        private static IEnumerable<MemberAccessExpressionSyntax> LiveMeasurementReads(
+            SyntaxNode scope)
+        {
+            return scope.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                .Where(a => a.Name.Identifier.Text == "preferredHeight");
+        }
+
+        /// <summary>True for `cardText.&lt;member&gt;` on the left of an
+        /// assignment (the measurement surface writes).</summary>
+        private static bool IsCardTextMember(ExpressionSyntax expression, string member)
+        {
+            var access = expression as MemberAccessExpressionSyntax;
+            return access != null
+                && access.Name.Identifier.Text == member
+                && access.Expression is IdentifierNameSyntax receiver
+                && receiver.Identifier.Text == "cardText";
+        }
+
+        private static void CollectFontFitViolations(TypeDeclarationSyntax worksheet,
+            List<string> problems)
+        {
+            var fit = worksheet.Members.OfType<MethodDeclarationSyntax>()
+                .FirstOrDefault(m => m.Identifier.Text == "ApplyCardFontSize");
+            var refresh = worksheet.Members.OfType<MethodDeclarationSyntax>()
+                .FirstOrDefault(m => m.Identifier.Text == "RefreshCard");
+            if (fit == null)
+            {
+                problems.Add("SextantWorksheet.ApplyCardFontSize not found");
+                return;
+            }
+            if (refresh == null)
+            {
+                problems.Add("SextantWorksheet.RefreshCard not found");
+                return;
+            }
+
+            // A: the fit never reads a live measurement.
+            foreach (var read in LiveMeasurementReads(fit))
+                problems.Add($"live preferredHeight in ApplyCardFontSize: {read}");
+
+            // B/C: measurements live in RefreshCard, cached into *HeightAtBase
+            // after the base-font and text writes of the measurement block.
+            foreach (var read in LiveMeasurementReads(worksheet))
+            {
+                if (fit.Span.Contains(read.Span))
+                    continue; // already reported by rule A
+
+                if (!refresh.Span.Contains(read.Span))
+                {
+                    problems.Add($"preferredHeight read outside RefreshCard: {read}");
+                    continue;
+                }
+
+                var assignment = read.FirstAncestorOrSelf<AssignmentExpressionSyntax>();
+                var left = assignment != null ? assignment.Left as IdentifierNameSyntax : null;
+                bool cached = assignment != null && assignment.Right == read
+                    && left != null
+                    && left.Identifier.Text.EndsWith("HeightAtBase", StringComparison.Ordinal);
+                if (!cached)
+                {
+                    problems.Add($"preferredHeight not cached into a *HeightAtBase field: {read}");
+                    continue;
+                }
+
+                int position = read.SpanStart;
+                bool atBase = refresh.DescendantNodes()
+                    .OfType<AssignmentExpressionSyntax>()
+                    .Any(a => a.SpanStart < position
+                        && IsCardTextMember(a.Left, "fontSize")
+                        && a.Right.ToString() == "cardBaseFontSize");
+                bool textWritten = refresh.DescendantNodes()
+                    .OfType<AssignmentExpressionSyntax>()
+                    .Any(a => a.SpanStart < position && IsCardTextMember(a.Left, "text"));
+                if (!atBase || !textWritten)
+                {
+                    problems.Add($"preferredHeight measured before the base-font/text writes: {read}");
+                }
+            }
+
+            // D: the fit goes through CardFontSize (status-line reserve).
+            bool usesCardFontSize = fit.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(i => i.Expression.ToString().EndsWith("CardFontSize", StringComparison.Ordinal));
+            if (!usesCardFontSize)
+                problems.Add("ApplyCardFontSize does not call FixCardLayout.CardFontSize");
+            foreach (var call in worksheet.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            {
+                if (call.Expression.ToString() == "FixCardLayout.FontSize")
+                    problems.Add($"FixCardLayout.FontSize bypasses the status reserve: {call}");
+            }
+        }
+
+        /// <summary>
         /// Frequency-text gate (SRP): the frequency/station header lines
         /// must live in FrequencyPanelText as pure functions (tested in
         /// FrequencyPanelTextTests), with
@@ -2830,9 +3051,9 @@ namespace RadioNavigation.SourceCheck
                 }
             }
 
-            if (skyRootCount < 4)
+            if (skyRootCount < 5)
             {
-                problems.Add($"SceneContentBuilder.SkyRoots has {skyRootCount} entries, need 4 (StarSkyRoot + ConstellationRoot + PlanetRoot + SunDiscRoot) — a missing root is never created");
+                problems.Add($"SceneContentBuilder.SkyRoots has {skyRootCount} entries, need 5 (StarSkyRoot + ConstellationRoot + PlanetRoot + MoonDiscRoot + SunDiscRoot) — a missing root is never created");
             }
 
             if (ensureSkyRoots == null)
@@ -3132,6 +3353,40 @@ namespace RadioNavigation.SourceCheck
                     || (inv.Expression is MemberAccessExpressionSyntax qualified
                         && qualified.Name is IdentifierNameSyntax qname
                         && qname.Identifier.Text == name));
+        }
+
+        /// <summary>First position of an assignment to <paramref name="field"/>
+        /// inside an `if (Locked)` branch whose right side mentions
+        /// <paramref name="source"/>; -1 when absent. Used by the keyboard-trim
+        /// gate (the frozen-pose shift must be paired with the trim).</summary>
+        private static int LockedBranchAssignmentStart(
+            MethodDeclarationSyntax method, string field, string source)
+        {
+            int best = -1;
+            foreach (var ifStatement in method.DescendantNodes().OfType<IfStatementSyntax>())
+            {
+                if (ifStatement.Condition.ToString() != "Locked")
+                    continue;
+                foreach (var assignment in ifStatement.Statement.DescendantNodesAndSelf()
+                    .OfType<AssignmentExpressionSyntax>())
+                {
+                    if (!(assignment.Left is IdentifierNameSyntax left)
+                        || left.Identifier.Text != field)
+                        continue;
+                    if (assignment.Right.ToString().IndexOf(source, StringComparison.Ordinal) < 0)
+                        continue;
+                    if (best < 0 || assignment.SpanStart < best)
+                        best = assignment.SpanStart;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>True when the method body reads the named member.</summary>
+        private static bool ReadsMember(MethodDeclarationSyntax method, string member)
+        {
+            return method.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                .Any(a => a.Name.Identifier.Text == member);
         }
 
         private static TypeDeclarationSyntax FindSourceType(
@@ -3467,6 +3722,14 @@ namespace RadioNavigation.SourceCheck
                     problems.Add("CelestialEphemeris.JdForKind not found");
                 else if (!InvokesName(jdForKind, "CalibratedJd"))
                     problems.Add("CelestialEphemeris.JdForKind never invokes CalibratedJd");
+
+                // P2/R5: the observer-aware path must carry the Moon's
+                // topocentric parallax correction.
+                var forObserver = FindMethod(ephemeris, "ComputeForObserver");
+                if (forObserver == null)
+                    problems.Add("CelestialEphemeris.ComputeForObserver not found");
+                else if (!InvokesName(forObserver, "MoonTopocentricRaDec"))
+                    problems.Add("CelestialEphemeris.ComputeForObserver never invokes MoonTopocentricRaDec");
             }
 
             var runningFix = FindSourceType(roots, "RunningFixCalculator");
@@ -3479,7 +3742,8 @@ namespace RadioNavigation.SourceCheck
                 bool routes = runningFix.Members.OfType<MethodDeclarationSyntax>()
                     .Where(m => m.Identifier.Text == "BuildObservation"
                         && m.ParameterList.Parameters.Count == 5)
-                    .Any(m => InvokesName(m, "Compute") && InvokesName(m, "JdFor"));
+                    .Any(m => (InvokesName(m, "Compute") || InvokesName(m, "ComputeForObserver"))
+                        && InvokesName(m, "JdFor"));
                 if (!routes)
                     problems.Add("RunningFixCalculator.BuildObservation(5 args) never routes through CelestialEphemeris");
             }
@@ -3489,12 +3753,37 @@ namespace RadioNavigation.SourceCheck
                 problems.Add("type 'SextantStarId' not found in Source/");
             else if (!starId.DescendantNodes().OfType<InvocationExpressionSyntax>()
                 .Any(inv => inv.Expression is MemberAccessExpressionSyntax ma
-                    && ma.Name.Identifier.Text == "MoonRaDec"))
-                problems.Add("SextantStarId never invokes MoonRaDec — the Moon cannot be sighted");
+                    && ma.Name.Identifier.Text == "MoonTopocentricRaDec"))
+                problems.Add("SextantStarId never invokes MoonTopocentricRaDec — the Moon cannot be sighted topocentrically");
 
             Assert.True(problems.Count == 0,
                 $"{problems.Count} celestial-body routing violation(s):\n"
                 + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// INV-ALPHA gate (CELESTIAL_REALISM_PLAN P3/P4): the star layer must
+        /// assemble visibility in exactly one place. StarsMesh may read
+        /// GetVisibility only for the material tint — a second reference
+        /// (e.g. multiplied into the vertex alpha) double-dims the whole
+        /// field, a regression this project already fixed once.
+        /// </summary>
+        [Fact]
+        public void StarsMesh_VisibilityReferencedOnce()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var roots = ParseAllSources();
+            var type = FindSourceType(roots, "StarsMesh");
+            Assert.True(type != null, "type 'StarsMesh' not found in Source/");
+
+            int references = type.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Count(i => i.Expression.ToString().EndsWith("GetVisibility"));
+
+            Assert.True(references == 1,
+                "StarsMesh must reference GetVisibility exactly once (INV-ALPHA: material tint only); found "
+                + references);
         }
 
         /// <summary>
@@ -3532,15 +3821,325 @@ namespace RadioNavigation.SourceCheck
             }
             else
             {
-                var capture = FindMethod(worksheet, "CaptureObservation");
-                if (capture == null)
+                bool captureFound = worksheet.Members.OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "CaptureObservation");
+                bool validates = worksheet.Members.OfType<MethodDeclarationSyntax>()
+                    .Where(m => m.Identifier.Text == "CaptureObservation")
+                    .Any(m => InvokesName(m, "Compute"));
+                if (!captureFound)
                     problems.Add("SextantWorksheet.CaptureObservation not found");
-                else if (!InvokesName(capture, "Compute"))
+                else if (!validates)
                     problems.Add("SextantWorksheet.CaptureObservation never validates CelestialEphemeris.Compute — unknown bodies silently fall back to the sun");
             }
 
             Assert.True(problems.Count == 0,
                 $"{problems.Count} no-HIP sentinel violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Sticky-body gates (swarm review 2026-11-04): the selection itself
+        /// lives in the pure BodySelection, but the two invariants a
+        /// regression would break silently are imperative —
+        ///  (a) SextantStarId.ClearSelection must reset the hold tracker, or
+        ///      the next tick re-confirms an empty selection (InCone=true with
+        ///      nothing selected) and the C calibration writes a clamped
+        ///      index error into PlayerPrefs;
+        ///  (b) SextantInputPoller.PollIndexError must require a selection —
+        ///      it is the only persistent write in the poller.
+        /// Mutation checks: drop tracker.Reset() -> (a) FAIL; drop HasSelection
+        /// -> (b) FAIL.
+        /// </summary>
+        [Fact]
+        public void StickyBody_TrackerAndCalibrationGates()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var starId = FindSourceType(roots, "SextantStarId");
+            if (starId == null)
+            {
+                problems.Add("type 'SextantStarId' not found in Source/");
+            }
+            else
+            {
+                var clear = FindMethod(starId, "ClearSelection");
+                if (clear == null)
+                    problems.Add("SextantStarId.ClearSelection not found");
+                else if (!InvokesName(clear, "Reset"))
+                    problems.Add("SextantStarId.ClearSelection never resets the hold tracker — an empty selection can re-confirm on the next tick");
+            }
+
+            var poller = FindSourceType(roots, "SextantInputPoller");
+            if (poller == null)
+            {
+                problems.Add("type 'SextantInputPoller' not found in Source/");
+            }
+            else
+            {
+                var indexError = FindMethod(poller, "PollIndexError");
+                if (indexError == null)
+                    problems.Add("SextantInputPoller.PollIndexError not found");
+                else if (!indexError.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                    .Any(a => a.Name.Identifier.Text == "HasSelection"))
+                    problems.Add("SextantInputPoller.PollIndexError does not gate on HasSelection — calibration can write from an empty selection");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} sticky-body violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Stabilization open-edge gate (swarm review 2026-11-04): the filter
+        /// state lives in static fields and survives an open/close cycle (the
+        /// PIP cameras live for the whole scene session), so the session-open
+        /// edge must snap them — otherwise the first frame glides from the
+        /// pose frozen at Close. Rules:
+        ///  A) SextantPipPose.ResetFilters exists and clears all three flags;
+        ///  B) SextantPipPose.Reset delegates to it;
+        ///  C) AttachAndConfigureCameras calls ResetFilters BEFORE the first
+        ///     UpdatePipPose.
+        /// Mutation checks: remove the call -> FAIL; move it after
+        /// UpdatePipPose -> FAIL; drop lastInsideBoat = false -> FAIL.
+        /// </summary>
+        [Fact]
+        public void SextantPip_OpenResetsStabilizationFilters()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var pose = FindSourceType(roots, "SextantPipPose");
+            if (pose == null)
+            {
+                problems.Add("type 'SextantPipPose' not found in Source/");
+            }
+            else
+            {
+                var resetFilters = FindMethod(pose, "ResetFilters");
+                if (resetFilters == null)
+                {
+                    problems.Add("SextantPipPose.ResetFilters not found");
+                }
+                else
+                {
+                    foreach (string field in new[]
+                    {
+                        "yawOffset", "yawTrimDeg", "idleSeconds", "wasLocked",
+                        "lockedYaw", "Locked"
+                    })
+                    {
+                        bool cleared = resetFilters.DescendantNodes()
+                            .OfType<AssignmentExpressionSyntax>()
+                            .Any(a => a.Left is IdentifierNameSyntax left
+                                && left.Identifier.Text == field
+                                && (a.Right.ToString() == "false"
+                                    || a.Right.ToString() == "0f"));
+                        if (!cleared)
+                            problems.Add("SextantPipPose.ResetFilters does not clear " + field);
+                    }
+                }
+
+                // The POSITION must stay raw (bino parity, author decision
+                // 2026-11-04): the game's bridge binocular keeps its camera at
+                // the character's head undamped, and any position filtering or
+                // freeze showed as height jumps in the ocular.
+                if (FindMethod(pose, "StabilizePosition") != null)
+                {
+                    problems.Add("SextantPipPose.StabilizePosition is back — the position must stay raw (bino parity, height jumps)");
+                }
+
+                // The yaw must stay RAW (author feedback 2026-11-04: a
+                // low-passed yaw made the view slide behind the mouse); only
+                // the washout offset may touch it.
+                var stabilizeYaw = FindMethod(pose, "StabilizeYaw");
+                if (stabilizeYaw == null)
+                {
+                    problems.Add("SextantPipPose.StabilizeYaw not found");
+                }
+                else if (InvokesName(stabilizeYaw, "Smooth")
+                    || InvokesName(stabilizeYaw, "SmoothAngle"))
+                {
+                    problems.Add("SextantPipPose.StabilizeYaw low-passes the yaw — the aim would slide behind the mouse (raw + washout offset only)");
+                }
+
+                var reset = FindMethod(pose, "Reset");
+                if (reset == null)
+                    problems.Add("SextantPipPose.Reset not found");
+                else if (!InvokesName(reset, "ResetFilters"))
+                    problems.Add("SextantPipPose.Reset does not delegate to ResetFilters");
+            }
+
+            var controller = FindSourceType(roots, "SextantController");
+            if (controller == null)
+            {
+                problems.Add("type 'SextantController' not found in Source/");
+            }
+            else
+            {
+                var attach = FindMethod(controller, "AttachAndConfigureCameras");
+                if (attach == null)
+                {
+                    problems.Add("SextantController.AttachAndConfigureCameras not found");
+                }
+                else
+                {
+                    int resetAt = -1;
+                    int updateAt = -1;
+                    foreach (var call in attach.DescendantNodes().OfType<InvocationExpressionSyntax>())
+                    {
+                        string target = call.Expression.ToString();
+                        if (target == "SextantPipPose.ResetFilters")
+                            resetAt = call.SpanStart;
+                        else if (target == "UpdatePipPose")
+                            updateAt = call.SpanStart;
+                    }
+                    if (resetAt < 0)
+                        problems.Add("AttachAndConfigureCameras never calls SextantPipPose.ResetFilters — the first pose can glide from the pose frozen at Close");
+                    else if (updateAt >= 0 && resetAt > updateAt)
+                        problems.Add("AttachAndConfigureCameras resets the filters AFTER the first UpdatePipPose");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} stabilization open-edge violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Keyboard aim trim gate (swarm review 2026-11-04, judge C5): the
+        /// left/right trim must MOVE the frozen pose instead of releasing the
+        /// aim freeze — the frozen branch of StabilizeYaw absorbs any change
+        /// of `target` into the washout offset, so a trim that only touches
+        /// yawTrimDeg would be swallowed (R would not centre the view), and a
+        /// trim that poked idleSeconds would drop the freeze exactly during
+        /// the fine adjustment (the star would dance). Rules:
+        ///  A) AddYawTrim shifts `lockedYaw` by `deltaDeg` while locked;
+        ///  B) ResetYawTrim shifts `lockedYaw` by `yawTrimDeg` while locked,
+        ///     BEFORE zeroing the trim;
+        ///  C) NotifyAimInput is gone and PollYawTrim never calls it;
+        ///  D) SetTestAim resets the trim (an absolute test aim);
+        ///  E) SextantProbe.Snapshot reads YawTrimDeg (the live check);
+        ///  F) ResetArc (R) drops the trim.
+        /// Mutations: drop A -> FAIL; drop B -> FAIL; swap the order in B ->
+        /// FAIL; bring the NotifyAimInput call back -> FAIL; drop D -> FAIL.
+        /// </summary>
+        [Fact]
+        public void SextantPip_TrimShiftsFrozenPose()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var pose = FindSourceType(roots, "SextantPipPose");
+            if (pose == null)
+            {
+                problems.Add("type 'SextantPipPose' not found in Source/");
+            }
+            else
+            {
+                var add = FindMethod(pose, "AddYawTrim");
+                if (add == null)
+                {
+                    problems.Add("SextantPipPose.AddYawTrim not found");
+                }
+                else if (LockedBranchAssignmentStart(add, "lockedYaw", "deltaDeg") < 0)
+                {
+                    problems.Add("SextantPipPose.AddYawTrim does not shift lockedYaw by deltaDeg while locked — the trim is swallowed by the frozen branch (C1)");
+                }
+
+                var reset = FindMethod(pose, "ResetYawTrim");
+                if (reset == null)
+                {
+                    problems.Add("SextantPipPose.ResetYawTrim not found");
+                }
+                else
+                {
+                    int shiftAt = LockedBranchAssignmentStart(reset, "lockedYaw", "yawTrimDeg");
+                    if (shiftAt < 0)
+                    {
+                        problems.Add("SextantPipPose.ResetYawTrim does not shift lockedYaw by yawTrimDeg while locked — R is absorbed by the offset (C1)");
+                    }
+                    else
+                    {
+                        int zeroAt = reset.DescendantNodes()
+                            .OfType<AssignmentExpressionSyntax>()
+                            .Where(a => a.Left is IdentifierNameSyntax left
+                                && left.Identifier.Text == "yawTrimDeg"
+                                && a.Right.ToString() == "0f")
+                            .Select(a => a.SpanStart)
+                            .DefaultIfEmpty(-1)
+                            .Min();
+                        if (zeroAt >= 0 && shiftAt > zeroAt)
+                            problems.Add("SextantPipPose.ResetYawTrim zeroes the trim BEFORE shifting the frozen pose — R would leave the view off-centre");
+                    }
+                }
+
+                if (FindMethod(pose, "NotifyAimInput") != null)
+                {
+                    problems.Add("SextantPipPose.NotifyAimInput is back — the trim must not release the aim freeze (C2)");
+                }
+
+                var setTestAim = FindMethod(pose, "SetTestAim");
+                if (setTestAim == null)
+                {
+                    problems.Add("SextantPipPose.SetTestAim not found");
+                }
+                else if (!InvokesName(setTestAim, "ResetYawTrim"))
+                {
+                    problems.Add("SextantPipPose.SetTestAim does not reset the trim — an agent's absolute aim would be offset by a leftover trim (C3)");
+                }
+            }
+
+            var poller = FindSourceType(roots, "SextantInputPoller");
+            if (poller == null)
+            {
+                problems.Add("type 'SextantInputPoller' not found in Source/");
+            }
+            else
+            {
+                var pollYawTrim = FindMethod(poller, "PollYawTrim");
+                if (pollYawTrim == null)
+                    problems.Add("SextantInputPoller.PollYawTrim not found");
+                else if (InvokesName(pollYawTrim, "NotifyAimInput"))
+                    problems.Add("SextantInputPoller.PollYawTrim still calls NotifyAimInput — the star would dance during the fine adjustment (C2)");
+            }
+
+            var probe = FindSourceType(roots, "SextantProbe");
+            if (probe == null)
+            {
+                problems.Add("type 'SextantProbe' not found in Source/");
+            }
+            else
+            {
+                var snapshot = FindMethod(probe, "Snapshot");
+                if (snapshot == null)
+                    problems.Add("SextantProbe.Snapshot not found");
+                else if (!ReadsMember(snapshot, "YawTrimDeg"))
+                    problems.Add("SextantProbe.Snapshot does not read YawTrimDeg — the live check cannot see the trim");
+            }
+
+            var controller = FindSourceType(roots, "SextantController");
+            if (controller == null)
+            {
+                problems.Add("type 'SextantController' not found in Source/");
+            }
+            else
+            {
+                var resetArc = FindMethod(controller, "ResetArc");
+                if (resetArc == null)
+                    problems.Add("SextantController.ResetArc not found");
+                else if (!InvokesName(resetArc, "ResetYawTrim"))
+                    problems.Add("SextantController.ResetArc does not call ResetYawTrim — R would not centre the view");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} keyboard-trim violation(s):\n"
                 + string.Join("\n", problems));
         }
 

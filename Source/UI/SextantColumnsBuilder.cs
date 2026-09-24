@@ -16,9 +16,9 @@ namespace UBOAT.Mods.RadioNavigation
     internal static class SextantColumnsBuilder
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
-        private const float FixCardHeightUnits = 560f;
         private const int FixCardFontSize = 11;
-        private const float SunColumnWidthUnits = 440f;
+        private const float SunColumnWidthUnits = SextantOverlayLayout.SunColumnWidthUnits;
+        private const float ReadingColumnWidthUnits = SextantOverlayLayout.ColumnWidthUnits;
 
         private const string PainMessage =
             "\u041D\u0415 \u041C\u041E\u0413\u0423, \u0413\u041B\u0410\u0417\u0410\u041C \u0411\u041E\u041B\u042C\u041D\u041E \u2014 " +
@@ -29,10 +29,16 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>
         /// Builds the reading, sun and fix columns under canvasRoot. The fix
         /// column placement (stacked vs side-by-side) comes from
-        /// SextantOverlayLayout, unit-tested offline.
+        /// SextantOverlayLayout, unit-tested offline; the ocular side
+        /// (SextantOcularSize) drives the column offsets so they hug the
+        /// circle at any size.
         /// </summary>
-        public static void BuildColumns(GameObject canvasRoot, SextantOverlay.Result result)
+        public static void BuildColumns(GameObject canvasRoot, SextantOverlay.Result result,
+            float uiScale, float ocularSizeUnits)
         {
+            if (ocularSizeUnits <= 0f || float.IsNaN(ocularSizeUnits))
+                ocularSizeUnits = 600f;
+
             // Reading column hugging the circle's left edge (§13.3).
             GameObject columnGo = new GameObject("ReadingColumn");
             columnGo.transform.SetParent(canvasRoot.transform, false);
@@ -40,9 +46,10 @@ namespace UBOAT.Mods.RadioNavigation
             column.anchorMin = new Vector2(0.5f, 0.5f);
             column.anchorMax = new Vector2(0.5f, 0.5f);
             column.pivot = new Vector2(1f, 0.5f);
-            column.sizeDelta = new Vector2(SextantOverlayLayout.ColumnWidthUnits, 180f);
+            column.sizeDelta = new Vector2(ReadingColumnWidthUnits, 180f);
             column.anchoredPosition = new Vector2(
-                -SextantOverlayLayout.OcularSizeUnits * 0.5f - SextantOverlayLayout.ColumnGapUnits, 0f);
+                -ocularSizeUnits * 0.5f - SextantOverlayLayout.ColumnGapUnits, 0f);
+            result.ReadingColumn = column;
 
             result.AngleText = MakeLabel(canvasRoot, "AngleText", 22, TextAnchor.MiddleRight, Color.white);
             SetChild(column, result.AngleText, 160f);
@@ -61,7 +68,7 @@ namespace UBOAT.Mods.RadioNavigation
                 pr.anchorMax = new Vector2(0.5f, 0f);
                 pr.pivot = new Vector2(0.5f, 0f);
                 pr.sizeDelta = new Vector2(1500f, 40f);
-                pr.anchoredPosition = new Vector2(0f, SextantOverlayLayout.HintYUnits + 155f);
+                pr.anchoredPosition = new Vector2(0f, SextantOverlayLayout.PainYUnits);
             }
             result.FilterText = MakeLabel(canvasRoot, "FilterText", 14, TextAnchor.MiddleRight, new Color(0.85f, 0.85f, 0.85f));
             SetChild(column, result.FilterText, 36f);
@@ -76,33 +83,45 @@ namespace UBOAT.Mods.RadioNavigation
             sunColumn.pivot = new Vector2(0f, 0.5f);
             sunColumn.sizeDelta = new Vector2(SunColumnWidthUnits, 180f);
             sunColumn.anchoredPosition = new Vector2(
-                SextantOverlayLayout.OcularSizeUnits * 0.5f + SextantOverlayLayout.ColumnGapUnits, 0f);
+                ocularSizeUnits * 0.5f + SextantOverlayLayout.ColumnGapUnits, 0f);
+            result.SunColumn = sunColumn;
 
-            result.SunAltText = MakeLabel(canvasRoot, "SunAltText", 14, TextAnchor.MiddleLeft, new Color(0.75f, 0.9f, 1f));
-            SetChild(sunColumn, result.SunAltText, 160f);
+            // Body block: Sun row (daytime full row / below-horizon status),
+            // Moon + nav stars above the horizon (updated on a 1 s cadence,
+            // see SextantBodiesReadout). The old separate wide sun line was
+            // folded into this block (2026-11-04): its 291-unit text ran off
+            // the screen edge, while the block's rows are ~231 units.
+            result.BodiesAltText = MakeLabel(canvasRoot, "BodiesAltText",
+                SextantOverlayLayout.BodiesFontSize, TextAnchor.UpperLeft,
+                new Color(0.62f, 0.70f, 0.78f));
+            SetChild(sunColumn, result.BodiesAltText, SextantOverlayLayout.BodiesYUnits);
 
-            // Small-font body altitudes: Moon + nav stars above the horizon
-            // (updated on a 1 s cadence, see SextantBodiesReadout).
-            result.BodiesAltText = MakeLabel(canvasRoot, "BodiesAltText", 11, TextAnchor.UpperLeft, new Color(0.62f, 0.70f, 0.78f));
-            SetChild(sunColumn, result.BodiesAltText, 130f);
-
-            // Running-fix worksheet column (F-Tafel card): second column left
-            // of the ocular; on narrow aspects (4:3, side zone < ~740 units)
-            // it stacks below the reading column instead.
+            // Running-fix worksheet column (F-Tafel card): pinned to the
+            // screen's top-left corner on wide unit spaces (so it clears the
+            // game's bottom UI); on narrow ones it stacks below the reading
+            // column instead (SextantOverlayLayout decides).
             GameObject fixColumnGo = new GameObject("FixColumn");
             fixColumnGo.transform.SetParent(canvasRoot.transform, false);
             RectTransform fixColumn = fixColumnGo.AddComponent<RectTransform>();
             var placement = SextantOverlayLayout.ComputeFixColumnPlacement(
-                (float)Screen.width, (float)Screen.height);
+                (float)Screen.width, (float)Screen.height, uiScale, ocularSizeUnits);
             fixColumn.anchorMin = new Vector2(0.5f, 0.5f);
             fixColumn.anchorMax = new Vector2(0.5f, 0.5f);
-            fixColumn.sizeDelta = new Vector2(SextantOverlayLayout.FixColumnWidthUnits, FixCardHeightUnits);
+            // Height = the space the placement actually leaves on screen
+            // (stacked: top-anchored below the reading column; 2026-09-22 the
+            // fixed 560 ran the three-observation card off the bottom edge).
+            fixColumn.sizeDelta = new Vector2(SextantOverlayLayout.FixColumnWidthUnits,
+                placement.maxHeightUnits);
             fixColumn.pivot = new Vector2(placement.pivotX, placement.pivotY);
             fixColumn.anchoredPosition = new Vector2(placement.anchorX, placement.anchorY);
+            result.FixColumn = fixColumn;
+            result.FixCardAvailableUnits = placement.maxHeightUnits;
+            result.FixCardBaseFontSize = FixCardFontSize;
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                LogPrefix + " FIXLAYOUT stacked={0} pivot=({1:F1},{2:F1}) anchor=({3:F0},{4:F0})",
-                placement.stacked, placement.pivotX, placement.pivotY,
-                placement.anchorX, placement.anchorY));
+                LogPrefix + " FIXLAYOUT stacked={0} branch={1} pivot=({2:F1},{3:F1}) anchor=({4:F0},{5:F0}) h={6:F0} uiScale={7:F2}",
+                placement.stacked, placement.stacked ? "stacked" : "topleft",
+                placement.pivotX, placement.pivotY,
+                placement.anchorX, placement.anchorY, placement.maxHeightUnits, uiScale));
 
             result.FixCardText = MakeLabel(canvasRoot, "FixCardText", FixCardFontSize,
                 TextAnchor.UpperLeft, new Color(0.82f, 0.88f, 0.82f));
@@ -114,6 +133,30 @@ namespace UBOAT.Mods.RadioNavigation
             fixCardRect.anchorMax = Vector2.one;
             fixCardRect.offsetMin = Vector2.zero;
             fixCardRect.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>
+        /// Re-places the reading and sun columns when the ocular size changes
+        /// (UI-scale poll, 2026-11-04): both hug the circle's edges, so a
+        /// bigger ocular must push them outward or they would overlap it.
+        /// </summary>
+        public static void PlaceColumns(SextantOverlay.Result result, float ocularSizeUnits)
+        {
+            if (result == null)
+                return;
+            if (ocularSizeUnits <= 0f || float.IsNaN(ocularSizeUnits))
+                ocularSizeUnits = 600f;
+
+            if (result.ReadingColumn != null)
+            {
+                result.ReadingColumn.anchoredPosition = new Vector2(
+                    -ocularSizeUnits * 0.5f - SextantOverlayLayout.ColumnGapUnits, 0f);
+            }
+            if (result.SunColumn != null)
+            {
+                result.SunColumn.anchoredPosition = new Vector2(
+                    ocularSizeUnits * 0.5f + SextantOverlayLayout.ColumnGapUnits, 0f);
+            }
         }
 
         /// <summary>
