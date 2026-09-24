@@ -450,6 +450,23 @@ namespace RadioNavigation.SourceCheck
                         }
                         continue;
                     }
+                    if (diag.Id == "CS0030")
+                    {
+                        // "cannot convert type 'int' to 'X'" -> X must be an
+                        // enum (a flags cast in a real source file). The
+                        // message's SECOND quoted name is the target type.
+                        var full = ExtractMissingNamespaceFromMessage(diag);
+                        var name = full.Length > 0 ? full.Split('.').Last().Trim() : "";
+                        if (name.Length > 0)
+                        {
+                            enumTypes.Add(name);
+                            var nsC = ResolveNamespace(name, diag.Location.SourceTree, typeNamespaces);
+                            if (nsC != null)
+                                missingNs[name] = nsC;
+                            added = true;
+                        }
+                        continue;
+                    }
                     if (diag.Id == "CS0117")
                     {
                         // "'X' does not contain definition for 'Y'" -> X is an enum/class
