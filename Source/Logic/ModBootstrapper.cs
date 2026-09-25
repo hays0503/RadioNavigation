@@ -43,9 +43,16 @@ namespace UBOAT.Mods.RadioNavigation
             // Main instance per hot reload (Mod.InitializeAssembly), so an
             // instance 'loaded' flag is never true on the second call — the old
             // guard was dead and left stale statics/hooks behind.
-            bool reload = harmony != null;
-            if (reload)
-                harmony.UnpatchAll(harmony.Id); // F139: bare UnpatchAll() removes other mods' patches; 0Harmony 2.2.2 has no UnpatchSelf
+            //
+            // The unpatch must be unconditional: Harmony keys patches by patch
+            // method, not by owner instance, so a previous assembly copy's
+            // patches survive an instance-level guard (swarm 2026-09-25) and
+            // stack a second prefix/postfix set on every reload. UnpatchAll(id)
+            // is owner-string based and therefore copy-agnostic; 0Harmony 2.2.2
+            // has no UnpatchSelf, and a bare UnpatchAll() would remove other
+            // mods' patches (F139).
+            Harmony owner = new Harmony("UBOAT.Mods.RadioNavigation");
+            owner.UnpatchAll(owner.Id);
             RadioStoryIntegration.ResetRuntimeState();
             LighthousePlacer.Reset();
             LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
@@ -61,11 +68,16 @@ namespace UBOAT.Mods.RadioNavigation
             SkyVisibilityResolver.Reset();
             WarnOnce.Reset();
             FixMapMarker.Clear();
-            if (reload)
-                Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
+            Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
 
-            harmony = new Harmony("UBOAT.Mods.RadioNavigation");
+            harmony = owner;
             HarmonyPatchInstaller.Apply(harmony);
+
+            // Save/load hygiene for the native map points: prune duplicate
+            // owned rows before the game's restore (Loaded) and before every
+            // serialization (SavingStarted). Retried on scene start until the
+            // SavesManager singleton resolves.
+            MapSaveSanitizer.TryInstall();
 
             // Dev-console diagnostics (calibration probe: rn_lighthouse_height)
             LighthouseHeightProbe.EnsureRegistered();
@@ -173,6 +185,10 @@ namespace UBOAT.Mods.RadioNavigation
                 Debug.LogError("[RadioNav][Main] Injection failed (Awake): " + e.Message);
                 Debug.LogException(e);
             }
+
+            // Retry the save-sanitizer install until the SavesManager
+            // singleton is resolvable (LoadSingleton returns null early).
+            MapSaveSanitizer.TryInstall();
         }
 
         /// Self-recovery for a missing/evicted DI registration of the

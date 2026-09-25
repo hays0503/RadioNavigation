@@ -143,5 +143,51 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(new[] { "RadioNav FIX" }, adopt);
             Assert.Empty(destroy);
         }
+
+        [Fact]
+        public void KeyPrefixes_ScopeFamiliesForStaleCleanup()
+        {
+            Assert.StartsWith(MapMarkerPoints.LighthouseKeyPrefix, MapMarkerPoints.LighthouseKey("DE-042"));
+            Assert.StartsWith(MapMarkerPoints.StationKeyPrefix, MapMarkerPoints.StationKey("DDH"));
+            Assert.StartsWith(MapMarkerPoints.LopKeyPrefix, MapMarkerPoints.LopVertexKey(0));
+            Assert.False(MapMarkerPoints.LighthouseKey("DE-042")
+                .StartsWith(MapMarkerPoints.StationKeyPrefix, System.StringComparison.Ordinal));
+            Assert.False(MapMarkerPoints.FixKey
+                .StartsWith(MapMarkerPoints.LighthouseKeyPrefix, System.StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void IsSanitizableName_CoversOwnedAndLegacyMcp()
+        {
+            Assert.True(MapMarkerPoints.IsSanitizableName("RadioNav FIX"));
+            Assert.True(MapMarkerPoints.IsSanitizableName("RadioNav MCP 3"));
+            Assert.True(MapMarkerPoints.IsSanitizableName("MCP Point")); // legacy literal
+            Assert.False(MapMarkerPoints.IsSanitizableName("MCP Point 2"));
+            Assert.False(MapMarkerPoints.IsSanitizableName("Some game point"));
+            Assert.False(MapMarkerPoints.IsSanitizableName(""));
+            Assert.False(MapMarkerPoints.IsSanitizableName(null));
+        }
+
+        [Fact]
+        public void ShouldWritePosition_StaticAlways_DynamicOnlyWhenSourceMoved()
+        {
+            Assert.True(MapMarkerPoints.ShouldWritePosition(true, false, true));
+            Assert.True(MapMarkerPoints.ShouldWritePosition(true, true, true));
+            Assert.True(MapMarkerPoints.ShouldWritePosition(false, true, true));
+            Assert.False(MapMarkerPoints.ShouldWritePosition(false, false, true)); // player drag survives
+            Assert.False(MapMarkerPoints.ShouldWritePosition(true, true, false));
+            Assert.False(MapMarkerPoints.ShouldWritePosition(false, true, false));
+        }
+
+        [Fact]
+        public void ClampCreateCount_TruncatesToLimit()
+        {
+            Assert.Equal(0, MapMarkerPoints.ClampCreateCount(0, 10));
+            Assert.Equal(5, MapMarkerPoints.ClampCreateCount(5, 10));
+            Assert.Equal(10, MapMarkerPoints.ClampCreateCount(10, 10));
+            Assert.Equal(10, MapMarkerPoints.ClampCreateCount(400, 10));
+            Assert.Equal(0, MapMarkerPoints.ClampCreateCount(5, 0));
+            Assert.Equal(0, MapMarkerPoints.ClampCreateCount(5, -1));
+        }
     }
 }

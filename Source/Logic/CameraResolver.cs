@@ -33,6 +33,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         private const float WorldRadiusM = 3900f;
 
+        // Stable identity of the resolver type across hot-reload assemblies
+        // (AssemblyQualifiedName changes per load; FullName does not).
+        private const string ResolverTypeFullName = "UBOAT.Mods.RadioNavigation.CameraResolver";
+
         /// <summary>Sky-shell radius frozen while the sextant is open (P7).</summary>
         private static float? frozenRadius;
 
@@ -155,6 +159,29 @@ namespace UBOAT.Mods.RadioNavigation
             Camera.onPreCull += OnAnyCameraPreCull;
         }
 
+        /// <summary>Removes every <see cref="Camera.onPreCull"/> handler whose
+        /// declaring type is this class — including handlers installed by a
+        /// previous hot-reload assembly copy, whose delegates survive because
+        /// the old assembly is never unloaded.</summary>
+        private static void PurgeResolverPreCullHandlers()
+        {
+            Delegate handlers = Camera.onPreCull;
+            if (handlers == null)
+                return;
+            Delegate[] list = handlers.GetInvocationList();
+            for (int i = 0; i < list.Length; i++)
+            {
+                Delegate handler = list[i];
+                if (handler == null || handler.Method == null || handler.Method.DeclaringType == null)
+                    continue;
+                if (handler.Method.DeclaringType.FullName != ResolverTypeFullName)
+                    continue;
+                if (handler.Method.Name != "OnAnyCameraPreCull")
+                    continue;
+                Camera.onPreCull -= (Camera.CameraCallback)handler;
+            }
+        }
+
         public static void ResetForReload()
         {
             if (renderHookInstalled)
@@ -162,6 +189,11 @@ namespace UBOAT.Mods.RadioNavigation
                 Camera.onPreCull -= OnAnyCameraPreCull;
                 renderHookInstalled = false;
             }
+            // Purge ALL remaining resolver pre-cull handlers, including a
+            // previous assembly copy's (the per-copy renderHookInstalled static
+            // cannot see them and SceneEventsListener purging does not cover
+            // this game-static event — swarm 2026-09-25).
+            PurgeResolverPreCullHandlers();
             renderingCamera = null;
             lastLoggedCamera = null;
             gameMainCamera = null;

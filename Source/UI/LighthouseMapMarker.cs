@@ -57,6 +57,14 @@ namespace UBOAT.Mods.RadioNavigation
             return MapMarkerKind.Lighthouse;
         }
 
+        /// <summary>Stale cleanup scope: only lighthouse keys may be destroyed
+        /// by this component's reconcile (never station/fix keys).</summary>
+        protected override bool OwnsKey(string key)
+        {
+            return !string.IsNullOrEmpty(key)
+                && key.StartsWith(MapMarkerPoints.LighthouseKeyPrefix, StringComparison.Ordinal);
+        }
+
         protected override string HoverText(int index) => Name(index);
 
         protected override string PinnedText(int index)

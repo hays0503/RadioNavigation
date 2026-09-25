@@ -4327,6 +4327,25 @@ namespace RadioNavigation.SourceCheck
                     problems.Add("NavMapMarkerBase never calls MapMarkerPoints.Plan — the adoption/reconcile is gone");
                 if (!InvokesName(baseType, "Evaluate"))
                     problems.Add("NavMapMarkerBase never calls MapMarkerPoints.Evaluate — the interaction policy is gone");
+                if (!InvokesName(baseType, "ClampCreateCount"))
+                    problems.Add("NavMapMarkerBase never calls MapMarkerPoints.ClampCreateCount — the runaway creation guard is gone");
+                if (!InvokesName(baseType, "OwnsKey"))
+                    problems.Add("NavMapMarkerBase never calls OwnsKey — stale cleanup is no longer family-scoped");
+                if (!InvokesName(baseType, "ShouldWritePosition"))
+                    problems.Add("NavMapMarkerBase never calls MapMarkerPoints.ShouldWritePosition — the dynamic-position rule is gone");
+                if (!InvokesName(baseType, "RemovePointDataBeforeDestroy"))
+                    problems.Add("NavMapMarkerBase destroys points without MapSaveSanitizer.RemovePointDataBeforeDestroy — a save in the same frame would resurrect them");
+                if (!baseType.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(i => i.Expression.ToString()
+                            .EndsWith("FindObjectsOfType<MapPointUI>", StringComparison.Ordinal)
+                        && i.ArgumentList.Arguments.Count == 1
+                        && i.ArgumentList.Arguments[0].ToString() == "true"))
+                    problems.Add("NavMapMarkerBase scans points without includeInactive:true — hidden points would be recreated (27k runaway)");
+                var bridgeFrame = FindMethod(baseType, "ApplyBridgeFrame");
+                if (bridgeFrame == null
+                    || !bridgeFrame.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                        .Any(i => i.Expression.ToString().EndsWith("ApplyFrame", StringComparison.Ordinal)))
+                    problems.Add("NavMapMarkerBase.ApplyBridgeFrame no longer calls MapMarkerPointBridge.ApplyFrame");
                 if (baseType.DescendantNodes().OfType<SimpleNameSyntax>()
                     .Any(n => n.Identifier.Text == "GraphicRaycaster"))
                     problems.Add("NavMapMarkerBase creates a GraphicRaycaster again — the custom hitbox must stay gone (the native point is the hitbox)");
@@ -4357,6 +4376,40 @@ namespace RadioNavigation.SourceCheck
                 if (!bridge.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
                     .Any(m => m.Name.Identifier.Text == "Position"))
                     problems.Add("MapMarkerPointBridge never applies the static position lock");
+                var tick = FindMethod(bridge, "LateUpdate");
+                if (tick == null)
+                {
+                    problems.Add("MapMarkerPointBridge has no LateUpdate — ApplyFrame never runs (dead-code regression 2026-09-25)");
+                }
+                else if (!tick.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(i => i.Expression.ToString().EndsWith("ApplyBridgeFrame", StringComparison.Ordinal)))
+                {
+                    problems.Add("MapMarkerPointBridge.LateUpdate does not call Owner.ApplyBridgeFrame — the per-frame policy is dead");
+                }
+            }
+
+            var sanitizer = FindSourceType(roots, "MapSaveSanitizer");
+            if (sanitizer == null)
+            {
+                problems.Add("type 'MapSaveSanitizer' not found in Source/ — polluted saves would keep re-materializing the runaway rows");
+            }
+            else
+            {
+                if (FindMethod(sanitizer, "TryInstall") == null)
+                    problems.Add("MapSaveSanitizer.TryInstall not found");
+                if (!sanitizer.DescendantNodes().OfType<IdentifierNameSyntax>()
+                    .Any(n => n.Identifier.Text == "SavingStarted"))
+                    problems.Add("MapSaveSanitizer never hooks SavesManager.SavingStarted — autosaves would re-serialize junk rows");
+                if (!sanitizer.DescendantNodes().OfType<IdentifierNameSyntax>()
+                    .Any(n => n.Identifier.Text == "Loaded"))
+                    problems.Add("MapSaveSanitizer never hooks SavesManager.Loaded — a polluted save would materialize before cleanup");
+            }
+
+            var probe = FindSourceType(roots, "MapProbe");
+            if (probe != null && probe.DescendantNodes().OfType<LiteralExpressionSyntax>()
+                .Any(l => l.Token.ValueText == "MCP Point"))
+            {
+                problems.Add("MapProbe still creates points named 'MCP Point' — outside the owned prefix they are unremovable and saved");
             }
 
             var fix = FindSourceType(roots, "FixMapMarker");

@@ -22,7 +22,6 @@
   Source\Logic\LighthousePlacer.cs : warning RCS1129: 
   Source\Logic\LighthousePlacer.cs : warning RCS1146: 
   Source\Logic\LighthousePlacer.cs : warning RCS1169: 
-  Source\Logic\LighthousePlacer.cs : warning RCS1173: 
   Source\Logic\LighthousePlacer.cs : warning RCS1213: 
   Source\Logic\LighthouseRotator.cs : warning RCS1213: 
   Source\Logic\LighthouseScreenProjection.cs : warning RCS1146: 
@@ -69,13 +68,11 @@
   Source\UI\ExpanderHandler.cs : warning RCS1213: 
   Source\UI\FixCardComposer.cs : warning RCS1238: 
   Source\UI\FixMapMarker.cs : warning RCS1146: 
-  Source\UI\FixMapMarker.cs : warning RCS1238: 
   Source\UI\GroundHandler.cs : warning RCS1213: 
   Source\UI\InformationPanelHandler.cs : warning RCS1213: 
   Source\UI\InformationPanelHandler.cs : warning RCS1238: 
   Source\UI\LighthouseMapMarker.cs : warning RCS1146: 
   Source\UI\NavMapMarkerBase.cs : warning RCS1129: 
-  Source\UI\NavMapMarkerBase.cs : warning RCS1146: 
   Source\UI\NavMapMarkerBase.cs : warning RCS1213: 
   Source\UI\PanelDragHandler.cs : warning RCS1213: 
   Source\UI\RadioHandler.cs : warning RCS1213: 

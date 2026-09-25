@@ -107,15 +107,42 @@ namespace RadioNavigation.SourceCheck
             var refs = new List<MetadataReference>();
             refs.Add(MetadataReference.CreateFromImage(cleanGameDll));
 
-            // BCL (net40 semantics): the mod uses System.Enum/Byte/Int32/ValueType etc.
-            // In-memory Roslyn does not auto-add mscorlib, so reference the runtime BCL.
-            foreach (var bcl in BclPaths)
+            var managed = GameSourceCompiler.ManagedDir;
+
+            // BCL: prefer the game's own Mono BCL from Managed when present.
+            // The clean game dll's type refs point at Unity's mscorlib, and
+            // some BCL types differ between profiles (e.g. Queue<T> lives in
+            // mscorlib on Unity but in System.dll in the desktop framework) —
+            // mixing profiles produced CS7069 for those. Fall back to the
+            // desktop BCL when the game install is unavailable.
+            bool managedBcl = false;
+            var managedBclPaths = new List<string>();
+            foreach (var name in BclNames)
             {
-                if (File.Exists(bcl))
-                    refs.Add(MetadataReference.CreateFromFile(bcl));
+                var path = Path.Combine(managed, name);
+                if (File.Exists(path))
+                {
+                    managedBclPaths.Add(path);
+                    managedBcl = true;
+                }
             }
 
-            var managed = GameSourceCompiler.ManagedDir;
+            if (managedBcl)
+            {
+                foreach (var path in managedBclPaths)
+                    refs.Add(MetadataReference.CreateFromFile(path));
+            }
+            else
+            {
+                // BCL (net40 semantics): the mod uses System.Enum/Byte/Int32/ValueType etc.
+                // In-memory Roslyn does not auto-add mscorlib, so reference the runtime BCL.
+                foreach (var bcl in BclPaths)
+                {
+                    if (File.Exists(bcl))
+                        refs.Add(MetadataReference.CreateFromFile(bcl));
+                }
+            }
+
             foreach (var name in ModRefNames)
             {
                 var path = Path.Combine(managed, name);
@@ -124,6 +151,14 @@ namespace RadioNavigation.SourceCheck
             }
             return refs.ToImmutableArray();
         }
+
+        private static readonly string[] BclNames =
+        {
+            "mscorlib.dll",
+            "System.dll",
+            "System.Core.dll",
+            "System.Xml.dll",
+        };
 
         private static readonly string[] BclPaths =
         {

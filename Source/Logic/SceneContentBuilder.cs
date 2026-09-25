@@ -102,15 +102,27 @@ namespace UBOAT.Mods.RadioNavigation
         /// reconciles then fought (stale-set destruction / visibility), which
         /// the author saw as chaotically blinking markers (2026-11-05).
         /// </summary>
-        private static bool HasComponentNamed(GameObject go, Type componentType)
+        internal static bool HasComponentNamed(GameObject go, Type componentType)
         {
+            if (go == null || componentType == null)
+                return false;
             if (go.GetComponent(componentType) != null)
                 return true;
+            return HasComponentNamed(go, componentType.Name);
+        }
+
+        /// <summary>Name-based overload for callers that must not reference the
+        /// component Type directly (runtime components of a second assembly
+        /// copy).</summary>
+        internal static bool HasComponentNamed(GameObject go, string typeName)
+        {
+            if (go == null || string.IsNullOrEmpty(typeName))
+                return false;
             MonoBehaviour[] behaviours = go.GetComponents<MonoBehaviour>();
             for (int i = 0; i < behaviours.Length; i++)
             {
                 if (behaviours[i] != null
-                    && behaviours[i].GetType().Name == componentType.Name)
+                    && behaviours[i].GetType().Name == typeName)
                     return true;
             }
             return false;

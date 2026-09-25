@@ -96,6 +96,27 @@ namespace UBOAT.Mods.RadioNavigation
             suppressedIndices.Clear();
         }
 
+        /// <summary>A save/load cycle destroys every map point
+        /// (SavesManagerOnLoadingStarted -> Clear) and that destruction is
+        /// indistinguishable from a player erase at the point level — re-arm
+        /// the markers instead of leaving the fix hidden until the next
+        /// observation (leak forensic 2026-09-25). The fix data itself is
+        /// session state: a reload does not clear it.</summary>
+        public static void ResetSuppressions()
+        {
+            Suppressed = false;
+            suppressedIndices.Clear();
+        }
+
+        /// <summary>Stale cleanup scope: only the fix marker's own keys
+        /// (FIX / LOP) may be destroyed by this component's reconcile.</summary>
+        protected override bool OwnsKey(string key)
+        {
+            return !string.IsNullOrEmpty(key)
+                && (key.StartsWith(MapMarkerPoints.FixKey, System.StringComparison.Ordinal)
+                    || key.StartsWith(MapMarkerPoints.LopKeyPrefix, System.StringComparison.Ordinal));
+        }
+
         // Marker 0 = the fix pin, 1..3 = the cocked-hat vertices (P6).
         protected override int MarkerCount => 4;
 

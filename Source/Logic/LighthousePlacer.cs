@@ -71,6 +71,10 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Distance-gate maintenance cadence (seconds).</summary>
         private const float GateIntervalSeconds = 0.5f;
 
+        /// <summary>Scene-root name of the placer holder; also the
+        /// copy-agnostic guard used by <see cref="EnsureRunning"/>.</summary>
+        internal const string PlacerObjectName = "Lighthouse Placer";
+
         [Inject] private static ResourceManager resourceManager = null;
         [Inject] private static GameState gameState = null;
 
@@ -131,7 +135,16 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
-            var holder = new GameObject("Lighthouse Placer");
+            // Copy-agnostic guard (swarm 2026-09-25): a previous/parallel
+            // assembly copy's placer answers to the same GameObject name, and
+            // the per-copy static above cannot see it — without this check the
+            // second copy built a duplicate fleet (double rotators/glow).
+            if (GameObject.Find(PlacerObjectName) != null)
+            {
+                return;
+            }
+
+            var holder = new GameObject(PlacerObjectName);
             instance = holder.AddComponent<LighthousePlacer>();
             instance.BuildFleet();
         }
@@ -679,7 +692,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Debug.Log(LogPrefix + " '" + placement.GroupName + "': fixed light, rotator skipped");
             }
-            else if (rotator.GetComponent<LighthouseRotator>() != null)
+            else if (SceneContentBuilder.HasComponentNamed(rotator.gameObject, nameof(LighthouseRotator)))
             {
                 Debug.Log(LogPrefix + " '" + placement.GroupName + "': rotator already attached, skipping");
             }
@@ -699,11 +712,14 @@ namespace UBOAT.Mods.RadioNavigation
             // survives save/load respawns. Re-point it to the current
             // container/rotator on every (re)attach.
             LighthouseBeamGlow glow = EnsureGlowController(placement);
-            glow.Initialize(
-                container.transform,
-                container.transform.InverseTransformPoint(rotator.position),
-                rotator,
-                placement.GroupName);
+            if (glow != null)
+            {
+                glow.Initialize(
+                    container.transform,
+                    container.transform.InverseTransformPoint(rotator.position),
+                    rotator,
+                    placement.GroupName);
+            }
 
             AlignToWorldFrame(placement, container.transform, rotator);
 
@@ -871,6 +887,9 @@ namespace UBOAT.Mods.RadioNavigation
                     return existingComponent;
                 }
 
+                if (SceneContentBuilder.HasComponentNamed(placement.GlowHolder, nameof(LighthouseBeamGlow)))
+                    return null; // another assembly copy already owns the glow
+
                 return placement.GlowHolder.AddComponent<LighthouseBeamGlow>();
             }
 
@@ -881,7 +900,11 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 placement.GlowHolder = existing;
                 LighthouseBeamGlow component = existing.GetComponent<LighthouseBeamGlow>();
-                return component != null ? component : existing.AddComponent<LighthouseBeamGlow>();
+                if (component != null)
+                    return component;
+                if (SceneContentBuilder.HasComponentNamed(existing, nameof(LighthouseBeamGlow)))
+                    return null; // another assembly copy already owns the glow
+                return existing.AddComponent<LighthouseBeamGlow>();
             }
 
             var holder = new GameObject("RadioNavLighthouseGlow_" + placement.GroupName);

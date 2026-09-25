@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using UBOAT.Game.Sandbox;
+using UBOAT.Game.Scene.Tasks;
 using UBOAT.Game.UI;
 using UBOAT.Game.UI.Map;
 using UnityEngine;
@@ -31,7 +32,14 @@ namespace UBOAT.Mods.RadioNavigation
     public static class MapProbe
     {
         private const int MaxPoints = 400;
-        private const string OwnedPrefix = "RadioNav ";
+        private const string OwnedPrefix = MapMarkerPoints.Prefix;
+        // MCP-created test points live inside the owned namespace so the
+        // existing clear/owned tooling can always clean them up (swarm
+        // 2026-09-25: the old literal "MCP Point" name was outside the prefix,
+        // unremovable once duplicated, and persisted in the save).
+        private const string McpPrefix = OwnedPrefix + "MCP ";
+        private static int mcpCounter;
+        private static readonly List<MapLineUI> probeLines = new List<MapLineUI>();
 
         private static readonly FieldInfo HoveredPointField = typeof(MapPointUI).GetField(
             "hoveredPoint", BindingFlags.NonPublic | BindingFlags.Static);
@@ -103,7 +111,13 @@ namespace UBOAT.Mods.RadioNavigation
                 return Error("bad-position");
 
             if (string.IsNullOrEmpty(name))
-                name = "MCP Point";
+                name = McpPrefix + (++mcpCounter).ToString(CultureInfo.InvariantCulture);
+            else if (!IsOwned(name))
+                name = McpPrefix + name;
+
+            if (CountMatches(name) > 0)
+                return Error("duplicate-name");
+
             MapPointUI created = charting.CreatePoint(position, name);
             if (created == null)
                 return Error("create-failed");
@@ -176,7 +190,22 @@ namespace UBOAT.Mods.RadioNavigation
                 deleted++;
             }
 
+            // Probe-created lines have no delete verb of their own; the owned
+            // clear drains them too, otherwise they accumulate in the save
+            // forever (swarm 2026-09-25).
+            int deletedLines = 0;
+            for (int i = probeLines.Count - 1; i >= 0; i--)
+            {
+                MapLineUI line = probeLines[i];
+                probeLines.RemoveAt(i);
+                if (line == null)
+                    continue;
+                UnityEngine.Object.Destroy(line.gameObject);
+                deletedLines++;
+            }
+
             return "{\"ok\":true,\"deleted\":" + deleted.ToString(CultureInfo.InvariantCulture) +
+                ",\"deletedLines\":" + deletedLines.ToString(CultureInfo.InvariantCulture) +
                 ",\"note\":\"the mod reconciles its markers back (suppressed ones stay hidden)\"}";
         }
 
@@ -187,6 +216,8 @@ namespace UBOAT.Mods.RadioNavigation
                 return Error("no-map");
             if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to))
                 return Error("name-required");
+            if (string.Equals(from, to, StringComparison.Ordinal))
+                return Error("same-endpoint");
 
             MapPointUI start;
             string error = FindPoint(from, out start);
@@ -196,10 +227,13 @@ namespace UBOAT.Mods.RadioNavigation
             error = FindPoint(to, out end);
             if (error != null)
                 return error;
+            if (HasLineBetween(start, end))
+                return Error("line-exists");
 
             MapLineUI line = charting.CreateLine(start, end);
             if (line == null)
                 return Error("create-failed");
+            probeLines.Add(line);
             return "{\"ok\":true,\"from\":\"" + RadioNavProbeJson.Escape(from) +
                 "\",\"to\":\"" + RadioNavProbeJson.Escape(to) + "\"}";
         }
@@ -294,6 +328,39 @@ namespace UBOAT.Mods.RadioNavigation
             return result;
         }
 
+        private static int CountMatches(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return 0;
+            List<MapPointUI> points = CollectPoints();
+            int matches = 0;
+            for (int i = 0; i < points.Count; i++)
+            {
+                MapPointUI candidate = points[i];
+                if (candidate == null || candidate.Data == null)
+                    continue;
+                if (string.Equals(candidate.Data.Name, name, StringComparison.Ordinal))
+                    matches++;
+            }
+            return matches;
+        }
+
+        private static bool HasLineBetween(MapPointUI start, MapPointUI end)
+        {
+            MapLineUI[] lines = UnityEngine.Object.FindObjectsOfType<MapLineUI>(true);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                MapLineUI line = lines[i];
+                if (line == null)
+                    continue;
+                bool direct = ReferenceEquals(line.StartPoint, start) && ReferenceEquals(line.EndPoint, end);
+                bool reverse = ReferenceEquals(line.StartPoint, end) && ReferenceEquals(line.EndPoint, start);
+                if (direct || reverse)
+                    return true;
+            }
+            return false;
+        }
+
         private static string FindPoint(string name, out MapPointUI point)
         {
             point = null;
@@ -313,10 +380,17 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (point == null)
             {
+                MapPointUI first = points.Count > 0 ? points[0] : null;
+                string firstName = "(none)";
+                if (first != null)
+                {
+                    MapPointData firstData = first.Data;
+                    if (firstData != null)
+                        firstName = firstData.Name;
+                }
                 Debug.LogWarning("[RadioNav][MapProbe] point-not-found name=\"" + name +
                     "\" collected=" + points.Count +
-                    " first=\"" + (points.Count > 0 && points[0]?.Data != null
-                        ? points[0].Data.Name : "(none)") + "\"");
+                    " first=\"" + firstName + "\"");
                 return Error("point-not-found");
             }
             if (matches > 1)
@@ -331,11 +405,17 @@ namespace UBOAT.Mods.RadioNavigation
             position = Vector2.zero;
             float lat;
             float lon;
-            if (TryFloat(latRaw, out lat) && TryFloat(lonRaw, out lon))
+            if (TryFloat(latRaw, out lat) && TryFloat(lonRaw, out lon)
+                && lat >= -90f && lat <= 90f
+                && lon >= -180f && lon <= 180f)
             {
-                if (lat < -90f || lat > 90f)
+                Vector2 converted = Coordinates.ToWorldPosition(lat, lon);
+                if (float.IsNaN(converted.x) || float.IsInfinity(converted.x)
+                    || float.IsNaN(converted.y) || float.IsInfinity(converted.y))
+                {
                     return false;
-                position = Coordinates.ToWorldPosition(lat, lon);
+                }
+                position = converted;
                 return true;
             }
 
@@ -403,15 +483,19 @@ namespace UBOAT.Mods.RadioNavigation
         private static void AppendPositionFields(StringBuilder sb, Vector2 position)
         {
             Vector2 latLon = Coordinates.ToLatLong(position);
-            sb.Append("\"lat\":").Append(latLon.x.ToString("F5", CultureInfo.InvariantCulture));
-            sb.Append(",\"lon\":").Append(latLon.y.ToString("F5", CultureInfo.InvariantCulture));
-            sb.Append(",\"x\":").Append(position.x.ToString("F1", CultureInfo.InvariantCulture));
-            sb.Append(",\"y\":").Append(position.y.ToString("F1", CultureInfo.InvariantCulture));
+            sb.Append("\"lat\":").Append(RadioNavProbeJson.Float(latLon.x));
+            sb.Append(",\"lon\":").Append(RadioNavProbeJson.Float(latLon.y));
+            sb.Append(",\"x\":").Append(RadioNavProbeJson.Float(position.x));
+            sb.Append(",\"y\":").Append(RadioNavProbeJson.Float(position.y));
         }
 
         private static string PointName(MapPointUI point)
         {
-            return point?.Data?.Name;
+            // Unity's fake-null: `?.` uses the CLR check and would read the
+            // stale managed name of a destroyed point.
+            if (point == null || point.Data == null)
+                return null;
+            return point.Data.Name;
         }
 
         private static bool IsOwned(string name)

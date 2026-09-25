@@ -52,8 +52,18 @@ namespace UBOAT.Mods.RadioNavigation
             if (point == null || owner == null)
                 return null;
 
-            MapMarkerPointBridge bridge = point.GetComponent<MapMarkerPointBridge>()
-                ?? point.gameObject.AddComponent<MapMarkerPointBridge>();
+            // Copy-agnostic component lookup (double-load trap, swarm
+            // 2026-09-25): the typed GetComponent cannot see a bridge added by
+            // another assembly copy, so a name-based fallback prevents a second
+            // visual tree per point. The allocating scan runs only when the
+            // fast typed lookup found nothing.
+            MapMarkerPointBridge bridge = point.GetComponent<MapMarkerPointBridge>();
+            if (bridge == null)
+            {
+                if (FindForeignBridge(point) != null)
+                    return null;
+                bridge = point.gameObject.AddComponent<MapMarkerPointBridge>();
+            }
             bridge.Owner = owner;
             bridge.Index = index;
             bridge.point = point;
@@ -88,7 +98,6 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (built)
                 return;
-            built = true;
 
             var visualGo = new GameObject("RadioNavVisual", typeof(RectTransform));
             visualGo.transform.SetParent(transform, false);
@@ -142,6 +151,40 @@ namespace UBOAT.Mods.RadioNavigation
             tooltipText.enableWordWrapping = false;
             tooltipText.raycastTarget = false;
             tooltip.SetActive(false);
+            // Set the guard only after a complete build: a mid-build failure
+            // must not leave a half-built tree that EnsureBuilt never repairs
+            // (swarm 2026-09-25).
+            built = true;
+        }
+
+        /// <summary>Reuses a bridge component of the same type NAME from
+        /// another assembly copy, or null when only a foreign one exists
+        /// (the caller must not add a second visual tree then).</summary>
+        private static MonoBehaviour FindForeignBridge(MapPointUI point)
+        {
+            MonoBehaviour[] behaviours = point.GetComponents<MonoBehaviour>();
+            for (int i = 0; i < behaviours.Length; i++)
+            {
+                MonoBehaviour behaviour = behaviours[i];
+                if (behaviour == null)
+                    continue;
+                if (behaviour.GetType().Name == "MapMarkerPointBridge")
+                    return behaviour;
+            }
+            return null;
+        }
+
+        /// <summary>Per-frame compensation, called by the owner through
+        /// <see cref="NavMapMarkerBase.ApplyBridgeFrame"/>: the game re-writes
+        /// position and localScale every frame, so this runs after it.
+        /// Public so the Roslynator unused-member gate does not treat the
+        /// Unity lifecycle message as dead code.</summary>
+        public void LateUpdate()
+        {
+            NavMapMarkerBase owner = Owner;
+            if (owner == null)
+                return;
+            owner.ApplyBridgeFrame(this);
         }
 
         /// <summary>Per-frame compensation, called by the owner from this
@@ -200,7 +243,13 @@ namespace UBOAT.Mods.RadioNavigation
             if (tooltipText == null)
                 return;
 
-            tooltipText.text = text ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                HideTooltip();
+                return;
+            }
+
+            tooltipText.text = text;
             tooltipText.ForceMeshUpdate();
             Vector2 preferred = tooltipText.GetPreferredValues();
             tooltipText.rectTransform.sizeDelta = preferred;
@@ -238,6 +287,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            // RMB switches the charting tool map-wide and MMB is unrelated;
+            // only the left button pins the tooltip (swarm 2026-09-25).
+            if (eventData != null && eventData.button != PointerEventData.InputButton.Left)
+                return;
             if (Owner == null)
                 return;
             Owner.OnBridgeClick(this);

@@ -66,6 +66,8 @@ namespace UBOAT.Mods.RadioNavigation
             public bool Interactive = true;
             public bool PositionLocked;
             public Vector2 TruePosition;
+            public Vector2 LastTruePosition;
+            public bool HasTruePosition;
         }
 
         private static TMP_FontAsset tooltipFont;
@@ -102,6 +104,12 @@ namespace UBOAT.Mods.RadioNavigation
         protected abstract string PointKey(int index);
         /// <summary>Kind driving the static/dynamic interaction policy.</summary>
         protected abstract MapMarkerKind PointKind(int index);
+        /// <summary>True when the key belongs to this marker's family
+        /// (lighthouse / station / fix+LOP). The reconcile destroys only
+        /// own-family stale keys — a fix marker must not erase the lighthouse
+        /// fleet, and the second assembly copy of the same class derives the
+        /// same family keys, so the cleanup stays double-load safe.</summary>
+        protected abstract bool OwnsKey(string key);
         protected abstract string HoverText(int index);
         protected abstract string PinnedText(int index);
         protected abstract bool HasContent(int index);
@@ -233,12 +241,18 @@ namespace UBOAT.Mods.RadioNavigation
             CollectDesiredKeys();
             CollectExistingPoints();
             MapMarkerPoints.Plan(desiredKeys, existingNames, toCreate, toAdopt, toDestroy);
-            if (toDestroy.Count != lastStaleLogged && RadioNavDiagnostics.IsEnabledCached(
+            int ownStale = 0;
+            for (int i = 0; i < toDestroy.Count; i++)
+            {
+                if (OwnsKey(toDestroy[i]))
+                    ownStale++;
+            }
+            if (ownStale != lastStaleLogged && RadioNavDiagnostics.IsEnabledCached(
                     RadioNavDiagnostics.LighthouseDeclutterStatsKey, false))
             {
-                lastStaleLogged = toDestroy.Count;
-                Debug.Log(LogPrefix + " owned points outside this marker's set left in place=" +
-                    toDestroy.Count + " (double-load safety)");
+                lastStaleLogged = ownStale;
+                Debug.Log(LogPrefix + " own stale keys left for cleanup=" + ownStale +
+                    " (family-scoped, other marker families excluded)");
             }
             ApplyPlan();
             RebuildViews();
@@ -284,8 +298,11 @@ namespace UBOAT.Mods.RadioNavigation
                 else
                 {
                     // Duplicate of an owned name (a runaway from an earlier
-                    // build): keep the first, destroy the rest.
+                    // build): keep the first, destroy the rest. Remove the row
+                    // before the deferred Destroy so a save in this frame
+                    // cannot resurrect it.
                     point.Destroyed -= OnPointDestroyedHandler;
+                    MapSaveSanitizer.RemovePointDataBeforeDestroy(point.Data);
                     Destroy(point.gameObject);
                 }
             }
@@ -293,15 +310,19 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void ApplyPlan()
         {
-            // NOTE: the stale set (owned names that are not in this copy's
-            // desired set) is deliberately NOT destroyed. The mod assembly can
-            // be loaded twice (ProbeTest shim + mod loader); each copy has its
-            // own statics and its own fleet view, so one copy's "stale" set is
-            // the other copy's live set — destroying it made the markers blink
-            // in a 0.25 s create/destroy cycle (live bug 2026-11-05). Only
-            // exact duplicates are removed (CollectExistingPoints), and
-            // explicit resets remove their markers via CollectExplicitRemovals.
-            for (int i = 0; i < toCreate.Count; i++)
+            // Runaway guard (leak forensic 2026-09-25): the 27,512-point
+            // incident grew because each 0.25 s pass created the whole fleet
+            // again when the scan missed the hidden points. The plan is
+            // bounded by construction (toCreate ⊆ desired, |desired| ≤
+            // MarkerCount); bail out loudly if that invariant ever breaks.
+            int createLimit = MarkerCount;
+            if (toCreate.Count > createLimit)
+            {
+                Debug.LogError(LogPrefix + " reconcile wants " + toCreate.Count +
+                    " creates > marker count " + createLimit + " — truncated (runaway guard)");
+            }
+            int createCount = MapMarkerPoints.ClampCreateCount(toCreate.Count, createLimit);
+            for (int i = 0; i < createCount; i++)
             {
                 int index;
                 if (!indexByKey.TryGetValue(toCreate[i], out index))
@@ -309,6 +330,23 @@ namespace UBOAT.Mods.RadioNavigation
                 MapPointUI created = charting.CreatePoint(GetEncounterPosition(index), toCreate[i]);
                 if (created != null && !pointsByName.ContainsKey(toCreate[i]))
                     pointsByName.Add(toCreate[i], created);
+            }
+
+            // Stale cleanup, family-scoped: destroy own-family keys that are
+            // no longer desired (renames, fleet curation, older sessions).
+            // Double-load safe: both copies of this class derive identical
+            // families from identical data, and other families are excluded.
+            for (int i = 0; i < toDestroy.Count; i++)
+            {
+                string key = toDestroy[i];
+                if (!OwnsKey(key))
+                    continue;
+                MapPointUI stale;
+                if (!pointsByName.TryGetValue(key, out stale) || stale == null)
+                    continue;
+                stale.Destroyed -= OnPointDestroyedHandler;
+                MapSaveSanitizer.RemovePointDataBeforeDestroy(stale.Data);
+                Destroy(stale.gameObject);
             }
 
             explicitRemovals.Clear();
@@ -319,6 +357,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (pointsByName.TryGetValue(explicitRemovals[i], out point) && point != null)
                 {
                     point.Destroyed -= OnPointDestroyedHandler;
+                    MapSaveSanitizer.RemovePointDataBeforeDestroy(point.Data);
                     Destroy(point.gameObject);
                 }
             }
@@ -439,15 +478,26 @@ namespace UBOAT.Mods.RadioNavigation
                     continue;
 
                 view.TruePosition = GetEncounterPosition(view.Index);
+                bool sourceMoved = !view.HasTruePosition || view.TruePosition != view.LastTruePosition;
+                view.LastTruePosition = view.TruePosition;
+                view.HasTruePosition = true;
                 MapMarkerPolicy policy = MapMarkerPoints.Evaluate(
                     PointKind(view.Index), PointSuppressed(view.Index), true, pointsTool, eraser);
                 view.Interactive = policy.Interactive;
                 view.PositionLocked = policy.PositionLocked;
                 // Static markers keep their true position even while the
                 // declutter has them hidden (their bridge's LateUpdate does not
-                // run on an inactive GameObject).
-                if (view.PositionLocked && view.Point.Position != view.TruePosition)
+                // run on an inactive GameObject). Dynamic markers (fix / LOP):
+                // a NEW observation changes the source position and wins over
+                // the point's own position; an unchanged source means the
+                // player dragged the point — the drag is preserved instead of
+                // being overwritten every frame (swarm 2026-09-25: stale FIX
+                // position after the second observation).
+                if (MapMarkerPoints.ShouldWritePosition(view.PositionLocked, sourceMoved,
+                        view.Point.Position != view.TruePosition))
+                {
                     view.Point.Position = view.TruePosition;
+                }
 
                 Vector3 position = sandbox.EncounterToSceneSpace(view.TruePosition);
                 OnMarkerPositioned(view.Index, position,

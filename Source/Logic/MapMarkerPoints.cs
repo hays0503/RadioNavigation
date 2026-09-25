@@ -41,6 +41,9 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public const string Prefix = "RadioNav ";
         public const string FixKey = Prefix + "FIX";
+        public const string LopKeyPrefix = Prefix + "LOP ";
+        public const string LighthouseKeyPrefix = Prefix + "LH ";
+        public const string StationKeyPrefix = Prefix + "STN ";
 
         /// <summary>LOP vertex key; index 0..2 = pairs B+C, C+A, A+B
         /// (matches FixMapMarker / CockedHatResult order).</summary>
@@ -74,6 +77,35 @@ namespace UBOAT.Mods.RadioNavigation
         {
             return !string.IsNullOrEmpty(name)
                 && name.StartsWith(Prefix, StringComparison.Ordinal);
+        }
+
+        /// <summary>Names the save sanitizer may deduplicate: our own points
+        /// (including the MCP test points) and the legacy literal name written
+        /// by the first MCP builds.</summary>
+        public static bool IsSanitizableName(string name)
+        {
+            return IsOwned(name) || string.Equals(name, "MCP Point", StringComparison.Ordinal);
+        }
+
+        /// <summary>Dynamic-marker position rule (leak forensic 2026-09-25):
+        /// static markers always restore their true position; dynamic ones
+        /// (fix/LOP) accept the true position only when the source actually
+        /// moved — an unchanged source means the player dragged the point and
+        /// the drag must survive the 1 Hz refresh.</summary>
+        public static bool ShouldWritePosition(bool positionLocked, bool sourceMoved, bool changed)
+        {
+            if (!changed)
+                return false;
+            return positionLocked || sourceMoved;
+        }
+
+        /// <summary>Runaway guard for the reconcile create pass: never create
+        /// more points in one pass than the marker count.</summary>
+        public static int ClampCreateCount(int createCount, int limit)
+        {
+            if (createCount <= 0 || limit <= 0)
+                return 0;
+            return createCount < limit ? createCount : limit;
         }
 
         /// <summary>Static markers cannot be moved or erased; they only serve
