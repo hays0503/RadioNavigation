@@ -4428,6 +4428,83 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Eraser/Delete ownership gate (author 2026-09-25): a line/angle/
+        /// circle/bearing anchored to two protected static markers must stay
+        /// removable. MapShapeEraser runs before MapChartingUI.Update, removes
+        /// the anchored shapes and clears MapPointUI.hoveredPoint — it must
+        /// never destroy the marker itself.
+        /// Mutations: drop the execution order -> FAIL; drop a shape type ->
+        /// FAIL; destroy the hovered point -> FAIL; stop clearing the hover ->
+        /// FAIL (the vanilla eraser would kill the marker).
+        /// </summary>
+        [Fact]
+        public void MapShapeEraser_OwnsShapeCleanup()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var eraser = FindSourceType(roots, "MapShapeEraser");
+            if (eraser == null)
+            {
+                problems.Add("type 'MapShapeEraser' not found in Source/ — a line between two protected static markers is unremovable in game");
+            }
+            else
+            {
+                if (!eraser.DescendantNodes().OfType<AttributeSyntax>()
+                    .Any(a => a.ToString().Contains("DefaultExecutionOrder")
+                        && a.ToString().Contains("-1000")))
+                {
+                    problems.Add("MapShapeEraser has no [DefaultExecutionOrder(-1000)] — it must run before MapChartingUI.Update, otherwise the vanilla eraser destroys the marker first");
+                }
+
+                string[] shapeTypes = { "MapLineUI", "MapAngleUI", "MapCircleUI", "MapBearingUI" };
+                for (int i = 0; i < shapeTypes.Length; i++)
+                {
+                    string shape = shapeTypes[i];
+                    if (!eraser.DescendantNodes().OfType<SimpleNameSyntax>()
+                        .Any(n => n.Identifier.Text == shape))
+                    {
+                        problems.Add("MapShapeEraser never touches " + shape + " — that shape type would stay unremovable");
+                    }
+                }
+
+                if (!eraser.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                    .Any(m => m.Name.Identifier.Text == "HoveredPoint"))
+                {
+                    problems.Add("MapShapeEraser never reads MapPointUI.HoveredPoint — the eraser target is unknown");
+                }
+
+                if (!eraser.DescendantNodes().Any(n =>
+                    (n is IdentifierNameSyntax id && id.Identifier.Text == "hoveredPoint")
+                    || (n is LiteralExpressionSyntax lit && lit.Token.ValueText == "hoveredPoint")))
+                {
+                    problems.Add("MapShapeEraser never clears MapPointUI.hoveredPoint — the vanilla eraser would destroy the marker after the shapes are gone");
+                }
+
+                if (eraser.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(i => i.Expression.ToString().EndsWith("Destroy", StringComparison.Ordinal)
+                        && i.ArgumentList.ToString().Contains("hovered")))
+                {
+                    problems.Add("MapShapeEraser destroys the hovered MapPointUI — the marker must survive");
+                }
+            }
+
+            var builder = FindSourceType(roots, "SceneContentBuilder");
+            if (builder != null
+                && !builder.DescendantNodes().OfType<SimpleNameSyntax>()
+                    .Any(n => n.Identifier.Text == "MapShapeEraser"))
+            {
+                problems.Add("SceneContentBuilder does not register MapShapeEraser — it would never exist in the scene");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} shape-eraser violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Visibility gate (SRP slice BeamGate): flare/dot decisions flow
         /// LighthouseBeamGlow.IsFlareTakingOver -&gt; FlareTakesOver and
         /// GetBeamVisibilityFactor -&gt; BeamFactor. A re-inline of the cone

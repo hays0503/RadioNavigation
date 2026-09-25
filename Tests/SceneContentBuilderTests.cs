@@ -20,6 +20,7 @@ namespace UBOAT.Mods.RadioNavigation
     public sealed class StationMapMarker { }
     public sealed class FixMapMarker { }
     public sealed class SextantController { }
+    public sealed class MapShapeEraser { }
     public sealed class LighthousePlacer { public static void EnsureRunning() { } }
     public sealed class StarSkyPhase0Probe { public static void EnsureRunning() { } }
 }
@@ -74,7 +75,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void MapComponents_HasFiveExpectedTypesInOrder()
+        public void MapComponents_HasSixExpectedTypesInOrder()
         {
             Assert.Equal(
                 new[]
@@ -83,7 +84,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                     typeof(LighthouseMapMarker),
                     typeof(StationMapMarker),
                     typeof(FixMapMarker),
-                    typeof(SextantController)
+                    typeof(SextantController),
+                    typeof(MapShapeEraser)
                 },
                 SceneContentBuilder.MapComponents);
         }
@@ -122,9 +124,10 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             SceneContentBuilder.EnsureMapComponents(present.Contains, added.Add);
 
-            Assert.Equal(3, added.Count);
+            Assert.Equal(4, added.Count);
             Assert.DoesNotContain(typeof(StationMapOverlay), added);
             Assert.Contains(typeof(SextantController), added);
+            Assert.Contains(typeof(MapShapeEraser), added);
         }
 
         [Fact]

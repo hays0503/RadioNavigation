@@ -117,7 +117,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>Frame policy of one marker.</summary>
         public static MapMarkerPolicy Evaluate(MapMarkerKind kind, bool suppressed,
-            bool visible, bool pointsToolActive, bool eraserActive)
+            bool visible, bool pointsToolActive)
         {
             bool isStatic = IsStatic(kind);
             MapMarkerPolicy policy;
@@ -126,10 +126,12 @@ namespace UBOAT.Mods.RadioNavigation
             policy.PositionLocked = isStatic;
             // The Points tool opens the game's rename popup on click and the
             // name is our adoption key — the mod's points stay inert then.
-            // The eraser must not see the static markers at all.
-            policy.Interactive = visible
-                && !pointsToolActive
-                && !(isStatic && eraserActive);
+            // The eraser keeps the static markers HOVERABLE (unlike the first
+            // implementation): MapShapeEraser intercepts the erase and removes
+            // the shapes anchored to the marker instead of the marker itself,
+            // so a line/angle/circle between two protected markers is no
+            // longer unremovable (author 2026-09-25).
+            policy.Interactive = visible && !pointsToolActive;
             return policy;
         }
 

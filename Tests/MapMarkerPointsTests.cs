@@ -51,14 +51,14 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             MapMarkerPolicy policy = MapMarkerPoints.Evaluate(
                 MapMarkerKind.Fix, suppressed: false, visible: true,
-                pointsToolActive: false, eraserActive: false);
+                pointsToolActive: false);
             Assert.True(policy.Exists);
             Assert.True(policy.Interactive);
             Assert.False(policy.PositionLocked);
 
             policy = MapMarkerPoints.Evaluate(
                 MapMarkerKind.LopVertex, suppressed: true, visible: true,
-                pointsToolActive: false, eraserActive: false);
+                pointsToolActive: false);
             Assert.False(policy.Exists);
         }
 
@@ -67,7 +67,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             MapMarkerPolicy policy = MapMarkerPoints.Evaluate(
                 MapMarkerKind.Lighthouse, suppressed: true, visible: true,
-                pointsToolActive: false, eraserActive: false);
+                pointsToolActive: false);
             Assert.True(policy.Exists);
             Assert.True(policy.PositionLocked);
             Assert.True(policy.Interactive);
@@ -84,22 +84,27 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             foreach (MapMarkerKind kind in kinds)
             {
                 MapMarkerPolicy policy = MapMarkerPoints.Evaluate(kind, false, true,
-                    pointsToolActive: true, eraserActive: false);
+                    pointsToolActive: true);
                 Assert.False(policy.Interactive);
                 Assert.True(policy.Exists);
             }
         }
 
         [Fact]
-        public void Evaluate_Eraser_ProtectsStaticMarkersOnly()
+        public void Evaluate_KeepsStaticMarkersHoverable()
         {
+            // The eraser must still SEE the static markers: MapShapeEraser
+            // intercepts the erase and removes the anchored shapes (a line
+            // between two protected markers used to be unremovable), while
+            // the marker itself is never destroyed. Same for the fix marker.
             MapMarkerPolicy dynamicPolicy = MapMarkerPoints.Evaluate(
-                MapMarkerKind.Fix, false, true, false, eraserActive: true);
+                MapMarkerKind.Fix, false, true, false);
             Assert.True(dynamicPolicy.Interactive);
 
             MapMarkerPolicy staticPolicy = MapMarkerPoints.Evaluate(
-                MapMarkerKind.Station, false, true, false, eraserActive: true);
-            Assert.False(staticPolicy.Interactive);
+                MapMarkerKind.Station, false, true, false);
+            Assert.True(staticPolicy.Interactive);
+            Assert.True(staticPolicy.PositionLocked);
         }
 
         [Fact]
@@ -107,7 +112,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             MapMarkerPolicy policy = MapMarkerPoints.Evaluate(
                 MapMarkerKind.Lighthouse, false, visible: false,
-                pointsToolActive: false, eraserActive: false);
+                pointsToolActive: false);
             Assert.False(policy.Interactive);
             Assert.False(policy.Visible);
         }

@@ -469,7 +469,6 @@ namespace UBOAT.Mods.RadioNavigation
                 shownBuffer = new bool[views.Count];
 
             bool pointsTool = charting != null && charting.CurrentTool == MapChartingUI.Tool.Points;
-            bool eraser = charting != null && charting.CurrentTool == MapChartingUI.Tool.Eraser;
 
             for (int i = 0; i < views.Count; i++)
             {
@@ -482,7 +481,7 @@ namespace UBOAT.Mods.RadioNavigation
                 view.LastTruePosition = view.TruePosition;
                 view.HasTruePosition = true;
                 MapMarkerPolicy policy = MapMarkerPoints.Evaluate(
-                    PointKind(view.Index), PointSuppressed(view.Index), true, pointsTool, eraser);
+                    PointKind(view.Index), PointSuppressed(view.Index), true, pointsTool);
                 view.Interactive = policy.Interactive;
                 view.PositionLocked = policy.PositionLocked;
                 // Static markers keep their true position even while the
@@ -614,6 +613,14 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (view.Bridge == null)
                 return;
+            // Under the eraser the hover is a targeting gesture, not an
+            // inspection one (the eraser removes the shapes anchored to the
+            // marker) — do not pop a tooltip.
+            if (charting != null && charting.CurrentTool == MapChartingUI.Tool.Eraser)
+            {
+                view.Bridge.HideTooltip();
+                return;
+            }
             view.Bridge.RefreshTooltip(
                 view.Pinned ? PinnedText(view.Index) : HoverText(view.Index), view.Pinned);
         }

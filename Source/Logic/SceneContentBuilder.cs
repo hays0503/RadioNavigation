@@ -50,7 +50,8 @@ namespace UBOAT.Mods.RadioNavigation
             typeof(LighthouseMapMarker),
             typeof(StationMapMarker),
             typeof(FixMapMarker), // SEXTANT_PLAN v1.10
-            typeof(SextantController) // SEXTANT_PLAN §7.9
+            typeof(SextantController), // SEXTANT_PLAN §7.9
+            typeof(MapShapeEraser) // eraser/Delete removes shapes, not our markers
         };
 
         public static void EnsureSkyRoots(ISceneContentHost host)
