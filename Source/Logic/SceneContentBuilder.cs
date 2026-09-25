@@ -88,10 +88,32 @@ namespace UBOAT.Mods.RadioNavigation
             if (radio.IsNull())
                 return;
             EnsureMapComponents(
-                t => radio.GetComponent(t).IsNotNull(),
+                t => HasComponentNamed(radio, t),
                 t => radio.AddComponent(t));
             EnsureSkyRoots(new UnitySceneContentHost());
             EnsureRunners(LighthousePlacer.EnsureRunning, StarSkyPhase0Probe.EnsureRunning);
+        }
+
+        /// <summary>
+        /// Copy-agnostic component check: the mod assembly can be loaded twice
+        /// (ProbeTest shim + mod loader), so a component of the SAME type name
+        /// coming from another copy must satisfy the check. Checking by the
+        /// local Type made every copy add its own marker set — the two
+        /// reconciles then fought (stale-set destruction / visibility), which
+        /// the author saw as chaotically blinking markers (2026-11-05).
+        /// </summary>
+        private static bool HasComponentNamed(GameObject go, Type componentType)
+        {
+            if (go.GetComponent(componentType) != null)
+                return true;
+            MonoBehaviour[] behaviours = go.GetComponents<MonoBehaviour>();
+            for (int i = 0; i < behaviours.Length; i++)
+            {
+                if (behaviours[i] != null
+                    && behaviours[i].GetType().Name == componentType.Name)
+                    return true;
+            }
+            return false;
         }
 
         private sealed class UnitySceneContentHost : ISceneContentHost

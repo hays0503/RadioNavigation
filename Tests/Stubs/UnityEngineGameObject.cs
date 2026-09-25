@@ -11,6 +11,17 @@ namespace UnityEngine
     {
     }
 
+    /// <summary>Minimal Behaviour/MonoBehaviour stubs: the copy-agnostic
+    /// component check in SceneContentBuilder walks GetComponents&lt;MonoBehaviour&gt;().
+    /// </summary>
+    public class Behaviour : Component
+    {
+    }
+
+    public class MonoBehaviour : Behaviour
+    {
+    }
+
     public class GameObject : Object
     {
         public string name;
@@ -25,5 +36,7 @@ namespace UnityEngine
         public Component GetComponent(Type type) { return null; }
 
         public Component AddComponent(Type type) { return null; }
+
+        public T[] GetComponents<T>() where T : Component { return new T[0]; }
     }
 }

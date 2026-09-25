@@ -92,6 +92,7 @@ namespace UBOAT.Mods.RadioNavigation
         private float reconcileTimer;
         private float declutterLogTimer;
         private float maintenanceTimer;
+        private int lastStaleLogged = -1;
         private int hoveredIndex = -1;
         private float lastIconPx = LighthouseMarkerSizing.MinIconPixelSize;
         private double lastUnitsPerPixel;
@@ -232,10 +233,11 @@ namespace UBOAT.Mods.RadioNavigation
             CollectDesiredKeys();
             CollectExistingPoints();
             MapMarkerPoints.Plan(desiredKeys, existingNames, toCreate, toAdopt, toDestroy);
-            if (toDestroy.Count > 0 && RadioNavDiagnostics.IsEnabledCached(
+            if (toDestroy.Count != lastStaleLogged && RadioNavDiagnostics.IsEnabledCached(
                     RadioNavDiagnostics.LighthouseDeclutterStatsKey, false))
             {
-                Debug.Log(LogPrefix + " owned points outside this copy's set left in place=" +
+                lastStaleLogged = toDestroy.Count;
+                Debug.Log(LogPrefix + " owned points outside this marker's set left in place=" +
                     toDestroy.Count + " (double-load safety)");
             }
             ApplyPlan();
