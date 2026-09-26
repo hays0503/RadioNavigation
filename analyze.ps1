@@ -59,6 +59,22 @@ if (-not $roslynator) {
     exit 1
 }
 
+# Phase timings: the quick path costs ~300 s with no visibility into the split
+# (SourceCheck vs restore vs Roslynator). Each heavy step records its seconds
+# via Stop-Phase; Write-PhaseTimings prints the table before every terminal
+# exit so the cost is visible on green runs and on failures alike.
+$phaseTimes = [ordered]@{}
+$phaseWatch = $null
+function Stop-Phase([string]$name) {
+    $phaseTimes[$name] = $phaseWatch.Elapsed.TotalSeconds.ToString("0.0", [cultureinfo]::InvariantCulture)
+}
+function Write-PhaseTimings() {
+    Write-Host "--- analyze phase timings (s) ---"
+    foreach ($key in $phaseTimes.Keys) {
+        Write-Host ("  {0,-16} {1}" -f $key, $phaseTimes[$key])
+    }
+}
+
 # Neural-slop gate: compile the mod against the clean (non-obfuscated) game source
 # reference BEFORE static analysis. A hallucinated/wrong-signature game API call
 # fails here instead of passing silently against the obfuscated DLL. The runner
@@ -67,11 +83,15 @@ if (-not $SkipSourceCheck) {
     $scproj = Join-Path $root "RadioNavigation.SourceCheck\RadioNavigation.SourceCheck.csproj"
     if (Test-Path $scproj) {
         Write-Host "[RadioNavigation] SourceCheck (neural-slop guard) ..."
+        $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
         & dotnet run --project $scproj -c Release
         if ($LASTEXITCODE -ne 0) {
+            Stop-Phase "SourceCheck"
             Write-Error "[RadioNavigation] SourceCheck FAILED - mod references a game API that does not exist / has wrong signature (neural slop). Fix before analyzing."
+            Write-PhaseTimings
             exit $LASTEXITCODE
         }
+        Stop-Phase "SourceCheck"
         Write-Host "[RadioNavigation] SourceCheck PASS"
     }
     else {
@@ -80,11 +100,15 @@ if (-not $SkipSourceCheck) {
 }
 
 # Always restore so the shared obj/project.assets.json matches THIS project.
+$phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
 & dotnet restore $csproj | Out-Null
 if ($LASTEXITCODE -ne 0) {
+    Stop-Phase "Restore"
     Write-Error "[RadioNavigation] dotnet restore failed for $csproj"
+    Write-PhaseTimings
     exit $LASTEXITCODE
 }
+Stop-Phase "Restore"
 
 # IDE0051 (unused private member) + IDE0052 (unread private member) audit
 # (risk register iter6). Roslynator CLI never surfaces IDE rules, so this
@@ -107,12 +131,16 @@ if ($IdeAudit) {
     # Rebuild (not incremental): IDE warnings only surface when Roslyn
     # actually compiles; an up-to-date no-op build reports a vacuous clean
     # (same trap as RnAudit).
+    $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
     $buildLines = & dotnet build $csproj -c Release -p:EnforceCodeStyleInBuild=true -p:NoWarn="CS8032%3BCS0162%3BCS0219%3BCS0649" -t:Rebuild 2>&1
     if ($LASTEXITCODE -ne 0) {
+        Stop-Phase "IdeAudit-build"
         Write-Error "[RadioNavigation] IdeAudit build failed (exit $LASTEXITCODE) - refusing to report a clean audit on a broken compile"
         $buildLines | ForEach-Object { Write-Host $_ }
+        Write-PhaseTimings
         exit $LASTEXITCODE
     }
+    Stop-Phase "IdeAudit-build"
     $buildOut = $buildLines | Out-String
     # Build warnings repeat (project + target passes) — dedupe so counts
     # are stable run over run.
@@ -140,9 +168,11 @@ if ($IdeAudit) {
         Write-Host "--- GENUINE (fix or justify) ---"
         $genuine | ForEach-Object { Write-Host $_ }
         Write-Host "[RadioNavigation] IdeAudit FAILED - genuine dead members found"
+        Write-PhaseTimings
         exit 1
     }
     Write-Host "[RadioNavigation] IdeAudit clean"
+    Write-PhaseTimings
     exit 0
 }
 
@@ -153,19 +183,27 @@ if ($IdeAudit) {
 # `warning RNxxxx` line. Dedupe keeps counts stable run over run.
 if ($RnAudit) {
     $analyzersProj = Join-Path $root "RadioNavigation.Analyzers\RadioNavigation.Analyzers.csproj"
+    $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
     & dotnet build $analyzersProj -c Release --nologo -v q 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
+        Stop-Phase "RnAudit-analyzers"
         Write-Error "[RadioNavigation] analyzers build failed (exit $LASTEXITCODE)"
+        Write-PhaseTimings
         exit $LASTEXITCODE
     }
+    Stop-Phase "RnAudit-analyzers"
     # Rebuild (not incremental): analyzer warnings only surface when Roslyn
     # actually compiles; an up-to-date no-op build reports a vacuous clean.
+    $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
     $rnLines = & dotnet build $csproj -c Release --no-restore --nologo -v n -t:Rebuild 2>&1
     if ($LASTEXITCODE -ne 0) {
+        Stop-Phase "RnAudit-build"
         Write-Error "[RadioNavigation] RnAudit build failed (exit $LASTEXITCODE) - refusing to report a clean audit on a broken compile"
         $rnLines | ForEach-Object { Write-Host $_ }
+        Write-PhaseTimings
         exit $LASTEXITCODE
     }
+    Stop-Phase "RnAudit-build"
     $hits = @($rnLines | Select-String -Pattern 'warning RN\d+' | ForEach-Object { $_.Line.Trim() -replace '^\d+>', '' } | Sort-Object -Unique)
     # RN noise allowlist (exact file(line,col) + reason). Reviewed hits only:
     # - StationMapOverlay.cs(36,38) RN0006: throttled (0.5 s) one-shot retry until
@@ -185,9 +223,11 @@ if ($RnAudit) {
     if ($genuine.Count -gt 0) {
         $genuine | ForEach-Object { Write-Host $_ }
         Write-Host "[RadioNavigation] RnAudit FAILED - custom analyzer hits found"
+        Write-PhaseTimings
         exit 1
     }
     Write-Host "[RadioNavigation] RnAudit clean"
+    Write-PhaseTimings
     exit 0
 }
 
@@ -224,7 +264,10 @@ function Add-SupportedDiagnostics {
 if ($Fix) {
     $fixArgs = New-Object System.Collections.ArrayList
     Add-SupportedDiagnostics $quickRules $fixArgs
+    $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
     & roslynator fix $csproj --severity-level $Severity @fixArgs
+    Stop-Phase "Roslynator"
+    Write-PhaseTimings
     exit $LASTEXITCODE
 }
 
@@ -234,8 +277,11 @@ Add-SupportedDiagnostics $quickRules $args
 if ($Json) {
     $out = Join-Path $root "roslynator-report.sarif"
     $args += "--output", $out, "--output-format", "sarif"
+    $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
     & roslynator analyze $csproj --severity-level $Severity @args
+    Stop-Phase "Roslynator"
     Write-Host "[RadioNavigation] SARIF report -> $out"
+    Write-PhaseTimings
     exit $LASTEXITCODE
 }
 
@@ -259,21 +305,27 @@ function Get-NormalizedDiagnostics {
 
 $baselineFile = Join-Path $root "roslynator-baseline.txt"
 if ($UpdateBaseline) {
+    $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
     $fresh = & roslynator analyze $csproj --severity-level $Severity @args 2>&1
+    Stop-Phase "Roslynator"
     $fresh | ForEach-Object { Write-Host $_ }
     Get-NormalizedDiagnostics $fresh $root | Set-Content -LiteralPath $baselineFile
     Write-Host "[RadioNavigation] baseline refreshed - commit it with a reason"
+    Write-PhaseTimings
     exit $LASTEXITCODE
 }
 
 if ($Profile -eq "quick" -and $Severity -eq "warning") {
+    $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
     $rosOut = & roslynator analyze $csproj --severity-level $Severity @args 2>&1
+    Stop-Phase "Roslynator"
     $rosExit = $LASTEXITCODE
     $rosOut | ForEach-Object { Write-Host $_ }
     $current = Get-NormalizedDiagnostics $rosOut $root
     if (-not (Test-Path $baselineFile)) {
         $current | Set-Content -LiteralPath $baselineFile
         Write-Host "[RadioNavigation] no baseline found - written ($($current.Count) entries), commit it as reference"
+        Write-PhaseTimings
         exit $rosExit
     }
     $baseline = @(Get-Content -LiteralPath $baselineFile)
@@ -284,6 +336,7 @@ if ($Profile -eq "quick" -and $Severity -eq "warning") {
         Write-Host "--- NEW diagnostics (blocking) ---"
         $new | ForEach-Object { Write-Host $_ }
         Write-Host "[RadioNavigation] baseline gate FAILED - $($new.Count) new diagnostic(s)"
+        Write-PhaseTimings
         exit 1
     }
     if ($fixed.Count -gt 0) {
@@ -296,10 +349,15 @@ if ($Profile -eq "quick" -and $Severity -eq "warning") {
     # preserve the raw code in that case instead of masking it.
     $hasErrors = @($rosOut | Where-Object { $_ -match '\(\d+,\d+\):\s*error\s' }).Count -gt 0
     if ($hasErrors) {
+        Write-PhaseTimings
         exit $rosExit
     }
+    Write-PhaseTimings
     exit 0
 }
 
+$phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
 & roslynator analyze $csproj --severity-level $Severity @args
+Stop-Phase "Roslynator"
+Write-PhaseTimings
 exit $LASTEXITCODE
