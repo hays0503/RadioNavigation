@@ -9,11 +9,45 @@ namespace UBOAT.Mods.RadioNavigation
     // volatile flags (MorseKeyer.KeyOn/IsActive) and generates samples.
     public class AudioSynthesisEngine
     {
+        /// <summary>Offline/test fallback. The live engine never uses this
+        /// constant for DSP; see <see cref="DeviceSampleRate"/>.</summary>
         public const int SampleRate = 44100;
         private const float TickIntervalSeconds = 0.05f; // 50 ms per logical tick
+        private static int deviceSampleRate;
+        private static bool deviceSampleRateResolved;
+
+        /// <summary>
+        /// F234: the game runs at 48000 Hz on the live machine, while the DSP
+        /// constants were written against 44100. Sampling at the wrong rate
+        /// shifts every oscillator/filter by 48000/44100 (+146.7 cents).
+        /// Resolve once on the main thread; an invalid/unavailable device value
+        /// falls back to the offline constant so unit tests remain deterministic.
+        /// </summary>
+        public static int DeviceSampleRate
+        {
+            get
+            {
+                if (!deviceSampleRateResolved)
+                {
+                    int rate = 0;
+                    try
+                    {
+                        rate = AudioSettings.outputSampleRate;
+                    }
+                    catch (Exception)
+                    {
+                        rate = 0;
+                    }
+                    deviceSampleRate = rate > 0 ? rate : SampleRate;
+                    deviceSampleRateResolved = true;
+                }
+                return deviceSampleRate;
+            }
+        }
 
         private readonly Atmosphere atmosphere;
         private readonly ReceiverDsp dsp;
+        private readonly int sampleRate;
         // F94: double accumulator — float drift over hours of gameplay could
         // shift the 50 ms tick tempo.
         private double tickAccumulator;
@@ -68,7 +102,8 @@ namespace UBOAT.Mods.RadioNavigation
         public AudioSynthesisEngine(int atmosphereSeed)
         {
             atmosphere = new Atmosphere(atmosphereSeed);
-            dsp = new ReceiverDsp(SampleRate);
+            sampleRate = DeviceSampleRate;
+            dsp = new ReceiverDsp(sampleRate);
         }
 
         public void ApplyFeedback(float angle)
@@ -241,8 +276,8 @@ namespace UBOAT.Mods.RadioNavigation
                         carriers[s].NextSample();
                 }
 
-                sample = atmosphere.Apply(sample, SampleRate);
-                sample = dsp.Process(sample, SampleRate);
+                sample = atmosphere.Apply(sample, sampleRate);
+                sample = dsp.Process(sample, sampleRate);
 
                 for (int c = 0; c < channels; c++)
                     data[i + c] = sample * outputVolume;

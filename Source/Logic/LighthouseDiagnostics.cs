@@ -57,7 +57,7 @@ namespace UBOAT.Mods.RadioNavigation
             var model = ComputeModelBreakdown(s, worldPosition, cam.Distance);
             string devInfo = ReadDeviceInfo(s);
 
-            Debug.Log("[RadioNav][Lighthouse] glow diag: cam='" + cam.CamName + "' night=" + s.IsNight +
+            Debug.Log(RadioNavDiagnostics.Stamp() + "[RadioNav][Lighthouse] glow diag: cam='" + cam.CamName + "' night=" + s.IsNight +
                 " dist=" + cam.Distance.ToString("F0") + " camFar=" + cam.FarClip.ToString("F0") +
                 " beam=" + beamAngle.ToString("F0") + " fog=" + model.Fog.ToString("F2") +
                 " A=" + model.Attenuation.ToString("F3") + " T=" + model.Transmittance.ToString("F3") + " beam=" + model.HotSpot.ToString("F2") +

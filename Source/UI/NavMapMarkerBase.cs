@@ -23,7 +23,7 @@ namespace UBOAT.Mods.RadioNavigation
     /// charting tools (Lines/Circles/Angles/Bearing), selection — while the
     /// look stays exactly as it always was.
     ///
-    /// Lifecycle: a periodic reconciliation (0.25 s) syncs the desired marker
+    /// Lifecycle: a periodic reconciliation (1 s) syncs the desired marker
     /// set (subclass state) with the owned points in the scene — adopting the
     /// points restored from the save by their "RadioNav …" name key (never
     /// duplicating them), creating the missing ones and destroying the stale
@@ -50,7 +50,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>How often the desired set is reconciled with the scene.
         /// The fix marker appears within this delay after a new result.</summary>
-        private const float ReconcileIntervalSeconds = 0.25f;
+        private const float ReconcileIntervalSeconds = 1f;
 
         [Inject] protected static ResourceManager resourceManager = null;
         [Inject] protected static Sandbox sandbox = null;
@@ -251,7 +251,7 @@ namespace UBOAT.Mods.RadioNavigation
                     RadioNavDiagnostics.LighthouseDeclutterStatsKey, false))
             {
                 lastStaleLogged = ownStale;
-                Debug.Log(LogPrefix + " own stale keys left for cleanup=" + ownStale +
+                Debug.Log(RadioNavDiagnostics.Stamp() + LogPrefix + " own stale keys left for cleanup=" + ownStale +
                     " (family-scoped, other marker families excluded)");
             }
             ApplyPlan();
@@ -572,7 +572,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (declutterLogTimer < 2f)
                 return;
             declutterLogTimer = 0f;
-            Debug.Log(LogPrefix + " declutter shown=" + shownCount + "/" + views.Count);
+            Debug.Log(RadioNavDiagnostics.Stamp() + LogPrefix + " declutter shown=" + shownCount + "/" + views.Count);
         }
 
         // ---- hover / pin -----------------------------------------------------

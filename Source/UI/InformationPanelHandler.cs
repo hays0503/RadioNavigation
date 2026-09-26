@@ -121,14 +121,14 @@ namespace UBOAT.Mods.RadioNavigation
                 hasCachedCursor = true;
             }
 
-            patternUpdateTimer += Time.deltaTime;
+            patternUpdateTimer += Time.unscaledDeltaTime;
             if (patternUpdateTimer >= PatternUpdateInterval)
             {
                 patternUpdateTimer = 0f;
                 UpdatePatterns();
             }
 
-            signalUpdateTimer += Time.deltaTime;
+            signalUpdateTimer += Time.unscaledDeltaTime;
             if (signalUpdateTimer >= SignalUpdateInterval)
             {
                 signalUpdateTimer = 0f;

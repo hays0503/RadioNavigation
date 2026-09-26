@@ -264,6 +264,14 @@ namespace UBOAT.Mods.RadioNavigation
             return MapMarkerPoints.IsSanitizableName(name);
         }
 
+        /// <remarks>F152 audit: <c>MapChartingDatabase</c> derives from
+        /// <c>BackgroundTaskBase</c>, not <c>ScriptableObjectSingleton</c>, so the
+        /// injection framework does not register it and the DI branch below
+        /// returns null in practice — the working path is the private static
+        /// field of the game, which is the very instance the game itself uses
+        /// (verified live: prune reported the restored 215 rows). The DI probe
+        /// is kept only as a cheap fast path for a future game change; do not
+        /// read it as the primary route.</remarks>
         private static MapChartingDatabase ResolveDatabase()
         {
             InjectionFramework framework = InjectionFramework.Instance;

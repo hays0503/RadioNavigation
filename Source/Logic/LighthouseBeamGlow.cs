@@ -158,11 +158,10 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>
         /// PlayerPrefs-gated verbose diagnostics (ADR refactor step): the
         /// 2-second glow diag/screenPt/dot/flare model dumps run only when
-        /// RadioNav.LighthouseGlowVerbose is non-zero (default: on —
-        /// behavior unchanged).
+        /// RadioNav.LighthouseGlowVerbose is non-zero (default: off).
         /// </summary>
         private static bool VerboseDiagnostics =>
-            RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseGlowVerboseKey, true);
+            RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseGlowVerboseKey, false);
 
         private void UpdateDot(Vector3 worldPosition)
         {

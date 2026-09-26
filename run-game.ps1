@@ -19,7 +19,8 @@
 #   3. starts UBOAT.exe directly with -quicklatestgamestate (bypasses the
 #      launcher; that path calls IntroScene_completed ->
 #      ModManager.InitializeAssemblies() explicitly)
-#   4. polls the McpBridge HTTP bridge until /state reports a full snapshot
+#   4. polls the McpBridge HTTP bridge until /state reports loading.ready=true
+#      (the full load gate, not merely a cached player position)
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File run-game.ps1
@@ -64,6 +65,20 @@ foreach ($t in $targets) {
 }
 if ($touched -eq 0) { Fail 'no mod source touched - nothing would recompile' }
 
+# The game has no enabled flag in modlist.txt. If the launcher left an extra
+# or missing mod, a later "bridge is up" result is ambiguous and can recreate
+# the double-load class of failure. Require the exact harness set.
+$modListPath = Join-Path (Split-Path -Parent $modsRoot) 'modlist.txt'
+if (-not (Test-Path -LiteralPath $modListPath)) { Fail "modlist.txt not found: $modListPath" }
+$loadedMods = @(Get-Content -LiteralPath $modListPath |
+    ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' } | Sort-Object)
+$expectedMods = @('McpBridge', 'RadioNavigation') | Sort-Object
+$modDiff = @(Compare-Object -ReferenceObject $expectedMods -DifferenceObject $loadedMods)
+if ($modDiff.Count -ne 0) {
+    Fail "modlist.txt must contain exactly McpBridge + RadioNavigation (found: $($loadedMods -join ', '))"
+}
+Ok 'modlist verified (McpBridge + RadioNavigation)'
+
 # --- 3. restart the game directly (bypasses the launcher dialog) ------------
 $gameExe = Join-Path $GamePath 'UBOAT.exe'
 $launcherExe = Join-Path $GamePath 'UBOAT Launcher.exe'
@@ -86,13 +101,13 @@ if (-not $NoRestart) {
     exit 0
 }
 
-# --- 4. wait for the bridge (proves McpBridge initialized) ------------------
+# --- 4. wait for bridge + world load gate -----------------------------------
 $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
 while ((Get-Date) -lt $deadline) {
     try {
         $s = (Invoke-WebRequest -Uri 'http://127.0.0.1:28777/state' -TimeoutSec 8 -UseBasicParsing).Content
-        if ($s -like '*"position":{"ok":true*') {
-            Ok 'bridge up, game at sea'
+        if ($s -like '*"loading":{"ready":true*') {
+            Ok 'bridge up, loading gate ready'
             Write-Host $s.Substring(0, [Math]::Min(400, $s.Length))
             $log = Join-Path $env:USERPROFILE 'AppData\LocalLow\Deep Water Studio\UBOAT\output_log.txt'
             if (Test-Path -LiteralPath $log) {
@@ -106,4 +121,4 @@ while ((Get-Date) -lt $deadline) {
     } catch { }
     Start-Sleep -Seconds 10
 }
-Fail "bridge did not report a full snapshot within $TimeoutMinutes min"
+Fail "bridge did not report loading.ready=true within $TimeoutMinutes min"

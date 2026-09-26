@@ -14,12 +14,18 @@ namespace UBOAT.Mods.RadioNavigation
     /// (line / angle / circle / bearing) dies only with one of its endpoints —
     /// so a line between two protected static markers was unremovable in game.
     ///
-    /// This component runs BEFORE <c>MapChartingUI.Update</c>
-    /// (<see cref="DefaultExecutionOrderAttribute"/> -1000): when the eraser
-    /// targets one of our markers it destroys the SHAPES anchored to that
-    /// marker and clears <c>MapPointUI.hoveredPoint</c>, so the vanilla code
-    /// sees nothing to destroy and the marker itself survives (the reconcile
-    /// keeps it anyway). A marker without shapes is left untouched.
+    /// This component runs in the <c>Update</c> phase, the game's eraser in
+    /// <c>MapChartingUI.LateUpdate</c> (verified in the game source). When the
+    /// eraser targets one of our markers it destroys the SHAPES anchored to
+    /// that marker and clears <c>MapPointUI.hoveredPoint</c>, so the vanilla
+    /// code sees nothing to destroy and the marker itself survives (the
+    /// reconcile keeps it anyway). A marker without shapes is left untouched.
+    ///
+    /// Unity runs every <c>Update</c> before every <c>LateUpdate</c>, so the
+    /// hover is cleared before the vanilla code can act; the
+    /// <see cref="DefaultExecutionOrderAttribute"/> -1000 does NOT establish
+    /// that (it only orders within a phase) — the PHASE does. Pinned by the
+    /// SourceCheck gate <c>MapShapeEraser_RunsInUpdatePhase</c>.
     /// </summary>
     [DefaultExecutionOrder(-1000)]
     public sealed class MapShapeEraser : MonoBehaviour
@@ -36,8 +42,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>Eraser held over one of our markers, or Delete pressed on
         /// it: remove the anchored shapes and hide the point from the vanilla
-        /// destroy branch. Kept out of <see cref="Update"/> so the Unity
-        /// lifecycle analyzer does not flag the scene scans (RN0006).</summary>
+        /// destroy branch. The scene scans live here rather than in
+        /// <see cref="Update"/> because they run only while the user is erasing
+        /// (input-gated), not per frame — the same reason RN0006's one-hop blind
+        /// spot (F237) does not apply to them. The PHASE is what makes the
+        /// interception correct, so it is pinned by a gate, not by an analyzer.</summary>
         private void HandleEraserInput()
         {
             if (!IsEraserInput())

@@ -42,7 +42,7 @@ namespace UBOAT.Mods.RadioNavigation
                     CurrentConsolPattern = initialPattern
                 };
                 var keyer = new MorseKeyer();
-                var carrier = new CarrierGenerator(AudioSynthesisEngine.SampleRate);
+                var carrier = new CarrierGenerator(AudioSynthesisEngine.DeviceSampleRate);
 
                 Schedulers[i] = scheduler;
                 Keyers[i] = keyer;

@@ -29,6 +29,14 @@ namespace UBOAT.Mods.RadioNavigation
         private Component coreImage;
         private Component haloImage;
         private Component streakImage;
+        // F235: the three rects are stable for the lifetime of the overlay.
+        // Getters used to call GetComponent on every LighthouseBeamGlow frame.
+        private RectTransform coreRect;
+        private RectTransform haloRect;
+        private RectTransform streakRect;
+        private float lastCoreAlpha = float.NaN;
+        private float lastHaloAlpha = float.NaN;
+        private float lastStreakAlpha = float.NaN;
         // Sprite.Create assets are NOT owned by the canvas GameObject —
         // destroying the canvas leaks them unless freed explicitly.
         private Sprite coreSprite;
@@ -51,15 +59,15 @@ namespace UBOAT.Mods.RadioNavigation
 
         public RectTransform CoreRect
         {
-            get { return coreImage != null ? coreImage.GetComponent<RectTransform>() : null; }
+            get { return coreRect; }
         }
         public RectTransform HaloRect
         {
-            get { return haloImage != null ? haloImage.GetComponent<RectTransform>() : null; }
+            get { return haloRect; }
         }
         public RectTransform StreakRect
         {
-            get { return streakImage != null ? streakImage.GetComponent<RectTransform>() : null; }
+            get { return streakRect; }
         }
         public Component StreakImage
         {
@@ -102,6 +110,9 @@ namespace UBOAT.Mods.RadioNavigation
             streakImage = CreateImage(canvasRect, "Streak", streakSprite);
             coreImage = CreateImage(canvasRect, "Core", coreSprite);
             haloImage = CreateImage(canvasRect, "Halo", coreSprite);
+            coreRect = coreImage != null ? coreImage.GetComponent<RectTransform>() : null;
+            haloRect = haloImage != null ? haloImage.GetComponent<RectTransform>() : null;
+            streakRect = streakImage != null ? streakImage.GetComponent<RectTransform>() : null;
             Built = true;
             return true;
         }
@@ -123,6 +134,12 @@ namespace UBOAT.Mods.RadioNavigation
             coreImage = null;
             haloImage = null;
             streakImage = null;
+            coreRect = null;
+            haloRect = null;
+            streakRect = null;
+            lastCoreAlpha = float.NaN;
+            lastHaloAlpha = float.NaN;
+            lastStreakAlpha = float.NaN;
             if (coreSprite != null)
                 Object.Destroy(coreSprite);
             if (streakSprite != null)
@@ -135,13 +152,35 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>
         /// Sets the alpha of a reflection-built Image. Hot path (dot +
         /// halo + streak every frame): the reflection property is resolved
-        /// once and cached statically.
+        /// once and the last value is latched. Avoiding an unchanged SetValue
+        /// avoids both the reflection call and the Color boxing it requires.
         /// </summary>
         public void SetImageColor(Component image, float alpha)
         {
             if (image.IsNull())
             {
                 return;
+            }
+            bool isCore = ReferenceEquals(image, coreImage);
+            bool isHalo = ReferenceEquals(image, haloImage);
+            bool isStreak = ReferenceEquals(image, streakImage);
+            if (isCore)
+            {
+                if (!float.IsNaN(lastCoreAlpha) && Math.Abs(lastCoreAlpha - alpha) < 0.0001f)
+                    return;
+                lastCoreAlpha = alpha;
+            }
+            else if (isHalo)
+            {
+                if (!float.IsNaN(lastHaloAlpha) && Math.Abs(lastHaloAlpha - alpha) < 0.0001f)
+                    return;
+                lastHaloAlpha = alpha;
+            }
+            else if (isStreak)
+            {
+                if (!float.IsNaN(lastStreakAlpha) && Math.Abs(lastStreakAlpha - alpha) < 0.0001f)
+                    return;
+                lastStreakAlpha = alpha;
             }
             if (imageColorProperty == null)
             {

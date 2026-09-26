@@ -561,6 +561,23 @@ namespace RadioNavigation.SourceCheck
             if (!flare.Contains("frame.verbose && frame.now"))
                 problems.Add("LighthouseFlareDriver over-range log is not verbose-gated");
 
+            // F236/F221 follow-up: the old gate was a whitelist of five
+            // files, so a new release log could bypass it. Assert the general
+            // default-off and on-change contracts for the known noisy paths.
+            string beam = SourceText("LighthouseBeamGlow.cs");
+            if (!beam.Contains("LighthouseGlowVerboseKey, false"))
+                problems.Add("Lighthouse glow verbose flag must default off");
+            string marker = SourceText("LighthouseMapMarker.cs");
+            if (!marker.Contains("LighthouseMapMarkerPositionKey, false"))
+                problems.Add("Lighthouse map position verbose flag must default off");
+            string navMarkers = SourceText("NavMapMarkerBase.cs");
+            if (!navMarkers.Contains("RadioNavDiagnostics.Stamp()"))
+                problems.Add("throttled marker diagnostics need a time/frame stamp");
+            string columns = SourceText("SextantColumnsBuilder.cs");
+            if (!columns.Contains("lastFixLayoutLog") ||
+                !columns.Contains("RadioNavDiagnostics.Stamp()"))
+                problems.Add("FIXLAYOUT diagnostics must be change-gated and stamped");
+
             Assert.True(problems.Count == 0, string.Join("\n", problems));
         }
 
@@ -4589,6 +4606,297 @@ namespace RadioNavigation.SourceCheck
             Assert.True(problems.Count == 0,
                 $"{problems.Count} scene-content violation(s):\n"
                 + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// F232/F236 — lifecycle and diagnostics ordering gates, written as
+        /// SYNTAX checks (not substring greps) so a comment or a dead string
+        /// cannot satisfy them.
+        ///
+        /// 1. MapMarkerPointBridge.LateUpdate must carry a POSITIVE
+        ///    DefaultExecutionOrder: the game moves map points from
+        ///    MapChartingUI.LateUpdate (order 0) and Unity does not order
+        ///    same-phase callbacks, so the compensation can sample a stale
+        ///    lossyScale. Drop the attribute -> FAIL.
+        /// 2. MapShapeEraser must do its work in Update (the game's eraser is
+        ///    in LateUpdate; Update always precedes LateUpdate). Move the body
+        ///    into LateUpdate -> FAIL.
+        /// 3. Every diagnostics key used from a per-frame method must appear in
+        ///    the IsEnabledCached refresh list, otherwise the lookup misses the
+        ///    dictionary and falls back to a native PlayerPrefs read every
+        ///    frame (the F233 regression: two sextant keys, two calls/frame).
+        /// </summary>
+        [Fact]
+        public void LifecycleOrder_And_DiagnosticsCache_ArePinned()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            // --- 1. bridge LateUpdate must be ordered after the game's ---
+            var bridge = FindSourceType(roots, "MapMarkerPointBridge");
+            if (bridge == null)
+            {
+                problems.Add("type 'MapMarkerPointBridge' not found in Source/ — the native-point bridge is gone");
+            }
+            else
+            {
+                var attrs = bridge.AttributeLists.SelectMany(a => a.Attributes).ToList();
+                var order = attrs.FirstOrDefault(a =>
+                    a.Name.ToString().Contains("DefaultExecutionOrder"));
+                if (order == null)
+                {
+                    problems.Add("MapMarkerPointBridge has no [DefaultExecutionOrder] — its LateUpdate can run before the game's MapChartingUI.LateUpdate (same order 0 = undefined) and compute a stale hitbox");
+                }
+                else if (!HasPositiveIntArgument(order))
+                {
+                    problems.Add("MapMarkerPointBridge [DefaultExecutionOrder] must be POSITIVE (after the game's LateUpdate at order 0), found: " + order);
+                }
+            }
+
+            // --- 2. eraser interception must stay in the Update phase ---
+            var eraser = FindSourceType(roots, "MapShapeEraser");
+            if (eraser == null)
+            {
+                problems.Add("type 'MapShapeEraser' not found in Source/ — Eraser/Delete would destroy protected markers");
+            }
+            else
+            {
+                var names = eraser.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                    .Select(m => m.Identifier.ValueText).ToList();
+                if (!names.Contains("Update"))
+                    problems.Add("MapShapeEraser has no Update — the interception must run in the Update phase, before MapChartingUI.LateUpdate");
+                if (names.Contains("LateUpdate") || names.Contains("FixedUpdate"))
+                    problems.Add("MapShapeEraser must not move its interception into LateUpdate/FixedUpdate — the game erases from LateUpdate, and a same-phase order is undefined");
+            }
+
+            // --- 3. per-frame diagnostics keys must be in the cache list ---
+            var diag = FindSourceType(roots, "RadioNavDiagnostics");
+            if (diag == null)
+            {
+                problems.Add("type 'RadioNavDiagnostics' not found in Source/");
+            }
+            else
+            {
+                var refresh = diag.DescendantNodes()
+                    .OfType<ElementAccessExpressionSyntax>()
+                    .Where(e => e.Parent is AssignmentExpressionSyntax assign
+                        && assign.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                        && e.ToString().StartsWith("cachedValue[", StringComparison.Ordinal))
+                    .Select(e => e.ArgumentList != null && e.ArgumentList.Arguments.Count == 1
+                        ? KeyLeaf(e.ArgumentList.Arguments[0].Expression.ToString())
+                        : string.Empty)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                // Per-frame methods are the ones Unity calls every frame, PLUS
+                // the helpers they delegate to (ONE HOP). Without the hop this
+                // gate repeats the very blind spot it exists to close: F233's
+                // reads live in SextantPipPose.UpdateAimFreeze, called from
+                // SextantPipPose.Update — a name-only check PASSED that
+                // mutation, which is why the hop is here and not optional.
+                var perFrame = new HashSet<string>(StringComparer.Ordinal)
+                    { "Update", "LateUpdate", "FixedUpdate", "OnGUI" };
+
+                foreach (var file in roots)
+                {
+                    var methods = file.Item2.DescendantNodes()
+                        .OfType<MethodDeclarationSyntax>().ToList();
+
+                    foreach (var method in methods)
+                    {
+                        // Bodies that can run per frame: this method plus, when
+                        // it is a Unity per-frame method, the methods it calls.
+                        var bodies = new List<MethodDeclarationSyntax> { method };
+                        if (perFrame.Contains(method.Identifier.ValueText))
+                        {
+                            var invoked = new HashSet<string>(StringComparer.Ordinal);
+                            foreach (var call in method.DescendantNodes()
+                                .OfType<InvocationExpressionSyntax>())
+                            {
+                                invoked.Add(call.Expression.ToString());
+                            }
+                            bodies.AddRange(methods
+                                .Where(m => invoked.Contains(m.Identifier.ValueText)));
+                        }
+
+                        foreach (var body in bodies)
+                        {
+                            foreach (var invocation in body.DescendantNodes()
+                                .OfType<InvocationExpressionSyntax>())
+                            {
+                                if (invocation.Expression.ToString() != "RadioNavDiagnostics.IsEnabledCached")
+                                    continue;
+                                // The key is the first argument; only cached-
+                                // dictionary misses matter (a literal key would
+                                // always miss, so the refresh list must cover it).
+                                if (invocation.ArgumentList.Arguments.Count == 0)
+                                    continue;
+                                string keyExpr = invocation.ArgumentList.Arguments[0].Expression.ToString();
+                                if (!refresh.Contains(KeyLeaf(keyExpr)))
+                                {
+                                    problems.Add($"{file.Item1}.{body.Identifier.ValueText} reads diagnostics key {keyExpr} per frame but cachedValue[{keyExpr}] is not in the IsEnabledCached refresh list — falls back to a native PlayerPrefs call per frame");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} lifecycle/diagnostics-cache violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>Reduces a key expression to its leaf identifier: the refresh
+        /// list lives INSIDE <c>RadioNavDiagnostics</c> and therefore writes the
+        /// bare constant (<c>cachedValue[AimDebugKey]</c>), while callers in
+        /// other files qualify it
+        /// (<c>RadioNavDiagnostics.AimDebugKey</c>). Both forms name the same
+        /// key, so the gate compares the leaf. Anything that is not a
+        /// member access (a literal, a local) is returned verbatim, so a literal
+        /// key is still required to appear literally in the list.</summary>
+        private static string KeyLeaf(string keyExpression)
+        {
+            string text = keyExpression.Trim();
+            int at = text.LastIndexOf('.');
+            return at < 0 ? text : text.Substring(at + 1);
+        }
+
+        /// <summary>True when an attribute argument list contains a positive
+        /// integer literal (DefaultExecutionOrder(1000) etc.).</summary>
+        private static bool HasPositiveIntArgument(AttributeSyntax attr)
+        {
+            if (attr.ArgumentList == null)
+                return false;
+            foreach (var arg in attr.ArgumentList.Arguments)
+            {
+                if (arg.Expression is LiteralExpressionSyntax lit
+                    && lit.IsKind(SyntaxKind.NumericLiteralExpression)
+                    && int.TryParse(lit.Token.ValueText, out int value)
+                    && value > 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// F234 — the 44100 constant is an offline fallback only. The live
+        /// engine, station carriers, and Sonne's clip must all resolve the
+        /// device rate; otherwise the DSP runs 146.7 cents sharp on 48 kHz.
+        /// </summary>
+        [Fact]
+        public void AudioSynthesisEngine_UsesDeviceSampleRate()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var engine = FindSourceType(roots, "AudioSynthesisEngine");
+            if (engine == null)
+            {
+                problems.Add("type 'AudioSynthesisEngine' not found in Source/");
+            }
+            else
+            {
+                var property = engine.Members.OfType<PropertyDeclarationSyntax>()
+                    .FirstOrDefault(p => p.Identifier.ValueText == "DeviceSampleRate");
+                if (property == null || property.ToString().IndexOf(
+                    "AudioSettings.outputSampleRate", StringComparison.Ordinal) < 0)
+                    problems.Add("AudioSynthesisEngine.DeviceSampleRate must read AudioSettings.outputSampleRate");
+                var process = FindMethod(engine, "ProcessAudio");
+                if (process == null)
+                    problems.Add("AudioSynthesisEngine.ProcessAudio not found");
+                else if (process.ToString().IndexOf("SampleRate", StringComparison.Ordinal) >= 0)
+                    problems.Add("AudioSynthesisEngine.ProcessAudio still uses the 44100 constant instead of the resolved device rate");
+            }
+
+            var fleet = FindSourceType(roots, "StationFleet");
+            if (fleet == null || fleet.ToString().IndexOf(
+                "CarrierGenerator(AudioSynthesisEngine.DeviceSampleRate)", StringComparison.Ordinal) < 0)
+                problems.Add("StationFleet carriers must use AudioSynthesisEngine.DeviceSampleRate");
+
+            var sonne = FindSourceType(roots, "SonneController");
+            if (sonne == null || sonne.ToString().IndexOf(
+                "AudioSynthesisEngine.DeviceSampleRate", StringComparison.Ordinal) < 0)
+                problems.Add("SonneController silent clip must use AudioSynthesisEngine.DeviceSampleRate");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} audio sample-rate violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// F235 — LighthouseDotUi is read every frame by LighthouseBeamGlow.
+        /// Its rect properties must return cached fields, and color writes must
+        /// suppress an unchanged alpha before reflection boxes a Color.
+        /// </summary>
+        [Fact]
+        public void LighthouseDotUi_CachesRectsAndSuppressesUnchangedColor()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var dotUi = FindSourceType(ParseAllSources(), "LighthouseDotUi");
+            if (dotUi == null)
+            {
+                problems.Add("type 'LighthouseDotUi' not found in Source/");
+            }
+            else
+            {
+                foreach (var name in new[] { "CoreRect", "HaloRect", "StreakRect" })
+                {
+                    var property = dotUi.Members.OfType<PropertyDeclarationSyntax>()
+                        .FirstOrDefault(p => p.Identifier.ValueText == name);
+                    if (property == null || property.ToString().IndexOf(
+                        "GetComponent", StringComparison.Ordinal) >= 0)
+                        problems.Add("LighthouseDotUi." + name + " must return a cached field, not call GetComponent");
+                }
+
+                var build = FindMethod(dotUi, "EnsureBuilt");
+                if (build == null || build.ToString().IndexOf(
+                    "coreRect", StringComparison.Ordinal) < 0 ||
+                    build.ToString().IndexOf("haloRect", StringComparison.Ordinal) < 0 ||
+                    build.ToString().IndexOf("streakRect", StringComparison.Ordinal) < 0)
+                    problems.Add("LighthouseDotUi.EnsureBuilt must cache coreRect/haloRect/streakRect");
+
+                var color = FindMethod(dotUi, "SetImageColor");
+                if (color == null || color.ToString().IndexOf(
+                    "lastCoreAlpha", StringComparison.Ordinal) < 0 ||
+                    color.ToString().IndexOf("lastHaloAlpha", StringComparison.Ordinal) < 0 ||
+                    color.ToString().IndexOf("lastStreakAlpha", StringComparison.Ordinal) < 0)
+                    problems.Add("LighthouseDotUi.SetImageColor must latch per-layer alpha before SetValue");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} lighthouse hot-path violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// F240 — the game compiles the mod itself, so assembly version is
+        /// always 0.0.0.0. The bootstrap diagnostic must identify the manifest
+        /// build and warn when the verified game version drifts.
+        /// </summary>
+        [Fact]
+        public void BootstrapDiagnostics_IdentifyBuildAndGameVersion()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var bootstrap = FindSourceType(ParseAllSources(), "ModBootstrapper");
+            if (bootstrap == null)
+            {
+                Assert.Fail("type 'ModBootstrapper' not found in Source/");
+                return;
+            }
+
+            string text = bootstrap.ToString();
+            Assert.Contains("manifest=", text);
+            Assert.Contains("fingerprint=leuchtfeuer:", text);
+            Assert.Contains("VerifiedGameVersion", text);
+            Assert.Contains("LogWarning", text);
         }
 
         private static bool IsNullLiteral(ExpressionSyntax expr)

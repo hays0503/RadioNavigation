@@ -18,8 +18,19 @@ namespace UBOAT.Mods.RadioNavigation
     /// <c>Image.color/sprite/rectTransform</c>, <c>MapPointUI.Interactive</c>
     /// (<c>raycastTarget</c>), <c>MapPointUI.Name/Position</c>. The game's own
     /// per-frame writes (position, localScale) are compensated here in
-    /// LateUpdate, after the game's update.
+    /// LateUpdate, AFTER the game's own LateUpdate.
     /// </summary>
+    /// <remarks>
+    /// F232: the game moves every map point from
+    /// <c>MapChartingUI.LateUpdate</c> → <c>MapPointUI.UpdatePoints</c>, and that
+    /// component has no <c>DefaultExecutionOrder</c>. Unity does not order
+    /// same-phase callbacks, so without the attribute below this LateUpdate could
+    /// run BEFORE the game and sample a one-frame-stale <c>lossyScale</c> (the
+    /// visible effect is a hitbox rect that lags a frame, not a wrong marker
+    /// position — the game owns the transform). The attribute makes "after the
+    /// game" a contract instead of an assumption.
+    /// </remarks>
+    [DefaultExecutionOrder(1000)]
     internal sealed class MapMarkerPointBridge : MonoBehaviour,
         IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
     {
@@ -176,7 +187,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>Per-frame compensation, called by the owner through
         /// <see cref="NavMapMarkerBase.ApplyBridgeFrame"/>: the game re-writes
-        /// position and localScale every frame, so this runs after it.
+        /// position and localScale every frame, so this runs after it — ordered
+        /// by the class-level <see cref="DefaultExecutionOrderAttribute"/>(1000),
+        /// NOT by component registration order.
         /// Public so the Roslynator unused-member gate does not treat the
         /// Unity lifecycle message as dead code.</summary>
         public void LateUpdate()
@@ -188,9 +201,10 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>Per-frame compensation, called by the owner from this
-        /// component's LateUpdate (after the game's own point update): root
-        /// scale/lift compensation, the interaction policy, the adoption-key
-        /// re-assertion and the static position lock.</summary>
+        /// component's LateUpdate (after the game's own point update — see the
+        /// class-level execution order): root scale/lift compensation, the
+        /// interaction policy, the adoption-key re-assertion and the static
+        /// position lock.</summary>
         public void ApplyFrame(float iconPx, double unitsPerPixel, bool interactive,
             bool positionLocked, Vector2 trueEncounterPosition, string keyName)
         {

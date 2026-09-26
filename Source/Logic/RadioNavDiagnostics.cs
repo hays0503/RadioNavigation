@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
@@ -8,9 +9,9 @@ namespace UBOAT.Mods.RadioNavigation
     /// PlayerPrefs-gated switch for the mod's verbose diagnostics logging.
     /// Refactoring step: the verbose logs in LighthouseBeamGlow (glow diag,
     /// screenPt, dot/flare model dumps) and the LighthouseMapMarker position
-    /// log check these keys every time they would log. Default is enabled —
-    /// behavior unchanged after the refactor; disable in-game with
-    /// PlayerPrefs RadioNav.LighthouseGlowVerbose=0 (or via the console).
+    /// log check these keys every time they would log. Diagnostic flags are
+    /// OFF by default; enable in-game with PlayerPrefs
+    /// RadioNav.LighthouseGlowVerbose=1 (or via the console).
     /// </summary>
     public static class RadioNavDiagnostics
     {
@@ -57,19 +58,38 @@ namespace UBOAT.Mods.RadioNavigation
             if (!cacheInitialized || unchecked(now - cacheRefreshedAt) >= CacheMs)
             {
                 cachedValue[LighthouseGlowVerboseKey] =
-                    IsEnabled(LighthouseGlowVerboseKey, true);
+                    IsEnabled(LighthouseGlowVerboseKey, false);
                 cachedValue[LighthouseMapMarkerPositionKey] =
-                    IsEnabled(LighthouseMapMarkerPositionKey, true);
+                    IsEnabled(LighthouseMapMarkerPositionKey, false);
                 cachedValue[LighthouseDeclutterStatsKey] =
                     IsEnabled(LighthouseDeclutterStatsKey, false);
                 cachedValue[VerboseLogKey] =
                     IsEnabled(VerboseLogKey, false);
                 cachedValue[AimDebugKey] =
                     IsEnabled(AimDebugKey, false);
+                // F233: the sextant aim-freeze gate is evaluated EVERY FRAME
+                // while the sextant is open (SextantPipPose.Update -> :109 ->
+                // UpdateAimFreeze). These two keys were missing here, so every
+                // lookup missed the dictionary and fell through to a native
+                // PlayerPrefs registry read — twice per frame. Feature gates
+                // (default true) must be listed too, not just diagnostics.
+                cachedValue[SextantStabilization.PrefsKey] =
+                    IsEnabled(SextantStabilization.PrefsKey, true);
+                cachedValue[SextantStabilization.LockPrefsKey] =
+                    IsEnabled(SextantStabilization.LockPrefsKey, true);
                 cacheRefreshedAt = now;
                 cacheInitialized = true;
             }
             return cachedValue.TryGetValue(key, out bool value) ? value : IsEnabled(key, defaultValue);
+        }
+
+        /// <summary>Small diagnostic prefix for throttled/lifecycle log lines.
+        /// Unity's Player.log has no timestamp or frame column; without this,
+        /// correlating a mod line with the game's load coroutine is guesswork.</summary>
+        public static string Stamp()
+        {
+            return "[t=" + Time.time.ToString("F2", CultureInfo.InvariantCulture) +
+                " frame=" + Time.frameCount + "] ";
         }
 
         /// <summary>

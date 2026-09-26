@@ -885,3 +885,31 @@ _Maтрица охватывает F01-F52. F53-F76 не имеют перекр
 Открытых пунктов нет. F208–F229 закрыты (F229 подтверждён live).
 
 **Гейты после правок:** `tests.ps1` 786 PASS / 0 fail (было 761); `RadioNavigation.Analyzers.Tests` 68 PASS (было 55); `RadioNavigation.SourceCheck` 51 PASS (было 44); `build.ps1` Build OK + PVS clean; `analyze.ps1 -Profile quick` baseline clean; `analyze.ps1 -RnAudit` clean (0 genuine).
+
+---
+
+## Пост-аудит 2026-09-25 (F231–F243)
+
+Проверка выполнена по плану `..\PLAN_Phase6_LoadGate_Hygiene.md`; live-рестарт и основные
+критерии §9 пройдены, остаются физический LMB-тест и recovery на заранее залипшей сессии.
+
+| ID | P | Суть | Статус / доказательство |
+|----|---|------|--------------------------|
+| **F231** | P0 | Повторный `SavesManager.Load` без re-entrancy guard → NPE, orphaned `LoadingUIController.blockades`, `timeScale=0` | ✅ `McpLoadGate` + guards; live: `Autosave_1/2` 215 точек, 0 NPE, concurrent load отклонён |
+| **F232** | P1 | Неопределённый порядок `MapMarkerPointBridge.LateUpdate` и игры | ✅ `[DefaultExecutionOrder(1000)]`; `LifecycleOrder_And_DiagnosticsCache_ArePinned` |
+| **F233** | P1 | Два секстантных feature-ключа не кешировались → 2 `PlayerPrefs`/кадр | ✅ `RadioNavDiagnostics` cache; мутация гейта ловит удаление ключей |
+| **F234** | P1 | DSP использовал 44100 при живом device 48000 → +146.7 цента | ✅ `DeviceSampleRate`; `AudioSynthesisEngine_UsesDeviceSampleRate`, offline fallback test |
+| **F235** | P2 | `LighthouseDotUi` и горячие rect-getters + boxing `Color` | ✅ cached rects + alpha latch; `LighthouseDotUi_CachesRectsAndSuppressesUnchangedColor` |
+| **F236** | P2 | Verbose defaults on иFIXLAYOUT log без change-gate | ✅ defaults off, `RadioNavDiagnostics.Stamp`, расширенный `ReleaseLogs_AreGated` |
+| **F237** | P2 | RN0006/RN0007 однопрыжково не видят вынос в helper | 🔎 подтверждено; полноценный analyzer fix отложен, diagnostics gate уже следует one-hop |
+| **F238** | P2 | RN0007 проверяет только тело `OnAudioFilterRead`; чистота audio path доказывается тестом | 📌 задокументировано в Phase 6; analyzer scope не расширен |
+| **F239** | P2 | `perf_sample` отдаёт неполное окно как обычный результат | ✅ `"stale": true` при `complete:false`; bridge selftest |
+| **F240** | P2 | `0.0.0.0` в логе не идентифицирует build; нет canary версии игры | ✅ manifest + fingerprint + `VerifiedGameVersion` warning |
+| **F241** | — | Старые пункты `SEXTANT_PLAN`/Phase 4/5 и 24 открытых пункта | 📌 план сверки зафиксирован; массовая правка документации не выполнялась |
+| **F242** | — | Сводка 50 агентов наполовину устарела | ✅ повторная сверка P2/P3; неподтверждённые пункты не внедрялись |
+| **F243** | P2 | `loading.ready` требовал portraits при `LoadingUIController.IsLoading=false`; inactive HUD давал ложный not-ready | ✅ условная проверка + `Resources.FindObjectsOfTypeAll`; live 60 fps, `ready=true` |
+
+**Гейты после Phase 0–5:** `tests.ps1` **1135 PASS**; `RadioNavigation.SourceCheck`
+**66 PASS**; bridge compile/analyze/selftest PASS; `build.ps1` Build OK + PVS clean;
+`analyze.ps1 -Profile quick` — 189 baseline diagnostics, `baseline gate clean`; graphify
+обновлён (8187 nodes / 14591 edges).

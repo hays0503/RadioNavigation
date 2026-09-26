@@ -148,7 +148,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected override void OnMarkerPositioned(int index, Vector3 worldPosition, float scale, float iconPx)
         {
-            if (index != 0 || !RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseMapMarkerPositionKey, true))
+            if (index != 0 || !RadioNavDiagnostics.IsEnabledCached(RadioNavDiagnostics.LighthouseMapMarkerPositionKey, false))
             {
                 return;
             }
@@ -160,7 +160,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             positionLogTimer = 0f;
-            Debug.Log(LogPrefix + " lighthouse[0] icon: worldPos=" + worldPosition.ToString("F2") +
+            Debug.Log(RadioNavDiagnostics.Stamp() + LogPrefix + " lighthouse[0] icon: worldPos=" + worldPosition.ToString("F2") +
                 " elevation=" + mainCamera.MapController.CameraElevation.ToString("F0") +
                 " scale=" + scale.ToString("F4") +
                 " px=" + iconPx.ToString("F0") + "x" + iconPx.ToString("F0"));

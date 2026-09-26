@@ -25,6 +25,11 @@ namespace UBOAT.Mods.RadioNavigation
             "\u0423\u0421\u0422\u0410\u041D\u041E\u0412\u0418\u0422\u0415 \u0424\u0418\u041B\u042C\u0422\u0420";
 
         private static Font osFont;
+        // F236: the FIXLAYOUT line used to print on every column rebuild. Keep
+        // the last payload and log only on change — the placement cannot differ
+        // between two identical rebuilds, so a repeat is pure log noise (the
+        // same idiom NavMapMarkerBase uses for its stale-key counter).
+        private static string lastFixLayoutLog;
 
         /// <summary>
         /// Builds the reading, sun and fix columns under canvasRoot. The fix
@@ -123,11 +128,16 @@ namespace UBOAT.Mods.RadioNavigation
             result.FixColumn = fixColumn;
             result.FixCardAvailableUnits = placement.maxHeightUnits;
             result.FixCardBaseFontSize = FixCardFontSize;
-            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+            string layoutLine = RadioNavDiagnostics.Stamp() + string.Format(CultureInfo.InvariantCulture,
                 LogPrefix + " FIXLAYOUT stacked={0} branch={1} pivot=({2:F1},{3:F1}) anchor=({4:F0},{5:F0}) h={6:F0} uiScale={7:F2}",
                 placement.stacked, placement.stacked ? "stacked" : "topleft",
                 placement.pivotX, placement.pivotY,
-                placement.anchorX, placement.anchorY, placement.maxHeightUnits, uiScale));
+                placement.anchorX, placement.anchorY, placement.maxHeightUnits, uiScale);
+            if (layoutLine != lastFixLayoutLog)
+            {
+                lastFixLayoutLog = layoutLine;
+                Debug.Log(layoutLine);
+            }
 
             result.FixCardText = MakeLabel(canvasRoot, "FixCardText", FixCardFontSize,
                 TextAnchor.UpperLeft, new Color(0.82f, 0.88f, 0.82f));

@@ -13,6 +13,18 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         private const string Key = "RadioNav.TestDiag";
 
         [Fact]
+        public void MissingDiagnosticFlags_DefaultOff()
+        {
+            PlayerPrefs.DeleteKey(RadioNavDiagnostics.LighthouseGlowVerboseKey);
+            PlayerPrefs.DeleteKey(RadioNavDiagnostics.LighthouseMapMarkerPositionKey);
+            System.Threading.Thread.Sleep(300);
+            Assert.False(RadioNavDiagnostics.IsEnabledCached(
+                RadioNavDiagnostics.LighthouseGlowVerboseKey, false));
+            Assert.False(RadioNavDiagnostics.IsEnabledCached(
+                RadioNavDiagnostics.LighthouseMapMarkerPositionKey, false));
+        }
+
+        [Fact]
         public void MissingKey_ReturnsDefaultTrue()
         {
             PlayerPrefs.DeleteKey(Key);
@@ -69,10 +81,10 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             PlayerPrefs.DeleteKey(glowKey);
             PlayerPrefs.DeleteKey(markerKey);
 
-            Assert.True(RadioNavDiagnostics.IsEnabledCached(glowKey, true));
+            Assert.False(RadioNavDiagnostics.IsEnabledCached(glowKey, false));
 
-            PlayerPrefs.SetInt(glowKey, 0);
-            Assert.True(RadioNavDiagnostics.IsEnabledCached(glowKey, true));
+            PlayerPrefs.SetInt(glowKey, 1);
+            Assert.False(RadioNavDiagnostics.IsEnabledCached(glowKey, false));
 
             PlayerPrefs.DeleteKey(glowKey);
             PlayerPrefs.DeleteKey(markerKey);
@@ -86,11 +98,11 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             PlayerPrefs.DeleteKey(glowKey);
             PlayerPrefs.DeleteKey(markerKey);
 
-            Assert.True(RadioNavDiagnostics.IsEnabledCached(glowKey, true));
+            Assert.False(RadioNavDiagnostics.IsEnabledCached(glowKey, false));
 
-            PlayerPrefs.SetInt(glowKey, 0);
+            PlayerPrefs.SetInt(glowKey, 1);
             System.Threading.Thread.Sleep(300);
-            Assert.False(RadioNavDiagnostics.IsEnabledCached(glowKey, true));
+            Assert.True(RadioNavDiagnostics.IsEnabledCached(glowKey, false));
 
             PlayerPrefs.DeleteKey(glowKey);
             PlayerPrefs.DeleteKey(markerKey);

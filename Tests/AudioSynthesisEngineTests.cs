@@ -14,6 +14,16 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             return new AudioSynthesisEngine();
         }
 
+        [Fact]
+        public void DeviceSampleRate_FallsBackToOfflineDefaultWhenUnavailable()
+        {
+            // The test stub reports zero (no Unity audio device). Production
+            // uses AudioSettings.outputSampleRate; the offline contract remains
+            // deterministic for all render/golden tests.
+            Assert.Equal(AudioSynthesisEngine.SampleRate,
+                AudioSynthesisEngine.DeviceSampleRate);
+        }
+
         private static StationState[] CreateStation(float gain)
         {
             var stations = new StationState[1];

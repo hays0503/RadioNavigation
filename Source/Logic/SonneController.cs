@@ -10,7 +10,9 @@ namespace UBOAT.Mods.RadioNavigation
         private const int SonneZoneIndex = 1;
         private const float TimeCompressionThreshold = 1.01f;
 
-        private static readonly AudioClip silentClip = AudioClip.Create("SonneSilent", AudioSynthesisEngine.SampleRate * 2, 1, AudioSynthesisEngine.SampleRate, false);
+        private static readonly AudioClip silentClip = AudioClip.Create(
+            "SonneSilent", AudioSynthesisEngine.DeviceSampleRate * 2, 1,
+            AudioSynthesisEngine.DeviceSampleRate, false);
 
         // Station fleet state + tuning/navigation live in StationManager
         // (extracted, P5.6 slice SC-2); the fleet object stays here for
@@ -210,7 +212,7 @@ namespace UBOAT.Mods.RadioNavigation
             float posLat, posLon;
             if (positionProvider.IsNotNull() && positionProvider.TryGetPosition(out posLat, out posLon))
             {
-                positionLogTimer += Time.deltaTime;
+                positionLogTimer += Time.unscaledDeltaTime;
                 if (positionLogTimer >= PositionLogInterval)
                 {
                     positionLogTimer = 0f;
@@ -229,14 +231,14 @@ namespace UBOAT.Mods.RadioNavigation
                 positionProviderFailureLogged = true;
             }
 
-            tuningUpdateTimer += Time.deltaTime;
+            tuningUpdateTimer += Time.unscaledDeltaTime;
             if (tuningUpdateTimer >= TuningUpdateInterval)
             {
                 tuningUpdateTimer = 0f;
                 UpdateStationGains();
             }
 
-            navUpdateTimer += Time.deltaTime;
+            navUpdateTimer += Time.unscaledDeltaTime;
             if (navUpdateTimer >= NavUpdateInterval)
             {
                 navUpdateTimer = 0f;

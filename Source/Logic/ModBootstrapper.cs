@@ -2,6 +2,7 @@ using DWS.Common.InjectionFramework;
 using DWS.Common.Resources;
 using HarmonyLib;
 using System;
+using System.IO;
 using System.Reflection;
 using UBOAT.Game.Core.Serialization;
 using UnityEngine;
@@ -21,6 +22,11 @@ namespace UBOAT.Mods.RadioNavigation
     [NonSerializedInGameState]
     public sealed class ModBootstrapper
     {
+        /// <summary>F240: the game version this build was verified against.
+        /// Harmony targets fail SILENTLY on a game update, so a mismatch must
+        /// be loud in the log even when nothing crashes.</summary>
+        private const string VerifiedGameVersion = "2026.1-patch21";
+
         // F176: single source of truth for the game UI container lookup.
         private const string MainSceneViewportPath = "/GUI/Viewport";
         private const string RadioRootName = "RadioNavigationPanel";
@@ -124,10 +130,66 @@ namespace UBOAT.Mods.RadioNavigation
             SceneEventsListener.OnSceneStart += SceneEventsListener_OnSceneStart;
             SceneEventsListener.OnSceneAwake += SceneEventsListener_OnSceneAwake;
 
+            // F240: the in-game assembly carries no version stamp (the game
+            // compiles Source/*.cs itself → always 0.0.0.0), so the manifest
+            // version plus a content fingerprint is the only way to tell which
+            // build a log belongs to. The log also has no timestamps (measured:
+            // 29 of 34 lines in a 90 s window were mod diagnostics), which is
+            // why a "which build / when" answer took dozens of manual probes.
             Debug.Log("[RadioNav][DIAG] version=" + Assembly.GetExecutingAssembly().GetName().Version +
+                " manifest=" + ManifestVersion() +
+                " fingerprint=leuchtfeuer:" + LeuchtfeuerRegistry.Profiles.Count +
                 " game=" + Application.version +
                 " di=" + (InjectionFramework.Instance.IsNotNull() ? "ok" : "null") +
                 " resourceManager=" + (resourceManager.IsNotNull() ? "ok" : "null"));
+
+            if (!string.Equals(Application.version, VerifiedGameVersion, StringComparison.Ordinal))
+            {
+                Debug.LogWarning("[RadioNav][DIAG] game version drift: running " + Application.version +
+                    ", verified against " + VerifiedGameVersion +
+                    ". Re-verify the 5 Harmony targets (RadioStory.ContinueStory," +
+                    " Locale.RetrieveString x2, RadioStory.OnDecisionSelected," +
+                    " RadioStory.OnStopped) and the reflected map/save APIs —" +
+                    " a target rename fails SILENTLY.");
+            }
+        }
+
+        /// <summary>F240: manifest version as a string ("2.1"). The game compiles
+        /// the mod itself, so the assembly version is always 0.0.0.0 and useless
+        /// for identifying a build; the manifest is the only version the project
+        /// actually maintains. Read at runtime (IO permission is granted) so no
+        /// build step has to inject a constant into a game-compiled source file.
+        /// Returns "?" when the file cannot be read — never throws.</summary>
+        private static string ManifestVersion()
+        {
+            try
+            {
+                string path = Path.Combine(
+                    Application.persistentDataPath, "Mods", "RadioNavigation", "Manifest.json");
+                if (!File.Exists(path))
+                    return "?";
+                const string marker = "\"version\"";
+                string json = File.ReadAllText(path);
+                int at = json.IndexOf(marker, StringComparison.Ordinal);
+                if (at < 0)
+                    return "?";
+                at = json.IndexOf(':', at + marker.Length);
+                if (at < 0)
+                    return "?";
+                at++;
+                while (at < json.Length && char.IsWhiteSpace(json[at]))
+                    at++;
+                int end = at;
+                while (end < json.Length && json[end] != ',' && json[end] != '}'
+                    && !char.IsWhiteSpace(json[end]))
+                    end++;
+                return at < end ? json.Substring(at, end - at).Trim('"') : "?";
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[RadioNav][DIAG] manifest version unreadable: " + e.GetType().Name);
+                return "?";
+            }
         }
 
         /// <summary>
