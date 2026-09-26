@@ -742,7 +742,7 @@ LighthouseBeamGlow
   - `StarsMesh` (Source/Logic/StarsMesh.cs) — рендер звёзд билбордами, обходит весь массив (STAR_SKY_PLAN §9).
   - `ConstellationMesh` (Source/Logic/ConstellationMesh.cs) — линии созвездий по индексам из `ConstellationLines.cs`.
   - `ConstellationLines.cs` (Source/Data/) — 215 сегментов, индексы указывают прямо в `StarCatalog.Stars`.
-  - `StarSkyRenderer` (Source/Logic/StarSkyRenderer.cs) — подсчёт видимых звёзд по JD/LST/широте-долготе, диагностический лог.
+  - `StarSkyRenderer` - **прототип, удалён 2026-08-31** (dead sweep #2), заменён на `StarsMesh`; в дереве исходников его нет.
 - Инварианты и грабли:
   - Объём: файл ~554 КБ / 5067 строк — один литерал массива.
   - Правка только через регенерацию из Stellarium: руками данные не менять.

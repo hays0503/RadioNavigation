@@ -120,9 +120,28 @@ F225 и F230 не использованы (пропуски после ревь
    `RESOLVED_LEDGER.md` § 5), F125 уточнён (остался только путь неотображённого
    символа), F83 не перепроверен. Остальные 16 требуют отдельного прохода; число 22
    везде помечено как размер снимка от 2026-08-24.
-3. **SAD главы 04/05/07/08/10 описывают состояние 2026-08-01** и не обновлялись
-   под Phase 4/5/6. Актуальность проверялась построчно, но текст не переписывался.
-   Требует решения: переписать главы или пометить их как исторический снимок.
+3. ~~SAD устарел~~ — **частично опровергнуто измерением, реальный пробел narrower.**
+   Первоначальная оценка («главы 04/05/07/08/10 описывают состояние 2026-08-01 и
+   не обновлялись») была предположением и не подтвердилась:
+   - **Ссылки на классы в SAD живы.** Проверено гейтом `Sad_ClassReferencesResolve`
+     (SourceCheck): 216 упоминаний `.cs` (103 уникальных имени) в 10 из 11 глав против
+     индексов `Source/` (218), `Tests/` (151, без `obj`/`bin`) и игрового исходника
+     (2550 .cs) — **195 вхождений резолвятся**. Все 20 нерезолвящихся имён
+     аннотированы как намеренно нереализованные: 19 типов, предложенных главой 08
+     (5 интерфейсов в § 2.1 + 14 классов в § 2.2, все помечены «NOT implemented»), и
+     `AudioPipelineTests` главы 11 (отклонён, F47). Битых ссылок нет.
+   - **SAD покрывает более новое, чем казалось:** хронометр (42 упоминания),
+     `BeaconData` (36), маркеры карты (12/17), созвездия (10), `StationMapOverlay`,
+     `LighthousePlacer` и `LighthouseBeamGlow` имеют собственные разделы.
+   - **Настоящий пробел — полнота, а не битые ссылки.** `SAD/04` § 10 описывает
+     11 компонентов; из 24 крупных классов мода **17 не описаны**: вся цепочка
+     секстанта (`SextantController`, `SextantOverlay`, `SextantStarId`, `SextantPipPose`,
+     `SextantBurstSampler`, `SextantWorksheet`, `FixCardComposer`, `SextantArc`,
+     `CelestialEphemeris`, `CelestialForecast`, `AstroMath`) и вся цепочка маркеров
+     карты (`MapMarkerPointBridge`, `MapShapeEraser`, `MapSaveSanitizer`,
+     `NavMapMarkerBase`, `FixMapMarker`, `MapProbe`).
+   - Решение: дописать § 10 секстант и карту либо явно объявить SAD документом о
+     панели (как сделано в `DESIGN.md`) и вынести остальное в планы подсистем.
 4. ~~`DESIGN.md` не сверялся~~ — **закрыто частично.** Добавлен раздел «Область
    действия»: документ честно объявляет себя спецификацией только радиопанели,
    перечисляет 10 неохватываемых подсистем с каноническим документом для каждой,
@@ -163,10 +182,11 @@ F225 и F230 не использованы (пропуски после ревь
   автоматическая замена испортит выравнивание диаграмм. Решение за пользователем.
 - **BOM снят** с 7 markdown-файлов (`DESIGN.md`, `knowledge/README.md`, 4 файла `knowledge/inventory| catalogs`, `refactoring-plan/hypothesis/INDEX.md`).
 - **Гигиена закреплена гейтами**, а не только разовым проходом:
-  `RadioNavigation.SourceCheck/DocumentationTests.cs` — 6 гейтов (66 → 72):
+  `RadioNavigation.SourceCheck/DocumentationTests.cs` — 7 гейтов (66 → 73):
   `Docs_AreUtf8WithoutMojibake`, `Adr_NumbersAreUnique`,
   `Adr_StatusTableCoversEveryFile`, `Docs_MapLinksResolve`,
-  `Docs_RegistryCountsMatchDisk`, `Agents_DocStatesCurrentFacts`.
+  `Docs_RegistryCountsMatchDisk`, `Agents_DocStatesCurrentFacts`,
+  `Sad_ClassReferencesResolve`.
   Каждый проверен мутацией: дубль ADR-014, незанесённый в таблицу ADR-035,
   подстановка mojibake, BOM, потерянный перевод строки, выдуманный путь в карте,
   «207 гипотез» в README и подмена 1135 → 9999 в AGENTS.md — все пойманы.
@@ -174,7 +194,7 @@ F225 и F230 не использованы (пропуски после ревь
 ## 10. Правила сопровождения
 
 1. **Счётчики проверяются прогоном, а не на память:** `tests.ps1` (1135),
-   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (72).
+   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (73).
 2. **Новый ADR** = следующий свободный ID; дубли недопустимы, сводная строка
    добавляется в `SAD/12_Architecture_Decisions.md` § 1 в том же коммите.
 3. **Новая находка** = следующий свободный F-номер + строка в `hypothesis/INDEX.md`

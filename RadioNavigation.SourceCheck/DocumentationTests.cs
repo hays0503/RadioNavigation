@@ -256,6 +256,107 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Every `Name.cs` reference in the SAD chapters must resolve to a real file
+        /// in Source\, Tests\, or the decompiled game source. Measured on 2026-09-26:
+        /// 216 references (103 distinct names) over 10 of the 11 chapters, 195 of them
+        /// resolve, and all 20 names that do not are annotated in place as deliberately
+        /// not implemented - chapter 08 proposes 19 types (5 interfaces in 2.1, 14
+        /// implementation classes in 2.2, every one marked "NOT implemented") and
+        /// chapter 11 lists AudioPipelineTests, rejected as F47. So the reference
+        /// graph is sound; this gate exists to keep it that way after future dead-code
+        /// sweeps, when a SAD line can outlive its class.
+        ///
+        /// Deliberately NOT implemented: a completeness check ("does SAD describe the
+        /// sextant / the map markers"). Absence is not a dangling reference, and the
+        /// judgement about what SAD ought to cover is recorded in DOCS.md section 8
+        /// rather than enforced here.
+        /// </summary>
+        [Fact]
+        public void Sad_ClassReferencesResolve()
+        {
+            string sadDir = Path.Combine(Root, "SAD");
+            if (!Directory.Exists(sadDir))
+                return;
+
+            var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string dir in new[]
+            {
+                Path.Combine(Root, "Source"),
+                Path.Combine(Root, "Tests"),
+            })
+            {
+                if (!Directory.Exists(dir))
+                    continue;
+                foreach (string file in Directory.GetFiles(dir, "*.cs", SearchOption.AllDirectories))
+                {
+                    // Generated under obj\ and bin\ by the test build; no chapter may
+                    // reference them, and counting them would inflate the known set.
+                    if (SkipSegments.Any(s => file.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0))
+                        continue;
+                    known.Add(Path.GetFileNameWithoutExtension(file));
+                }
+            }
+
+            // Game types (ShipControlUI, Periscope, SavesManager, ...) live in the
+            // decompiled source tree, not in the mod. Resolve the tree through
+            // GameSourceCompiler so the gate also runs where UBOAT_GAME_SOURCE is not
+            // exported (it falls back to the default root) - reading the variable
+            // directly made this test skip silently on a default dev box. Without the
+            // tree those names cannot be resolved at all, so skip rather than report
+            // false damage.
+            if (!GameSourceCompiler.HasGameSource)
+                return;
+
+            foreach (string file in GameSourceCompiler.EnumerateSources())
+                known.Add(Path.GetFileNameWithoutExtension(file));
+
+            var broken = new List<string>();
+            var reference = new Regex(@"([A-Z][A-Za-z0-9_]{4,})\.cs", RegexOptions.Compiled);
+
+            foreach (string chapter in Directory.GetFiles(sadDir, "*.md").OrderBy(p => p, StringComparer.Ordinal))
+            {
+                string text = File.ReadAllText(chapter);
+                foreach (Match match in reference.Matches(text))
+                {
+                    string name = match.Groups[1].Value;
+                    if (!known.Contains(name))
+                        broken.Add(Path.GetFileName(chapter) + " -> " + name + ".cs");
+                }
+            }
+
+            // Chapter 08 proposes 19 types that were never implemented - 5 interfaces
+            // in 2.1 and 14 implementation classes in 2.2, each marked "NOT
+            // implemented" in place - and chapter 11 lists one rejected test. Both are
+            // documented as such, so allow exactly those 20 names and nothing else.
+            var expected = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                // SAD/08 section 2.1, proposed service interfaces
+                "IRadioState", "IStationDataSource", "IAudioOutput", "IGameServices",
+                "IMorseDecoder",
+                // SAD/08 section 2.2, proposed implementation classes
+                "RadioContext", "HardcodedStationRepository", "JsonStationRepository",
+                "AudioPipeline", "GameReflectionCache", "RadioController",
+                "DiagnosticsCollector", "StationInfoDisplay", "StationFinder",
+                "CarrierBank", "Atmosphere", "ReceiverDsp", "TickScheduler",
+                "GameStrings",
+                // SAD/11, rejected under F47
+                "AudioPipelineTests",
+            };
+
+            var unexpected = broken
+                .Where(entry => !expected.Contains(entry.Substring(entry.IndexOf(" -> ") + 4)
+                    .Replace(".cs", string.Empty)))
+                .Distinct()
+                .ToList();
+
+            Assert.True(unexpected.Count == 0,
+                "SAD references classes that exist nowhere (Source, Tests, or the game "
+                + "source). Fix the reference or annotate the entry as intentionally "
+                + "not implemented:" + Environment.NewLine
+                + string.Join(Environment.NewLine, unexpected));
+        }
+
+        /// <summary>
         /// The counts quoted in DOCS.md and README.md must be the counts actually on
         /// disk. Both files used to say 207 (the size of the first 2026-08-01 audit)
         /// while the table had grown to 241 rows, and nothing compared the prose
