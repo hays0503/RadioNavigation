@@ -290,7 +290,15 @@ if ($Profile -eq "quick" -and $Severity -eq "warning") {
         Write-Host "[RadioNavigation] improved: $($fixed.Count) baseline diagnostic(s) fixed (run -UpdateBaseline to refresh)"
     }
     Write-Host "[RadioNavigation] baseline gate clean"
-    exit $rosExit
+    # Roslynator exits non-zero whenever it reports diagnostics - including the
+    # triaged baseline ones - so the gate verdict is the diff above, not $rosExit.
+    # But error-level lines mean a real failure (broken build, analyzer crash):
+    # preserve the raw code in that case instead of masking it.
+    $hasErrors = @($rosOut | Where-Object { $_ -match '\(\d+,\d+\):\s*error\s' }).Count -gt 0
+    if ($hasErrors) {
+        exit $rosExit
+    }
+    exit 0
 }
 
 & roslynator analyze $csproj --severity-level $Severity @args
