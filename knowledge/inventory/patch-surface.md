@@ -1,4 +1,4 @@
-﻿# Patch surface: virtual methods in game source (Harmony targets)
+# Patch surface: virtual methods in game source (Harmony targets)
 generated 2026-08-24 20:15, files scanned: 2562
 
 - `DWS.Common\DeepMonoBehaviour.cs:29` :: public virtual void OnCreated()

@@ -1,4 +1,4 @@
-﻿# Reflection contract snapshot
+# Reflection contract snapshot
 ## Mod-side lookups (Source/)
 
 - type `DWS.Common.InjectionFramework.ScriptableObjectSingleton` in RadioStoryIntegration.cs

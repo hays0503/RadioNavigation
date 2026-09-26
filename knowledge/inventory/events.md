@@ -1,4 +1,4 @@
-﻿# Event inventory: observable integration points (no Harmony needed)
+# Event inventory: observable integration points (no Harmony needed)
 generated 2026-08-24 20:15
 
 - `DWS.Common.Characters\Character.cs:305` :: public event Action<Character> Destroyed;

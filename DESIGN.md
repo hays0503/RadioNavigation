@@ -1,4 +1,4 @@
-﻿# RadioNavigation  Design Specification
+# RadioNavigation  Design Specification
 
 > Project: UBOAT Mod "RadioNavigation"  
 > Type: Historical naval radio navigation instrument panel  

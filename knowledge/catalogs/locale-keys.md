@@ -1,4 +1,4 @@
-﻿# Locale-key candidates (string literals like X/Y)
+# Locale-key candidates (string literals like X/Y)
 unique: 236; top entries by occurrence
 
 - `Missions/Objectives` x33

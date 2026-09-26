@@ -34,6 +34,7 @@
     <Compile Include="ModCompiler.cs" />
     <Compile Include="CleanReferenceCache.cs" />
     <Compile Include="SourceCheckTests.cs" />
+    <Compile Include="DocumentationTests.cs" />
     <Compile Include="TempProbeTests.cs" />
   </ItemGroup>
 

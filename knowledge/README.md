@@ -1,4 +1,4 @@
-﻿# knowledge/
+# knowledge/
 Compiled UBOAT/mod knowledge base (free-token window 2026-08-24).
 - inventory/patch-surface.md - all virtual methods of game code (Harmony targets)
 - inventory/events.md - game event declarations (observable without patching)
