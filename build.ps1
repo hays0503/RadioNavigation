@@ -1,7 +1,8 @@
 param(
     [string]$GamePath = "C:\Program Files (x86)\Steam\steamapps\common\UBOAT",
     [string]$Configuration = "Release",
-    [string]$OutputDir = "."
+    [string]$OutputDir = ".",
+    [switch]$SkipPvs
 )
 
 # F182: fail with a clear message before csc spews 15+ missing-reference
@@ -117,15 +118,18 @@ if ($LASTEXITCODE -eq 0) {
     exit $LASTEXITCODE
 }
 
-# PVS-Studio static-analysis gate (always runs; blocking).
+# PVS-Studio static-analysis gate (blocking). Skipped with -SkipPvs for a fast
+# compile-check loop; gates.ps1 runs PVS as its own timed stage instead.
 # Analyzes RadioNavigation.Analysis.csproj (net48 + real game DLLs) via
 # pvs.ps1. A non-zero result (issues found or analyzer failure) fails the
 # build so regressions can't slip in silently.
-Write-Host "[RadioNavigation] Running PVS-Studio gate ..."
-& powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "pvs.ps1") -Configuration $Configuration
-$pvsCode = $LASTEXITCODE
-if ($pvsCode -ne 0) {
-    Write-Host "[RadioNavigation] PVS-Studio gate FAILED (exit $pvsCode). See pvs-report.txt"
-    exit $pvsCode
+if (-not $SkipPvs) {
+    Write-Host "[RadioNavigation] Running PVS-Studio gate ..."
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "pvs.ps1") -Configuration $Configuration
+    $pvsCode = $LASTEXITCODE
+    if ($pvsCode -ne 0) {
+        Write-Host "[RadioNavigation] PVS-Studio gate FAILED (exit $pvsCode). See pvs-report.txt"
+        exit $pvsCode
+    }
+    Write-Host "[RadioNavigation] PVS-Studio gate passed."
 }
-Write-Host "[RadioNavigation] PVS-Studio gate passed."
