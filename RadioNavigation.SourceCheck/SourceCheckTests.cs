@@ -190,6 +190,13 @@ namespace RadioNavigation.SourceCheck
             if (!HasGame) return;
             if (!ModCompiler.HasModSource) return;
 
+            // Incremental: the comparison is deterministic in (game sources,
+            // Managed DLLs, mod sources, this tool's sources). Re-run the ~205 s
+            // old semantic pass only when those inputs changed since the last
+            // verified pass; otherwise the previous 0-diffs verdict still holds.
+            if (CleanReferenceCache.IsSeedQualityCurrent("newvsold"))
+                return;
+
             var newSeeds = DependencyClosure.ComputeSeedTypes();
             var newSet = new HashSet<string>(
                 newSeeds.Select(s => s.Name), StringComparer.Ordinal);
@@ -217,6 +224,8 @@ namespace RadioNavigation.SourceCheck
                 .ToList();
             Assert.True(arityDiff.Count == 0,
                 $"Arity differs for {arityDiff.Count} seeds:\n" + string.Join("\n", arityDiff));
+
+            CleanReferenceCache.SaveSeedQuality("newvsold");
         }
 
         /// <summary>
@@ -230,6 +239,11 @@ namespace RadioNavigation.SourceCheck
         public void SeedQuality_DllOnlyTypesAreBounded()
         {
             if (!HasGame) return;
+
+            // Incremental: same input set as NewVsOld (game tree + DLL). Skip the
+            // re-index when a previous run already bounded it for these inputs.
+            if (CleanReferenceCache.IsSeedQualityCurrent("dllonly"))
+                return;
 
             var dllPath = Path.Combine(GameSourceCompiler.ManagedDir, "com.uboat.game.dll");
             if (!File.Exists(dllPath)) return;
@@ -248,6 +262,38 @@ namespace RadioNavigation.SourceCheck
                 $"{dllOnly.Count} types in com.uboat.game.dll are missing from game source "
                 + "(syntax pass would stub them instead of real):\n"
                 + string.Join("\n", dllOnly.Take(50)));
+
+            CleanReferenceCache.SaveSeedQuality("dllonly");
+        }
+
+        /// <summary>
+        /// Pins the seed-quality skip mechanism both ways: a missing stamp is not
+        /// current (forces the full comparison), a saved stamp is current (allows
+        /// the skip), and a tampered stamp is not current (a stale pass can never
+        /// go silently green). Uses a probe name so it never touches the real
+        /// newvsold/dllonly stamps.
+        /// </summary>
+        [Fact]
+        public void SeedQualityStamp_RoundTrip()
+        {
+            if (!HasGame) return;
+            if (!ModCompiler.HasModSource) return;
+
+            const string probe = "roundtrip-probe";
+            var path = CleanReferenceCache.SeedQualityStampPath(probe);
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+                Assert.False(CleanReferenceCache.IsSeedQualityCurrent(probe));
+                CleanReferenceCache.SaveSeedQuality(probe);
+                Assert.True(CleanReferenceCache.IsSeedQualityCurrent(probe));
+                File.WriteAllText(path, "tampered");
+                Assert.False(CleanReferenceCache.IsSeedQualityCurrent(probe));
+            }
+            finally
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
         }
 
         /// <summary>

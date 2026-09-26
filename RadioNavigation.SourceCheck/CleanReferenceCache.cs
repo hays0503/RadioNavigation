@@ -45,11 +45,52 @@ namespace RadioNavigation.SourceCheck
 
         private static string StampPath() => DllPath + ".stamp";
 
-        private static string ComputeStamp()
+        /// <summary>
+        /// Seed-quality comparison stamp: SeedQuality_NewVsOld re-runs the removed
+        /// ~205 s semantic pass on every run, and SeedQuality_DllOnlyTypesAreBounded
+        /// re-indexes the game source tree. Both comparisons are deterministic in
+        /// their inputs, so a passing result stays valid until an input changes.
+        /// Each test keeps its own stamp file (a shared one would let the first
+        /// test to run mark the second as verified without it ever executing).
+        /// The stamp is written only after the asserts pass - a failure leaves no
+        /// stamp, so the next run re-verifies instead of going silently green.
+        /// </summary>
+        public static string SeedQualityStampPath(string testName) =>
+            Path.Combine(CacheDir, "seedquality-" + testName + ".stamp");
+
+        public static bool IsSeedQualityCurrent(string testName)
+        {
+            var path = SeedQualityStampPath(testName);
+            if (!File.Exists(path))
+                return false;
+            return File.ReadAllText(path) == ComputeSeedQualityStamp();
+        }
+
+        public static void SaveSeedQuality(string testName)
+        {
+            Directory.CreateDirectory(CacheDir);
+            File.WriteAllText(SeedQualityStampPath(testName), ComputeSeedQualityStamp());
+        }
+
+        public static string ComputeSeedQualityStamp()
         {
             using var sha = SHA256.Create();
             var parts = new List<string>();
+            CollectSharedInputParts(parts);
+            // Both seed algorithms live in this tool: a change here can break the
+            // old-vs-new equivalence (or the type index) with identical game/mod
+            // inputs, so this tool's own sources join the stamp.
+            var selfDir = Path.Combine(ModCompiler.ModRoot, "RadioNavigation.SourceCheck");
+            if (Directory.Exists(selfDir))
+                foreach (var self in Directory.EnumerateFiles(selfDir, "*.cs", SearchOption.AllDirectories))
+                    parts.Add("self:" + self + ":" + File.GetLastWriteTimeUtc(self).Ticks);
+            var joined = string.Join("\n", parts);
+            var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(joined));
+            return Convert.ToBase64String(hash);
+        }
 
+        private static void CollectSharedInputParts(List<string> parts)
+        {
             foreach (var src in GameSourceCompiler.EnumerateSources())
                 parts.Add(src + ":" + File.GetLastWriteTimeUtc(src).Ticks);
 
@@ -69,7 +110,13 @@ namespace RadioNavigation.SourceCheck
             // (and thus every analyze.ps1 run) slow.
             foreach (var modSrc in ModCompiler.EnumerateSources())
                 parts.Add("mod:" + modSrc + ":" + File.GetLastWriteTimeUtc(modSrc).Ticks);
+        }
 
+        private static string ComputeStamp()
+        {
+            using var sha = SHA256.Create();
+            var parts = new List<string>();
+            CollectSharedInputParts(parts);
             var joined = string.Join("\n", parts);
             var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(joined));
             return Convert.ToBase64String(hash);

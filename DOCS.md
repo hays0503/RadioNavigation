@@ -194,7 +194,7 @@ F225 и F230 не использованы (пропуски после ревь
 ## 10. Правила сопровождения
 
 1. **Счётчики проверяются прогоном, а не на память:** `tests.ps1` (1135),
-   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (73).
+   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (74).
 2. **Новый ADR** = следующий свободный ID; дубли недопустимы, сводная строка
    добавляется в `SAD/12_Architecture_Decisions.md` § 1 в том же коммите.
 3. **Новая находка** = следующий свободный F-номер + строка в `hypothesis/INDEX.md`
