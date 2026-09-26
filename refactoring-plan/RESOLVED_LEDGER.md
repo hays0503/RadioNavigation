@@ -148,7 +148,28 @@
 | F205 | Формат с кириллической «В°» в UI-коде не находится; вероятно исчез при переписывании FormatFrequency/FormatCompact |
 | F206 | tickAccumulator теперь double += deltaSeconds с TickIntervalSeconds (AudioSynthesisEngine.cs:71-74) — стерео-удвоение устранено; подтвердить тестом |
 
-## 5. Всё ещё ОТКРЫТО (22)
+## 5. Всё ещё ОТКРЫТО (22) — снимок на 2026-08-24
+
+> **Пересчёт 2026-09-26 (частичный).** Список ниже — снимок на 2026-08-24, в нём
+> ровно 22 находки. За прошедшие месяцы часть из них закрыта. Перепроверено по
+> текущему коду:
+>
+> | Находка | Прежнее состояние | Факт на 2026-09-26 | Доказательство |
+> |---|---|---|---|
+> | F70 | открыта (`FormatCompact` вводит в заблуждение) | **закрыта** — метода `Format` в `NavigationPattern` больше нет | `Source/Logic/NavigationPattern.cs`: 0 совпадений (dead sweep #2) |
+> | F105 | открыта (аллокация `StringBuilder` в аудио-пути) | **закрыта** — `StringBuilder` в `SonneController` не используется; строки 204-206 заняты null-guard'ом `Sandbox.Instance` | `Source/Logic/SonneController.cs`: 0 совпадений |
+> | F112 | открыта (`DspPipeline.Frequency` не `volatile`) | **закрыта** — `targetFrequency` объявлен `private volatile float` | `Source/Sound/DspPipeline.cs:12` |
+> | F114 | открыта (тихий fallback на `Dot` прятал out-of-range) | **закрыта** — fallback сохранён как безопасное значение, но теперь пишет `LogError` с диагностикой | `Source/Logic/MorseKeyer.cs:266-272` |
+> | F125 | открыта (молчаливый `return ""`) | **частично** — баг unsigned-char устранён (это отдельная F183), но `""` на неотображённый символ и на `c >= table.Length` остаётся | `Source/Logic/MorseAlphabet.cs:61-63` |
+> | F83 | открыта (zombie-решения при hot-reload) | **не перепроверено** — класс `RadioStoryIntegration` в дереве есть; ядро G1-G4 закрыто через `StoryDecisionGateway.cs` (28f4a62), но сам класс не удалён | `Source/Logic/RadioStoryIntegration.cs:13` |
+>
+> **Остальные 16 находок этого раздела (F02, F03, F05, F17, F21, F27, F31, F32,
+> F62, F63, F71, F82, F163, F170, F179, F181) в этом проходе не перепроверялись.**
+> Число 22 — размер снимка, а не актуальный статус; полный пересчёт требует
+> отдельного прохода по коду. Не переписывайте это число на глаз.
+>
+> Поздние раунды (F208-F229, F231-F243) закрытия не добавили: их состояние
+> указано прямо в `hypothesis\INDEX.md`.
 
 God-object/static/logging хвост = территория DEFERRED + PLAN_Phase5:
 

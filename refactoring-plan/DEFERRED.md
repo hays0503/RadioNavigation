@@ -3,6 +3,11 @@
 These findings require validation on the live in-game panel. Status synchronized 2026-08-04:
 
 > **2026-08-24:** полная сверка решённости всех гипотез — в `RESOLVED_LEDGER.md`. Открытыми остаются 22; записи ниже сохраняют историческую формулировку.
+>
+> **2026-09-26:** «22» — размер снимка от 2026-08-24, а не текущий статус. Частичный
+> пересчёт по коду закрыл 4 из них (F70, F105, F112, F114) и уточнил F125;
+> доказательства — в `RESOLVED_LEDGER.md` § 5. Остальные в этом проходе не
+> перепроверялись.
 
 Position Fix chain (`PositionFixCalculator`, measurement aggregation, and panel
 output) was removed on 2026-08-08. Historical position-fix findings remain in
