@@ -33,7 +33,7 @@
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1 [-GamePath <path>]  # локальная DLL (для IDE-проверок)
 dotnet build radionavigation.csproj -c Release -c Debug        # Release+Debug, эталонный билд (0 errors, MSB3277 warn ожидаем)
-powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (812 PASS; baseline-история ADR-014)
+powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (1135 PASS; baseline-история ADR-014)
 ```
 
 ## Структура репозитория
@@ -41,14 +41,18 @@ powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (812
 - `Source/` — код мода: `Data/` (конфиги маяков/диапазонов), `Logic/` (ядро: морзе, паттерны, пеленги), `Sound/` (DSP-синтез), `UI/` (обработчики uGUI)
 - `Tests/` — юнит-тесты (без Unity)
 - `SAD/` — документ архитектуры (11 глав; приложения A–C и старый roadmap — в `archive/`)
-- `refactoring-plan/` — аудит: 207 гипотез, статусы в `hypothesis/INDEX.md`, неисправленное в `DEFERRED.md`
+- `refactoring-plan/` — аудит: 241 находка F001–F243, статусы в `hypothesis/INDEX.md`, неисправленное в `DEFERRED.md`
+- `docs/adr/` — 21 решение (ADR-014…ADR-034); сводка статусов в `SAD/12_Architecture_Decisions.md`
+- `knowledge/` — скомпилированная база знаний по API игры UBOAT
 - `DESIGN.md` — спецификация дизайна
+- **`DOCS.md` — карта всей документации: что читать и для чего** (начните отсюда)
 
 ## Статус качества
 
-- Аудит рефакторинга: **207 гипотез** — ~160 закрыто (доказательства построчно в `refactoring-plan/RESOLVED_LEDGER.md`), 22 открыто (`DEFERRED.md` + `PLAN_Phase5.md`), ~10 частично, 13 отклонено
-- Тесты: **812 PASS** (baseline `baseline-182-20260819` на `8b3021fa`, ADR-014), сборка Release+Debug без ошибок
-- Отложено (live-проверка в игре): характер шума (F71); архитектурные F163/F179–F181 (см. `refactoring-plan/DEFERRED.md`)
+- Аудит рефакторинга: **241 находка** (F001–F243; номера F225/F230 не использованы) — 173 закрыто, 13 отклонено, 2 отложено, 53 строки без статусного маркера (см. `DOCS.md` § 8)
+- Тесты: **1135 PASS** (baseline `baseline-182-20260819` на `8b3021fa`, ADR-014), сборка Release+Debug без ошибок
+- Смежные гейты: анализаторы **68 PASS**, SourceCheck **66 PASS**, PVS clean
+- Открытые пункты и пробелы документации перечислены в `DOCS.md` § 8
 
 ## История
 

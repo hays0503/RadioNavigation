@@ -34,10 +34,17 @@
 | ADR-026 | STAR_SKY visibility по Weather.Sky | Accepted | 2026-08-19 |
 | ADR-027 | Собственный маркер маяка на карте (LighthouseMapMarker) | Accepted | 2026-08-22 |
 | ADR-028 | Геометрия бандла = истина; свет на Spot Light; flare без лимита в device-режиме | Accepted | 2026-08-22 |
-| ADR-023* | Хронометр: двухзонная курсорная политика + expanded drag (`ADR-023-chronometer-cursor-and-expanded-drag.md`) | Accepted | 2026-08-23 |
 | ADR-029 | Coupling Assessment: 3 концентратора + static mutable; лечение через слайсы PLAN_Phase5, big-bang перенос отвергнут | Accepted | 2026-08-24 |
+| ADR-030 | Land curation маяков — ручная правка `LeuchtfeuerExcluded.json` | Accepted | 2026-09-09 |
+| ADR-031 | Fire-height curation — высота огня <15° через `LeuchtfeuerMinor.json` | Accepted | 2026-09-09 |
+| ADR-032 | Screen-space деклаттер маркеров (greedy min-gap) | Accepted | 2026-09-09 |
+| ADR-033 | Селектор тел для пеленга: Солнце, Луна, звезды | Accepted | 2026-09-16 |
+| ADR-034 | Хронометр: двухзонная курсорная политика + expanded drag | Accepted | 2026-08-23 |
 
-> **⚠️ Конфликт номеров:** существуют **два** файла с номером ADR-023 — `ADR-023-planets.md` (планеты, 2026-08-19) и `ADR-023-chronometer-cursor-and-expanded-drag.md` (хронометр, 2026-08-23). Различать по имени файла, не по номеру.
+> **История нумерации.** До 2026-09-26 существовали **два** файла с номером ADR-023: `ADR-023-planets.md`
+> (планеты, 2026-08-19) и `ADR-023-chronometer-cursor-and-expanded-drag.md` (хронометр, 2026-08-23).
+> Номер оставлен у более раннего ADR; хронометр переименован в **ADR-034** (свободный номер),
+> ссылки в `SAD/04_Component_Architecture.md` и `AGENTS.md` обновлены.
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 

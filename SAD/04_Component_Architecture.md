@@ -592,7 +592,7 @@ LighthouseBeamGlow
   - GameDefault обязан идти через `ApplyGameDefaultCursor`: чужие `UnsetCustomCursor` оставляют режим Default при живой кастомной текстуре, guarded `SetDefaultCursor` выйдет рано — текстуру приходится форсить напрямую.
   - Ховер не сбрасывается покадрово (на карте убил бы подсказку); восстановление точечное через `ResetChronometerScale`.
   - Рефлексия молча вернёт false при переименовании полей игры — искать префикс `[RadioNav][Chronometer]` в логе.
-- Тесты: `ChronometerCursorPolicyTests` (двухзонная политика, emit-only-on-change) и `ChronometerMapDragMathTests` (нормализация PosOverride, ADR-023); сам обработчик напрямую не покрыт — тонкая связка с Unity/игрой.
+- Тесты: `ChronometerCursorPolicyTests` (двухзонная политика, emit-only-on-change) и `ChronometerMapDragMathTests` (нормализация PosOverride, ADR-034); сам обработчик напрямую не покрыт — тонкая связка с Unity/игрой.
 
 ### 10.7 StationMapOverlay
 - Source: `Source/UI/StationMapOverlay.cs`

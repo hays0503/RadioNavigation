@@ -1,4 +1,4 @@
-# ADR-023: Курсорные зоны и расширенный драг хронометра
+# ADR-034: Курсорные зоны и расширенный драг хронометра
 
 > Статус: Accepted (2026-08-23)  
 > Связи: `Source/UI/ChronometerScaleControl.cs`, `Source/UI/ChronometerOverlayHandler.cs`, `Source/UI/ChronometerCursorPolicy.cs`, `Source/UI/ChronometerMapDragMath.cs`, `Source/UI/PanelDragHandler.cs`, `Tests/ChronometerCursorPolicyTests.cs`, `Tests/ChronometerMapDragMathTests.cs`, `PLAN_Phase5.md`

@@ -1,14 +1,14 @@
-﻿## graphify
+## graphify
 
 Knowledge graph at graphify-out/: god nodes, communities, cross-file relationships.
 
-User types `/graphify` в†’ use graphify skill/instructions first.
+User types `/graphify` → use graphify skill/instructions first.
 
 Rules:
-- Codebase questions: run `graphify query "<question>"` first when graphify-out/graph.json exists. Relationships: `graphify path "<A>" "<B>"`. Concepts: `graphify explain "<concept>"`. Returns scoped subgraph вЂ” smaller than GRAPH_REPORT.md or raw grep.
+- Codebase questions: run `graphify query "<question>"` first when graphify-out/graph.json exists. Relationships: `graphify path "<A>" "<B>"`. Concepts: `graphify explain "<concept>"`. Returns scoped subgraph — smaller than GRAPH_REPORT.md or raw grep.
 - Dirty graphify-out/ files expected after hooks/incremental updates; not a reason to skip. Skip only if task is about stale/incorrect graph output or user opts out.
-- graphify-out/wiki/index.md exists в†’ use it for broad navigation, not raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain insufficient.
+- `graphify-out/wiki/` is NOT generated in this project — do not reference it. Navigation entry points are `graphify query/path/explain` (preferred) and `graphify-out/GRAPH_REPORT.md`.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain insufficient. HTML viz is skipped above 5000 nodes (mod graph = 8187), so there is no `graph.html`.
 - After code changes, run `graphify update .` (AST-only, no API cost).
 - MCP server gotcha (2026-08-24): server default project path resolves to sibling `testui` mod dir — always pass explicit `project_path` = this project root to query/stats/god-nodes tools.
 - **Game-source graph** (2026-08-24): second graph at `C:\code\projects\uboat\graphify-out\` (32140 nodes / 78914 edges / 814 communities, full inference). For game-code questions pass `project_path = C:\code\projects\uboat`. Game digests (Stories/Mods/DI/Time+Weather/Map/Camera/AI/Characters/Sandbox/Serialization/DWS infra) — in supermemory.
@@ -44,7 +44,7 @@ C# .NET Standard 2.0 Unity mod for [UBOAT](https://www.deepwaterstudio.com/uboot
 
 ## Build system
 
-Raw `csc.exe` via PowerShell вЂ” **not** `dotnet build`/MSBuild SDK. Needs local UBOAT install for Unity/game DLL refs.
+Raw `csc.exe` via PowerShell — **not** `dotnet build`/MSBuild SDK. Needs local UBOAT install for Unity/game DLL refs.
 
 ```powershell
 powershell -File build.ps1 [-GamePath <path>] [-Configuration Debug|Release] [-OutputDir .]
@@ -54,9 +54,9 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 
 **PVS-Studio gate (always runs, blocking):** after a successful csc compile, `build.ps1` invokes `pvs.ps1`, which analyzes `RadioNavigation.Analysis.csproj` (net48 + real game DLLs) with `PVS-Studio_Cmd.exe` and converts the report to `pvs-report.txt`. A non-zero PVS result fails the build. Run standalone via `powershell -File pvs.ps1 [-Configuration Debug|Release] [-Json] [-Sarif]`. Suppressions live in `RadioNavigation.pvsconfig` (referenced by Analysis.csproj) — disabled codes are Unity/extension-guard false positives documented there; do NOT re-add inline `//-V:` comments (C++-only, ignored for C#). Keep PVS clean before committing.
 
-**Important:** game **recompiles mod from `Source\*.cs`** at load (Roslyn, `Mod.cs Compile()`) вЂ” build.ps1 DLL unused at runtime. Game compile defines: `UBOAT`, `UBOAT_2024_1`, `UNITY_STANDALONE_WIN` вЂ” **no `DEBUG`**, so `#if DEBUG` blocks stripped at runtime regardless of build.ps1 config. Local builds = IDE/static checks only.
+**Important:** game **recompiles mod from `Source\*.cs`** at load (Roslyn, `Mod.cs Compile()`) — build.ps1 DLL unused at runtime. Game compile defines: `UBOAT`, `UBOAT_2024_1`, `UNITY_STANDALONE_WIN` — **no `DEBUG`**, so `#if DEBUG` blocks stripped at runtime regardless of build.ps1 config. Local builds = IDE/static checks only.
 
-**C# language version = 7.0 (game RoslynCSharp contract, verified in-game 2026-09-03):** the game compiler rejects anything newer (e.g. `default;` literal = C# 7.1 в†' CS8107) and then loads a broken assembly (`BadImageFormatException`). Mod sources must stay C# 7.0. Enforced statically in three places: (1) `build.ps1` Roslyn branch passes `/langversion:7`; (2) `ModCompiler.GameParityParseOptions` (C#7 + game defines, no DEBUG) pins every mod-source parse in SourceCheck, so `Mod_CompilesAgainstCleanGameApi` fails offline on any newer-feature use; (3) the same test also fails on CS0169 (never-used field вЂ” dead code after extractions). CS0649 (never-assigned `[Inject]` fields) is the DI pattern, allowed. Consequence: never use `const bool` as a feature gate вЂ” const folds away and produces CS0162 unreachable-code in the game compiler; use `static readonly bool`.
+**C# language version = 7.0 (game RoslynCSharp contract, verified in-game 2026-09-03):** the game compiler rejects anything newer (e.g. `default;` literal = C# 7.1 → CS8107) and then loads a broken assembly (`BadImageFormatException`). Mod sources must stay C# 7.0. Enforced statically in three places: (1) `build.ps1` Roslyn branch passes `/langversion:7`; (2) `ModCompiler.GameParityParseOptions` (C#7 + game defines, no DEBUG) pins every mod-source parse in SourceCheck, so `Mod_CompilesAgainstCleanGameApi` fails offline on any newer-feature use; (3) the same test also fails on CS0169 (never-used field — dead code after extractions). CS0649 (never-assigned `[Inject]` fields) is the DI pattern, allowed. Consequence: never use `const bool` as a feature gate — const folds away and produces CS0162 unreachable-code in the game compiler; use `static readonly bool`.
 
 ## Static analysis (Roslynator + custom Harmony analyzer)
 
@@ -88,18 +88,20 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 
 ## Architecture
 
-- **Entry point**: `Source/Logic/Main.cs` вЂ” `IUserMod`, Harmony patching, DI injection, prefab instantiation
+- **Entry point**: `Source/Logic/Main.cs` — `IUserMod`, Harmony patching, DI injection, prefab instantiation
 - **Harmony patches** target: `RadioStory.ContinueStory`, `Locale.RetrieveString` (2 overloads), `RadioStory.OnDecisionSelected`, `RadioStory.OnStopped`
-- **DI framework**: UBOAT custom `DWS.Common.InjectionFramework` вЂ” needs Reflection permission in Manifest.json. Mod assembly injected explicitly via `InjectIntoAssembly` (`Mod.cs InitializeAssembly`), not framework `"uboat"` auto-injection (assembly name `radionavigation` doesn't match). `OnSceneAwake` handler injects scene objects.
+- **DI framework**: UBOAT custom `DWS.Common.InjectionFramework` — needs Reflection permission in Manifest.json. Mod assembly injected explicitly via `InjectIntoAssembly` (`Mod.cs InitializeAssembly`), not framework `"uboat"` auto-injection (assembly name `radionavigation` doesn't match). `OnSceneAwake` handler injects scene objects.
 - **UI**: Unity uGUI prefabs from AssetBundle (`Bundles/testui`). Hierarchy validated against hardcoded paths at runtime (Main.cs:~200, `requiredChildren[]` из констант `PrefabNames.*`); destroyed+skipped on failure.
-- **Source layout**: `Data/` (static configs вЂ” 5 beacons CAP 59, 5 radio bands), `Logic/` (core sim вЂ” morse keyer, nav patterns, bearing diagnostics), `Sound/` (DSP audio synthesis via `OnAudioFilterRead`), `UI/` (MonoBehaviour handlers)
+- **Source layout**: `Data/` (static configs — 5 beacons CAP 59, 5 radio bands), `Logic/` (core sim — morse keyer, nav patterns, bearing diagnostics), `Sound/` (DSP audio synthesis via `OnAudioFilterRead`), `UI/` (MonoBehaviour handlers)
 
 ## Gotchas
 
-- Tests: 786 PASS `powershell -ExecutionPolicy Bypass -File tests.ps1` (xunit 2.9 + Runner, baseline ADR-014 `baseline-182-20260819`; 232 с 2026-08-22, 253 с 2026-08-22, 255 с 2026-08-23 — golden audio render `AudioRenderPauseTests`, офлайн рендер движка + огибающая, без Unity; 257 с 2026-08-23 — морзе-канон 1:3 (`DashSoundMs=600`, `CallsignDashSoundMs=375`) + pitch-split точка/тире/экви ±150 Гц вокруг `BeatFrequency`, `DashGainBoost=1.25`; 252 с 2026-08-23 — P5.0 dead sweep убрал 5 тестов мёртвого кода; 260 с 2026-08-23 — `ChronometerCursorPolicyTests` пиннят двухзонную курсорную политику хронометра (стрелки центра/крестик тела/игровой дефолт, приоритет масштаба, emit-only-on-change); 263 с 2026-08-23 — `ChronometerMapDragMathTests` (нормализация PosOverride, ADR-023); рост до 330 от секстантной/звёздной работы; 315 с 2026-08-31 — dead sweep #2: −15 тестов test-only членов (`AstroMath.NutationDeg`/`PrecessionMatrix`, `BeaconOperatingSchedule.IsOperationalAt`, `SonneSignalGenerator.CalculateSector`/`RestoreBearingFromDotCount` + транзитивные `SectorResult`/`TotalSignals`/`DegPerSign`, `NavigationPattern.FormatPattern`/`FormatCompact`, `StoryDecisionGateway.IsInitialized`) + write-only поля (×5) + DEBUG-хелперы (`DumpHierarchy`/`StateLog`/`DebugImg`/`wired`) + мёртвые константы (`PrefabNames` ×4, `PlayerPositionProvider` ×2) + `StarSkyRenderer.cs` целиком (прототип, заменён `StarsMesh`; хост-узла в бандле нет). `dotnet build -c Release/Debug` 0 errors. SAD 11 — 786 PASS.
+- **Tests (актуально на 2026-09-26): 1135 PASS / 0 FAIL** — `powershell -ExecutionPolicy Bypass -File tests.ps1` (xunit 2.9 + Runner; baseline ADR-014 `baseline-182-20260819`). Смежные гейты: `RadioNavigation.Analyzers.Tests` **68 PASS**, `RadioNavigation.SourceCheck` **66 PASS**. `dotnet build -c Release/Debug` 0 errors.
+  - Чем закреплены нетривиальные инварианты: golden audio render `AudioRenderPauseTests` (офлайн рендер движка + огибающая, без Unity); морзе-канон 1:3 (`DashSoundMs=600`, `CallsignDashSoundMs=375`) + pitch-split точка/тире/экви ±150 Гц вокруг `BeatFrequency`, `DashGainBoost=1.25`; `ChronometerCursorPolicyTests` (двухзонная курсорная политика, emit-only-on-change); `ChronometerMapDragMathTests` (нормализация PosOverride, ADR-034).
+  - Летопись роста счётчика (неактуальные значения оставлены как история): 182 baseline → 232/253/255 (2026-08-22/23) → 257 (морзе-канон) → 263 (хронометр) → 315 (dead sweep #2, 2026-08-31) → 761→786 (пост-аудит F208–F228, 2026-09-15) → 1133 (пост-сварочные P0+P1, 2026-09-25) → **1135** (Phase 6, 2026-09-26). Детали dead sweep: −15 тестов test-only членов + `StarSkyRenderer.cs` целиком.
 - **Post-audit F208–F228 (2026-09-15):** +25 tests (761→786), `RadioNavigation.Analyzers.Tests` 55→68, `RadioNavigation.SourceCheck` 44→51; `pvsconfig` V3080/V3095 re-enabled (explicit `== null` guards replaced the extension idiom on 18 sites); `build.ps1` now defines the game symbol set `UBOAT;UBOAT_2024_1;UNITY_STANDALONE_WIN`; SourceCheck derives the mod root from `Assembly.Location` (env overrides `UBOAT_GAME_SOURCE`/`UBOAT_GAME_PATH`); new gates `TestProject_LinksAllSourceFiles`, `BuildScript_GameDefineParity`, `ReleaseLogs_AreGated`, `SextantOwnedResources_AreDestroyed`. Details: `refactoring-plan/hypothesis/INDEX.md` § «Пост-аудит 2026-09-15».
 - No formatter or `.editorconfig` for the mod build itself (analysis uses `RadioNavigation.Analysis.csproj` + `.editorconfig`, separate from `build.ps1`). Refactoring plans propose adding one.
-- Harmony patches fail silently on game version change вЂ” targets renamed/removed. Check pre-flight log (`target methods not found`) on load.
+- Harmony patches fail silently on game version change — targets renamed/removed. Check pre-flight log (`target methods not found`) on load.
 - AssetBundle required at `Bundles/testui` relative to mod root. Unity editor builds it; mod loader expects it at runtime.
 - `#if DEBUG` blocks in Main.cs dump prefab hierarchy but stripped from Release builds.
 - **Sextant debug aim readout (2026-09-22)**: `PlayerPrefs RadioNav.DebugAim=1` (cached via `RadioNavDiagnostics.AimDebugKey`, OFF by default) appends `Δ…′ в…′ г…′` to the identification line — Δ = total line-of-sight↔body angle, в = `bodyAlt − (arc + ИП)` (the future intercept, 1′ = 1 NM), г = horizontal offset in the aim frame (pan). Files: `Source/Logic/AimOffsetFormat.cs` (pure, 16 tests) + `SextantStarId.UpdateAimDebug` (needs `FindNearestBody`'s new `out Vector3 bodyDir`). Nulling `в` with the drum (↑↓, Ctrl = 0.1′) is the "perfect measurement" path. Live: `HIP 3697  Δ26.5′ в+21.6′ г−15.4′`, √(21.6²+15.4²) = 26.5 ✓. **The recorded Ho is the drum reading at the I press** (author decision 2026-09-22): the P6 auto-taps no longer move the recorded value — `SextantBurstSampler.Tap` restarts the burst when the drum moves (≥1 quantum 0.1′, the 1/600° grid) and σ/n stay as a card quality metric; `MaxInterceptNm` 30 → 5 NM (`Проверьте наведение (a > 5 NM)`). Квант дуги — 0.1′ = 6″ = 1/600° (`SextantArc.StepsPerDeg = 600`): верньер на 10 делений (Bowditch Ch.15 §1502) и формат немецкой F-Tafel в десятых минуты; один щелчок Ctrl+стрелки = один разряд отображения.
@@ -120,8 +122,8 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 - **Game source**: `C:\code\projects\uboat` (full C# project, assembly `com.uboat.game`, Unity 2021.3.45f2, 0Harmony 2.2.2). All 5 Harmony targets verified statically (2026-08-01). API map: `refactoring-plan/game-source-findings/GAME_SOURCE_REFERENCE.md`.
 - **RadioStoryIntegration dead chain (G1-G4, verified 2026-08-01, FIXED 2026-08-23 via `StoryDecisionGateway.cs`, commit 28f4a62)**: `stage` field EXISTS (`RadioStory.cs:83`, enum) — реальная причина падения: `(int)`-каст boxed-перечисления → InvalidCastException; `InsertDecision`/`OnUpdated` looked up on `RadioStory.BaseType` (=GenericStory) but declared in `Story` (GetMethod doesn't traverse bases); `LocalizationKey` readonly *field* in game, not property. Details: `refactoring-plan/game-source-findings/`.
 - `supportedGameVersions` in Manifest.json **not validated** by game (ModManager parses, never checks).
-- AssetBundle built with Unity 2021.3.33f1 вЂ” compatible with game's 2021.3.45f2.
-- Game does no own Harmony patching (0Harmony.dll ships for mods only); mod's `new Harmony("UBOAT.Mods.RadioNavigation")` в†’ `UnpatchAll()` hits only its own patches.
+- AssetBundle built with Unity 2021.3.33f1 — compatible with game's 2021.3.45f2.
+- Game does no own Harmony patching (0Harmony.dll ships for mods only); mod's `new Harmony("UBOAT.Mods.RadioNavigation")` → `UnpatchAll()` hits only its own patches.
 
 - **Метки карты — родные точки игры (2026-11-05)**: фикс, вершины LOP, маяки и станции — настоящие `MapPointUI` через публичный `MapChartingUI.CreatePoint` (только они видны инструментам/ластику/Delete — те читают статический `MapPointUI.HoveredPoint`); вид мода переехал детьми под GameObject точки (`MapMarkerPointBridge`: нейтрализация `image.color=(0,0,0,0)` + `label.enabled=false`, компенсация масштаба/подъёма в LateUpdate, политика `Interactive`/позиции). Реконсиляция каждые 0.25 с по ключам `RadioNav …` (адопция сохранённых точек, создание, удаление устаревших/дублей; **`FindObjectsOfType<MapPointUI>(true)`** — иначе неактивные (деклаттер) не видны и флот дублируется каждые 0.25 с). Политика: фикс/LOP — динамические (drag/ластик/Delete; после удаления подавление до I/О, расчёты/карточка/проба не трогаются), маяки/станции — статичные (позиция возвращается, сам маркер не удаляется); при инструменте «Точки» все наши точки inert (попап переименования ломал бы ключ адопции). Гейт `MapMarkers_AreNativeMapPoints` (5/5 мутаций). План/живые результаты: `MAP_MARKERS_PLAN.md`. **MCP-интерфейс карты (2026-11-05, мост)**: маршруты `/map` + `/map/*` (`McpMap.cs`) — снимок точек/линий/инструмента, создание/перемещение/удаление точек, линии, `map_tool`, `map_hover`, `map_point_clear_owned`; MCP-инструменты `map*` в `mcp_server.py` (после правки сервера — **перезапуск opencode**: снапшот списка инструментов; гейты моста `compile-mcpbridge.ps1` → `analyze-bridge.ps1` → `python mcp_server.py --selftest`). Синтетический указатель MCP до 3D-карты не дотягивается — drag/ластик/инструменты проверяются этими маршрутами. **Двойная загрузка сборок (ловушка 2026-11-05):** мод поднимается шимом и загрузчиком → в сцене две копии с *разными* привязками игровых типов и своими статиками; корень моргания — `SceneContentBuilder.Build` проверял наличие компонента **по своему Type**, вторая копия его не видела и добавляла свой набор маркеров на тот же GO, после чего две реконсиляции воевали (удаление/видимость). Фикс: `HasComponentNamed` — проверка по **имени типа** (copy-agnostic), поэтому второй набор не создаётся; плюс stale-набор не удаляется вовсе (только точные дубли), явные удаления — через `CollectExplicitRemovals` (сброс O и старт сцены у `FixMapMarker`); статичная блокировка позиции живёт и в Update владельца (мост в скрытом деклаттером GO не тикает); мост кэширует копию с максимумом точек и даёт её вербам первой. Диагностика «owned points outside this marker's set left in place=N» — штатные числа (маяки 5, станции 210, фикс 215), логируется только при изменении. Живьём: 215 (210 маяков + 5 станций) стабильно, active-флаги стоят, статичная блокировка и линия к маркеру мода ✓.
 
@@ -129,10 +131,13 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 
 ## Documentation sources
 
-- `SAD/` вЂ” 11-chapter architecture doc (decisions, code smells; приложения A–C и старый roadmap — в `archive/`)
-- `refactoring-plan/` вЂ” активные планы: `PLAN_Phase5.md` (живой), `PLAN_Phase4_GodObjects.md`, `PLAN_InfoPanel_ZoneDebug.md`, `LIVE_VALIDATION_CHECKLIST.md`, `DEFERRED.md`, `VERIFICATION_REPORT.md`
-- `refactoring-plan/hypothesis/INDEX.md` вЂ” 207 verified findings (194 confirmed, 13 rejected) with status column
-- `refactoring-plan/RESOLVED_LEDGER.md` вЂ” закрытие гипотез с доказательствами (теги file:line, коммиты)
-- `refactoring-plan/VERIFICATION_REPORT.md` вЂ” verdicts, duplicates, Phase 5 game-source verification
-- `refactoring-plan/game-source-findings/` вЂ” G1-G4 (dead RadioStoryIntegration chain) + `GAME_SOURCE_REFERENCE.md` (modв†”game API map)
-- `.opencode/opencode.json` вЂ” graphify.js plugin config for OpenCode
+- **`DOCS.md` — карта документации: что читать и для чего, известные пробелы, правила сопровождения. Начинать отсюда.**
+- `SAD/` — 11 глав архитектуры (01-08, 10-12; глава 09 = roadmap, ушла в `archive/09_Refactoring_Roadmap.md`, нумерация не сдвигалась; приложения A–C — в `archive/`)
+- `docs/adr/` — 21 решение, ID ADR-014…ADR-034, дублей нет; сводная таблица статусов — `SAD/12_Architecture_Decisions.md` § 1
+- `refactoring-plan/` — планы: `PLAN_Phase6_LoadGate_Hygiene.md` (живой, фазы 0-5 + live-приёмка), `PLAN_Phase5.md` (ждёт live), `PLAN_Phase4_GodObjects.md` (закрыт), `PLAN_InfoPanel_ZoneDebug.md` (перенесён в чеклист/архив), `LIVE_VALIDATION_CHECKLIST.md`, `DEFERRED.md`, `VERIFICATION_REPORT.md`
+- `refactoring-plan/hypothesis/INDEX.md` — реестр находок F001-F243 (241 строка; номера F225/F230 не использованы). Аудит 2026-08-01 дал F01-F207, из них 194 в `refactoring-plan/confirmed/` и 13 в `refactoring-plan/rejected/`; поздние раунды F208-F229 и F231-F243 лежат только строками в таблице
+- `refactoring-plan/RESOLVED_LEDGER.md` — закрытие гипотез с доказательствами (теги file:line, коммиты)
+- `refactoring-plan/game-source-findings/` — G1-G4 (dead RadioStoryIntegration chain) + `GAME_SOURCE_REFERENCE.md` (mod→game API map)
+- `knowledge/` — скомпилированная база по API игры (21 файл: inventory/catalogs/classes/playbooks/qa), подключена как reference `uboat-kb` + skill `uboat-game-api`. Проверять до чтения исходников игры
+- `documents-readonly/` — первоисточники по радионавигации, не редактируются
+- `.opencode/opencode.json` — graphify.js plugin config for OpenCode

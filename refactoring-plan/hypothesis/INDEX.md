@@ -884,7 +884,8 @@ _Maтрица охватывает F01-F52. F53-F76 не имеют перекр
 
 Открытых пунктов нет. F208–F229 закрыты (F229 подтверждён live).
 
-**Гейты после правок:** `tests.ps1` 786 PASS / 0 fail (было 761); `RadioNavigation.Analyzers.Tests` 68 PASS (было 55); `RadioNavigation.SourceCheck` 51 PASS (было 44); `build.ps1` Build OK + PVS clean; `analyze.ps1 -Profile quick` baseline clean; `analyze.ps1 -RnAudit` clean (0 genuine).
+**Гейты на 2026-09-15 (исторический снимок):** `tests.ps1` 786 PASS / 0 fail (было 761); `RadioNavigation.Analyzers.Tests` 68 PASS (было 55); `RadioNavigation.SourceCheck` 51 PASS (было 44); `build.ps1` Build OK + PVS clean; `analyze.ps1 -Profile quick` baseline clean; `analyze.ps1 -RnAudit` clean (0 genuine).
+> Актуальные числа — в разделе «Пост-аудит 2026-09-25» ниже и в `AGENTS.md` § Gotchas.
 
 ---
 
