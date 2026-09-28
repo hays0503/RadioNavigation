@@ -126,6 +126,7 @@ namespace UBOAT.Mods.RadioNavigation
         // conversions would allocate a new delegate each frame.
         private Action<float> logArcInputDelegate;
         private Action<int, bool> setFiltersDelegate;
+        private Action toggleLensDelegate;
         private Action zoomInDelegate;
         private Action zoomOutDelegate;
         private Action resetArcDelegate;
@@ -155,6 +156,7 @@ namespace UBOAT.Mods.RadioNavigation
             inputPoller = new SextantInputPoller(arcInput, worksheet, starId);
             logArcInputDelegate = LogArcInputVector;
             setFiltersDelegate = SetFilters;
+            toggleLensDelegate = ToggleLens;
             zoomInDelegate = ZoomIn;
             zoomOutDelegate = ZoomOut;
             resetArcDelegate = ResetArc;
@@ -261,6 +263,7 @@ namespace UBOAT.Mods.RadioNavigation
                 inputPoller.PollArc(Time.unscaledDeltaTime, ref arcAngle, ShiftHeld(), logArcInputDelegate);
                 inputPoller.PollYawTrim(Time.unscaledDeltaTime, ShiftHeld());
                 inputPoller.PollFilters(setFiltersDelegate);
+                inputPoller.PollLens(toggleLensDelegate);
                 inputPoller.PollZoom(zoomInDelegate, zoomOutDelegate, resetArcDelegate);
                 UpdatePipPose();
                 if (vectorLog.OnViewRotate(viewCamera))
@@ -458,6 +461,14 @@ namespace UBOAT.Mods.RadioNavigation
             StarsMesh.Shielded = false;
             if (gameInput != null)
                 gameInput.RemoveBlockade(this);
+            // The disposable Phase-0 fixture is also on Default so Main Camera
+            // can serve as the unchanged-route control. Hide it when the
+            // sextant closes, while retaining one configured component per PIP
+            // for a clean reopen without duplicate effects.
+            pipFactory.SuspendSternspreizPhase0();
+            // The lens has no render-scope registration: disabling the effect
+            // components is enough, and the scene image returns to the pipeline.
+            pipFactory.SuspendLens();
             pipFactory.Detach();
             pipFactory.InteriorMirror.SetEnabled(false);
             SunDiscRenderer.Active = false;
@@ -479,6 +490,13 @@ namespace UBOAT.Mods.RadioNavigation
         internal SextantWorksheet WorksheetForProbe
         {
             get { return worksheet; }
+        }
+
+        internal string SternspreizPhase0SnapshotForProbe()
+        {
+            return pipFactory != null
+                ? pipFactory.SternspreizPhase0Snapshot()
+                : "null";
         }
 
         internal SextantStarId StarIdForProbe
@@ -886,6 +904,20 @@ namespace UBOAT.Mods.RadioNavigation
                 viewCamera != null ? viewCamera.fieldOfView / zoom.FovDivisor : 0f));
         }
 
+        /// <summary>Key 4: swing the Sternspreizglas lens in or out. The state
+        /// IS the PlayerPrefs gate the PIP factory reads every frame, so no
+        /// duplicate field is kept here.</summary>
+        internal void ToggleLens()
+        {
+            bool on = SternspreizLensEffect.Enabled;
+            PlayerPrefs.SetInt(SternspreizLensEffect.PrefsKey, on ? 0 : 1);
+            PlayerPrefs.Save();
+            UpdateFilterLabel();
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} LENS {1} lengthDeg={2:F2}", LogPrefix, on ? "off" : "on",
+                SternspreizLensEffect.LengthDeg));
+        }
+
         private void SetFilters(int count, bool leftSide)
         {
             if (leftSide)
@@ -1151,7 +1183,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (filterText == null)
                 return;
-            filterText.text = SextantReadout.FormatFilters(leftFilterCount, rightFilterCount);
+            filterText.text = SextantReadout.FormatFiltersAndLens(leftFilterCount,
+                rightFilterCount, SternspreizLensEffect.Enabled, SternspreizLensEffect.LengthDeg);
         }
 
         // ---- overlay construction (§13.3) lives in SextantOverlay (extracted) ----

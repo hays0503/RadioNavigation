@@ -111,6 +111,18 @@ namespace UBOAT.Mods.RadioNavigation
             else if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0)) setFilters(0, left);
         }
 
+        /// <summary>Sternspreizglas lens (key 4): the swinging 5th glass, so it
+        /// toggles like the shade filters next to it. Plain key only - Ctrl is
+        /// already the left-filter modifier.</summary>
+        public void PollLens(Action toggleLens)
+        {
+            if (Input.GetKeyDown(KeyCode.Alpha4) || Input.GetKeyDown(KeyCode.Keypad4))
+            {
+                if (toggleLens != null)
+                    toggleLens();
+            }
+        }
+
         public void PollZoom(Action zoomIn, Action zoomOut, Action resetArc)
         {
             if (Input.GetKeyDown(KeyCode.Equals) || Input.GetKeyDown(KeyCode.KeypadPlus))

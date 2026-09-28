@@ -34,6 +34,9 @@ Desktop.ini
 # pause_check audio artifacts (regenerable)
 Tools/pause_check/*.wav
 
+# SBP AssetBundle build log (regenerable)
+Bundles/buildlogtep.json
+
 # Local supermemory tool artifacts (contain key material)
 .supermemory/
 memory.txt

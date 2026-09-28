@@ -14,9 +14,14 @@
 | Архитектура (почему так, а не иначе) | `SAD/` — 11 глав |
 | Решения с фиксацией (ADR) | `docs/adr/` — 21 файл, ID 014–034 |
 | Планируемая работа | `refactoring-plan/` + корневые `*_PLAN.md` |
+| Sternspreizglas: Phase 0 runtime gate | `docs/sternspreiz-phase0.md` — opt-in probe, 15/15 live checks PASS; исключение TOD Sun отдельно не доказано |
+| Sternspreizglas: pure PSF math | `docs/sternspreiz-phase1-psf.md` — параметризованное горизонтальное ядро-кандидат; runtime/shader/Sun не подключены |
+| Sternspreizglas: Phase 1a source gate | `docs/sternspreiz-phase1a-source-suppression.md` — mode 3 live 2026-09-27: suppression scope PASS per PIP, Main intact; visual star-absence PARTIAL (native sky remains); redraw/Sun/PSF still gated |
+| Sternspreizglas: Phase 1b redraw gate | `docs/sternspreiz-phase1b-redraw-design.md` — live BLOCKED 2026-09-28 (меш не растеризуется; F-находка); mode 4 не production |
+| Sternspreizglas: Линза v1 | `docs/sternspreiz-lens-v1.md` — шейдер/материал в бандле, чистая математика (1204 тестов), PIP-эффект (алидадная половина), приёмка 2026-09-28, сужение и мягкий ромб подтверждены живьём (2026-11-07/08); наклон штрихов — интермиттентный, на свежем аттаче не воспроизводится (уточнено 2026-11-08); попутно найден и починен невидимый звёздный слой (проход шейдера + проекционный масштаб) |
 | Реестр найденных проблем | `refactoring-plan/hypothesis/INDEX.md` |
 | Знания об API игры UBOAT | `knowledge/` — 21 файл, 6 разделов |
-| Граф кода | `graphify-out/` (8187 узлов) |
+| Граф кода | `graphify-out/` (8371 узел) |
 
 ## 2. Архитектура — `SAD/`
 
@@ -97,7 +102,7 @@ F225 и F230 не использованы (пропуски после ревь
 
 ## 7. Граф кода — `graphify-out/`
 
-8187 узлов / 14591 ребро / 613 сообществ. Обновление: `graphify update .` (AST-only, без API).
+8371 узел / 14977 рёбер / 624 сообщества (2026-09-27). Обновление: `graphify update .` (AST-only, без API).
 
 **Чего там нет** (и не надо искать):
 
@@ -193,8 +198,8 @@ F225 и F230 не использованы (пропуски после ревь
 
 ## 10. Правила сопровождения
 
-1. **Счётчики проверяются прогоном, а не на память:** `tests.ps1` (1135),
-   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (74).
+1. **Счётчики проверяются прогоном, а не на память:** `tests.ps1` (1204),
+   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (79).
 2. **Новый ADR** = следующий свободный ID; дубли недопустимы, сводная строка
    добавляется в `SAD/12_Architecture_Decisions.md` § 1 в том же коммите.
 3. **Новая находка** = следующий свободный F-номер + строка в `hypothesis/INDEX.md`

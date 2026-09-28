@@ -3624,6 +3624,697 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Sternspreiz probes must remain opt-in. Mode 3 may suppress only the
+        /// StarSkyRoot renderer around each PIP render and is pass-through;
+        /// mode 4 may additionally redraw that same mesh with a flat
+        /// diagnostic tint. Neither mode processes/draws any other celestial
+        /// content nor alters Main Camera.
+        /// This source gate pins the diagnostic boundary, not live acceptance.
+        /// </summary>
+        [Fact]
+        public void Sternspreiz_Phase0IsProbeOnlyAndPipRouted()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var effect = FindSourceType(roots, "SternspreizPipProbeEffect");
+            var factory = FindSourceType(roots, "SextantPipFactory");
+            var pose = FindSourceType(roots, "SextantPipPose");
+            var probe = FindSourceType(roots, "SextantProbe");
+            var renderScope = FindSourceType(roots, "SternspreizPipRenderScopePatch");
+            var installer = FindSourceType(roots, "HarmonyPatchInstaller");
+
+            if (effect == null)
+            {
+                problems.Add("SternspreizPipProbeEffect is missing");
+            }
+            else
+            {
+                string bases = effect.BaseList == null ? string.Empty : effect.BaseList.ToString();
+                if (bases.IndexOf("IOpaqueImageEffect", StringComparison.Ordinal) < 0)
+                    problems.Add("Phase-0 effect no longer implements UBOAT IOpaqueImageEffect");
+                if (effect.ToString().IndexOf("GetInt(PrefsKey, 0)", StringComparison.Ordinal) < 0)
+                    problems.Add("Probe preference must default to OFF (PlayerPrefs.GetInt(..., 0))");
+                if (effect.ToString().IndexOf("StarSourceSuppressionMode", StringComparison.Ordinal) < 0)
+                    problems.Add("Actual StarSkyRoot suppression must remain an explicit opt-in mode");
+                if (effect.ToString().IndexOf("StarRedrawMode", StringComparison.Ordinal) < 0)
+                    problems.Add("Phase-1b star redraw must remain an explicit opt-in mode");
+                var configureProbe = FindMethod(effect, "CreateRedrawMaterial");
+                if (configureProbe == null
+                    || configureProbe.ToString().IndexOf(".mainTexture",
+                        StringComparison.Ordinal) < 0)
+                    problems.Add("Phase-1b redraw material must sample a texture, or untextured quads add nothing");
+                var shaderResolver = FindMethod(effect, "ResolveProbeShader");
+                if (shaderResolver == null
+                    || shaderResolver.ToString().IndexOf("Hidden/Internal-Colored", StringComparison.Ordinal) < 0
+                    || shaderResolver.ToString().IndexOf("Sprites/Default", StringComparison.Ordinal) < 0)
+                    problems.Add("Probe fixture must use the live-available built-in color shader with fallback, not stripped Unlit/Color");
+                var callback = FindMethod(effect, "RenderImageOpaque");
+                if (callback == null)
+                {
+                    problems.Add("RenderImageOpaque callback is missing");
+                }
+                else
+                {
+                    string parameters = callback.ParameterList.ToString();
+                    foreach (string required in new[] { "source", "destination", "zBuffer" })
+                    {
+                        if (parameters.IndexOf(required, StringComparison.Ordinal) < 0)
+                            problems.Add("RenderImageOpaque no longer receives " + required);
+                    }
+                    var execute = FindMethod(effect, "ExecuteProbeDraw");
+                    if (!InvokesName(callback, "ExecuteProbeDraw"))
+                        problems.Add("RenderImageOpaque no longer owns callback execution");
+                    if (execute == null || !InvokesName(execute, "Blit"))
+                        problems.Add("Phase-0 callback no longer copies source to destination");
+                    if (execute == null || !InvokesName(execute, "QueueSentinelDraws"))
+                        problems.Add("Phase-0 callback no longer dispatches its test mesh draws");
+                    if (execute == null
+                        || execute.ToString().IndexOf("mode == CustomDrawMode", StringComparison.Ordinal) < 0
+                        || execute.ToString().IndexOf("StarSourceSuppressionMode", StringComparison.Ordinal) >= 0)
+                        problems.Add("Mode 3 must stay pass-through and never dispatch the sentinel draw");
+                    if (execute == null
+                        || execute.ToString().IndexOf("StarRedrawMode", StringComparison.Ordinal) < 0
+                        || !InvokesName(execute, "DrawStarsMesh"))
+                        problems.Add("Mode 4 must redraw only the existing star mesh after suppression");
+                    var drawStars = FindMethod(effect, "DrawStarsMesh");
+                    if (drawStars == null
+                        || !drawStars.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                            .Any(inv => CalledName(inv) == "DrawMesh"
+                                && inv.ArgumentList.Arguments.Count > 0
+                                && inv.ArgumentList.Arguments[0].Expression.ToString() == "starsMesh"))
+                        problems.Add("Phase-1b redraw must draw the shared star mesh, not a copy or the sentinel");
+                    if (drawStars != null)
+                    {
+                        string drawStarsText = drawStars.ToString();
+                        if (drawStarsText.IndexOf("Matrix4x4.identity", StringComparison.Ordinal) < 0
+                            || drawStarsText.IndexOf("starRedrawMaterial", StringComparison.Ordinal) < 0
+                            || drawStarsText.IndexOf("sentinelMesh", StringComparison.Ordinal) >= 0)
+                            problems.Add("Phase-1b redraw must use identity matrix and the tint material, never the sentinel");
+                    }
+                    string callbackText = callback.ToString();
+                    int offGate = callbackText.IndexOf("if (mode == 0)", StringComparison.Ordinal);
+                    int executeCall = callbackText.IndexOf("ExecuteProbeDraw", StringComparison.Ordinal);
+                    if (offGate < 0 || executeCall < 0 || offGate > executeCall
+                        || callbackText.IndexOf("return;", offGate, StringComparison.Ordinal) < 0)
+                        problems.Add("OFF mode must return before any callback blit/draw");
+                    if (callbackText.IndexOf("IsSourceSuppressedForCurrentRender",
+                            StringComparison.Ordinal) < 0
+                        || callbackText.IndexOf("registered-source-not-suppressed-for-current-pip-render",
+                            StringComparison.Ordinal) < 0
+                        || callbackText.IndexOf("StarSourceSuppressionMode", StringComparison.Ordinal) < 0
+                        || callbackText.IndexOf("StarRedrawMode", StringComparison.Ordinal) < 0)
+                        problems.Add("Modes 2/3/4 must require current-frame suppression of the registered source");
+                }
+                var drawAtTransform = FindMethod(effect, "DrawAtTransform");
+                if (drawAtTransform == null
+                    || !drawAtTransform.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                        .Any(inv => CalledName(inv) == "DrawMesh"
+                            && inv.ArgumentList.Arguments.Count > 0
+                            && inv.ArgumentList.Arguments[0].Expression.ToString() == "sentinelMesh"))
+                    problems.Add("Visible DrawMesh must use the shared sentinel source mesh");
+                var depthDraw = FindMethod(effect, "DrawBehindOccluder");
+                if (depthDraw == null
+                    || !InvokesName(depthDraw, "WorldToViewportPoint")
+                    || !InvokesName(depthDraw, "ViewportToWorldPoint")
+                    || depthDraw.ToString().IndexOf("depthOccluderTransform.rotation",
+                        StringComparison.Ordinal) < 0
+                    || depthDraw.ToString().IndexOf("depthOccluderTransform.lossyScale",
+                        StringComparison.Ordinal) < 0
+                    || !depthDraw.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                        .Any(inv => CalledName(inv) == "DrawMesh"
+                            && inv.ArgumentList.Arguments.Count > 0
+                            && inv.ArgumentList.Arguments[0].Expression.ToString() == "sentinelMesh"))
+                    problems.Add("Depth DrawMesh must share the occluder's projected ray and reuse the sentinel mesh");
+                string effectText = effect.ToString();
+                foreach (string forbidden in new[] { "SternspreizPsf", "StarStreak", "RebuildMesh" })
+                {
+                    if (effectText.IndexOf(forbidden, StringComparison.Ordinal) >= 0)
+                        problems.Add("Probe effect contains production PSF/celestial mutation token: " + forbidden);
+                }
+                foreach (string celestial in new[] { "TOD_", "SunDisc", "MoonDisc", "PlanetRenderer", "ConstellationMesh" })
+                {
+                    if (effectText.IndexOf(celestial, StringComparison.Ordinal) >= 0)
+                        problems.Add("Probe effect must not select/process celestial content beyond StarSkyRoot: " + celestial);
+                }
+            }
+
+            if (factory == null)
+            {
+                problems.Add("SextantPipFactory is missing");
+            }
+            else
+            {
+                var ensureEffect = FindMethod(factory, "EnsurePhase0Effect");
+                if (ensureEffect == null
+                    || ensureEffect.ToString().IndexOf("ComponentName", StringComparison.Ordinal) < 0
+                    || ensureEffect.ToString().IndexOf("AddComponent<SternspreizPipProbeEffect>",
+                        StringComparison.Ordinal) < 0)
+                    problems.Add("PIP effect attachment must check the component type name before AddComponent");
+                var prepare = FindMethod(factory, "PrepareSternspreizPhase0");
+                if (prepare == null || !InvokesName(prepare, "TryCreateSternspreizPhase0")
+                    || !InvokesName(prepare, "SetPhase0RenderTarget"))
+                    problems.Add("Sternspreiz setup and per-mode source registration must be owned by SextantPipFactory");
+                if (prepare == null
+                    || prepare.ToString().IndexOf("StarRedrawMode", StringComparison.Ordinal) < 0)
+                    problems.Add("Mode 4 must hide the disposable fixture and reuse the StarSkyRoot registration");
+                var findStarsRenderer = FindMethod(factory, "FindStarsMeshRenderer");
+                if (findStarsRenderer == null
+                    || !InvokesName(findStarsRenderer, "FindStarsMeshFilter")
+                    || findStarsRenderer.ToString().IndexOf("GetComponent<MeshRenderer>", StringComparison.Ordinal) < 0)
+                    problems.Add("Mode 3 must target the existing StarSkyRoot MeshRenderer, not a copied star source");
+                var setRenderTarget = FindMethod(factory, "SetPhase0RenderTarget");
+                if (setRenderTarget == null
+                    || setRenderTarget.ToString().IndexOf("StarSourceSuppressionMode", StringComparison.Ordinal) < 0
+                    || setRenderTarget.ToString().IndexOf("StarRedrawMode", StringComparison.Ordinal) < 0
+                    || setRenderTarget.ToString().IndexOf("FindStarsMeshRenderer", StringComparison.Ordinal) < 0
+                    || setRenderTarget.ToString().IndexOf("UnregisterPhase0RenderTarget", StringComparison.Ordinal) < 0
+                    || setRenderTarget.ToString().IndexOf("Register(LeftCamera", StringComparison.Ordinal) < 0
+                    || setRenderTarget.ToString().IndexOf("Register(RightCamera", StringComparison.Ordinal) < 0)
+                    problems.Add("Modes 3/4 must replace the registered renderer with StarSkyRoot on both PIPs");
+                var unregisterTarget = FindMethod(factory, "UnregisterPhase0RenderTarget");
+                if (unregisterTarget == null
+                    || !InvokesName(unregisterTarget, "Unregister")
+                    || unregisterTarget.ToString().IndexOf("phase0RegisteredRenderer = null", StringComparison.Ordinal) < 0)
+                    problems.Add("The actual-source registration must be released on OFF/close/teardown");
+                var fixture = FindMethod(factory, "CreateSternspreizPhase0Fixture");
+                if (fixture == null || !InvokesName(fixture, "CreatePhase0SentinelMesh"))
+                    problems.Add("Phase-0 fixture must create its one shared, isolated sentinel mesh");
+                var route = FindMethod(factory, "CanRoutePhase0Fixture");
+                if (route == null || !InvokesName(route, "PassesContainLayer")
+                    || route.ToString().IndexOf("viewCamera.cullingMask", StringComparison.Ordinal) < 0
+                    || route.ToString().IndexOf("LeftCamera.cullingMask", StringComparison.Ordinal) < 0
+                    || route.ToString().IndexOf("RightCamera.cullingMask", StringComparison.Ordinal) < 0)
+                    problems.Add("Fixture routing must validate the shared Default bit in Main/PIP camera masks and PIP passes");
+                if (factory.ToString().IndexOf("FindUnusedIncludedLayer", StringComparison.Ordinal) >= 0
+                    || factory.ToString().IndexOf("LayerToName", StringComparison.Ordinal) >= 0)
+                    problems.Add("Fixture routing must not require a custom unnamed layer unavailable in the live game");
+                var destroy = FindMethod(factory, "Destroy");
+                if (destroy == null || !InvokesName(destroy, "DestroySternspreizPhase0"))
+                    problems.Add("PIP factory teardown must own Phase-0 resource cleanup");
+                var suspend = FindMethod(factory, "SuspendSternspreizPhase0");
+                if (suspend == null
+                    || suspend.ToString().IndexOf("UnregisterPhase0RenderTarget", StringComparison.Ordinal) < 0
+                    || suspend.ToString().IndexOf("SetPhase0SourcesEnabled(false)", StringComparison.Ordinal) < 0
+                    || suspend.ToString().IndexOf("SetPhase0EffectsEnabled(false)", StringComparison.Ordinal) < 0)
+                    problems.Add("Closing the sextant must unregister the source and disable both callbacks/fixture renderers");
+                var close = FindMethod(FindSourceType(roots, "SextantController"), "Close");
+                if (close == null || !InvokesName(close, "SuspendSternspreizPhase0"))
+                    problems.Add("Sextant Close must suspend Phase-0 fixture renderers to keep Main Camera clean");
+            }
+
+            if (renderScope == null)
+            {
+                problems.Add("PIP-local source suppression patch is missing");
+            }
+            else
+            {
+                var patchCameraMethod = FindMethod(renderScope, "PatchCameraMethod");
+                var applyRenderScope = FindMethod(renderScope, "Apply");
+                var beginRender = FindMethod(renderScope, "BeginCameraRender");
+                var completeRender = FindMethod(renderScope, "CompleteCameraRender");
+                var currentSuppression = FindMethod(renderScope, "IsSourceSuppressedForCurrentRender");
+                if (patchCameraMethod == null
+                    || patchCameraMethod.ToString().IndexOf("ScriptableRenderContext", StringComparison.Ordinal) < 0
+                    || patchCameraMethod.ToString().IndexOf("typeof(Camera)", StringComparison.Ordinal) < 0)
+                    problems.Add("PIP-local hook must target DeepPipeline camera render methods by signature");
+                if (applyRenderScope == null
+                    || applyRenderScope.ToString().IndexOf("RenderDeferredCamera", StringComparison.Ordinal) < 0
+                    || applyRenderScope.ToString().IndexOf("RenderForwardCamera", StringComparison.Ordinal) < 0)
+                    problems.Add("PIP-local hook must install both deferred and forward camera render wrappers");
+                if (beginRender == null
+                    || beginRender.ToString().IndexOf("CustomDrawMode", StringComparison.Ordinal) < 0
+                    || beginRender.ToString().IndexOf("StarSourceSuppressionMode", StringComparison.Ordinal) < 0
+                    || beginRender.ToString().IndexOf("StarRedrawMode", StringComparison.Ordinal) < 0
+                    || beginRender.ToString().IndexOf("Renderer renderer = target.Renderer", StringComparison.Ordinal) < 0
+                    || beginRender.ToString().IndexOf("renderer.enabled = false", StringComparison.Ordinal) < 0)
+                    problems.Add("Only Modes 2/3/4 may disable the registered renderer inside the PIP scope");
+                if (completeRender == null
+                    || completeRender.ToString().IndexOf("target.Renderer.enabled = true", StringComparison.Ordinal) < 0
+                    || completeRender.ToString().IndexOf("RestorationCount++", StringComparison.Ordinal) < 0)
+                    problems.Add("PIP source renderer must be restored and counted when the render scope exits");
+                if (currentSuppression == null
+                    || currentSuppression.ToString().IndexOf("LastSuppressionFrame == Time.frameCount",
+                        StringComparison.Ordinal) < 0)
+                    problems.Add("Source-suppression evidence must belong to the current PIP frame");
+                if (renderScope.ToString().IndexOf("rendererName", StringComparison.Ordinal) < 0
+                    || renderScope.ToString().IndexOf("rendererId", StringComparison.Ordinal) < 0)
+                    problems.Add("Runtime evidence must identify which renderer each PIP suppresses");
+                foreach (string celestial in new[] { "TOD_", "SunDisc", "MoonDisc", "PlanetRenderer", "ConstellationMesh" })
+                {
+                    if (renderScope.ToString().IndexOf(celestial, StringComparison.Ordinal) >= 0)
+                        problems.Add("Render scope must not select/process celestial content beyond StarSkyRoot: " + celestial);
+                }
+                var apply = FindMethod(installer, "Apply");
+                if (apply == null
+                    || apply.ToString().IndexOf("SternspreizPipRenderScopePatch.Apply", StringComparison.Ordinal) < 0)
+                    problems.Add("Startup must install the PIP-local source suppression hooks");
+            }
+
+            if (pose == null)
+            {
+                problems.Add("SextantPipPose is missing");
+            }
+            else
+            {
+                var update = FindMethod(pose, "Update");
+                var sync = FindMethod(pose, "SyncCameraState");
+                if (update == null || sync == null
+                    || !InvokesName(update, "PrepareSternspreizPhase0"))
+                    problems.Add("Probe setup must precede the PIP camera-mask update");
+                if (sync != null)
+                {
+                    string syncText = sync.ToString();
+                    if (syncText.IndexOf("ApplyMaskToPasses", StringComparison.Ordinal) < 0
+                        || syncText.IndexOf("cam.cullingMask", StringComparison.Ordinal) < 0
+                        || syncText.IndexOf("Sternspreiz", StringComparison.Ordinal) >= 0
+                        || syncText.IndexOf("probeLayer", StringComparison.Ordinal) >= 0)
+                        problems.Add("Normal PIP masks stay synchronized; Phase-0 suppression must not rewrite either camera mask");
+                    if (syncText.IndexOf("MainCamera", StringComparison.Ordinal) >= 0)
+                        problems.Add("PIP route must not write Main Camera state");
+                }
+            }
+
+            var snapshot = probe != null ? FindMethod(probe, "Snapshot") : null;
+            if (snapshot == null
+                || snapshot.ToString().IndexOf("SternspreizPhase0SnapshotForProbe",
+                    StringComparison.Ordinal) < 0)
+                problems.Add("Existing sextant snapshot must expose the Phase-0 evidence");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} Sternspreiz Phase-0 source-gate violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Phase 1 is only a Unity-free math candidate (kernel + field
+        /// convolution). Until the source-mask route is proven and a runtime
+        /// stage is explicitly selected, keep that math disconnected from
+        /// every mod runtime source.
+        /// </summary>
+        [Fact]
+        public void Sternspreiz_Phase1MathRemainsPureAndOffline()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var math = FindSourceType(roots, "SternspreizPsfMath");
+            if (math == null)
+            {
+                problems.Add("SternspreizPsfMath is missing");
+            }
+            else
+            {
+                var method = FindMethod(math, "BuildHorizontalLineSpreadKernel");
+                if (method == null || !method.Modifiers.Any(SyntaxKind.StaticKeyword))
+                    problems.Add("Phase-1 kernel must remain a static pure-math method");
+
+                var unit = math.SyntaxTree.GetRoot() as CompilationUnitSyntax;
+                if (unit != null)
+                {
+                    foreach (var directive in unit.Usings)
+                    {
+                        string usedNamespace = directive.Name.ToString();
+                        if (usedNamespace.StartsWith("UnityEngine", StringComparison.Ordinal)
+                            || usedNamespace.StartsWith("UBOAT.", StringComparison.Ordinal)
+                            || usedNamespace.StartsWith("DWS.", StringComparison.Ordinal))
+                            problems.Add("Phase-1 math imports runtime API: " + usedNamespace);
+                    }
+                }
+            }
+
+            foreach (var root in roots)
+            {
+                foreach (var identifier in root.Item2.DescendantNodes()
+                    .OfType<IdentifierNameSyntax>())
+                {
+                    if (identifier.Identifier.Text != "SternspreizPsfMath"
+                        && identifier.Identifier.Text != "BuildHorizontalLineSpreadKernel"
+                        && identifier.Identifier.Text != "ConvolveHorizontalField")
+                        continue;
+
+                    bool insideMathType = identifier.Ancestors()
+                        .OfType<TypeDeclarationSyntax>()
+                        .Any(type => type.Identifier.Text == "SternspreizPsfMath");
+                    if (!insideMathType)
+                        problems.Add("Runtime source references the isolated phase-1 math: "
+                            + root.Item1);
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} Sternspreiz Phase-1 boundary violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Hiding the game's decorative star sphere must be fail-safe: only
+        /// while the mod's own catalog sky actually draws with the bundled
+        /// shader, patched onto TOD_Sky.LateUpdate, and revertible by
+        /// preference.
+        /// </summary>
+        [Fact]
+        public void StarLayerSuppression_IsFailSafeAndPatchesTodSky()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var policy = FindSourceType(roots, "StarLayerSuppression");
+            var suppressor = FindSourceType(roots, "GameStarLayerSuppressor");
+            var stars = FindSourceType(roots, "StarsMesh");
+            var installer = FindSourceType(roots, "HarmonyPatchInstaller");
+
+            if (policy == null)
+                problems.Add("StarLayerSuppression decision is missing");
+            else
+            {
+                string text = policy.ToString();
+                if (text.IndexOf("\"TOD_StarVisibility\"", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppression must zero the verified TOD global name");
+                var shouldHide = FindMethod(policy, "ShouldHide");
+                if (shouldHide == null
+                    || shouldHide.ToString().IndexOf("&&", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppression decision must require BOTH the preference and our active sky");
+            }
+
+            if (suppressor == null)
+            {
+                problems.Add("GameStarLayerSuppressor is missing");
+            }
+            else
+            {
+                string text = suppressor.ToString();
+                if (text.IndexOf("\"TOD_Sky\"", StringComparison.Ordinal) < 0
+                    || text.IndexOf("\"LateUpdate\"", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppressor must patch TOD_Sky.LateUpdate (postfix after the game writes the global)");
+                if (text.IndexOf("GetInt(PrefsKey, 1)", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppressor preference must default to ON while our sky is authoritative");
+                var postfix = FindMethod(suppressor, "AfterSkyLateUpdate");
+                if (postfix == null
+                    || !InvokesName(postfix, "ShouldHide")
+                    || postfix.ToString().IndexOf("StarsMesh.UsesBundledStarShader", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppressor postfix must gate on our own sky being drawn (fail-safe)");
+                if (postfix == null
+                    || !InvokesName(postfix, "SetGlobalFloat")
+                    || postfix.ToString().IndexOf("PropertyToID", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppressor postfix must zero the cached TOD global");
+            }
+
+            if (stars == null
+                || stars.ToString().IndexOf("UsesBundledStarShader", StringComparison.Ordinal) < 0)
+                problems.Add("StarsMesh must report when the bundled star shader is actually in use");
+
+            var apply = installer != null ? FindMethod(installer, "Apply") : null;
+            if (apply == null
+                || apply.ToString().IndexOf("GameStarLayerSuppressor.Apply", StringComparison.Ordinal) < 0)
+                problems.Add("Startup must install the game-star suppression postfix");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} game-star suppression violation(s):\n" + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// The Sternspreiz lens must stay an opt-in PIP-only feature: catalog
+        /// streaks drawn through the proven IOpaqueImageEffect path, gated by
+        /// the sky state, sized in angles (not pixels), loaded through the
+        /// bundle ladder with a built-in fallback, and never touching the star
+        /// mesh, Main Camera or a per-frame catalog rebuild.
+        /// </summary>
+        [Fact]
+        public void Sternspreiz_LensIsOptInPipOnlyAndGated()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var lens = FindSourceType(roots, "SternspreizLensEffect");
+            var field = FindSourceType(roots, "SternspreizLensField");
+            var profile = FindSourceType(roots, "SternspreizLineProfile");
+            var factory = FindSourceType(roots, "SextantPipFactory");
+            var pose = FindSourceType(roots, "SextantPipPose");
+            var controller = FindSourceType(roots, "SextantController");
+
+            if (lens == null)
+            {
+                problems.Add("SternspreizLensEffect is missing");
+            }
+            else
+            {
+                string bases = lens.BaseList == null ? string.Empty : lens.BaseList.ToString();
+                if (bases.IndexOf("IOpaqueImageEffect", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens must draw through UBOAT's IOpaqueImageEffect");
+                string lensText = lens.ToString();
+                if (lensText.IndexOf("GetInt(PrefsKey, 0)", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens preference must default to OFF (PlayerPrefs.GetInt(..., 0))");
+
+                var callback = FindMethod(lens, "RenderImageOpaque");
+                if (callback == null)
+                {
+                    problems.Add("Lens RenderImageOpaque callback is missing");
+                }
+                else if (!InvokesName(callback, "CanSightSky")
+                    || !InvokesName(callback, "DrawStreaks"))
+                {
+                    problems.Add("Lens callback must gate on CanSightSky and then draw the streaks");
+                }
+
+                var canSight = FindMethod(lens, "CanSightSky");
+                if (canSight == null
+                    || canSight.ToString().IndexOf("SkyVisibilityResolver.IsPlayerOutside", StringComparison.Ordinal) < 0
+                    || canSight.ToString().IndexOf("SextantController.IsOpen", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens must gate on the shared outside/map resolver and the open sextant");
+
+                var draw = FindMethod(lens, "DrawStreaks");
+                if (draw == null
+                    || !InvokesName(draw, "DrawMesh")
+                    || draw.ToString().IndexOf("Blit", StringComparison.Ordinal) < 0
+                    || draw.ToString().IndexOf("SetViewProjectionMatrices", StringComparison.Ordinal) < 0
+                    || draw.ToString().IndexOf("worldToCameraMatrix", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens must pass the image through then draw with the PIP camera matrices");
+                if (draw == null
+                    || draw.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                        .All(inv => CalledName(inv) != "DrawMesh"
+                            || inv.ArgumentList.Arguments.Count < 1
+                            || inv.ArgumentList.Arguments[0].Expression.ToString() != "streakMesh"))
+                    problems.Add("Lens DrawMesh must draw the lens-owned streak mesh, not a foreign mesh");
+
+                var ensureMaterial = FindMethod(lens, "EnsureMaterial");
+                if (ensureMaterial == null
+                    || ensureMaterial.ToString().IndexOf("LoadBundleAsset", StringComparison.Ordinal) < 0
+                    || ensureMaterial.ToString().IndexOf("Shader.Find(\"Sprites/Default\")", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens material must come from the bundle with a built-in fallback");
+                if (lensText.IndexOf("HasProperty", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens must verify material properties before writing them (silent no-ops)");
+
+                foreach (string forbidden in new[] { "StarSkyRoot", "RebuildMesh", "Camera.main", "MainCamera" })
+                {
+                    if (lensText.IndexOf(forbidden, StringComparison.Ordinal) >= 0)
+                        problems.Add("Lens must not touch the celestial mesh or Main Camera: " + forbidden);
+                }
+                if (lensText.IndexOf("SizePx", StringComparison.Ordinal) >= 0)
+                    problems.Add("Lens must not size streaks by the point-sprite pixel size");
+            }
+
+            if (field == null || profile == null)
+            {
+                problems.Add("Lens field/profile math is missing");
+            }
+            else
+            {
+                foreach (var candidate in new[] { field, profile })
+                {
+                    var unit = candidate.SyntaxTree.GetRoot() as CompilationUnitSyntax;
+                    if (unit == null)
+                        continue;
+                    foreach (var directive in unit.Usings)
+                    {
+                        string used = directive.Name.ToString();
+                        if (used.StartsWith("UnityEngine", StringComparison.Ordinal)
+                            || used.StartsWith("UBOAT.", StringComparison.Ordinal)
+                            || used.StartsWith("DWS.", StringComparison.Ordinal))
+                            problems.Add("Lens math must stay Unity-free: " + candidate.Identifier.Text + " imports " + used);
+                    }
+                }
+                if (field.ToString().IndexOf("AngularWidthMeters", StringComparison.Ordinal) < 0
+                    || field.ToString().IndexOf("LineLengthDeg", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens field must size streaks by angular length, not by pixels");
+            }
+
+            if (factory == null)
+            {
+                problems.Add("SextantPipFactory is missing");
+            }
+            else
+            {
+                var prepare = FindMethod(factory, "PrepareLens");
+                if (prepare == null
+                    || prepare.ToString().IndexOf("SternspreizLensEffect.Enabled", StringComparison.Ordinal) < 0
+                    || !InvokesName(prepare, "EnsureAndConfigureLens"))
+                    problems.Add("Lens attachment must be driven by the PIP factory on the preference gate");
+                if (prepare == null
+                    || prepare.ToString().IndexOf("RightCamera", StringComparison.Ordinal) < 0
+                    || prepare.ToString().IndexOf("LeftCamera", StringComparison.Ordinal) >= 0)
+                    problems.Add("The glass sits in the index beam: only the alidade (right) PIP may carry the lens");
+                var suspend = FindMethod(factory, "SuspendLens");
+                if (suspend == null
+                    || suspend.ToString().IndexOf("SetLensEffectsEnabled(false)", StringComparison.Ordinal) < 0)
+                    problems.Add("Closing the sextant must disable both lens effects");
+                var destroy = FindMethod(factory, "Destroy");
+                if (destroy == null || !InvokesName(destroy, "DestroyLens"))
+                    problems.Add("PIP factory teardown must release the lens effect and its resources");
+                var remove = FindMethod(factory, "RemoveLensEffect");
+                if (remove == null
+                    || remove.ToString().IndexOf("SternspreizLensEffect.ComponentName", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens removal must be copy-agnostic (type-name check)");
+            }
+
+            if (pose != null)
+            {
+                var update = FindMethod(pose, "Update");
+                if (update == null || !InvokesName(update, "PrepareLens"))
+                    problems.Add("The per-frame PIP pose update must drive the lens");
+            }
+
+            if (controller != null)
+            {
+                var close = FindMethod(controller, "Close");
+                if (close == null || !InvokesName(close, "SuspendLens"))
+                    problems.Add("Sextant Close must suspend the lens effect");
+
+                var toggle = FindMethod(controller, "ToggleLens");
+                if (toggle == null
+                    || toggle.ToString().IndexOf("SternspreizLensEffect.PrefsKey", StringComparison.Ordinal) < 0)
+                    problems.Add("Key 4 must toggle the lens through the SternspreizLensEffect.PrefsKey gate");
+
+                var label = FindMethod(controller, "UpdateFilterLabel");
+                if (label == null
+                    || label.ToString().IndexOf("FormatFiltersAndLens", StringComparison.Ordinal) < 0
+                    || label.ToString().IndexOf("SternspreizLensEffect.Enabled", StringComparison.Ordinal) < 0)
+                    problems.Add("The readout label must fold the lens state into FormatFiltersAndLens");
+            }
+
+            var poller = FindSourceType(roots, "SextantInputPoller");
+            if (poller == null)
+            {
+                problems.Add("SextantInputPoller is missing");
+            }
+            else
+            {
+                var pollLens = FindMethod(poller, "PollLens");
+                if (pollLens == null
+                    || pollLens.ToString().IndexOf("Alpha4", StringComparison.Ordinal) < 0
+                    || pollLens.ToString().IndexOf("Keypad4", StringComparison.Ordinal) < 0)
+                    problems.Add("Key 4 must be polled as Alpha4/Keypad4 in SextantInputPoller.PollLens");
+            }
+
+            var help = FindSourceType(roots, "SextantHelpPanel");
+            if (help == null
+                || help.ToString().IndexOf("RadioNav.SternspreizLengthDeg", StringComparison.Ordinal) < 0)
+                problems.Add("The help panel must document key 4 (RadioNav.SternspreizLengthDeg anchor)");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} Sternspreiz lens violation(s):\n" + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// The streak sprite must be baked as a 2-D alpha map (columns along the
+        /// line, rows across it) so pass 0 - the only pass the lens draws - renders
+        /// the width taper. A 1-pixel-tall texture is exactly the bug: pass 0's
+        /// fragment is tex2D(_MainTex, uv) * i.color, so the taper only exists if
+        /// the baked profile carries it across the line.
+        /// </summary>
+        [Fact]
+        public void Sternspreiz_StreakProfileIsBakedWithWidthTaper()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var lens = FindSourceType(roots, "SternspreizLensEffect");
+            var profile = FindSourceType(roots, "SternspreizLineProfile");
+
+            if (profile == null)
+            {
+                problems.Add("SternspreizLineProfile is missing");
+            }
+            else
+            {
+                foreach (string taper in new[]
+                {
+                    "DefaultStreakRows", "DefaultWidthTaper", "DefaultMinWidth", "DefaultCoreFraction"
+                })
+                {
+                    if (!HasFieldNamed(profile, taper))
+                        problems.Add("SternspreizLineProfile must expose the taper parameter: " + taper);
+                }
+            }
+
+            if (lens == null)
+            {
+                problems.Add("SternspreizLensEffect is missing");
+            }
+            else
+            {
+                var ensure = FindMethod(lens, "EnsureProfile");
+                if (ensure == null)
+                {
+                    problems.Add("SternspreizLensEffect.EnsureProfile is missing");
+                }
+                else if (!InvokesName(ensure, "BuildStreakAlphaMap"))
+                {
+                    problems.Add(
+                        "EnsureProfile must bake the 2-D alpha map from SternspreizLineProfile.BuildStreakAlphaMap");
+                }
+                else if (Texture2DHeightIsOne(ensure))
+                {
+                    problems.Add(
+                        "EnsureProfile must bake a multi-row texture (rows >= 2): a 1-pixel-tall profile has no width taper");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} Sternspreiz streak-profile violation(s):\n" + string.Join("\n", problems));
+        }
+
+        private static bool HasFieldNamed(TypeDeclarationSyntax type, string name)
+        {
+            if (type == null)
+                return false;
+            foreach (var field in type.Members.OfType<FieldDeclarationSyntax>())
+            {
+                foreach (var variable in field.Declaration.Variables)
+                {
+                    if (variable.Identifier.Text == name)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool Texture2DHeightIsOne(MethodDeclarationSyntax method)
+        {
+            foreach (var creation in method.DescendantNodes().OfType<ObjectCreationExpressionSyntax>())
+            {
+                if (creation.Type.ToString() != "Texture2D")
+                    continue;
+                if (creation.ArgumentList == null || creation.ArgumentList.Arguments.Count < 2)
+                    return true;
+                var height = creation.ArgumentList.Arguments[1].Expression;
+                var literal = height as LiteralExpressionSyntax;
+                if (literal != null)
+                {
+                    object value = literal.Token.Value;
+                    if (value is int && (int)value < 2)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Pain-latch gate (SRP slice 4d): glare application flows
         /// SextantController.UpdateGlare -&gt; SextantGlareCoordinator.Update -&gt;
         /// ApplyGlare. A re-inline of the hysteresis fails here.

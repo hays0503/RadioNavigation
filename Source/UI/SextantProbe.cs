@@ -34,6 +34,8 @@ namespace UBOAT.Mods.RadioNavigation
                   .Append(",\"right\":").Append(controller.RightFilterCount).Append('}');
                 sb.Append(",\"calibrationMin\":").Append(Num(SunEphemerisCalibration.DeltaMinutes));
                 sb.Append(",\"moonDiag\":").Append(MoonDiagEnabled() ? "true" : "false");
+                sb.Append(",\"sternspreizPhase0\":")
+                  .Append(controller.SternspreizPhase0SnapshotForProbe());
                 // Keyboard aim trim (2026-11-04): visible so the live check can
                 // read the exact value the ←→ keys produce.
                 sb.Append(",\"yawTrimDeg\":").Append(Num(SextantPipPose.YawTrimDeg));

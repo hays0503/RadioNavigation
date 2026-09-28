@@ -42,6 +42,17 @@ namespace UBOAT.Mods.RadioNavigation
             // PIP render pass at one GBuffer writer (§16.21). Non-fatal - a
             // miss only leaves the old shared-_GBufferZ behaviour.
             PipCloneCameraPatch.Apply(harmony);
+
+            // Phase-0-only per-PIP scope: temporarily disables only the
+            // disposable Sternspreiz source renderer around its DeepPipeline
+            // camera render, with a finalizer restoring it on every exit.
+            SternspreizPipRenderScopePatch.Apply(harmony);
+
+            // Separate target assembly (com.uboat.dependencies): hides the
+            // game's decorative star sphere while the mod's catalog sky is the
+            // visible one. Non-fatal, and fail-safe (only zeroes the global
+            // once StarsMesh confirms it draws with the bundled shader).
+            GameStarLayerSuppressor.Apply(harmony);
         }
 
         private static PatchTarget[] ResolveTargets()

@@ -67,6 +67,43 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void FormatLens_Off_ReturnsEmpty()
+        {
+            Assert.Equal("", SextantReadout.FormatLens(false, 0.35f));
+        }
+
+        [Fact]
+        public void FormatLens_On_ShowsLength()
+        {
+            string text = SextantReadout.FormatLens(true, 0.35f);
+
+            Assert.Contains("0.35", text);
+        }
+
+        [Fact]
+        public void FormatFiltersAndLens_LensOnly_EqualsLens()
+        {
+            Assert.Equal(SextantReadout.FormatLens(true, 0.35f),
+                SextantReadout.FormatFiltersAndLens(0, 0, true, 0.35f));
+        }
+
+        [Fact]
+        public void FormatFiltersAndLens_FiltersOnly_EqualsFilters()
+        {
+            Assert.Equal(SextantReadout.FormatFilters(1, 0),
+                SextantReadout.FormatFiltersAndLens(1, 0, false, 0.35f));
+        }
+
+        [Fact]
+        public void FormatFiltersAndLens_Both_ContainsFilterAndLens()
+        {
+            string text = SextantReadout.FormatFiltersAndLens(1, 2, true, 0.35f);
+
+            Assert.Contains(SextantReadout.FormatFilters(1, 2), text);
+            Assert.Contains(SextantReadout.FormatLens(true, 0.35f), text);
+        }
+
+        [Fact]
         public void FilterDimAlpha_ScalesWithCount()
         {
             Assert.Equal(0f, SextantReadout.FilterDimAlpha(0));

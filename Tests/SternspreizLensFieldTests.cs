@@ -1,0 +1,311 @@
+using System;
+using Xunit;
+
+namespace UBOAT.Mods.RadioNavigation.Tests
+{
+    /// <summary>
+    /// Pins the Sternspreiz streak field: visibility gates, camera-frame
+    /// orientation (the line must be horizontal in the OBSERVER's frame, not in
+    /// world space), angular sizing, front-facing winding and energy-carried
+    /// colour. The line length stays a caller-supplied baseline parameter.
+    /// </summary>
+    public sealed class SternspreizLensFieldTests
+    {
+        private static LensCamera IdentityCamera(float distanceUnused)
+        {
+            return new LensCamera
+            {
+                Px = 0f, Py = 0f, Pz = 0f,
+                Rx = 1f, Ry = 0f, Rz = 0f,
+                Ux = 0f, Uy = 1f, Uz = 0f,
+                Fx = 0f, Fy = 0f, Fz = 1f,
+                TanHalfFovY = 0.6f
+            };
+        }
+
+        private static LensOptics Optics(float lineLengthDeg, float thicknessRatio, float distanceM)
+        {
+            return new LensOptics
+            {
+                LineLengthDeg = lineLengthDeg,
+                ThicknessRatio = thicknessRatio,
+                DistanceM = distanceM
+            };
+        }
+
+        private static LensStar Star(float x, float y, float z)
+        {
+            return new LensStar
+            {
+                DirX = x, DirY = y, DirZ = z,
+                R = 1f, G = 0.5f, B = 0.25f, Alpha = 0.75f
+            };
+        }
+
+        [Fact]
+        public void CollectVisibleStars_FillsBufferWithGatedStars()
+        {
+            // Equinox, 48 N, midnight UTC: a real sky must yield some stars.
+            var buffer = new LensStar[32];
+            int count = SternspreizLensField.CollectVisibleStars(48f, 180d, 2451545d,
+                6.5f, 0f, 1d, buffer.Length, buffer);
+
+            Assert.True(count > 0);
+            for (int i = 0; i < count; i++)
+            {
+                double length = Math.Sqrt(buffer[i].DirX * buffer[i].DirX
+                    + buffer[i].DirY * buffer[i].DirY + buffer[i].DirZ * buffer[i].DirZ);
+                Assert.Equal(1d, length, 4);
+                Assert.True(buffer[i].Alpha > 0f);
+                Assert.InRange(buffer[i].R, 0f, 1f);
+            }
+        }
+
+        [Fact]
+        public void CollectVisibleStars_RespectsTheCap()
+        {
+            var buffer = new LensStar[4];
+            int count = SternspreizLensField.CollectVisibleStars(48f, 180d, 2451545d,
+                6.5f, 0f, 1d, 4, buffer);
+            Assert.True(count <= 4);
+        }
+
+        [Fact]
+        public void CollectVisibleStars_RejectsBadBuffer()
+        {
+            Assert.Throws<ArgumentNullException>(() =>
+                SternspreizLensField.CollectVisibleStars(48f, 0d, 2451545d, 6f, 0f, 1d, 1, null));
+            Assert.Throws<ArgumentException>(() =>
+                SternspreizLensField.CollectVisibleStars(48f, 0d, 2451545d, 6f, 0f, 1d, 8, new LensStar[2]));
+        }
+
+        [Fact]
+        public void BuildStreakMesh_EmitsOneCentredScreenHorizontalQuad()
+        {
+            var stars = new[] { Star(0f, 0f, 1f) };
+            var optics = Optics(1f, 0.25f, 1000f);
+            var positions = new float[SternspreizLensField.PositionFloatCount(1)];
+            var colors = new float[SternspreizLensField.ColorFloatCount(1)];
+            var uvs = new float[SternspreizLensField.UvFloatCount(1)];
+            var indices = new int[SternspreizLensField.IndexCount(1)];
+
+            int emitted = SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
+                optics, positions, colors, uvs, indices);
+
+            Assert.Equal(1, emitted);
+            float expectedWidth = SternspreizLineProfile.AngularWidthMeters(1f, 1000f);
+            float expectedThickness = expectedWidth * 0.25f;
+
+            // All vertices sit on the star's shell plane (z = distance).
+            for (int v = 0; v < 4; v++)
+                Assert.Equal(1000f, positions[v * 3 + 2], 3);
+
+            // Horizontal extent = the streak length (observer frame).
+            float minX = float.MaxValue, maxX = float.MinValue;
+            float minY = float.MaxValue, maxY = float.MinValue;
+            for (int v = 0; v < 4; v++)
+            {
+                minX = Math.Min(minX, positions[v * 3 + 0]);
+                maxX = Math.Max(maxX, positions[v * 3 + 0]);
+                minY = Math.Min(minY, positions[v * 3 + 1]);
+                maxY = Math.Max(maxY, positions[v * 3 + 1]);
+            }
+            Assert.Equal(expectedWidth, maxX - minX, 3);
+            Assert.Equal(expectedThickness, maxY - minY, 3);
+            Assert.True(maxX > 0f && minX < 0f, "The line must be centred on the star.");
+            Assert.Equal(0f, (maxX + minX) * 0.5f, 3);
+
+            // UVs: x along the line, y across it.
+            Assert.Equal(0f, uvs[0], 6);
+            Assert.Equal(0f, uvs[1], 6);
+            Assert.Equal(1f, uvs[2], 6);
+            Assert.Equal(0f, uvs[3], 6);
+            Assert.Equal(1f, uvs[4], 6);
+            Assert.Equal(1f, uvs[5], 6);
+            Assert.Equal(0f, uvs[6], 6);
+            Assert.Equal(1f, uvs[7], 6);
+
+            // Colour carries the star's photometry on every vertex.
+            for (int v = 0; v < 4; v++)
+            {
+                Assert.Equal(1f, colors[v * 4 + 0], 6);
+                Assert.Equal(0.5f, colors[v * 4 + 1], 6);
+                Assert.Equal(0.25f, colors[v * 4 + 2], 6);
+                Assert.Equal(0.75f, colors[v * 4 + 3], 6);
+            }
+        }
+
+        [Fact]
+        public void BuildStreakMesh_IndicesFaceTheCameraUnderUnitysClockwiseRule()
+        {
+            var stars = new[] { Star(0f, 0f, 1f) };
+            var positions = new float[SternspreizLensField.PositionFloatCount(1)];
+            var colors = new float[SternspreizLensField.ColorFloatCount(1)];
+            var uvs = new float[SternspreizLensField.UvFloatCount(1)];
+            var indices = new int[SternspreizLensField.IndexCount(1)];
+            SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
+                Optics(1f, 0.5f, 500f), positions, colors, uvs, indices);
+
+            Assert.Equal(new[] { 0, 3, 2, 0, 2, 1 }, indices);
+
+            // Signed area in the camera's (right, up) frame must be negative
+            // (clockwise) so the quad is front-facing.
+            float SignedArea(int a, int b, int c)
+            {
+                float ax = positions[a * 3], ay = positions[a * 3 + 1];
+                float bx = positions[b * 3], by = positions[b * 3 + 1];
+                float cx2 = positions[c * 3], cy2 = positions[c * 3 + 1];
+                return 0.5f * ((bx - ax) * (cy2 - ay) - (cx2 - ax) * (by - ay));
+            }
+
+            Assert.True(SignedArea(0, 3, 2) < 0f);
+            Assert.True(SignedArea(0, 2, 1) < 0f);
+        }
+
+        [Fact]
+        public void BuildStreakMesh_FollowsTheCameraRollNotTheWorldAxis()
+        {
+            // Camera rolled 90 degrees: right = +Y, up = -X. A world-horizontal
+            // streak would be wrong here; the line must follow the observer.
+            var rolled = new LensCamera
+            {
+                Px = 0f, Py = 0f, Pz = 0f,
+                Rx = 0f, Ry = 1f, Rz = 0f,
+                Ux = -1f, Uy = 0f, Uz = 0f,
+                Fx = 0f, Fy = 0f, Fz = 1f,
+                TanHalfFovY = 0.6f
+            };
+            var stars = new[] { Star(0f, 0f, 1f) };
+            var positions = new float[SternspreizLensField.PositionFloatCount(1)];
+            var colors = new float[SternspreizLensField.ColorFloatCount(1)];
+            var uvs = new float[SternspreizLensField.UvFloatCount(1)];
+            var indices = new int[SternspreizLensField.IndexCount(1)];
+
+            SternspreizLensField.BuildStreakMesh(stars, 1, rolled,
+                Optics(1f, 0.2f, 1000f), positions, colors, uvs, indices);
+
+            float expectedWidth = SternspreizLineProfile.AngularWidthMeters(1f, 1000f);
+            float minX = float.MaxValue, maxX = float.MinValue;
+            float minY = float.MaxValue, maxY = float.MinValue;
+            for (int v = 0; v < 4; v++)
+            {
+                minX = Math.Min(minX, positions[v * 3 + 0]);
+                maxX = Math.Max(maxX, positions[v * 3 + 0]);
+                minY = Math.Min(minY, positions[v * 3 + 1]);
+                maxY = Math.Max(maxY, positions[v * 3 + 1]);
+            }
+            Assert.Equal(expectedWidth, maxY - minY, 3);          // long axis follows camera right (+Y)
+            Assert.Equal(expectedWidth * 0.2f, maxX - minX, 3);
+        }
+
+        [Fact]
+        public void BuildStreakMesh_SkipsStarsBehindTheCamera()
+        {
+            var stars = new[] { Star(0f, 0f, -1f), Star(0f, 0f, 1f) };
+            var positions = new float[SternspreizLensField.PositionFloatCount(2)];
+            var colors = new float[SternspreizLensField.ColorFloatCount(2)];
+            var uvs = new float[SternspreizLensField.UvFloatCount(2)];
+            var indices = new int[SternspreizLensField.IndexCount(2)];
+
+            int emitted = SternspreizLensField.BuildStreakMesh(stars, 2, IdentityCamera(0f),
+                Optics(1f, 0.2f, 1000f), positions, colors, uvs, indices);
+
+            Assert.Equal(1, emitted);
+            Assert.Equal(1000f, positions[2], 3);
+        }
+
+        [Fact]
+        public void BuildStreakMesh_AngularLengthKeepsScreenSizeAcrossDistance()
+        {
+            var stars = new[] { Star(0f, 0f, 1f) };
+            var positions = new float[SternspreizLensField.PositionFloatCount(1)];
+            var colors = new float[SternspreizLensField.ColorFloatCount(1)];
+            var uvs = new float[SternspreizLensField.UvFloatCount(1)];
+            var indices = new int[SternspreizLensField.IndexCount(1)];
+
+            SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
+                Optics(0.5f, 0.2f, 1000f), positions, colors, uvs, indices);
+            float near = positions[3] - positions[0];
+
+            SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
+                Optics(0.5f, 0.2f, 2000f), positions, colors, uvs, indices);
+            float far = positions[3] - positions[0];
+
+            Assert.Equal(2f, far / near, 3);
+        }
+
+        [Fact]
+        public void BuildStreakMesh_WidenedBaselineKeepsAbsoluteThickness()
+        {
+            // Author request 2026-11-08: the streak must be 2x longer along the
+            // line but NOT taller. The shipping constants are
+            // SternspreizLensEffect.DefaultLengthDeg = 0.7f and its private
+            // ThicknessRatio = 0.27f; the previous pairing was (0.35f, 0.54f).
+            // length * ratio = 0.189 deg either way, so the world-space
+            // thickness of the quad must be identical while the length doubles.
+            const float oldLengthDeg = 0.35f;   // mirror of the old DefaultLengthDeg
+            const float oldThicknessRatio = 0.54f; // mirror of the old ThicknessRatio
+            const float newLengthDeg = 0.7f;    // mirror of the new DefaultLengthDeg
+            const float newThicknessRatio = 0.27f; // mirror of the new ThicknessRatio
+
+            var stars = new[] { Star(0f, 0f, 1f) };
+            var positions = new float[SternspreizLensField.PositionFloatCount(1)];
+            var colors = new float[SternspreizLensField.ColorFloatCount(1)];
+            var uvs = new float[SternspreizLensField.UvFloatCount(1)];
+            var indices = new int[SternspreizLensField.IndexCount(1)];
+
+            SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
+                Optics(oldLengthDeg, oldThicknessRatio, 1000f), positions, colors, uvs, indices);
+            float oldWorldLength = positions[3] - positions[0];      // bottom-right - bottom-left
+            float oldWorldThickness = positions[10] - positions[1];  // top-left - bottom-left
+
+            SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
+                Optics(newLengthDeg, newThicknessRatio, 1000f), positions, colors, uvs, indices);
+            float newWorldLength = positions[3] - positions[0];
+            float newWorldThickness = positions[10] - positions[1];
+
+            Assert.Equal(2f, newWorldLength / oldWorldLength, 4);
+            // The invariant length * ratio = 0.189 deg is exact in ANGLE; the
+            // world conversion 2*d*tan(theta/2) is very slightly nonlinear, so a
+            // doubled angle shifts the world thickness by ~3e-5 relative (< 0.05 mm
+            // at the 1000 m test distance). 3 decimals matches the sibling
+            // geometry tests and still catches a missed ratio halving (2x).
+            Assert.Equal(oldWorldThickness, newWorldThickness, 3);
+        }
+
+        [Fact]
+        public void BuildStreakMesh_ZeroLengthEmitsNothing()
+        {
+            var stars = new[] { Star(0f, 0f, 1f) };
+            var positions = new float[SternspreizLensField.PositionFloatCount(1)];
+            var colors = new float[SternspreizLensField.ColorFloatCount(1)];
+            var uvs = new float[SternspreizLensField.UvFloatCount(1)];
+            var indices = new int[SternspreizLensField.IndexCount(1)];
+
+            int emitted = SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
+                Optics(0f, 0.2f, 1000f), positions, colors, uvs, indices);
+            Assert.Equal(0, emitted);
+        }
+
+        [Fact]
+        public void BuildStreakMesh_RejectsBadInput()
+        {
+            Assert.Throws<ArgumentNullException>(() => SternspreizLensField.BuildStreakMesh(
+                null, 0, IdentityCamera(0f), Optics(1f, 0.2f, 100f),
+                new float[12], new float[16], new float[8], new int[6]));
+            Assert.Throws<ArgumentOutOfRangeException>(() => SternspreizLensField.BuildStreakMesh(
+                new[] { Star(0f, 0f, 1f) }, 5, IdentityCamera(0f), Optics(1f, 0.2f, 100f),
+                new float[12], new float[16], new float[8], new int[6]));
+        }
+
+        [Fact]
+        public void BufferSizeHelpers_MatchTheEmittedLayout()
+        {
+            Assert.Equal(12, SternspreizLensField.PositionFloatCount(1));
+            Assert.Equal(16, SternspreizLensField.ColorFloatCount(1));
+            Assert.Equal(8, SternspreizLensField.UvFloatCount(1));
+            Assert.Equal(6, SternspreizLensField.IndexCount(1));
+            Assert.Equal(120, SternspreizLensField.PositionFloatCount(10));
+        }
+    }
+}

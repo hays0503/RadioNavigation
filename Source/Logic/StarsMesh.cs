@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
@@ -36,6 +37,14 @@ namespace UBOAT.Mods.RadioNavigation
         /// Set by SextantController while any filter is down.</summary>
         public static bool Shielded { get; set; }
 
+        /// <summary>Current dark-adaptation factor of the point-star layer
+        /// (1 = fully adapted). The Sternspreiz streak field applies the same
+        /// value so lines and points fade together.</summary>
+        public static float CurrentAdaptation
+        {
+            get { return instance != null ? (float)instance.adaptation.Value : 1f; }
+        }
+
         /// <summary>White flash / sun glare resets dark adaptation (P4).
         /// Called from the glare coordinator's pain rising edge.</summary>
         public static void NotifyWhiteFlash()
@@ -62,28 +71,84 @@ namespace UBOAT.Mods.RadioNavigation
             meshRenderer = GetComponent<MeshRenderer>();
             positionProvider = new GamePlayerPositionProvider();
 
-            // Create additive blend material (Sprites/Default or fallback)
-            Shader shader = Shader.Find("Sprites/Default");
-            if (shader == null)
-                shader = Shader.Find("Legacy Shaders/Particles/Additive");
-            if (shader != null)
-            {
-                material = new Material(shader);
-                material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
-                material.SetInt("_ZWrite", 0);
-                // Gaussian PSF sprite: without a texture the quads rendered as
-                // solid squares (P3). Straight white + SrcAlpha/One blend.
-                spriteTexture = BuildSpriteTexture();
-                material.mainTexture = spriteTexture;
+            material = CreateStarMaterial();
+            if (material != null)
                 meshRenderer.material = material;
-            }
-            else
-            {
-                Debug.LogWarning("[RadioNav][StarsMesh] No suitable shader found, using default");
-            }
+            UsesBundledStarShader = material != null && material.shader != null
+                && material.shader.name == "RadioNav/SternspreizStreak";
 
             Debug.Log("[RadioNav][StarsMesh] Initialized with " + StarCatalog.Stars.Length + " stars");
+        }
+
+        /// <summary>
+        /// Star material ladder: the mod's bundled shader first (it carries the
+        /// scene passes the Deep pipeline actually draws - live 2026-09-28 the
+        /// stock sprite shader contributed zero pixels), then the built-in
+        /// sprite shader, then the legacy additive one. The bundled shader also
+        /// honors _SrcBlend/_DstBlend/_ZWrite, so the additive star light below
+        /// is real instead of a silent no-op on Sprites/Default.
+        /// </summary>
+        private Material CreateStarMaterial()
+        {
+            Shader shader = ResolveStarShader();
+            if (shader == null)
+            {
+                Debug.LogWarning("[RadioNav][StarsMesh] No suitable shader found, using default");
+                return null;
+            }
+
+            var created = new Material(shader);
+            created.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            created.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            created.SetFloat("_ZWrite", 0f);
+            // Gaussian PSF sprite: without a texture the quads rendered as
+            // solid squares (P3). Straight white + SrcAlpha/One blend.
+            spriteTexture = BuildSpriteTexture();
+            created.mainTexture = spriteTexture;
+            return created;
+        }
+
+        private const string BundledStarShader = "RadioNavStarField";
+
+        /// <summary>True once the star layer actually draws with the bundled
+        /// star shader (the one the Deep pipeline renders). The game's
+        /// decorative star sphere is hidden only in that state, so a loading or
+        /// shader failure can never leave an empty sky.</summary>
+        public static bool UsesBundledStarShader { get; private set; }
+
+        private bool bundledShaderResolved;
+        private int shaderUpgradeCountdown = 30;
+
+        private static Shader ResolveStarShader()
+        {
+            Shader bundled = ModBootstrapper.LoadBundleAsset(BundledStarShader) as Shader;
+            if (bundled != null)
+                return bundled;
+            Shader fallback = Shader.Find("Sprites/Default");
+            return fallback != null ? fallback : Shader.Find("Legacy Shaders/Particles/Additive");
+        }
+
+        /// <summary>
+        /// The mod bundle may not be loaded when the sky roots are created, so
+        /// the star material starts on the built-in fallback and upgrades once
+        /// the bundled shader becomes available (bounded retries, no per-frame
+        /// reflection storm after that).
+        /// </summary>
+        private void TryUpgradeToBundledShader()
+        {
+            if (bundledShaderResolved || material == null || shaderUpgradeCountdown <= 0)
+                return;
+
+            Shader bundled = ModBootstrapper.LoadBundleAsset(BundledStarShader) as Shader;
+            if (bundled != null)
+            {
+                material.shader = bundled;
+                bundledShaderResolved = true;
+                UsesBundledStarShader = true;
+                Debug.Log("[RadioNav][StarsMesh] star shader resolved to bundled " + bundled.name);
+                return;
+            }
+            shaderUpgradeCountdown--;
         }
 
         /// <summary>Builds the 64² gaussian sprite from StarSpriteMath.</summary>
@@ -120,11 +185,31 @@ namespace UBOAT.Mods.RadioNavigation
                 Destroy(meshFilter.mesh);
         }
 
+        /// <summary>One-shot evidence that the star renderer is actually
+        /// submitted to a camera: it fires only for cameras that render this
+        /// object. Without it a silent sky is indistinguishable from a culled
+        /// one (live 2026-09-28: the layer was believed invisible until the
+        /// shader pass and the quad scale were fixed).</summary>
+        private static bool willRenderLogged;
+
+        private void OnWillRenderObject()
+        {
+            if (willRenderLogged)
+                return;
+            willRenderLogged = true;
+            Camera current = Camera.current;
+            Debug.Log("[RadioNav][StarsMesh] OnWillRenderObject camera="
+                + (current != null ? current.name : "none")
+                + " shader=" + (material != null && material.shader != null ? material.shader.name : "none"));
+        }
+
         private void LateUpdate()
         {
             Camera cam;
             if (!CameraResolver.TryResolve(out cam))
                 return;
+
+            TryUpgradeToBundledShader();
 
             // Star sky is visible only from outside the boat (bridge/deck):
             // hidden inside (periscope, interior) and on the map.
@@ -195,28 +280,12 @@ namespace UBOAT.Mods.RadioNavigation
                 lastRebuildRealtime, Time.realtimeSinceStartup);
         }
 
-        /// <summary>Limiting V magnitude for the current sky. The Sun's zenith
-        /// distance comes from the MOD's own ephemeris, not the game's
-        /// TOD_Sky.SunZenith: live 2026-09-22 the reflected member returned a
-        /// stale daytime value at night (74° instead of ~140°), which drove the
-        /// twilight shift to daylight and hid almost the whole field. Our sun
-        /// matches the game sun to 0.001°, so this is both safer and equal.</summary>
+        /// <summary>Limiting V magnitude for the current sky. Delegates to the
+        /// Unity-free StarSkyConditions helper so the point layer and the
+        /// Sternspreiz streak field share one condition model.</summary>
         private static double ComputeLimitingMagnitude(DateTime utc, float lat, float lon)
         {
-            double sunZenith = CelestialForecast.SunZenithDeg(lat, lon, utc);
-            if (double.IsNaN(sunZenith))
-                sunZenith = 108.0; // fail dark: never wash the field out
-
-            double moonJd = CelestialEphemeris.JdFor(CelestialBody.Moon(), utc);
-            double moonAltDeg = 0.0;
-            if (AstroMath.MoonRaDec(moonJd, out double moonRa, out double moonDec))
-            {
-                AstroMath.RaDecToEnu(moonRa, moonDec, AstroMath.LstDeg(moonJd, lon), lat,
-                    out double altRad, out _, out _, out _, out _);
-                moonAltDeg = altRad * 180.0 / Math.PI;
-            }
-            double illumination = AstroMath.MoonIllumination(moonJd);
-            return SkyBrightness.LimitingMagnitude(sunZenith, illumination, moonAltDeg);
+            return StarSkyConditions.LimitingMagnitude(utc, lat, lon);
         }
 
         private void RebuildMesh(Camera cam, float latDeg, double lstDeg, double jd,
@@ -229,6 +298,14 @@ namespace UBOAT.Mods.RadioNavigation
 
             int visibleCount = 0;
             float safeRadius = CameraResolver.SafeRadius(cam);
+            // StarBrightness reports a SCREEN size in pixels; the quad lives on
+            // the sky shell, so the world size must come through the projection:
+            // worldPerPixel = 2*R*tan(fov/2)/viewportHeight. Without this the
+            // old "sizePx * 0.1" built quads of ~0.2-2 m at ~3825 m, i.e. ~0.05
+            // screen pixels - the layer contributed no visible pixels at all
+            // (measured live 2026-09-28, see docs/sternspreiz-lens-v1.md).
+            float worldPerPixel = StarQuadScale.WorldUnitsPerPixel(
+                safeRadius, cam.fieldOfView, cam.pixelHeight);
 
             foreach (var star in StarCatalog.Stars)
             {
@@ -277,7 +354,8 @@ namespace UBOAT.Mods.RadioNavigation
                 color.a = alpha;
 
                 // Billboard quad (4 vertices, 2 triangles)
-                BillboardQuadBuilder.AddQuad(vertices, triangles, colors, uvs, worldPos, dir, sizePx * 0.1f, color);
+                BillboardQuadBuilder.AddQuad(vertices, triangles, colors, uvs, worldPos, dir,
+                    sizePx * worldPerPixel, color);
                 visibleCount++;
             }
 
@@ -296,54 +374,23 @@ namespace UBOAT.Mods.RadioNavigation
             if (visibleCount > 0 && Time.time - lastLogTime > 5f)
             {
                 lastLogTime = Time.time;
-                Debug.Log($"[RadioNav][StarsMesh] Rendered {visibleCount}/{StarCatalog.Stars.Length} stars");
+                Debug.Log($"[RadioNav][StarsMesh] Rendered {visibleCount}/{StarCatalog.Stars.Length} stars "
+                    + $"pxScale={worldPerPixel.ToString("F2", CultureInfo.InvariantCulture)} "
+                    + $"verts={vertices.Count} radius={safeRadius.ToString("F0", CultureInfo.InvariantCulture)} "
+                    + $"fov={cam.fieldOfView.ToString("F1", CultureInfo.InvariantCulture)} "
+                    + $"h={cam.pixelHeight} adapt={adapt.ToString("F2", CultureInfo.InvariantCulture)} "
+                    + $"tint={(material != null ? material.color.a.ToString("F2", CultureInfo.InvariantCulture) : "0")} "
+                    + $"shader={(material != null && material.shader != null ? material.shader.name : "none")}");
             }
         }
 
         /// <summary>B-V index → RGB (simplified Stellarium-like map). Alpha is
-        /// NOT set here: it comes from StarBrightness (single source).</summary>
+        /// NOT set here: it comes from StarBrightness (single source). The map
+        /// itself lives in the Unity-free StarColor helper so the Sternspreiz
+        /// streak field shares one source of truth.</summary>
         private static Color ColorFromBV(float bv)
         {
-            // B-V index → RGB (simplified Stellarium-like map)
-            // B-V < 0: blue, 0: white, 0.5: yellow-white, 1.0: orange, 1.5+: red
-            float r, g, b;
-            if (bv < -0.4f)
-            {
-                r = 0.6f; g = 0.7f; b = 1.0f; // blue
-            }
-            else if (bv < 0.0f)
-            {
-                float t = Mathf.InverseLerp(-0.4f, 0.0f, bv);
-                r = Mathf.Lerp(0.6f, 1.0f, t);
-                g = Mathf.Lerp(0.7f, 1.0f, t);
-                b = 1.0f;
-            }
-            else if (bv < 0.5f)
-            {
-                float t = Mathf.InverseLerp(0.0f, 0.5f, bv);
-                r = 1.0f;
-                g = Mathf.Lerp(1.0f, 0.95f, t);
-                b = Mathf.Lerp(1.0f, 0.8f, t);
-            }
-            else if (bv < 1.0f)
-            {
-                float t = Mathf.InverseLerp(0.5f, 1.0f, bv);
-                r = 1.0f;
-                g = Mathf.Lerp(0.95f, 0.7f, t);
-                b = Mathf.Lerp(0.8f, 0.4f, t);
-            }
-            else if (bv < 1.5f)
-            {
-                float t = Mathf.InverseLerp(1.0f, 1.5f, bv);
-                r = 1.0f;
-                g = Mathf.Lerp(0.7f, 0.4f, t);
-                b = Mathf.Lerp(0.4f, 0.2f, t);
-            }
-            else
-            {
-                r = 1.0f; g = 0.3f; b = 0.1f; // deep red
-            }
-
+            StarColor.FromBv(bv, out float r, out float g, out float b);
             return new Color(r, g, b, 1f);
         }
     }

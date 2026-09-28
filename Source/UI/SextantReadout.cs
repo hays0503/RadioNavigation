@@ -45,6 +45,26 @@ namespace UBOAT.Mods.RadioNavigation
             return sb.ToString().TrimEnd();
         }
 
+        /// <summary>Lens state: empty while the glass is swung out.</summary>
+        public static string FormatLens(bool lensOn, float lengthDeg)
+        {
+            if (!lensOn)
+                return "";
+            return "\u041B\u0438\u043D\u0437\u0430 " + lengthDeg.ToString("0.00",
+                System.Globalization.CultureInfo.InvariantCulture) + "\u00B0";
+        }
+
+        /// <summary>Filters plus the lens on one readout line.</summary>
+        public static string FormatFiltersAndLens(int leftCount, int rightCount,
+            bool lensOn, float lengthDeg)
+        {
+            string filters = FormatFilters(leftCount, rightCount);
+            string lens = FormatLens(lensOn, lengthDeg);
+            if (filters.Length == 0)
+                return lens;
+            return lens.Length == 0 ? filters : filters + " \u00B7 " + lens;
+        }
+
         public static float FilterDimAlpha(int count)
         {
             return 0.30f * count;

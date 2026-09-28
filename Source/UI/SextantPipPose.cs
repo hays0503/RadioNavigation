@@ -100,6 +100,17 @@ namespace UBOAT.Mods.RadioNavigation
                 lastGoodViewCamera = viewCamera;
             }
 
+            // Optional Sternspreiz diagnostic. This is a no-op unless the
+            // dedicated PlayerPrefs gate is explicitly 1, 2, or 3. Prepare
+            // before applying masks so the fixture/source scope and callback
+            // are ready for the same PIP frame.
+            factory.PrepareSternspreizPhase0(viewCamera);
+
+            // Sternspreizglas lens (production feature, PlayerPrefs gate): the
+            // streak effect is attached to both PIPs and gated by the sky state
+            // inside the effect, so this call is a cheap no-op while off.
+            factory.PrepareLens();
+
             MainCamera interiorMain = MainCamera.Instance;
             bool insideBoat = interiorMain?.IsInsideBoat == true;
 
@@ -152,7 +163,8 @@ namespace UBOAT.Mods.RadioNavigation
                 manualRender();
         }
 
-        public static void SyncCameraState(Camera cam, Camera source, float fovDivisor, int interiorMask)
+        public static void SyncCameraState(Camera cam, Camera source, float fovDivisor,
+            int interiorMask)
         {
             cam.fieldOfView = source.fieldOfView / fovDivisor;
             // Camera params the game recomputes while the sextant is open:
