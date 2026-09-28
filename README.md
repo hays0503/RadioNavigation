@@ -33,7 +33,7 @@
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1 [-GamePath <path>]  # локальная DLL (для IDE-проверок)
 dotnet build radionavigation.csproj -c Release -c Debug        # Release+Debug, эталонный билд (0 errors, MSB3277 warn ожидаем)
-powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (1204 PASS; baseline-история ADR-014)
+powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (1205 PASS; baseline-история ADR-014)
 ```
 
 ## Структура репозитория
@@ -50,7 +50,7 @@ powershell -ExecutionPolicy Bypass -File tests.ps1             # тесты (120
 ## Статус качества
 
 - Аудит рефакторинга: **241 находка** (F001–F243; номера F225/F230 не использованы) — 173 закрыто, 13 отклонено, 2 отложено, 53 строки без статусного маркера (см. `DOCS.md` § 8)
-- Тесты: **1204 PASS** (baseline `baseline-182-20260819` на `8b3021fa`, ADR-014), сборка Release+Debug без ошибок
+- Тесты: **1205 PASS** (baseline `baseline-182-20260819` на `8b3021fa`, ADR-014), сборка Release+Debug без ошибок
 - Смежные гейты: анализаторы **68 PASS**, SourceCheck **79 PASS**, PVS clean
 - Открытые пункты и пробелы документации перечислены в `DOCS.md` § 8
 
