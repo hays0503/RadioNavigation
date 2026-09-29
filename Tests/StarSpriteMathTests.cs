@@ -61,5 +61,68 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             float a = field[(size / 2) * size + xi];
             Assert.InRange(a, 0.350f, 0.370f);
         }
+
+        [Fact]
+        public void OpticalPsf_HasBrightCoreAndFaintHaloWithoutSquareCorners()
+        {
+            int size = StarSpriteMath.SpriteSize;
+            float[] field = StarSpriteMath.BuildOpticalPsfField(size);
+            float center = field[(size / 2) * size + size / 2];
+            float corner = field[0];
+
+            Assert.InRange(center, 0.99f, 1f);
+            Assert.Equal(0f, corner);
+            Assert.True(field[(size / 2) * size + size / 2 + size / 4] < 0.36f,
+                "the core/halo PSF should be sharper at the mid-radius than the old Gaussian");
+            Assert.True(field[(size / 2) * size + size - 1] > 0f,
+                "the restrained scatter wing should survive near the quad edge");
+        }
+
+        [Fact]
+        public void OpticalPsf_PreservesIntegratedAlphaNearTheLegacyGaussian()
+        {
+            int size = 128;
+            float[] legacy = StarSpriteMath.BuildAlphaField(size, StarSpriteMath.SpriteSigma);
+            float[] optical = StarSpriteMath.BuildOpticalPsfField(size);
+            double legacySum = 0d;
+            double opticalSum = 0d;
+            for (int i = 0; i < legacy.Length; i++)
+            {
+                legacySum += legacy[i];
+                opticalSum += optical[i];
+            }
+
+            double ratio = opticalSum / legacySum;
+            Assert.InRange(ratio, 0.94d, 1.02d);
+        }
+
+        [Fact]
+        public void OpticalPsf_IsRadiallyMonotonic()
+        {
+            int size = 128;
+            float[] field = StarSpriteMath.BuildOpticalPsfField(size);
+            float half = size * 0.5f;
+            float previous = 1f;
+            for (int i = 0; i <= 100; i++)
+            {
+                float r = i / 100f;
+                int x = Math.Min(size - 1, (int)Math.Round(half + r * half - 0.5f));
+                float alpha = field[(size / 2) * size + x];
+                Assert.True(alpha <= previous + 1e-4f,
+                    string.Format("optical PSF must not grow with radius (r={0:F2})", r));
+                previous = alpha;
+            }
+        }
+
+        [Fact]
+        public void OpticalPsf_RejectsInvalidParameters()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => StarSpriteMath.BuildOpticalPsfField(1));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => StarSpriteMath.BuildOpticalPsfField(16, 0f, 0.4f, 0.2f));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => StarSpriteMath.BuildOpticalPsfField(16, 0.2f, 0.4f, 1.1f));
+        }
     }
 }

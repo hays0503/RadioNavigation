@@ -36,9 +36,9 @@ namespace UBOAT.Mods.RadioNavigation
         /// the Sky-stage pass. <c>DeepPipeline.RenderSky</c> draws the
         /// <c>ShaderTagId("Sky")</c> stage with <c>RenderQueueRange.opaque</c>
         /// (0…2500), immediately after <c>DrawSkybox</c> and before the
-        /// forward/G-buffer stages; the only shipping Sky-tagged shader is the
-        /// UniStorm volumetric-cloud composite at queue 1051 (Background+51), so
-        /// 1020 sorts the celestial sprites UNDER the clouds. Any value ≥ 2500 is
+        /// forward/G-buffer stages. The mod's PointSky pass at queue 1020 sorts
+        /// before UniStorm's cloud-composite Sky pass at queue 1051 (Background+51).
+        /// Any value ≥ 2500 is
         /// filtered out of the Sky stage (and the deferred path then draws
         /// ForwardSRP only in the transparent range, i.e. after the clouds —
         /// the original bug).

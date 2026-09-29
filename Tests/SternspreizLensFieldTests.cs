@@ -23,12 +23,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             };
         }
 
-        private static LensOptics Optics(float lineLengthDeg, float thicknessRatio, float distanceM)
+        private static LensOptics Optics(float lineLengthDeg, float thicknessDeg, float distanceM)
         {
             return new LensOptics
             {
                 LineLengthDeg = lineLengthDeg,
-                ThicknessRatio = thicknessRatio,
+                ThicknessDeg = thicknessDeg,
                 DistanceM = distanceM
             };
         }
@@ -224,29 +224,26 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var indices = new int[SternspreizLensField.IndexCount(1)];
 
             SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
-                Optics(0.5f, 0.2f, 1000f), positions, colors, uvs, indices);
+                Optics(0.5f, 0.1f, 1000f), positions, colors, uvs, indices);
             float near = positions[3] - positions[0];
 
             SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
-                Optics(0.5f, 0.2f, 2000f), positions, colors, uvs, indices);
+                Optics(0.5f, 0.1f, 2000f), positions, colors, uvs, indices);
             float far = positions[3] - positions[0];
 
             Assert.Equal(2f, far / near, 3);
         }
 
         [Fact]
-        public void BuildStreakMesh_WidenedBaselineKeepsAbsoluteThickness()
+        public void BuildStreakMesh_ThicknessIsIndependentFromUserLength()
         {
-            // Author request 2026-11-08: the streak must be 2x longer along the
-            // line but NOT taller. The shipping constants are
-            // SternspreizLensEffect.DefaultLengthDeg = 0.7f and its private
-            // ThicknessRatio = 0.27f; the previous pairing was (0.35f, 0.54f).
-            // length * ratio = 0.189 deg either way, so the world-space
-            // thickness of the quad must be identical while the length doubles.
-            const float oldLengthDeg = 0.35f;   // mirror of the old DefaultLengthDeg
-            const float oldThicknessRatio = 0.54f; // mirror of the old ThicknessRatio
-            const float newLengthDeg = 0.7f;    // mirror of the new DefaultLengthDeg
-            const float newThicknessRatio = 0.27f; // mirror of the new ThicknessRatio
+            // Length is a user-facing angular control; thickness models the
+            // cylindrical optic and must not grow when the user makes the dash
+            // longer. The previous ratio-based design accidentally made a
+            // 1.5-degree line 2.14x thicker than the 0.7-degree baseline.
+            const float shortLengthDeg = 0.7f;
+            const float longLengthDeg = 1.5f;
+            const float thicknessDeg = 0.189f;
 
             var stars = new[] { Star(0f, 0f, 1f) };
             var positions = new float[SternspreizLensField.PositionFloatCount(1)];
@@ -255,22 +252,17 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var indices = new int[SternspreizLensField.IndexCount(1)];
 
             SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
-                Optics(oldLengthDeg, oldThicknessRatio, 1000f), positions, colors, uvs, indices);
-            float oldWorldLength = positions[3] - positions[0];      // bottom-right - bottom-left
-            float oldWorldThickness = positions[10] - positions[1];  // top-left - bottom-left
+                Optics(shortLengthDeg, thicknessDeg, 1000f), positions, colors, uvs, indices);
+            float shortWorldLength = positions[3] - positions[0];     // bottom-right - bottom-left
+            float shortWorldThickness = positions[10] - positions[1]; // top-left - bottom-left
 
             SternspreizLensField.BuildStreakMesh(stars, 1, IdentityCamera(0f),
-                Optics(newLengthDeg, newThicknessRatio, 1000f), positions, colors, uvs, indices);
-            float newWorldLength = positions[3] - positions[0];
-            float newWorldThickness = positions[10] - positions[1];
+                Optics(longLengthDeg, thicknessDeg, 1000f), positions, colors, uvs, indices);
+            float longWorldLength = positions[3] - positions[0];
+            float longWorldThickness = positions[10] - positions[1];
 
-            Assert.Equal(2f, newWorldLength / oldWorldLength, 4);
-            // The invariant length * ratio = 0.189 deg is exact in ANGLE; the
-            // world conversion 2*d*tan(theta/2) is very slightly nonlinear, so a
-            // doubled angle shifts the world thickness by ~3e-5 relative (< 0.05 mm
-            // at the 1000 m test distance). 3 decimals matches the sibling
-            // geometry tests and still catches a missed ratio halving (2x).
-            Assert.Equal(oldWorldThickness, newWorldThickness, 3);
+            Assert.Equal(longLengthDeg / shortLengthDeg, longWorldLength / shortWorldLength, 3);
+            Assert.Equal(shortWorldThickness, longWorldThickness, 5);
         }
 
         [Fact]

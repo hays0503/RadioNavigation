@@ -152,11 +152,10 @@ namespace UBOAT.Mods.RadioNavigation
             shaderUpgradeCountdown--;
         }
 
-        /// <summary>Builds the 64² gaussian sprite from StarSpriteMath.</summary>
+        /// <summary>Builds the 64² sharp-core / soft-halo PSF sprite.</summary>
         private static Texture2D BuildSpriteTexture()
         {
-            float[] field = StarSpriteMath.BuildAlphaField(
-                StarSpriteMath.SpriteSize, StarSpriteMath.SpriteSigma);
+            float[] field = StarSpriteMath.BuildOpticalPsfField(StarSpriteMath.SpriteSize);
             Color32[] pixels = new Color32[field.Length];
             for (int i = 0; i < field.Length; i++)
             {

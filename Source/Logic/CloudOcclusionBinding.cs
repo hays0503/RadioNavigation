@@ -4,20 +4,17 @@ using UnityEngine;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Discovers the cloud-opacity RenderTexture the celestial materials sample
-    /// so the star/planet/Moon/Sun point sprites can fade behind the clouds
-    /// (which write no depth). Two sources are resolved, one per mode family:
+    /// Discovers textures for the legacy, disabled-by-default cloud-mask
+    /// experiment. Production occlusion is the PointSky draw occurring before
+    /// UniStorm's own cloud composite. Two historical sources are resolved:
     ///
     ///  - <c>fullCloudBuff0</c>/<c>fullCloudBuff1</c> — UniStorm's ping-pong
-    ///    cloud dome; only the alpha channel carries the opacity, laid out as a
-    ///    dome disc inscribed in the square (modes 1/2). Live-tested: that map
-    ///    is a polar dome, so the direction-based UV removes the mod's stars
-    ///    across the whole sky (2026-09-29).
-    ///  - <c>GBuffer3…</c> — the game's screen-space G-buffer target the
-    ///    UniStorm cloud composite (<c>UniStorm/Clouds/Cloud Computing</c>)
-    ///    renders into. Its pixel shader ends with <c>min(cloudAlpha * 1.5, 1)</c>
-    ///    in the alpha channel, so the screen-space cloud opacity is trivially
-    ///    addressable by screen UV (mode 3).
+    ///    cloud dome (modes 1/2). Its direction-to-UV mapping is not calibrated;
+    ///    the old guesses darkened broad parts of the sky and remain diagnostic.
+    ///  - <c>GBuffer3…</c> — historical mode-3 target. RenderDoc 2026-09-30
+    ///    showed that PointSky draws before the cloud composite and that the
+    ///    observed cloud pass uses Zero/Zero alpha blend factors. Post-composite
+    ///    GBuffer3 alpha is therefore not a cloud-opacity mask.
     ///
     /// <see cref="Apply"/> is called from the five sky renderers every frame,
     /// but the expensive <see cref="Resources.FindObjectsOfTypeAll{T}"/> scan
@@ -105,11 +102,9 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Screen-space G-buffer target for mode 3. Prefers a name exactly
-        /// equal to <c>GBuffer3</c>, then the first name containing it (the
-        /// live name is e.g. <c>GBuffer3_1129x635_ARGBHalf</c>). Logs the full
-        /// RenderTexture inventory once, then the chosen target; logs once if
-        /// it never appears. Same ~5 s retry schedule as the dome map.
+        /// Historical mode-3 screen-space target. It is retained only to
+        /// diagnose old experiments; its post-composite alpha is not cloud
+        /// opacity. Same ~5 s retry schedule as the dome map.
         /// </summary>
         private static RenderTexture ResolveGBufferTexture()
         {

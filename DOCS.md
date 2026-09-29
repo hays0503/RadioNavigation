@@ -18,12 +18,13 @@
 | Sternspreizglas: pure PSF math | `docs/sternspreiz-phase1-psf.md` — параметризованное горизонтальное ядро-кандидат; runtime/shader/Sun не подключены |
 | Sternspreizglas: Phase 1a source gate | `docs/sternspreiz-phase1a-source-suppression.md` — mode 3 live 2026-09-27: suppression scope PASS per PIP, Main intact; visual star-absence PARTIAL (native sky remains); redraw/Sun/PSF still gated |
 | Sternspreizglas: Phase 1b redraw gate | `docs/sternspreiz-phase1b-redraw-design.md` — live BLOCKED 2026-09-28 (меш не растеризуется; F-находка); mode 4 не production |
-| Sternspreizglas: Линза v1 | `docs/sternspreiz-lens-v1.md` — шейдер/материал в бандле, чистая математика (1212 тестов), PIP-эффект (алидадная половина), приёмка 2026-09-28, сужение и мягкий ромб подтверждены живьём (2026-11-07/08); наклон штрихов — интермиттентный, на свежем аттаче не воспроизводится (уточнено 2026-11-08); попутно найден и починен невидимый звёздный слой (проход шейдера + проекционный масштаб) |
+| Sternspreizglas: Линза v1 | `docs/sternspreiz-lens-v1.md` — PIP-эффект (алидадная половина), сужение/мягкий ромб; 2026-09-30: фиксированная угловая толщина 0.189°, baseline длины 1.5° и авторский roll ±0.25°/8 s |
+| Визуальная ревизия окуляра/звёзд/линзы | `docs/sextant-optical-visuals.md` — активные shader paths, procedural bezel, sharp-core/soft-halo PSF, настоящий pass0 линзы, параметры и live/gate-проверки |
 | Иконки маркеров карты (F229) | `docs/map-marker-icons-f229.md` — белые квадраты вместо иконок: два корня (ResourceManager не видит бандл мода + контейнерные ключи `Sprite/<имя>`), общий `LoadBundleIconSprite`, гейт `MapMarkerIcons_ResolveThroughBundleFallback`; живая приёмка 2026-11-09 |
-| Небо против облаков | `docs/sky-vs-clouds.md` — небесные материалы перенесены в стадию Sky (`PointSky`, очередь 1020), механизм подтверждён 2026-09-29/30 на прокси-стенде PIP-текстур (порядок отрисовки + пиксели), **визуальная приёмка главного вида — PENDING**; ограничение моста (материал по имени не читается) и грабли RenderDoc |
+| Небо против облаков | `docs/sky-vs-clouds.md` — `PointSky` и очередь 1020; главная причина утечки (второй draw через `SRPDefaultUnlit`/`ForwardSRP` после композита) устранена; приёмка главного вида закрыта RenderDoc + `pixel_history`; ограничения моста и грабли RenderDoc |
 | Реестр найденных проблем | `refactoring-plan/hypothesis/INDEX.md` |
 | Знания об API игры UBOAT | `knowledge/` — 21 файл, 6 разделов |
-| Граф кода | `graphify-out/` (8371 узел) |
+| Граф кода | `graphify-out/` (8832 узла) |
 
 ## 2. Архитектура — `SAD/`
 
@@ -104,7 +105,7 @@ F225 и F230 не использованы (пропуски после ревь
 
 ## 7. Граф кода — `graphify-out/`
 
-8371 узел / 14977 рёбер / 624 сообщества (2026-09-27). Обновление: `graphify update .` (AST-only, без API).
+8832 узла / 16000 рёбер / 648 сообществ (2026-09-30). Обновление: `graphify update .` (AST-only, без API).
 
 **Чего там нет** (и не надо искать):
 
@@ -200,8 +201,8 @@ F225 и F230 не использованы (пропуски после ревь
 
 ## 10. Правила сопровождения
 
-1. **Счётчики проверяются прогоном, а не на память:** `tests.ps1` (1217),
-   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (83).
+1. **Счётчики проверяются прогоном, а не на память:** `tests.ps1` (1228),
+   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (85).
 2. **Новый ADR** = следующий свободный ID; дубли недопустимы, сводная строка
    добавляется в `SAD/12_Architecture_Decisions.md` § 1 в том же коммите.
 3. **Новая находка** = следующий свободный F-номер + строка в `hypothesis/INDEX.md`

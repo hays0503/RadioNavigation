@@ -74,10 +74,12 @@
     <Compile Include="StarPrecessionTests.cs" />
     <Compile Include="StarBrightnessTests.cs" />
     <Compile Include="StarSpriteMathTests.cs" />
+    <Compile Include="SextantRimProfileTests.cs" />
     <Compile Include="SternspreizPsfMathTests.cs" />
     <Compile Include="SternspreizLineProfileTests.cs" />
     <Compile Include="StarColorTests.cs" />
     <Compile Include="SternspreizLensFieldTests.cs" />
+    <Compile Include="SternspreizLensTiltTests.cs" />
     <Compile Include="StarSkyConditionsTests.cs" />
     <Compile Include="StarQuadScaleTests.cs" />
     <Compile Include="SkyRenderQueuePolicyTests.cs" />
@@ -222,10 +224,12 @@
     <Compile Include="..\Source\Logic\AstroMath.cs" Link="Source\Logic\AstroMath.cs" />
     <Compile Include="..\Source\Logic\StarBrightness.cs" Link="Source\Logic\StarBrightness.cs" />
     <Compile Include="..\Source\Logic\StarSpriteMath.cs" Link="Source\Logic\StarSpriteMath.cs" />
+    <Compile Include="..\Source\Logic\SextantRimProfile.cs" Link="Source\Logic\SextantRimProfile.cs" />
     <Compile Include="..\Source\Logic\SternspreizPsfMath.cs" Link="Source\Logic\SternspreizPsfMath.cs" />
     <Compile Include="..\Source\Logic\SternspreizLineProfile.cs" Link="Source\Logic\SternspreizLineProfile.cs" />
     <Compile Include="..\Source\Logic\StarColor.cs" Link="Source\Logic\StarColor.cs" />
     <Compile Include="..\Source\Logic\SternspreizLensField.cs" Link="Source\Logic\SternspreizLensField.cs" />
+    <Compile Include="..\Source\Logic\SternspreizLensTilt.cs" Link="Source\Logic\SternspreizLensTilt.cs" />
     <Compile Include="..\Source\Logic\StarSkyConditions.cs" Link="Source\Logic\StarSkyConditions.cs" />
     <Compile Include="..\Source\Logic\StarQuadScale.cs" Link="Source\Logic\StarQuadScale.cs" />
     <Compile Include="..\Source\Logic\SkyRenderQueuePolicy.cs" Link="Source\Logic\SkyRenderQueuePolicy.cs" />

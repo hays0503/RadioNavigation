@@ -46,10 +46,11 @@ Shader "RadioNav/SternspreizStreak"
         _EndTaper ("End taper", Range(0, 0.5)) = 0.25
         _WidthTaper ("Width taper toward the ends", Range(0, 2)) = 1.0
         _MinWidth ("Minimum relative width at the ends", Range(0.02, 1)) = 0.12
-        // Cloud occlusion: UniStorm's fullCloudBuff0 dome alpha (modes 1/2) or
-        // the screen-space GBuffer3 alpha the cloud composite writes (mode 3)
-        // fades the point sprites behind the clouds. Declared here (not just in
-        // the passes) so Material.HasProperty sees them; mode 0 = off.
+        // Legacy experimental cloud-mask switches (modes 1-3), default OFF.
+        // Production occlusion is the Sky-stage ordering above. The screen-space
+        // GBuffer3 alpha is not a valid cloud mask: PointSky draws before the
+        // composite, and the observed composite blend uses Zero/Zero for alpha.
+        // These properties are declared only for the retained diagnostic path.
         [HideInInspector] _CloudOcclusionTex ("Cloud occlusion", 2D) = "black" {}
         [HideInInspector] _CloudOcclusionMode ("Cloud occlusion mode", Float) = 0
         [HideInInspector] _CloudOcclusionStrength ("Cloud occlusion strength", Float) = 1
@@ -117,10 +118,10 @@ Shader "RadioNav/SternspreizStreak"
                     float a;
                     if (_CloudOcclusionMode > 2.5)
                     {
-                        // Mode 3: screen-space cloud opacity. The UniStorm
-                        // composite writes min(cloudAlpha * 1.5, 1) into the
-                        // alpha of the game's GBuffer3 target, so the fragment's
-                        // own screen UV addresses exactly its cloud coverage.
+                        // Historical mode 3 only. This Sky-stage draw precedes
+                        // the cloud composite, and the observed GBuffer3 alpha is
+                        // cleared by its Zero/Zero alpha blend; do not use this
+                        // branch as production occlusion.
                         float2 screenUv = i.pos.xy / _ScreenParams.xy;
                         a = tex2D(_CloudOcclusionTex, screenUv).a;
                     }
@@ -199,10 +200,9 @@ Shader "RadioNav/SternspreizStreak"
                     float a;
                     if (_CloudOcclusionMode > 2.5)
                     {
-                        // Mode 3: screen-space cloud opacity. The UniStorm
-                        // composite writes min(cloudAlpha * 1.5, 1) into the
-                        // alpha of the game's GBuffer3 target, so the fragment's
-                        // own screen UV addresses exactly its cloud coverage.
+                        // Historical mode 3 only. This pass is not the production
+                        // Sky pass, and the observed GBuffer3 alpha is not a
+                        // preserved cloud-opacity mask.
                         float2 screenUv = i.pos.xy / _ScreenParams.xy;
                         a = tex2D(_CloudOcclusionTex, screenUv).a;
                     }
@@ -284,10 +284,8 @@ Shader "RadioNav/SternspreizStreak"
                     float a;
                     if (_CloudOcclusionMode > 2.5)
                     {
-                        // Mode 3: screen-space cloud opacity. The UniStorm
-                        // composite writes min(cloudAlpha * 1.5, 1) into the
-                        // alpha of the game's GBuffer3 target, so the fragment's
-                        // own screen UV addresses exactly its cloud coverage.
+                        // Historical mode 3 only. The cloud composite is drawn
+                        // after this pass; its target alpha is not a usable mask.
                         float2 screenUv = i.pos.xy / _ScreenParams.xy;
                         a = tex2D(_CloudOcclusionTex, screenUv).a;
                     }

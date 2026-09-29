@@ -871,6 +871,62 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Visual-profile ownership gate: the star renderer must use the
+        /// core+halo PSF rather than the legacy Gaussian, and the ocular rim
+        /// Image must be fed by the resolution-independent profile which adds
+        /// the narrow bezel over the retained tube vignette. This prevents a
+        /// future edit to an unused shader asset from masquerading as a live UI
+        /// change.
+        /// </summary>
+        [Fact]
+        public void OpticalProfiles_AreAppliedToTheLiveStarAndOcularPaths()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var stars = FindSourceType(roots, "StarsMesh");
+            var sprite = FindSourceType(roots, "StarSpriteMath");
+            var sprites = FindSourceType(roots, "SextantSprites");
+            var rim = FindSourceType(roots, "SextantRimProfile");
+            var ocular = FindSourceType(roots, "SextantOcularBuilder");
+
+            var buildStarSprite = FindMethod(stars, "BuildSpriteTexture");
+            if (buildStarSprite == null
+                || !InvokesName(buildStarSprite, "BuildOpticalPsfField"))
+                problems.Add("StarsMesh must upload the tested optical core/halo PSF, not the legacy single Gaussian");
+
+            if (sprite == null
+                || !HasFieldNamed(sprite, "OpticalCoreSigma")
+                || !HasFieldNamed(sprite, "OpticalHaloSigma")
+                || !HasFieldNamed(sprite, "OpticalHaloWeight")
+                || FindMethod(sprite, "BuildOpticalPsfField") == null)
+                problems.Add("StarSpriteMath must define and build the two-scale optical PSF");
+
+            var createRing = FindMethod(sprites, "CreateRingTexture");
+            if (createRing == null
+                || !InvokesName(createRing, "Evaluate")
+                || createRing.ToString().IndexOf("SextantRimProfile", StringComparison.Ordinal) < 0
+                || !InvokesName(createRing, "SetPixels32"))
+                problems.Add("the ring sprite must be rasterized from SextantRimProfile at the profile resolution");
+
+            if (rim == null
+                || FindMethod(rim, "Evaluate") == null
+                || !HasFieldNamed(rim, "TextureSize"))
+                problems.Add("SextantRimProfile is missing its resolution-independent radial profile");
+
+            var buildOcular = FindMethod(ocular, "BuildOcular");
+            if (buildOcular == null
+                || !InvokesName(buildOcular, "CreateRingTexture")
+                || buildOcular.ToString().IndexOf("EdgeRing", StringComparison.Ordinal) < 0)
+                problems.Add("the active ocular EdgeRing must consume the procedural bezel texture");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} live-optics profile violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Flare-driver context gate (SRP): LighthouseFlareDriver.Update must
         /// take a single FlareFrame parameter instead of a sprawling parameter
         /// list. A bundled frame object keeps the per-frame call-site contract
@@ -4130,6 +4186,21 @@ namespace RadioNavigation.SourceCheck
                             || inv.ArgumentList.Arguments.Count < 1
                             || inv.ArgumentList.Arguments[0].Expression.ToString() != "streakMesh"))
                     problems.Add("Lens DrawMesh must draw the lens-owned streak mesh, not a foreign mesh");
+                if (draw == null
+                    || draw.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                        .Where(inv => CalledName(inv) == "DrawMesh")
+                        .All(inv => inv.ArgumentList.Arguments.Count != 5
+                            || inv.ArgumentList.Arguments[4].Expression.ToString() != "0"))
+                    problems.Add("Lens must explicitly draw pass 0: the 2-D baked profile owns the live streak shape");
+
+                var rebuildStreak = FindMethod(lens, "RebuildStreakMesh");
+                if (rebuildStreak == null
+                    || !InvokesName(rebuildStreak, "ApplyRoll")
+                    || rebuildStreak.ToString().IndexOf("ThicknessDeg = BaselineThicknessDeg", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens mesh must apply the tiny observer-frame roll and fixed angular thickness");
+                if (lensText.IndexOf("SternspreizLensTilt.AngleDeg(Time.unscaledTime)", StringComparison.Ordinal) < 0
+                    || lensText.IndexOf("SternspreizLensTilt.ShouldUpdate", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens must animate its small roll through the throttled pure tilt policy");
 
                 var ensureMaterial = FindMethod(lens, "EnsureMaterial");
                 if (ensureMaterial == null
@@ -5126,18 +5197,15 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
-        /// Cloud-occlusion gate (2026-09-29): UniStorm's clouds write no depth,
-        /// so the celestial point sprites (drawn after the composite) always
-        /// paint over the clouds. Each of the five sky renderers must push the
-        /// live CloudOcclusionSwitch into its material every frame via
-        /// CloudOcclusionBinding.Apply; the bundled RadioNavStarField.shader
-        /// must carry the occlusion block in its three point passes (Point,
-        /// PointForward, PointSky; mode 0 = untouched default path) including
-        /// the mode-3 screen-space branch (GBuffer3 alpha via the fragment's
-        /// screen UV); and the binding must pick the texture by mode.
-        /// Mutations: drop Apply from one renderer -> FAIL; remove the shader
-        /// block -> FAIL; change/remove the mode-3 guard in any pass -> FAIL;
-        /// break the GBuffer3/mode selection in the binding -> FAIL.
+        /// Legacy cloud-mask experiment wiring (2026-09-29). Production clouds
+        /// cover the mod layer through the single PointSky pass ordering; modes
+        /// 1-3 remain disabled (Mode 0) diagnostic branches, not an occlusion
+        /// guarantee. In particular, mode 3's GBuffer3 alpha was later shown
+        /// unusable: the cloud composite runs after PointSky and its observed
+        /// alpha blend factors are Zero/Zero. This gate only keeps the dormant
+        /// experiment internally wired until it can be removed separately.
+        /// Mutations: drop Apply from one renderer -> FAIL; remove the legacy
+        /// shader block -> FAIL; break the old binding selection -> FAIL.
         /// </summary>
         [Fact]
         public void CelestialRenderers_RouteThroughCloudOcclusion()
@@ -5231,13 +5299,13 @@ namespace RadioNavigation.SourceCheck
                 string bindingText = binding.ToFullString();
                 if (bindingText.IndexOf("GBuffer3", StringComparison.Ordinal) < 0)
                 {
-                    problems.Add("CloudOcclusionBinding must resolve the screen-space "
+                    problems.Add("Legacy CloudOcclusionBinding no longer resolves its historical "
                         + "'GBuffer3' target for mode 3");
                 }
                 if (bindingText.IndexOf("Mode >= 3", StringComparison.Ordinal) < 0)
                 {
-                    problems.Add("CloudOcclusionBinding.Apply must select the texture "
-                        + "by mode (mode 3 = the GBuffer target, modes 1/2 = the dome map)");
+                    problems.Add("Legacy CloudOcclusionBinding.Apply must select the diagnostic "
+                        + "texture by mode (not a production cloud-occlusion path)");
                 }
             }
 
@@ -5250,10 +5318,10 @@ namespace RadioNavigation.SourceCheck
         /// Sky-stage gate (2026-09-29): the Deep pipeline draws a
         /// ShaderTagId("Sky") stage with RenderQueueRange.opaque (0..2500),
         /// immediately after DrawSkybox and BEFORE the forward/G-buffer stages
-        /// (verified in com.dws.pipeline.Runtime.dll). The only shipping
-        /// Sky-tagged shader is the UniStorm volumetric-cloud composite (queue
-        /// 1051), so a celestial material that carries one point pass tagged
-        /// Sky and defaults to queue 1020 is composited UNDER the clouds. A
+        /// (verified in com.dws.pipeline.Runtime.dll). The mod's PointSky pass
+        /// and the UniStorm volumetric-cloud composite (queue 1051) both use
+        /// this stage, so the mod material must sort at 1020 to be composited
+        /// UNDER the clouds. A
         /// queue >= 2500 falls out of the Sky stage and (in the deferred path)
         /// leaves ForwardSRP to the transparent stage, i.e. drawn after the
         /// clouds - the original bug.

@@ -1,20 +1,17 @@
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Live-switchable cloud-occlusion mode for the mod's celestial layer,
-    /// driven by the MCP bridge (reflect_set). UniStorm's clouds write no depth,
-    /// so the mod's stars/planets/Moon/Sun (drawn after the composite) always
-    /// paint over them. Two opacity sources exist: UniStorm's volumetric dome
-    /// (<c>fullCloudBuff0</c> alpha, modes 1/2) and the screen-space cloud
-    /// opacity the composite writes into the game's <c>GBuffer3</c> target
-    /// alpha (mode 3). The five sky renderers push the mode/strength into their
-    /// material every frame through <see cref="CloudOcclusionBinding.Apply"/>,
-    /// so a bridge write takes effect within a frame or two without a restart.
-    /// <see cref="Mode"/> 0 is OFF — the shader's default path is untouched.
+    /// Legacy, live-switchable cloud-mask experiment, retained for diagnostics
+    /// only. Production occlusion is provided by the single PointSky pass being
+    /// drawn before UniStorm's cloud composite; do not enable these modes as a
+    /// substitute for that ordering. Modes 1/2 use an uncalibrated dome-map UV,
+    /// and mode 3 is invalid: PointSky runs before the cloud composite, while its
+    /// output target does not preserve alpha (the observed blend factors are
+    /// Zero/Zero for alpha). <see cref="Mode"/> 0 is the shipping/default path.
     /// </summary>
     internal static class CloudOcclusionSwitch
     {
-        /// <summary>0 = off, 1 = view-space orthographic dome map, 2 = world-azimuthal dome map, 3 = screen-space GBuffer3 cloud alpha.</summary>
+        /// <summary>0 = production ordering only; 1–3 = legacy uncalibrated/invalid cloud-mask experiments.</summary>
         internal static int Mode;
 
         /// <summary>Occlusion strength override, clamped to [0,1] when applied.</summary>

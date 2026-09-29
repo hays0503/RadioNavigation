@@ -13,13 +13,6 @@ namespace UBOAT.Mods.RadioNavigation
     /// </summary>
     internal static class SextantSprites
     {
-        // Tube light falloff (ring): clear center, gradual shadow, fully
-        // black before the mask edge so no seam shows at the rim.
-        private const float TubeShadowStart = 0.55f;
-        private const float TubeShadowMid = 0.85f;
-        private const float TubeShadowMidAlpha = 0.45f;
-        private const float TubeShadowFull = 0.97f;
-
         // Eyecup (наглазник): solid black up to the ocular rim, long soft
         // falloff outward (out-of-focus rubber close to the eye).
         private const float EyecupSolidTo = 0.60f;
@@ -27,11 +20,14 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Creates the ring texture; caller owns and must destroy it.</summary>
         public static Texture2D CreateRingTexture()
         {
-            const int size = 256;
+            const int size = SextantRimProfile.TextureSize;
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             tex.name = "RadioNavSextantRing";
             tex.hideFlags = HideFlags.DontSave;
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
             float half = size * 0.5f;
+            var pixels = new Color32[size * size];
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
@@ -39,24 +35,21 @@ namespace UBOAT.Mods.RadioNavigation
                     float dx = (x + 0.5f - half) / half;
                     float dy = (y + 0.5f - half) / half;
                     float r = Mathf.Sqrt(dx * dx + dy * dy);
-                    float a;
-                    if (r <= TubeShadowStart) a = 0f;
-                    else if (r >= TubeShadowFull) a = 1f;
-                    else if (r <= TubeShadowMid)
-                    {
-                        float t = (r - TubeShadowStart) / (TubeShadowMid - TubeShadowStart);
-                        a = TubeShadowMidAlpha * (t * t * (3f - 2f * t));
-                    }
-                    else
-                    {
-                        float t = (r - TubeShadowMid) / (TubeShadowFull - TubeShadowMid);
-                        a = TubeShadowMidAlpha + (1f - TubeShadowMidAlpha) * (t * t * (3f - 2f * t));
-                    }
-                    tex.SetPixel(x, y, new Color(0f, 0f, 0f, a));
+                    float lightFacing = r > 0f
+                        ? (-dx + dy) * 0.70710678f / r : 0f;
+                    SextantRimSample sample = SextantRimProfile.Evaluate(r, lightFacing);
+                    pixels[y * size + x] = new Color32(
+                        ToByte(sample.R), ToByte(sample.G), ToByte(sample.B), ToByte(sample.A));
                 }
             }
+            tex.SetPixels32(pixels);
             tex.Apply();
             return tex;
+        }
+
+        private static byte ToByte(float value)
+        {
+            return (byte)Mathf.Clamp(Mathf.RoundToInt(value * 255f), 0, 255);
         }
 
         public static Sprite CreateRingSprite(Texture2D ringTexture)

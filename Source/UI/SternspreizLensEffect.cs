@@ -23,17 +23,19 @@ namespace UBOAT.Mods.RadioNavigation
     ///
     /// PlayerPrefs RadioNav.SternspreizLens: 1 = lens swung in (default 0).
     /// PlayerPrefs RadioNav.SternspreizLengthDeg: angular line length (baseline
-    /// value only - no published optical measurement exists). The widened
-    /// baseline (DefaultLengthDeg) is coupled to ThicknessRatio: the streak is
-    /// twice as long along the line while the across-line thickness - the
-    /// visible height of the rhombus - is unchanged (length * ratio is fixed).
+    /// value only - no published optical measurement exists). The across-line
+    /// thickness is an independent angle, so making the line longer does not
+    /// turn the historical short dash into a fat rhombus. The line also rocks
+    /// very slightly (±0.25° over 8 s) as requested; its centre stays on the
+    /// star.
     /// </summary>
     internal sealed class SternspreizLensEffect : MonoBehaviour, IOpaqueImageEffect, IDisposable
     {
         internal const string PrefsKey = "RadioNav.SternspreizLens";
         internal const string LengthPrefsKey = "RadioNav.SternspreizLengthDeg";
         internal const string ComponentName = "SternspreizLensEffect";
-        internal const float DefaultLengthDeg = 0.7f;
+        internal const float DefaultLengthDeg = 1.5f;
+        internal const float BaselineThicknessDeg = 0.189f;
         internal const float MinLengthDeg = 0.02f;
         internal const float MaxLengthDeg = 3f;
         internal const int MaxStars = 48;
@@ -41,13 +43,6 @@ namespace UBOAT.Mods.RadioNavigation
         private const string LogPrefix = "[RadioNav][Sternspreiz][Lens]";
         private const string MaterialAssetName = "RadioNavSternspreizStreak";
         private const string ShaderAssetName = "RadioNavStarField";
-        // Author request 2026-11-07 - 3.4x wider rhombus (0.16 -> 0.54).
-        // Author request 2026-11-08 - 2x wider along the line, SAME height:
-        // DefaultLengthDeg 0.35 -> 0.7 with the ratio halved here (0.54 -> 0.27),
-        // so length * ratio = 0.35*0.54 = 0.7*0.27 = 0.189 deg is invariant and
-        // the absolute (world-space) thickness does not change.
-        private const float ThicknessRatio = 0.27f;
-
         private Camera pipCamera;
         private bool rightEye;
         private bool configured;
@@ -75,6 +70,8 @@ namespace UBOAT.Mods.RadioNavigation
         private double lastLstDeg = double.NaN;
         private float lastLat = float.NaN;
         private float lastRebuildRealtime;
+        private float lastTiltRebuildRealtime = float.NegativeInfinity;
+        private float lastTiltDeg = float.NaN;
 
         private int callbackCount;
         private int lastCallbackFrame = -1;
@@ -169,6 +166,13 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (ShouldRebuild())
                 RebuildField();
+            else
+            {
+                float tilt = SternspreizLensTilt.AngleDeg(Time.unscaledTime);
+                if (SternspreizLensTilt.ShouldUpdate(lastTiltDeg, tilt,
+                        lastTiltRebuildRealtime, Time.realtimeSinceStartup))
+                    RebuildStreakMesh(tilt);
+            }
             if (lastEmitted <= 0)
                 return;
 
@@ -214,17 +218,7 @@ namespace UBOAT.Mods.RadioNavigation
             lastStarCount = SternspreizLensField.CollectVisibleStars(lat, lstDeg, jd,
                 (float)limitingMag, fogginess, adaptation, MaxStars, stars);
 
-            LensCamera camera = BuildCamera();
-            LensOptics optics = new LensOptics
-            {
-                LineLengthDeg = LengthDeg,
-                ThicknessRatio = ThicknessRatio,
-                DistanceM = CameraResolver.SafeRadius(pipCamera)
-            };
-            lastEmitted = SternspreizLensField.BuildStreakMesh(stars, lastStarCount,
-                camera, optics, positions, colors, uvs, indices);
-            ApplySkyFade();
-            UploadMesh();
+            RebuildStreakMesh(SternspreizLensTilt.AngleDeg(Time.unscaledTime));
 
             lastRebuildFrame = Time.frameCount;
             lastCamPos = pipCamera.transform.position;
@@ -232,6 +226,28 @@ namespace UBOAT.Mods.RadioNavigation
             lastLstDeg = lstDeg;
             lastLat = lat;
             lastRebuildRealtime = Time.realtimeSinceStartup;
+        }
+
+        /// <summary>
+        /// Re-emits the capped streak mesh in the live instrument frame. When
+        /// only the small roll changes, the already-collected star set is
+        /// reused; the 5046-entry catalog is not rescanned for the wobble.
+        /// </summary>
+        private void RebuildStreakMesh(float tiltDeg)
+        {
+            LensCamera camera = SternspreizLensTilt.ApplyRoll(BuildCamera(), tiltDeg);
+            LensOptics optics = new LensOptics
+            {
+                LineLengthDeg = LengthDeg,
+                ThicknessDeg = BaselineThicknessDeg,
+                DistanceM = CameraResolver.SafeRadius(pipCamera)
+            };
+            lastEmitted = SternspreizLensField.BuildStreakMesh(stars, lastStarCount,
+                camera, optics, positions, colors, uvs, indices);
+            ApplySkyFade();
+            UploadMesh();
+            lastTiltDeg = tiltDeg;
+            lastTiltRebuildRealtime = Time.realtimeSinceStartup;
         }
 
         private LensCamera BuildCamera()
@@ -380,10 +396,9 @@ namespace UBOAT.Mods.RadioNavigation
             streakMaterial.name = MaterialAssetName + (rightEye ? " (right)" : " (left)");
             streakMaterial.hideFlags = HideFlags.DontSave;
             SetProfileTexture();
-            SetFloatIfPresent("_Softness", 0.35f);
-            SetFloatIfPresent("_EndTaper", 0.35f);
-            SetFloatIfPresent("_WidthTaper", 1.0f);
-            SetFloatIfPresent("_MinWidth", 0.12f);
+            // DrawMesh explicitly selects pass 0 (Point). Its 2-D baked
+            // profile owns softness/taper; these uniforms belong to the
+            // unused reference Streak pass and would be a silent no-op here.
             SetColorIfPresent("_Color", Color.white);
             return true;
         }
@@ -394,15 +409,6 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             if (streakMaterial.HasProperty("_MainTex"))
                 streakMaterial.mainTexture = profileTexture;
-        }
-
-        private void SetFloatIfPresent(string property, float value)
-        {
-            if (streakMaterial == null)
-                return;
-            if (!streakMaterial.HasProperty(property))
-                return;
-            streakMaterial.SetFloat(property, value);
         }
 
         private void SetColorIfPresent(string property, Color value)
@@ -418,12 +424,15 @@ namespace UBOAT.Mods.RadioNavigation
         internal string SnapshotJson()
         {
             return string.Format(CultureInfo.InvariantCulture,
-                "{{\"enabled\":{0},\"configured\":{1},\"material\":\"{2}\",\"lengthDeg\":{3},"
-                + "\"stars\":{4},\"emitted\":{5},\"draws\":{6},\"drew\":{7},\"rebuildFrame\":{8},"
-                + "\"callbackCount\":{9},\"lastFrame\":{10},\"setupError\":\"{11}\"}}",
+                "{{\"enabled\":{0},\"configured\":{1},\"material\":\"{2}\",\"lengthDeg\":{3},\"thicknessDeg\":{4},\"tiltDeg\":{5},"
+                + "\"stars\":{6},\"emitted\":{7},\"draws\":{8},\"drew\":{9},\"rebuildFrame\":{10},"
+                + "\"callbackCount\":{11},\"lastFrame\":{12},\"setupError\":\"{13}\"}}",
                 Enabled ? "true" : "false", configured ? "true" : "false",
                 streakMaterial != null ? RadioNavProbeJson.Escape(streakMaterial.shader.name) : string.Empty,
                 LengthDeg.ToString("F3", CultureInfo.InvariantCulture),
+                BaselineThicknessDeg.ToString("F3", CultureInfo.InvariantCulture),
+                (float.IsNaN(lastTiltDeg) || float.IsInfinity(lastTiltDeg) ? 0f : lastTiltDeg)
+                    .ToString("F3", CultureInfo.InvariantCulture),
                 lastStarCount, lastEmitted, drawCount, lastDrew ? "true" : "false",
                 lastRebuildFrame, callbackCount, lastCallbackFrame,
                 RadioNavProbeJson.Escape(setupError ?? string.Empty));

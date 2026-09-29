@@ -20,7 +20,7 @@ namespace UBOAT.Mods.RadioNavigation
     public struct LensOptics
     {
         public float LineLengthDeg;
-        public float ThicknessRatio;  // across-line thickness as a fraction of the length
+        public float ThicknessDeg;    // independent angular thickness of the optical line
         public float DistanceM;       // draw distance (same shell the star mesh uses)
     }
 
@@ -176,11 +176,13 @@ namespace UBOAT.Mods.RadioNavigation
 
             float fullWidth = SternspreizLineProfile.AngularWidthMeters(
                 optics.LineLengthDeg, optics.DistanceM);
+            float fullThickness = SternspreizLineProfile.AngularWidthMeters(
+                optics.ThicknessDeg, optics.DistanceM);
             if (fullWidth <= 0f)
                 return 0;
 
             float halfLength = fullWidth * 0.5f;
-            float halfThickness = halfLength * optics.ThicknessRatio;
+            float halfThickness = fullThickness * 0.5f;
             int maxEmittable = Math.Min(positions.Length / (VerticesPerStreak * 3),
                 indices.Length / IndicesPerStreak);
 
