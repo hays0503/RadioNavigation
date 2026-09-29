@@ -1,23 +1,37 @@
 // RadioNavigation Sternspreiz star shader.
 //
-// Two roles, four passes:
-//  - "Point" (untagged, SRPDefaultUnlit) and "PointForward" (LightMode=ForwardSRP)
-//    draw the mod's point-star sprites on scene renderers. The game's Deep
-//    pipeline draws scene renderers by shader tag, so a sprite shader without a
-//    matching pass never appears (live 2026-09-28: StarsMesh contributed zero
-//    pixels). Blend comes from the material's _SrcBlend/_DstBlend, which is how
-//    StarsMesh asks for additive star light.
-//  - "PointSky" (LightMode=Sky) is the copy the Deep pipeline's Sky stage draws
-//    (DeepPipeline.RenderSky, ShaderTagId "Sky", RenderQueueRange.opaque) right
-//    after DrawSkybox and BEFORE the forward/G-buffer stages. The UniStorm cloud
-//    composite is the only shipping Sky-tagged shader (queue 1051), so a
-//    celestial material queued below 1051 (and below 2500 so the opaque-range
-//    filter accepts it) is composited UNDER the clouds. This also takes the
-//    material out of the transparent range, where the deferred path's
-//    RenderTransparent was the only stage drawing ForwardSRP.
-//  - "Streak" draws the Sternspreiz line. The lens draws this pass EXPLICITLY
-//    through the PIP command buffer (DrawMesh pass index 2), so the scene
-//    passes above never need to know about it.
+// FOUR passes, but only ONE of them may ever be matched by a pipeline stage:
+//
+//  - "PointSky" (LightMode=Sky) is the ONLY pipeline-visible pass. The Deep
+//    pipeline's Sky stage (DeepPipeline.RenderSky, ShaderTagId "Sky",
+//    RenderQueueRange.opaque) draws it right after DrawSkybox and BEFORE the
+//    forward/G-buffer stages. The UniStorm cloud composite is the only shipping
+//    Sky-tagged shader (queue 1051), so a celestial material queued below 1051
+//    (and below 2500 so the opaque-range filter accepts it) is composited UNDER
+//    the clouds - which is the whole point: the game's own composite, not a
+//    mask, decides how much starlight a cloud lets through.
+//
+//  - "Point", "PointForward" and "Streak" are RETAINED COPIES that carry a
+//    private LightMode tag no pipeline stage queries. They must stay
+//    non-matchable. RenderDoc evidence (main-view capture
+//    mainview_frame25072, 2026-09-30): with the material at queue 1020 the
+//    sprite mesh was submitted TWICE per frame - once into the 800x452 scene
+//    target before the cloud composite (correct) and once into the 1360x768
+//    post-process output AFTER it, from a DIFFERENT compiled pass of the same
+//    material (the pixel shader hash was identical, the shader object id was
+//    not). That second submission is what made the stars shine through the
+//    clouds, and it ignored renderQueue, so no queue value can suppress it.
+//    Tagging the copy with a name the pipeline never asks for removes it.
+//    The lens still draws "Streak" EXPLICITLY through the PIP command buffer
+//    (CommandBuffer.DrawMesh with an explicit pass index), which is unaffected
+//    by tags.
+//
+//  - The pipeline-visible behaviour is unchanged by this: an untagged pass
+//    falls back to SRPDefaultUnlit, and the SRP Batcher picks the pass by tag,
+//    not by name, so the copies below never shadow "PointSky".
+//
+// Blend comes from the material's _SrcBlend/_DstBlend, which is how StarsMesh
+// asks for additive star light.
 // The line profile/texture and the band shaping are the mod's tested PSF math.
 // NOTE (open question): the Sky stage enables the global keyword TOD_OUTPUT_HDR
 // before DrawSkybox/RenderSky; no keyword is declared here on purpose - if the
@@ -51,10 +65,11 @@ Shader "RadioNav/SternspreizStreak"
         Cull Off
         Lighting Off
 
-        // 1) Scene point sprite, default pass name.
+        // 1) Point sprite copy - kept for reference, never matched by a stage.
         Pass
         {
             Name "Point"
+            Tags { "LightMode" = "RadioNavPointSpriteReference" }
             CGPROGRAM
             #pragma vertex vertPoint
             #pragma fragment fragPoint
@@ -136,7 +151,7 @@ Shader "RadioNav/SternspreizStreak"
         Pass
         {
             Name "PointForward"
-            Tags { "LightMode" = "ForwardSRP" }
+            Tags { "LightMode" = "RadioNavPointForwardReference" }
             CGPROGRAM
             #pragma vertex vertPoint
             #pragma fragment fragPoint
@@ -303,6 +318,7 @@ Shader "RadioNav/SternspreizStreak"
         Pass
         {
             Name "Streak"
+            Tags { "LightMode" = "RadioNavStreakReference" }
             Blend SrcAlpha One
             ZWrite Off
             CGPROGRAM

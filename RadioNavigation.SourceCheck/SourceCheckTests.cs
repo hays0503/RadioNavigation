@@ -5387,6 +5387,154 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Single-pipeline-pass gate (2026-09-30). RenderDoc on the MAIN view
+        /// (capture mainview_frame25072) showed the celestial mesh submitted
+        /// TWICE per frame with the material at queue 1020: once into the
+        /// 800x452 scene target before the UniStorm composite, and once into
+        /// the 1360x768 post-process output AFTER it, from a different
+        /// compiled pass of the same material. That second submission ignored
+        /// renderQueue and painted the stars over the finished sky - the
+        /// actual cause of "stars shine through the clouds". The fix is not a
+        /// queue value or a cloud mask: exactly ONE pass of the shader may be
+        /// matchable by a pipeline stage, the Sky-tagged one, so the game's own
+        /// composite (SrcAlpha/InvSrcAlpha, queue 1051) is the only thing that
+        /// decides how much starlight a cloud lets through.
+        ///
+        /// Rules:
+        ///  A) every Pass declares a LightMode tag (an untagged pass falls back
+        ///     to SRPDefaultUnlit and is picked up by post-process stages);
+        ///  B) exactly one pass declares LightMode = "Sky" - the PointSky copy;
+        ///  C) the three reference copies carry the private tags
+        ///     RadioNavPointSpriteReference / RadioNavPointForwardReference /
+        ///     RadioNavStreakReference, which no stage queries;
+        ///  D) no pass declares a pipeline tag other than "Sky"
+        ///     (ForwardSRP / SRPDefaultUnlit / UniversalForward are banned).
+        /// Mutations: drop the tag from the Point pass -> FAIL; tag Point
+        /// ForwardSRP again -> FAIL; tag a second pass Sky -> FAIL.
+        /// </summary>
+        [Fact]
+        public void CelestialShader_ExposesOnlyTheSkyPassToThePipeline()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            string shaderPath = ResolveStarFieldShaderPath();
+            if (shaderPath == null)
+            {
+                problems.Add("RadioNavStarField.shader not found");
+            }
+            else
+            {
+                string text = File.ReadAllText(shaderPath);
+                var referenceTags = new[]
+                {
+                    "RadioNavPointSpriteReference",
+                    "RadioNavPointForwardReference",
+                    "RadioNavStreakReference"
+                };
+                string[] pipelineTags =
+                {
+                    "ForwardSRP", "SRPDefaultUnlit", "UniversalForward",
+                    "UniversalForwardOnly", "LightweightForward", "DepthOnly",
+                    "ShadowCaster"
+                };
+
+                int skyPasses = 0;
+                int cursor = 0;
+                while (true)
+                {
+                    int nameAt = text.IndexOf("Name \"", cursor, StringComparison.Ordinal);
+                    if (nameAt < 0)
+                        break;
+
+                    int nameEnd = text.IndexOf('"', nameAt + 6);
+                    string passName = nameEnd > nameAt
+                        ? text.Substring(nameAt + 6, nameEnd - nameAt - 6)
+                        : "?";
+
+                    int nextPass = text.IndexOf("Name \"", nameEnd, StringComparison.Ordinal);
+                    string body = nextPass > nameEnd
+                        ? text.Substring(nameAt, nextPass - nameAt)
+                        : text.Substring(nameAt);
+
+                    string tag = null;
+                    int tagAt = body.IndexOf("\"LightMode\"", StringComparison.Ordinal);
+                    if (tagAt >= 0)
+                    {
+                        int valueAt = body.IndexOf('"', tagAt + 13);
+                        int valueEnd = valueAt > tagAt
+                            ? body.IndexOf('"', valueAt + 1)
+                            : -1;
+                        if (valueAt > tagAt && valueEnd > valueAt)
+                            tag = body.Substring(valueAt + 1, valueEnd - valueAt - 1);
+                    }
+
+                    if (tag == null || tag.Length == 0)
+                    {
+                        problems.Add("pass '" + passName + "' declares no LightMode tag - "
+                            + "an untagged pass falls back to SRPDefaultUnlit and post-process "
+                            + "stages re-draw the celestial layer over the finished sky");
+                    }
+                    else if (tag == "Sky")
+                    {
+                        skyPasses++;
+                    }
+                    else if (Array.IndexOf(referenceTags, tag) < 0)
+                    {
+                        problems.Add("pass '" + passName + "' carries the pipeline tag '"
+                            + tag + "'; only the private reference tags ("
+                            + string.Join(", ", referenceTags) + ") or \"Sky\" are allowed");
+                    }
+
+                    for (int i = 0; i < pipelineTags.Length; i++)
+                    {
+                        if (tag == pipelineTags[i])
+                        {
+                            problems.Add("pass '" + passName + "' is matchable by the "
+                                + "pipeline again (LightMode = " + pipelineTags[i] + ")");
+                        }
+                    }
+
+                    cursor = nameEnd + 1;
+                }
+
+                if (skyPasses != 1)
+                {
+                    problems.Add("exactly one pass may declare LightMode = \"Sky\" (the "
+                        + "PointSky copy the Deep pipeline's Sky stage draws); found "
+                        + skyPasses);
+                }
+
+                // The in-repo reference copy (Source/Shaders) must stay byte-equal
+                // to the Unity source the bundle is built from: editing only one
+                // of the two silently ships a different shader than the one the
+                // repo documents.
+                string referenceCopy = Path.Combine(ModCompiler.ModRoot, "Source",
+                    "Shaders", "RadioNavStarField.shader");
+                if (File.Exists(referenceCopy))
+                {
+                    string referenceText = Normalize(File.ReadAllText(referenceCopy));
+                    if (referenceText != Normalize(text))
+                    {
+                        problems.Add("Source/Shaders/RadioNavStarField.shader differs from "
+                            + "the Unity source the bundle is built from - the two copies "
+                            + "must stay identical (the bundle wins at runtime)");
+                    }
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} celestial-shader pass violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>Line-ending/whitespace-insensitive text comparison.</summary>
+        private static string Normalize(string value)
+        {
+            return value.Replace("\r\n", "\n").TrimEnd();
+        }
+
+        /// <summary>
         /// Locates the mod's star shader in the Unity source project (the
         /// bundle is built from there, outside the repo). Overridable via
         /// UBOAT_TESTUI_PROJECT; returns null when the project is absent so
