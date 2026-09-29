@@ -3,17 +3,22 @@ using UnityEngine;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Sky render-queue policy. UniStorm's volumetric cloud dome (~5.5 km)
-    /// is farther than the mod's ~3.7 km celestial shell, so Unity draws it
-    /// first (transparent sorting is back-to-front) and the clouds write no
-    /// depth — our quads then paint over them. Lowering our material queue
-    /// below the cloud queue makes the cloud pass blend OVER the sky. The
-    /// queue is a live-switchable override (<see cref="SkyRenderQueueSwitch"/>)
-    /// so it can be tuned without a game restart.
+    /// Sky render-queue policy. The correct occlusion route is the Deep
+    /// pipeline's Sky stage (<c>ShaderTagId("Sky")</c>, drawn right after
+    /// <c>DrawSkybox</c> and before the forward/G-buffer stages with
+    /// <c>RenderQueueRange.opaque</c>): the celestial materials carry a Sky
+    /// pass and default to <see cref="SkyStageQueue"/> (1020), below the
+    /// UniStorm cloud composite at 1051, so the clouds blend OVER the mod's
+    /// sky content. An old hypothesis — lowering the queue inside the
+    /// transparent band — was disproved by RenderDoc (a queue of 1990 simply
+    /// dropped the star field from the frame); that is why 1020 must stay
+    /// below 2500.
     ///
-    /// The decision math (clamp/off) is kept in the pure <see cref="Clamp"/>
-    /// method so it is unit-testable; <see cref="TryApply"/> is the Unity
-    /// write.
+    /// <see cref="SkyRenderQueueSwitch"/> is a live override for experiments,
+    /// so the default can be tuned without a game restart. The decision math
+    /// (clamp/off) is kept in the pure <see cref="Clamp"/> method so it is
+    /// unit-testable; <see cref="TryApply"/> and <see cref="ApplySkyStage"/>
+    /// are the Unity writes.
     /// </summary>
     internal static class SkyRenderQueuePolicy
     {
@@ -25,6 +30,20 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>Upper bound stays inside the Transparent queue band (3000+).</summary>
         internal const int MaxQueue = 3500;
+
+        /// <summary>
+        /// Queue every celestial material defaults to when its shader carries
+        /// the Sky-stage pass. <c>DeepPipeline.RenderSky</c> draws the
+        /// <c>ShaderTagId("Sky")</c> stage with <c>RenderQueueRange.opaque</c>
+        /// (0…2500), immediately after <c>DrawSkybox</c> and before the
+        /// forward/G-buffer stages; the only shipping Sky-tagged shader is the
+        /// UniStorm volumetric-cloud composite at queue 1051 (Background+51), so
+        /// 1020 sorts the celestial sprites UNDER the clouds. Any value ≥ 2500 is
+        /// filtered out of the Sky stage (and the deferred path then draws
+        /// ForwardSRP only in the transparent range, i.e. after the clouds —
+        /// the original bug).
+        /// </summary>
+        internal const int SkyStageQueue = 1020;
 
         /// <summary>
         /// Pure clamp. <see cref="Off"/> (0) and every negative value stay 0
@@ -55,6 +74,23 @@ namespace UBOAT.Mods.RadioNavigation
             int clamped = Clamp(queue);
             if (material.renderQueue != clamped)
                 material.renderQueue = clamped;
+            return true;
+        }
+
+        /// <summary>
+        /// Pushes the Sky-stage default queue onto a freshly created celestial
+        /// material. <paramref name="hasSkyPass"/> is supplied by the caller
+        /// (the material's shader must carry the <c>Sky</c> pass) so this
+        /// policy stays free of Unity shader lookups and testable with the
+        /// Material stub. The live override (<see cref="SkyRenderQueueSwitch"/>)
+        /// still wins per frame through <see cref="TryApply"/>.
+        /// </summary>
+        public static bool ApplySkyStage(Material material, bool hasSkyPass)
+        {
+            if (material == null || !hasSkyPass)
+                return false;
+            if (material.renderQueue != SkyStageQueue)
+                material.renderQueue = SkyStageQueue;
             return true;
         }
     }

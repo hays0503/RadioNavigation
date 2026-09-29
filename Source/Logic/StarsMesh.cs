@@ -73,9 +73,15 @@ namespace UBOAT.Mods.RadioNavigation
 
             material = CreateStarMaterial();
             if (material != null)
+            {
                 meshRenderer.material = material;
+                // Sky-stage default queue: under the UniStorm cloud composite.
+                // Only applies when the bundled shader (Sky pass) is in use.
+                SkyRenderQueuePolicy.ApplySkyStage(material,
+                    CelestialShaderResolver.IsBundled(material.shader));
+            }
             UsesBundledStarShader = material != null && material.shader != null
-                && material.shader.name == "RadioNav/SternspreizStreak";
+                && material.shader.name == CelestialShaderResolver.BundledShaderName;
 
             Debug.Log("[RadioNav][StarsMesh] Initialized with " + StarCatalog.Stars.Length + " stars");
         }
@@ -108,8 +114,6 @@ namespace UBOAT.Mods.RadioNavigation
             return created;
         }
 
-        private const string BundledStarShader = "RadioNavStarField";
-
         /// <summary>True once the star layer actually draws with the bundled
         /// star shader (the one the Deep pipeline renders). The game's
         /// decorative star sphere is hidden only in that state, so a loading or
@@ -121,11 +125,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static Shader ResolveStarShader()
         {
-            Shader bundled = ModBootstrapper.LoadBundleAsset(BundledStarShader) as Shader;
-            if (bundled != null)
-                return bundled;
-            Shader fallback = Shader.Find("Sprites/Default");
-            return fallback != null ? fallback : Shader.Find("Legacy Shaders/Particles/Additive");
+            return CelestialShaderResolver.ResolveShader();
         }
 
         /// <summary>
@@ -139,12 +139,13 @@ namespace UBOAT.Mods.RadioNavigation
             if (bundledShaderResolved || material == null || shaderUpgradeCountdown <= 0)
                 return;
 
-            Shader bundled = ModBootstrapper.LoadBundleAsset(BundledStarShader) as Shader;
+            Shader bundled = CelestialShaderResolver.LoadBundled();
             if (bundled != null)
             {
                 material.shader = bundled;
                 bundledShaderResolved = true;
                 UsesBundledStarShader = true;
+                SkyRenderQueuePolicy.ApplySkyStage(material, true);
                 Debug.Log("[RadioNav][StarsMesh] star shader resolved to bundled " + bundled.name);
                 return;
             }

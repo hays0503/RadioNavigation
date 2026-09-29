@@ -5101,12 +5101,12 @@ namespace RadioNavigation.SourceCheck
         /// paint over the clouds. Each of the five sky renderers must push the
         /// live CloudOcclusionSwitch into its material every frame via
         /// CloudOcclusionBinding.Apply; the bundled RadioNavStarField.shader
-        /// must carry the occlusion block in its two point passes (mode 0 =
-        /// untouched default path) including the mode-3 screen-space branch
-        /// (GBuffer3 alpha via the fragment's screen UV); and the binding must
-        /// pick the texture by mode.
+        /// must carry the occlusion block in its three point passes (Point,
+        /// PointForward, PointSky; mode 0 = untouched default path) including
+        /// the mode-3 screen-space branch (GBuffer3 alpha via the fragment's
+        /// screen UV); and the binding must pick the texture by mode.
         /// Mutations: drop Apply from one renderer -> FAIL; remove the shader
-        /// block -> FAIL; change/remove the mode-3 guard in either pass -> FAIL;
+        /// block -> FAIL; change/remove the mode-3 guard in any pass -> FAIL;
         /// break the GBuffer3/mode selection in the binding -> FAIL.
         /// </summary>
         [Fact]
@@ -5171,27 +5171,26 @@ namespace RadioNavigation.SourceCheck
                             + required[i]);
                 }
 
-                // The block belongs to the two point passes only (the lens'
-                // Streak pass must stay untouched).
+                // The block belongs to the three point passes only (Point,
+                // PointForward, PointSky; the lens' Streak pass stays untouched).
                 int blocks = text.Split(
                     new[] { "float occl = saturate(a * 1.5);" },
                     StringSplitOptions.None).Length - 1;
-                if (blocks != 2)
+                if (blocks != 3)
                 {
                     problems.Add("RadioNavStarField.shader must carry the occlusion block "
-                        + "in exactly the two point passes (found " + blocks + ")");
+                        + "in exactly the three point passes (found " + blocks + ")");
                 }
 
-                // The screen-space branch must likewise exist in both point
-                // passes (a single-pass branch leaves one pipeline tag
-                // un-occluded).
+                // The screen-space branch must likewise exist in all three point
+                // passes (a missing branch leaves one pipeline tag un-occluded).
                 int screenBranches = text.Split(
                     new[] { "_CloudOcclusionMode > 2.5" },
                     StringSplitOptions.None).Length - 1;
-                if (screenBranches != 2)
+                if (screenBranches != 3)
                 {
                     problems.Add("RadioNavStarField.shader must carry the mode-3 "
-                        + "screen-space branch in exactly the two point passes (found "
+                        + "screen-space branch in exactly the three point passes (found "
                         + screenBranches + ")");
                 }
             }
@@ -5214,6 +5213,146 @@ namespace RadioNavigation.SourceCheck
 
             Assert.True(problems.Count == 0,
                 $"{problems.Count} cloud-occlusion violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Sky-stage gate (2026-09-29): the Deep pipeline draws a
+        /// ShaderTagId("Sky") stage with RenderQueueRange.opaque (0..2500),
+        /// immediately after DrawSkybox and BEFORE the forward/G-buffer stages
+        /// (verified in com.dws.pipeline.Runtime.dll). The only shipping
+        /// Sky-tagged shader is the UniStorm volumetric-cloud composite (queue
+        /// 1051), so a celestial material that carries one point pass tagged
+        /// Sky and defaults to queue 1020 is composited UNDER the clouds. A
+        /// queue >= 2500 falls out of the Sky stage and (in the deferred path)
+        /// leaves ForwardSRP to the transparent stage, i.e. drawn after the
+        /// clouds - the original bug.
+        ///
+        /// Rules:
+        ///  A) the shader carries exactly one point pass named PointSky tagged
+        ///     LightMode = "Sky", and the pre-existing Point / PointForward /
+        ///     Streak passes survive;
+        ///  B) SkyRenderQueuePolicy declares SkyStageQueue = 1020 and an
+        ///     ApplySkyStage method;
+        ///  C) all five celestial renderers call ApplySkyStage;
+        ///  D) the four former Sprites/Default renderers resolve their shader
+        ///     through CelestialShaderResolver.
+        /// Mutations: remove the Sky tag -> FAIL; wrong queue constant -> FAIL;
+        /// drop ApplySkyStage from one renderer -> FAIL; re-introduce a raw
+        /// Shader.Find("Sprites/Default") in one of the four -> FAIL.
+        /// </summary>
+        [Fact]
+        public void CelestialRenderers_DrawInTheSkyStage()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var policy = FindSourceType(roots, "SkyRenderQueuePolicy");
+            if (policy == null)
+            {
+                problems.Add("type 'SkyRenderQueuePolicy' not found in Source/");
+            }
+            else
+            {
+                bool hasQueue = policy.DescendantNodes().OfType<FieldDeclarationSyntax>()
+                    .Any(f => f.ToString().Contains("SkyStageQueue = 1020"));
+                if (!hasQueue)
+                {
+                    problems.Add("SkyRenderQueuePolicy.SkyStageQueue must be 1020 "
+                        + "(inside the Sky stage's opaque range and below the cloud composite 1051)");
+                }
+                bool hasApply = policy.DescendantNodes().OfType<MethodDeclarationSyntax>()
+                    .Any(m => m.Identifier.Text == "ApplySkyStage");
+                if (!hasApply)
+                    problems.Add("SkyRenderQueuePolicy.ApplySkyStage not found");
+            }
+
+            var renderers = new[]
+            {
+                "StarsMesh", "ConstellationMesh", "PlanetRenderer",
+                "MoonDiscRenderer", "SunDiscRenderer"
+            };
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                var type = FindSourceType(roots, renderers[i]);
+                if (type == null)
+                {
+                    problems.Add("type '" + renderers[i] + "' not found in Source/");
+                    continue;
+                }
+                bool applies = type.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression.ToString() == "SkyRenderQueuePolicy.ApplySkyStage");
+                if (!applies)
+                {
+                    problems.Add(renderers[i] + " never calls SkyRenderQueuePolicy.ApplySkyStage "
+                        + "- its celestial material would not default to the sky-stage queue");
+                }
+            }
+
+            string shaderPath = ResolveStarFieldShaderPath();
+            if (shaderPath != null)
+            {
+                string text = File.ReadAllText(shaderPath);
+                int skyTags = text.Split(new[] { "\"LightMode\" = \"Sky\"" },
+                    StringSplitOptions.None).Length - 1;
+                if (skyTags != 1)
+                {
+                    problems.Add("RadioNavStarField.shader must declare the Sky pass exactly once "
+                        + "(found " + skyTags + ")");
+                }
+
+                int pointSkyStart = text.IndexOf("Name \"PointSky\"", StringComparison.Ordinal);
+                if (pointSkyStart < 0)
+                {
+                    problems.Add("RadioNavStarField.shader is missing the 'PointSky' pass");
+                }
+                else
+                {
+                    // The Sky tag must live inside the PointSky pass (everything
+                    // from its Name to its ENDCG).
+                    int pointSkyEnd = text.IndexOf("ENDCG", pointSkyStart, StringComparison.Ordinal);
+                    if (pointSkyEnd > pointSkyStart)
+                    {
+                        string passBody = text.Substring(pointSkyStart, pointSkyEnd - pointSkyStart);
+                        if (passBody.IndexOf("\"LightMode\" = \"Sky\"", StringComparison.Ordinal) < 0)
+                            problems.Add("the 'Sky' LightMode tag must sit inside the PointSky pass");
+                    }
+                }
+
+                string[] keptPasses = { "Name \"Point\"", "Name \"PointForward\"", "Name \"Streak\"" };
+                for (int i = 0; i < keptPasses.Length; i++)
+                {
+                    if (text.IndexOf(keptPasses[i], StringComparison.Ordinal) < 0)
+                        problems.Add("RadioNavStarField.shader lost the " + keptPasses[i] + " pass");
+                }
+            }
+
+            // The four former Sprites/Default renderers must resolve the bundled
+            // shader through the shared ladder (that is what gives them a Sky
+            // pass at all).
+            var bundleRenderers = new[]
+            {
+                "ConstellationMesh", "PlanetRenderer", "MoonDiscRenderer", "SunDiscRenderer"
+            };
+            for (int i = 0; i < bundleRenderers.Length; i++)
+            {
+                var type = FindSourceType(roots, bundleRenderers[i]);
+                if (type == null)
+                    continue;
+                bool routes = type.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression.ToString()
+                        .IndexOf("CelestialShaderResolver", StringComparison.Ordinal) >= 0);
+                if (!routes)
+                {
+                    problems.Add(bundleRenderers[i] + " does not resolve the bundled celestial shader "
+                        + "through CelestialShaderResolver - it cannot reach the Sky stage");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} sky-stage violation(s):\n"
                 + string.Join("\n", problems));
         }
 

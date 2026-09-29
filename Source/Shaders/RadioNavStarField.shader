@@ -1,16 +1,27 @@
 // RadioNavigation Sternspreiz star shader.
 //
-// Two roles, three passes:
+// Two roles, four passes:
 //  - "Point" (untagged, SRPDefaultUnlit) and "PointForward" (LightMode=ForwardSRP)
 //    draw the mod's point-star sprites on scene renderers. The game's Deep
 //    pipeline draws scene renderers by shader tag, so a sprite shader without a
 //    matching pass never appears (live 2026-09-28: StarsMesh contributed zero
 //    pixels). Blend comes from the material's _SrcBlend/_DstBlend, which is how
 //    StarsMesh asks for additive star light.
+//  - "PointSky" (LightMode=Sky) is the copy the Deep pipeline's Sky stage draws
+//    (DeepPipeline.RenderSky, ShaderTagId "Sky", RenderQueueRange.opaque) right
+//    after DrawSkybox and BEFORE the forward/G-buffer stages. The UniStorm cloud
+//    composite is the only shipping Sky-tagged shader (queue 1051), so a
+//    celestial material queued below 1051 (and below 2500 so the opaque-range
+//    filter accepts it) is composited UNDER the clouds. This also takes the
+//    material out of the transparent range, where the deferred path's
+//    RenderTransparent was the only stage drawing ForwardSRP.
 //  - "Streak" draws the Sternspreiz line. The lens draws this pass EXPLICITLY
 //    through the PIP command buffer (DrawMesh pass index 2), so the scene
 //    passes above never need to know about it.
 // The line profile/texture and the band shaping are the mod's tested PSF math.
+// NOTE (open question): the Sky stage enables the global keyword TOD_OUTPUT_HDR
+// before DrawSkybox/RenderSky; no keyword is declared here on purpose - if the
+// UniStorm composite ever needs it, that must be measured, not guessed.
 Shader "RadioNav/SternspreizStreak"
 {
     Properties
@@ -203,7 +214,92 @@ Shader "RadioNav/SternspreizStreak"
             ENDCG
         }
 
-        // 3) Sternspreiz streak (lens only, drawn with an explicit pass index).
+        // 3) Same point sprite for the pipeline's Sky stage (DeepPipeline
+        //    RenderSky, ShaderTagId "Sky", opaque queue range). Drawn BEFORE the
+        //    forward/G-buffer stages so the UniStorm cloud composite (queue
+        //    1051) blends over the celestial sprites.
+        Pass
+        {
+            Name "PointSky"
+            Tags { "LightMode" = "Sky" }
+            CGPROGRAM
+            #pragma vertex vertPoint
+            #pragma fragment fragPoint
+            #pragma target 3.0
+            #include "UnityCG.cginc"
+
+            sampler2D _MainTex;
+            float4 _MainTex_ST;
+            fixed4 _Color;
+            sampler2D _CloudOcclusionTex;
+            float _CloudOcclusionMode;
+            float _CloudOcclusionStrength;
+
+            struct pointAppdata
+            {
+                float4 vertex : POSITION;
+                fixed4 color : COLOR;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct pointV2f
+            {
+                float4 pos : SV_POSITION;
+                fixed4 color : COLOR;
+                float2 uv : TEXCOORD0;
+                float3 worldPos : TEXCOORD1;
+            };
+
+            pointV2f vertPoint(pointAppdata v)
+            {
+                pointV2f o;
+                o.pos = UnityObjectToClipPos(v.vertex);
+                o.color = v.color * _Color;
+                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
+                return o;
+            }
+
+            fixed4 fragPoint(pointV2f i) : SV_Target
+            {
+                fixed4 c = tex2D(_MainTex, i.uv) * i.color;
+                // Cloud occlusion (mode 0 = untouched default path).
+                if (_CloudOcclusionMode > 0.5 && _CloudOcclusionStrength > 0.0)
+                {
+                    float a;
+                    if (_CloudOcclusionMode > 2.5)
+                    {
+                        // Mode 3: screen-space cloud opacity. The UniStorm
+                        // composite writes min(cloudAlpha * 1.5, 1) into the
+                        // alpha of the game's GBuffer3 target, so the fragment's
+                        // own screen UV addresses exactly its cloud coverage.
+                        float2 screenUv = i.pos.xy / _ScreenParams.xy;
+                        a = tex2D(_CloudOcclusionTex, screenUv).a;
+                    }
+                    else
+                    {
+                        float3 dirW = normalize(i.worldPos - _WorldSpaceCameraPos);
+                        float2 domeUv;
+                        if (_CloudOcclusionMode < 1.5)
+                        {
+                            float3 dirView = mul(UNITY_MATRIX_V, float4(dirW, 0.0)).xyz;
+                            domeUv = dirView.xy * 0.5 + 0.5;
+                        }
+                        else
+                        {
+                            domeUv = normalize(dirW).xy * 0.5 + 0.5;
+                        }
+                        a = tex2D(_CloudOcclusionTex, domeUv).a;
+                    }
+                    float occl = saturate(a * 1.5);
+                    c.a *= (1.0 - occl * _CloudOcclusionStrength);
+                }
+                return c;
+            }
+            ENDCG
+        }
+
+        // 4) Sternspreiz streak (lens only, drawn with an explicit pass index).
         Pass
         {
             Name "Streak"

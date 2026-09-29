@@ -67,6 +67,39 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void SkyStageQueue_IsBelowTheCloudCompositeAndInsideTheOpaqueRange()
+        {
+            // The pipeline's Sky stage filters with RenderQueueRange.opaque
+            // (0..2500) and the UniStorm cloud composite is the only other
+            // Sky-tagged shader, at Background+51 = 1051.
+            Assert.Equal(1020, SkyRenderQueuePolicy.SkyStageQueue);
+            Assert.True(SkyRenderQueuePolicy.SkyStageQueue < 1051);
+            Assert.True(SkyRenderQueuePolicy.SkyStageQueue < 2500);
+            Assert.True(SkyRenderQueuePolicy.SkyStageQueue >= SkyRenderQueuePolicy.MinQueue);
+            Assert.Equal(SkyRenderQueuePolicy.SkyStageQueue,
+                SkyRenderQueuePolicy.Clamp(SkyRenderQueuePolicy.SkyStageQueue));
+        }
+
+        [Fact]
+        public void ApplySkyStage_OnlyTouchesSkyCapableMaterials()
+        {
+            var sky = new Material { renderQueue = 3000 };
+            Assert.True(SkyRenderQueuePolicy.ApplySkyStage(sky, true));
+            Assert.Equal(SkyRenderQueuePolicy.SkyStageQueue, sky.renderQueue);
+
+            // Leaving an already-correct queue is a no-op that still reports true.
+            Assert.True(SkyRenderQueuePolicy.ApplySkyStage(sky, true));
+            Assert.Equal(SkyRenderQueuePolicy.SkyStageQueue, sky.renderQueue);
+
+            // A material whose shader has no Sky pass must keep its own queue.
+            var fallback = new Material { renderQueue = 3000 };
+            Assert.False(SkyRenderQueuePolicy.ApplySkyStage(fallback, false));
+            Assert.Equal(3000, fallback.renderQueue);
+
+            Assert.False(SkyRenderQueuePolicy.ApplySkyStage(null, true));
+        }
+
+        [Fact]
         public void Switch_DefaultsOffAndRoundTrips()
         {
             SkyRenderQueueSwitch.Reset();

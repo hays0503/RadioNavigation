@@ -23,6 +23,7 @@ namespace UBOAT.Mods.RadioNavigation
     public sealed class MapShapeEraser { }
     public sealed class LighthousePlacer { public static void EnsureRunning() { } }
     public sealed class StarSkyPhase0Probe { public static void EnsureRunning() { } }
+    public sealed class SkyMaterialProbe { public static void EnsureRunning() { } }
 }
 
 namespace UBOAT.Mods.RadioNavigation.Tests

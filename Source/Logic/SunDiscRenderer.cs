@@ -77,9 +77,12 @@ namespace UBOAT.Mods.RadioNavigation
             BuildQuad(meshFilter);
             RebuildTexture();
 
-            Shader shader = Shader.Find("Sprites/Default");
-            if (shader == null)
-                shader = Shader.Find("Legacy Shaders/Particles/Alpha Blended");
+            // Celestial shader ladder (bundled -> Sprites/Default -> legacy
+            // alpha blended). The bundled shader carries the Sky-stage pass so
+            // the clouds composite over the disc; the premultiplied
+            // One/OneMinusSrcAlpha blend below is the disc's own blend.
+            Shader shader = CelestialShaderResolver.ResolveShader(
+                "Legacy Shaders/Particles/Alpha Blended");
             if (shader != null)
             {
                 material = new Material(shader);
@@ -88,6 +91,8 @@ namespace UBOAT.Mods.RadioNavigation
                 material.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
                 material.SetInt("_ZWrite", 0);
                 meshRenderer.sharedMaterial = material;
+                bundledShaderResolved = CelestialShaderResolver.IsBundled(shader);
+                SkyRenderQueuePolicy.ApplySkyStage(material, bundledShaderResolved);
             }
             else
             {
@@ -95,6 +100,32 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             Debug.Log(LogPrefix + " initialized, layer=" + SunDiscLayer);
+        }
+
+        private bool bundledShaderResolved;
+        private int shaderUpgradeCountdown = 30;
+
+        /// <summary>
+        /// The mod bundle may not be loaded when the sky roots are created, so
+        /// the material starts on the stock fallback and upgrades once the
+        /// bundled shader becomes available (bounded retries, same ladder as
+        /// StarsMesh). The upgrade also applies the Sky-stage queue.
+        /// </summary>
+        private void TryUpgradeToBundledShader()
+        {
+            if (bundledShaderResolved || material == null || shaderUpgradeCountdown <= 0)
+                return;
+
+            Shader bundled = CelestialShaderResolver.LoadBundled();
+            if (bundled != null)
+            {
+                material.shader = bundled;
+                bundledShaderResolved = true;
+                SkyRenderQueuePolicy.ApplySkyStage(material, true);
+                Debug.Log(LogPrefix + " celestial shader resolved to bundled " + bundled.name);
+                return;
+            }
+            shaderUpgradeCountdown--;
         }
 
         private void OnDestroy()
@@ -216,6 +247,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void LateUpdate()
         {
+            TryUpgradeToBundledShader();
+
             if (!Active || material == null)
             {
                 meshRenderer.enabled = false;

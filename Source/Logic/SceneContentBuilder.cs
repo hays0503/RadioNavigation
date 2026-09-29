@@ -93,6 +93,8 @@ namespace UBOAT.Mods.RadioNavigation
                 t => radio.AddComponent(t));
             EnsureSkyRoots(new UnitySceneContentHost());
             EnsureRunners(LighthousePlacer.EnsureRunning, StarSkyPhase0Probe.EnsureRunning);
+            // One-shot diagnostic: log sky draw layers once the roots exist.
+            SkyMaterialProbe.EnsureRunning();
         }
 
         /// <summary>

@@ -72,6 +72,7 @@ namespace UBOAT.Mods.RadioNavigation
             GameTypeCache.Clear();
             TypeMemberCache.Clear();
             SkyVisibilityResolver.Reset();
+            SkyMaterialProbe.Reset();
             WarnOnce.Reset();
             FixMapMarker.Clear();
             Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
