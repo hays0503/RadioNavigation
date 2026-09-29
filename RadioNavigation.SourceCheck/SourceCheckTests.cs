@@ -3998,6 +3998,20 @@ namespace RadioNavigation.SourceCheck
                 if (shouldHide == null
                     || shouldHide.ToString().IndexOf("&&", StringComparison.Ordinal) < 0)
                     problems.Add("Suppression decision must require BOTH the preference and our active sky");
+                // Renderer-level identification contract: material token AND
+                // dome-sized world extent AND active, so the sub-metre flare
+                // renderers and the UI `Stars` namesakes are never matched.
+                if (text.IndexOf("\"Stars\"", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppression must identify the dome by the `Stars` material token");
+                if (text.IndexOf("DomeMinExtent", StringComparison.Ordinal) < 0
+                    || text.IndexOf("HasDomeExtent", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppression must reject the sub-metre flare renderers by a dome extent floor");
+                var candidate = FindMethod(policy, "IsStarDomeCandidate");
+                if (candidate == null
+                    || candidate.ToString().IndexOf("active", StringComparison.Ordinal) < 0
+                    || !InvokesName(candidate, "IsStarDomeMaterial")
+                    || !InvokesName(candidate, "HasDomeExtent"))
+                    problems.Add("Suppression candidate rule must require active + material token + dome extent");
             }
 
             if (suppressor == null)
@@ -4012,6 +4026,8 @@ namespace RadioNavigation.SourceCheck
                     problems.Add("Suppressor must patch TOD_Sky.LateUpdate (postfix after the game writes the global)");
                 if (text.IndexOf("GetInt(PrefsKey, 1)", StringComparison.Ordinal) < 0)
                     problems.Add("Suppressor preference must default to ON while our sky is authoritative");
+                if (text.IndexOf("Resources.FindObjectsOfTypeAll", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppressor renderer stage must scan the loaded renderers (FindObjectsOfTypeAll)");
                 var postfix = FindMethod(suppressor, "AfterSkyLateUpdate");
                 if (postfix == null
                     || !InvokesName(postfix, "ShouldHide")
@@ -4021,6 +4037,20 @@ namespace RadioNavigation.SourceCheck
                     || !InvokesName(postfix, "SetGlobalFloat")
                     || postfix.ToString().IndexOf("PropertyToID", StringComparison.Ordinal) < 0)
                     problems.Add("Suppressor postfix must zero the cached TOD global");
+                if (postfix == null || !InvokesName(postfix, "ApplyRendererStage"))
+                    problems.Add("Suppressor postfix must run the renderer-level stage");
+                var stage = FindMethod(suppressor, "ApplyRendererStage");
+                if (stage == null
+                    || !InvokesName(stage, "IsStarDomeCandidate")
+                    || stage.ToString().IndexOf("OriginalEnabled", StringComparison.Ordinal) < 0)
+                    problems.Add("Renderer stage must gate on the candidate rule and store the previous enabled state");
+                var restore = FindMethod(suppressor, "RestoreRendererStage");
+                if (restore == null
+                    || !InvokesName(restore, "ReportHiddenRendererCount")
+                    || restore.ToString().IndexOf("OriginalEnabled", StringComparison.Ordinal) < 0)
+                    problems.Add("Renderer stage must restore the stored previous state (never blanket-enable)");
+                if (postfix == null || !InvokesName(postfix, "RestoreRendererStage"))
+                    problems.Add("Suppressor must restore on the fail-safe/inactive path");
             }
 
             if (stars == null
