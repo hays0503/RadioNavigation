@@ -18,8 +18,9 @@
 | Sternspreizglas: pure PSF math | `docs/sternspreiz-phase1-psf.md` — параметризованное горизонтальное ядро-кандидат; runtime/shader/Sun не подключены |
 | Sternspreizglas: Phase 1a source gate | `docs/sternspreiz-phase1a-source-suppression.md` — mode 3 live 2026-09-27: suppression scope PASS per PIP, Main intact; visual star-absence PARTIAL (native sky remains); redraw/Sun/PSF still gated |
 | Sternspreizglas: Phase 1b redraw gate | `docs/sternspreiz-phase1b-redraw-design.md` — live BLOCKED 2026-09-28 (меш не растеризуется; F-находка); mode 4 не production |
-| Sternspreizglas: Линза v1 | `docs/sternspreiz-lens-v1.md` — шейдер/материал в бандле, чистая математика (1205 тестов), PIP-эффект (алидадная половина), приёмка 2026-09-28, сужение и мягкий ромб подтверждены живьём (2026-11-07/08); наклон штрихов — интермиттентный, на свежем аттаче не воспроизводится (уточнено 2026-11-08); попутно найден и починен невидимый звёздный слой (проход шейдера + проекционный масштаб) |
+| Sternspreizglas: Линза v1 | `docs/sternspreiz-lens-v1.md` — шейдер/материал в бандле, чистая математика (1212 тестов), PIP-эффект (алидадная половина), приёмка 2026-09-28, сужение и мягкий ромб подтверждены живьём (2026-11-07/08); наклон штрихов — интермиттентный, на свежем аттаче не воспроизводится (уточнено 2026-11-08); попутно найден и починен невидимый звёздный слой (проход шейдера + проекционный масштаб) |
 | Иконки маркеров карты (F229) | `docs/map-marker-icons-f229.md` — белые квадраты вместо иконок: два корня (ResourceManager не видит бандл мода + контейнерные ключи `Sprite/<имя>`), общий `LoadBundleIconSprite`, гейт `MapMarkerIcons_ResolveThroughBundleFallback`; живая приёмка 2026-11-09 |
+| Небо против облаков | `docs/sky-vs-clouds.md` — инструмент очереди отрисовки (`SkyRenderQueuePolicy`/`SkyRenderQueueSwitch`, инертен по умолчанию), живой A/B 3000 vs 2900 **неубедителен** (кадры идентичны), механизм не подтверждён и не опровергнут; ограничение моста (материал по имени не читается) и следующие шаги |
 | Реестр найденных проблем | `refactoring-plan/hypothesis/INDEX.md` |
 | Знания об API игры UBOAT | `knowledge/` — 21 файл, 6 разделов |
 | Граф кода | `graphify-out/` (8371 узел) |
@@ -199,8 +200,8 @@ F225 и F230 не использованы (пропуски после ревь
 
 ## 10. Правила сопровождения
 
-1. **Счётчики проверяются прогоном, а не на память:** `tests.ps1` (1205),
-   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (80).
+1. **Счётчики проверяются прогоном, а не на память:** `tests.ps1` (1212),
+   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (81).
 2. **Новый ADR** = следующий свободный ID; дубли недопустимы, сводная строка
    добавляется в `SAD/12_Architecture_Decisions.md` § 1 в том же коммите.
 3. **Новая находка** = следующий свободный F-номер + строка в `hypothesis/INDEX.md`

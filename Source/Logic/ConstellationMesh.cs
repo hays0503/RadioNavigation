@@ -129,7 +129,11 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             if (material != null)
+            {
                 material.color = new Color(1f, 1f, 1f, SkyVisibilityResolver.GetVisibility());
+                // Live sky render-queue override (clouds must blend over us).
+                SkyRenderQueuePolicy.TryApply(material, SkyRenderQueueSwitch.QueueOverride);
+            }
 
             DateTime utc = GameTimeResolver.GetUtcNow();
             double jd = AstroMath.ToJulianDay(utc);

@@ -83,5 +83,5 @@ Sprite/sone
 
 ## Гейты
 
-`tests.ps1` — **1205 PASS / 0 FAIL**; `RadioNavigation.SourceCheck` — **80/80**
+`tests.ps1` — **1212 PASS / 0 FAIL**; `RadioNavigation.SourceCheck` — **81/81**
 (было 79; новый гейт выше); build + PVS clean.

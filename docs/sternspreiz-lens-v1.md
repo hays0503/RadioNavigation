@@ -11,7 +11,7 @@
   не подтверждён как постоянный дефект**: на свежем аттаче линзы штрихи горизонтальны —
   остаётся **интермиттентным** (только в сессии с изменением прицела после сборки меша;
   связь с политикой перестройки меша — гипотеза, не доказана), см. раздел ниже.
-- Все гейты зелёные: build, SourceCheck **80/80**, тесты **1205**, PVS clean.
+- Все гейты зелёные: build, SourceCheck **81/81**, тесты **1212**, PVS clean.
 
 ## Управление (для автора)
 
@@ -155,7 +155,7 @@ RadioNav.SternspreizLengthDeg = 0.35  угловая длина штриха, к
   `SextantPipFactory.Destroy → DestroyLens()` (уничтожает меш/материал/текстуру/буфер команд).
 - **Телеметрия**: блок `lens` в снапшоте `sextant` (`enabled/configured/material/lengthDeg/stars/emitted/draws/drew/rebuildFrame/callbackCount/setupError`).
 
-## Гейт (SourceCheck 80/80)
+## Гейт (SourceCheck 81/81)
 
 `Sternspreiz_LensIsOptInPipOnlyAndGated` фиксирует: `IOpaqueImageEffect`, дефолт OFF,
 ворота `IsPlayerOutside`+`IsOpen`, Blit+DrawMesh своим мешем с матрицами PIP, лестницу

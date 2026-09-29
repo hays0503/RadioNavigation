@@ -224,6 +224,9 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            // Live sky render-queue override (clouds must blend over us).
+            SkyRenderQueuePolicy.TryApply(material, SkyRenderQueueSwitch.QueueOverride);
+
             Vector3 dir = SunDirection;
             if (dir.sqrMagnitude < 0.01f)
             {

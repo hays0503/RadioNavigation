@@ -26,6 +26,7 @@
     <Compile Include="Stubs\UnityEnginePlayerPrefs.cs" />
     <Compile Include="Stubs\UnityEngineTransform.cs" />
     <Compile Include="Stubs\UnityEngineTexture.cs" />
+    <Compile Include="Stubs\UnityEngineMaterial.cs" />
     <Compile Include="Stubs\UnityEngineColor.cs" />
     <Compile Include="Stubs\UnityEngineGameObject.cs" />
     <Compile Include="Stubs\UnityEngineTime.cs" />
@@ -79,6 +80,7 @@
     <Compile Include="SternspreizLensFieldTests.cs" />
     <Compile Include="StarSkyConditionsTests.cs" />
     <Compile Include="StarQuadScaleTests.cs" />
+    <Compile Include="SkyRenderQueuePolicyTests.cs" />
     <Compile Include="StarLayerSuppressionTests.cs" />
     <Compile Include="AtmosphericExtinctionTests.cs" />
     <Compile Include="SkyBrightnessTests.cs" />
@@ -226,6 +228,8 @@
     <Compile Include="..\Source\Logic\SternspreizLensField.cs" Link="Source\Logic\SternspreizLensField.cs" />
     <Compile Include="..\Source\Logic\StarSkyConditions.cs" Link="Source\Logic\StarSkyConditions.cs" />
     <Compile Include="..\Source\Logic\StarQuadScale.cs" Link="Source\Logic\StarQuadScale.cs" />
+    <Compile Include="..\Source\Logic\SkyRenderQueuePolicy.cs" Link="Source\Logic\SkyRenderQueuePolicy.cs" />
+    <Compile Include="..\Source\Logic\SkyRenderQueueSwitch.cs" Link="Source\Logic\SkyRenderQueueSwitch.cs" />
     <Compile Include="..\Source\Logic\StarLayerSuppression.cs" Link="Source\Logic\StarLayerSuppression.cs" />
     <Compile Include="..\Source\Logic\AtmosphericExtinction.cs" Link="Source\Logic\AtmosphericExtinction.cs" />
     <Compile Include="..\Source\Logic\SkyBrightness.cs" Link="Source\Logic\SkyBrightness.cs" />

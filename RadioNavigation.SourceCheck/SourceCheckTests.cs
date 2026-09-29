@@ -5040,6 +5040,62 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Sky render-queue gate (2026-09-29): the mod's celestial geometry on
+        /// the ~3.7 km shell draws AFTER UniStorm's ~5.5 km cloud dome (Unity
+        /// sorts transparent renderers back-to-front), so our stars paint over
+        /// the clouds. Each of the five sky renderers must push the live
+        /// SkyRenderQueueSwitch.QueueOverride into its material every frame via
+        /// SkyRenderQueuePolicy.TryApply — dropping the call from any one
+        /// renderer re-introduces the overlap for that layer.
+        /// Mutations: drop the call from one renderer -> FAIL; pass a literal
+        /// queue instead of QueueOverride -> FAIL; drop the policy/switch
+        /// type -> FAIL.
+        /// </summary>
+        [Fact]
+        public void SkyRenderers_RouteThroughQueueOverride()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            if (FindSourceType(roots, "SkyRenderQueuePolicy") == null)
+                problems.Add("type 'SkyRenderQueuePolicy' not found in Source/");
+            if (FindSourceType(roots, "SkyRenderQueueSwitch") == null)
+                problems.Add("type 'SkyRenderQueueSwitch' not found in Source/");
+
+            var renderers = new[]
+            {
+                "StarsMesh", "ConstellationMesh", "PlanetRenderer",
+                "MoonDiscRenderer", "SunDiscRenderer"
+            };
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                var type = FindSourceType(roots, renderers[i]);
+                if (type == null)
+                {
+                    problems.Add("type '" + renderers[i] + "' not found in Source/");
+                    continue;
+                }
+
+                bool routes = type.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression.ToString() == "SkyRenderQueuePolicy.TryApply"
+                        && inv.ArgumentList.ToString()
+                            .Contains("SkyRenderQueueSwitch.QueueOverride"));
+                if (!routes)
+                {
+                    problems.Add(renderers[i] + " does not call "
+                        + "SkyRenderQueuePolicy.TryApply(material, SkyRenderQueueSwitch.QueueOverride) "
+                        + "— its sky content would paint over the clouds");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} sky render-queue violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Native map points gate (author 2026-11-05): every mod marker must
         /// BE a real MapPointUI created through the public
         /// MapChartingUI.CreatePoint — only then do the game's charting tools,
