@@ -226,6 +226,8 @@ namespace UBOAT.Mods.RadioNavigation
 
             // Live sky render-queue override (clouds must blend over us).
             SkyRenderQueuePolicy.TryApply(material, SkyRenderQueueSwitch.QueueOverride);
+            // Live cloud occlusion (UniStorm writes no depth).
+            CloudOcclusionBinding.Apply(material);
 
             Vector3 dir = SunDirection;
             if (dir.sqrMagnitude < 0.01f)

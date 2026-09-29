@@ -176,6 +176,8 @@ namespace UBOAT.Mods.RadioNavigation
                 material.color = new Color(1f, 1f, 1f, SkyVisibilityResolver.GetVisibility());
                 // Live sky render-queue override (clouds must blend over us).
                 SkyRenderQueuePolicy.TryApply(material, SkyRenderQueueSwitch.QueueOverride);
+                // Live cloud occlusion (UniStorm writes no depth).
+                CloudOcclusionBinding.Apply(material);
             }
 
             float radius = CameraResolver.SafeRadius(cam);

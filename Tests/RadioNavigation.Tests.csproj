@@ -230,6 +230,7 @@
     <Compile Include="..\Source\Logic\StarQuadScale.cs" Link="Source\Logic\StarQuadScale.cs" />
     <Compile Include="..\Source\Logic\SkyRenderQueuePolicy.cs" Link="Source\Logic\SkyRenderQueuePolicy.cs" />
     <Compile Include="..\Source\Logic\SkyRenderQueueSwitch.cs" Link="Source\Logic\SkyRenderQueueSwitch.cs" />
+    <Compile Include="..\Source\Logic\CloudOcclusionSwitch.cs" Link="Source\Logic\CloudOcclusionSwitch.cs" />
     <Compile Include="..\Source\Logic\StarLayerSuppression.cs" Link="Source\Logic\StarLayerSuppression.cs" />
     <Compile Include="..\Source\Logic\AtmosphericExtinction.cs" Link="Source\Logic\AtmosphericExtinction.cs" />
     <Compile Include="..\Source\Logic\SkyBrightness.cs" Link="Source\Logic\SkyBrightness.cs" />

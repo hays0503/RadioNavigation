@@ -5096,6 +5096,160 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Cloud-occlusion gate (2026-09-29): UniStorm's clouds write no depth,
+        /// so the celestial point sprites (drawn after the composite) always
+        /// paint over the clouds. Each of the five sky renderers must push the
+        /// live CloudOcclusionSwitch into its material every frame via
+        /// CloudOcclusionBinding.Apply; the bundled RadioNavStarField.shader
+        /// must carry the occlusion block in its two point passes (mode 0 =
+        /// untouched default path) including the mode-3 screen-space branch
+        /// (GBuffer3 alpha via the fragment's screen UV); and the binding must
+        /// pick the texture by mode.
+        /// Mutations: drop Apply from one renderer -> FAIL; remove the shader
+        /// block -> FAIL; change/remove the mode-3 guard in either pass -> FAIL;
+        /// break the GBuffer3/mode selection in the binding -> FAIL.
+        /// </summary>
+        [Fact]
+        public void CelestialRenderers_RouteThroughCloudOcclusion()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            if (FindSourceType(roots, "CloudOcclusionSwitch") == null)
+                problems.Add("type 'CloudOcclusionSwitch' not found in Source/");
+            if (FindSourceType(roots, "CloudOcclusionBinding") == null)
+                problems.Add("type 'CloudOcclusionBinding' not found in Source/");
+
+            var renderers = new[]
+            {
+                "StarsMesh", "ConstellationMesh", "PlanetRenderer",
+                "MoonDiscRenderer", "SunDiscRenderer"
+            };
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                var type = FindSourceType(roots, renderers[i]);
+                if (type == null)
+                {
+                    problems.Add("type '" + renderers[i] + "' not found in Source/");
+                    continue;
+                }
+
+                bool routes = type.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(inv => inv.Expression.ToString() == "CloudOcclusionBinding.Apply"
+                        && inv.ArgumentList.ToString().Contains("material"));
+                if (!routes)
+                {
+                    problems.Add(renderers[i] + " does not call "
+                        + "CloudOcclusionBinding.Apply(material) "
+                        + "- its sky content would paint over the clouds");
+                }
+            }
+
+            string shaderPath = ResolveStarFieldShaderPath();
+            if (shaderPath != null)
+            {
+                string text = File.ReadAllText(shaderPath);
+                var required = new[]
+                {
+                    "sampler2D _CloudOcclusionTex;",
+                    "float _CloudOcclusionMode;",
+                    "float _CloudOcclusionStrength;",
+                    "_CloudOcclusionMode > 0.5 && _CloudOcclusionStrength > 0.0",
+                    "tex2D(_CloudOcclusionTex, domeUv).a",
+                    "c.a *= (1.0 - occl * _CloudOcclusionStrength);",
+                    // Mode 3 addresses the screen-space cloud opacity with the
+                    // fragment's own screen UV.
+                    "_CloudOcclusionMode > 2.5",
+                    "i.pos.xy / _ScreenParams.xy",
+                };
+                for (int i = 0; i < required.Length; i++)
+                {
+                    if (text.IndexOf(required[i], StringComparison.Ordinal) < 0)
+                        problems.Add("RadioNavStarField.shader missing cloud-occlusion marker: "
+                            + required[i]);
+                }
+
+                // The block belongs to the two point passes only (the lens'
+                // Streak pass must stay untouched).
+                int blocks = text.Split(
+                    new[] { "float occl = saturate(a * 1.5);" },
+                    StringSplitOptions.None).Length - 1;
+                if (blocks != 2)
+                {
+                    problems.Add("RadioNavStarField.shader must carry the occlusion block "
+                        + "in exactly the two point passes (found " + blocks + ")");
+                }
+
+                // The screen-space branch must likewise exist in both point
+                // passes (a single-pass branch leaves one pipeline tag
+                // un-occluded).
+                int screenBranches = text.Split(
+                    new[] { "_CloudOcclusionMode > 2.5" },
+                    StringSplitOptions.None).Length - 1;
+                if (screenBranches != 2)
+                {
+                    problems.Add("RadioNavStarField.shader must carry the mode-3 "
+                        + "screen-space branch in exactly the two point passes (found "
+                        + screenBranches + ")");
+                }
+            }
+
+            var binding = FindSourceType(roots, "CloudOcclusionBinding");
+            if (binding != null)
+            {
+                string bindingText = binding.ToFullString();
+                if (bindingText.IndexOf("GBuffer3", StringComparison.Ordinal) < 0)
+                {
+                    problems.Add("CloudOcclusionBinding must resolve the screen-space "
+                        + "'GBuffer3' target for mode 3");
+                }
+                if (bindingText.IndexOf("Mode >= 3", StringComparison.Ordinal) < 0)
+                {
+                    problems.Add("CloudOcclusionBinding.Apply must select the texture "
+                        + "by mode (mode 3 = the GBuffer target, modes 1/2 = the dome map)");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} cloud-occlusion violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// Locates the mod's star shader in the Unity source project (the
+        /// bundle is built from there, outside the repo). Overridable via
+        /// UBOAT_TESTUI_PROJECT; returns null when the project is absent so
+        /// the shader half of the gate skips on machines without it.
+        /// </summary>
+        private static string ResolveStarFieldShaderPath()
+        {
+            var candidates = new List<string>();
+            string project = Environment.GetEnvironmentVariable("UBOAT_TESTUI_PROJECT");
+            if (!string.IsNullOrEmpty(project))
+            {
+                candidates.Add(Path.Combine(project, "Assets", "Packages", "testui",
+                    "RadioNavStarField.shader"));
+            }
+            candidates.Add(@"C:\Users\Sergey Pimenov\Desktop\TestUI\Assets\Packages\testui\RadioNavStarField.shader");
+            try
+            {
+                candidates.Add(Path.GetFullPath(Path.Combine(ModCompiler.ModRoot,
+                    "..", "..", "..", "..", "..", "..",
+                    "Desktop", "TestUI", "Assets", "Packages", "testui",
+                    "RadioNavStarField.shader")));
+            }
+            catch (ArgumentException) { }
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (File.Exists(candidates[i]))
+                    return candidates[i];
+            }
+            return null;
+        }
+
         /// Native map points gate (author 2026-11-05): every mod marker must
         /// BE a real MapPointUI created through the public
         /// MapChartingUI.CreatePoint — only then do the game's charting tools,
