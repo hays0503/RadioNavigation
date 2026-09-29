@@ -527,7 +527,29 @@ namespace UBOAT.Mods.RadioNavigation
                 // Unity accepts both the asset name and its full project path.
                 UnityEngine.Object asset = loadAsset.Invoke(fallbackBundle, new object[] { assetName }) as UnityEngine.Object
                     ?? loadAsset.Invoke(fallbackBundle, new object[] { "Assets/Packages/testui/" + assetName }) as UnityEngine.Object;
-                return asset;
+                if (asset != null)
+                    return asset;
+
+                // Neither the bare name nor the project path hit: Unity names
+                // the bundle entries after the build root, so the icon prefabs
+                // live under "Sprite/IconLighthouse" (container key) and
+                // LoadAsset("IconLighthouse") misses them. Match the asset's
+                // leaf name against GetAllAssetNames() and load by that path.
+                MethodInfo allNames = FindMethod(bundleType, "GetAllAssetNames", isStatic: false, parameterCount: 0);
+                if (allNames == null)
+                    return null;
+                string[] names = allNames.Invoke(fallbackBundle, null) as string[];
+                if (names == null)
+                    return null;
+                for (int i = 0; i < names.Length; i++)
+                {
+                    if (names[i] == null || !BundleLeafMatches(names[i], assetName))
+                        continue;
+                    asset = loadAsset.Invoke(fallbackBundle, new object[] { names[i] }) as UnityEngine.Object;
+                    if (asset != null)
+                        return asset;
+                }
+                return null;
             }
             catch (Exception e)
             {
@@ -535,6 +557,31 @@ namespace UBOAT.Mods.RadioNavigation
                     Debug.LogWarning("[RadioNav][Main] LoadBundleAsset('" + assetName + "') failed: " + e.Message);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// True when the last path segment of a bundle container key equals the
+        /// requested asset name (case-insensitive), e.g. "Sprite/IconSonne"
+        /// matches "IconSonne". Tolerates an optional file extension on either
+        /// side ("IconSonne.prefab").
+        /// </summary>
+        private static bool BundleLeafMatches(string bundlePath, string assetName)
+        {
+            if (string.IsNullOrEmpty(bundlePath) || string.IsNullOrEmpty(assetName))
+                return false;
+
+            int slash = bundlePath.LastIndexOf('/');
+            string leaf = slash >= 0 ? bundlePath.Substring(slash + 1) : bundlePath;
+            if (string.Equals(leaf, assetName, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            int leafDot = leaf.LastIndexOf('.');
+            if (leafDot > 0 && string.Equals(leaf.Substring(0, leafDot), assetName, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            int nameDot = assetName.LastIndexOf('.');
+            return nameDot > 0
+                && string.Equals(leaf, assetName.Substring(0, nameDot), StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

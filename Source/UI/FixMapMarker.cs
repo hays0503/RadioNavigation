@@ -189,9 +189,11 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// IconSextan prefab only (SpriteRenderer + sprite, IconSonne
-        /// pattern) — no fallback chain by author's decision. Blank icon +
-        /// one warning when the bundle predates the prefab.
+        /// IconSextan prefab (Image or SpriteRenderer), IconSonne pattern.
+        /// ResourceManager is tried first, but on 2026.1-patch21 it cannot see
+        /// the mod bundle (F229), so the icon is resolved straight from the
+        /// already-loaded bundle as the fallback that actually works. Blank
+        /// icon + one warning only when even the bundle lacks the prefab.
         /// </summary>
         protected override Sprite LoadIconSprite()
         {
@@ -209,6 +211,12 @@ namespace UBOAT.Mods.RadioNavigation
                 if (spriteRenderer != null && spriteRenderer.sprite != null)
                     return spriteRenderer.sprite;
             }
+
+            // F229: resolve from the bundle the mod itself loaded (prefab
+            // Image/SpriteRenderer).
+            Sprite fromBundle = LoadBundleIconSprite(IconPrefabName, null);
+            if (fromBundle != null)
+                return fromBundle;
 
             if (!iconWarned)
             {

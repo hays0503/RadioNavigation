@@ -126,6 +126,13 @@ namespace UBOAT.Mods.RadioNavigation
                 return direct.Asset;
             }
 
+            // F229: ResourceManager cannot see the mod bundle, so the loads
+            // above return null in a normal session — resolve the icon from
+            // the bundle the mod itself loaded (prefab Image/SpriteRenderer).
+            Sprite fromBundle = LoadBundleIconSprite(IconAssetName, null);
+            if (fromBundle != null)
+                return fromBundle;
+
             if (!iconWarned)
             {
                 iconWarned = true;

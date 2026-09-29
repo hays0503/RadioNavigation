@@ -5060,6 +5060,76 @@ namespace RadioNavigation.SourceCheck
         /// drop the label disable -> FAIL; drop the Interactive policy ->
         /// FAIL; drop Plan -> FAIL.
         /// </summary>
+        /// <summary>
+        /// Marker icon resolution gate (F229, 2026-11-09): the game's
+        /// ResourceManager never registers the mod bundle on 2026.1-patch21,
+        /// so ResourceManager.RetrieveAsset()/Resources.Load() return null for
+        /// the icons and all three marker families render as blank white
+        /// squares. Every LoadIconSprite() must therefore route through
+        /// ModBootstrapper.LoadBundleAsset — directly or via the shared
+        /// NavMapMarkerBase.LoadBundleIconSprite helper — and that helper must
+        /// itself call LoadBundleAsset.
+        /// Mutations: drop the fallback call from one family -> FAIL; make the
+        /// helper return without LoadBundleAsset -> FAIL.
+        /// </summary>
+        [Fact]
+        public void MapMarkerIcons_ResolveThroughBundleFallback()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var baseType = FindSourceType(roots, "NavMapMarkerBase");
+            if (baseType == null)
+            {
+                problems.Add("type 'NavMapMarkerBase' not found in Source/");
+            }
+            else
+            {
+                var helper = FindMethod(baseType, "LoadBundleIconSprite");
+                if (helper == null)
+                {
+                    problems.Add("NavMapMarkerBase.LoadBundleIconSprite not found — the F229 bundle fallback is gone");
+                }
+                else if (!helper.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(i => i.Expression.ToString()
+                        .IndexOf("ModBootstrapper.LoadBundleAsset", StringComparison.Ordinal) >= 0))
+                {
+                    problems.Add("NavMapMarkerBase.LoadBundleIconSprite does not call ModBootstrapper.LoadBundleAsset — "
+                        + "under F229 the icons would stay blank");
+                }
+            }
+
+            var families = new[] { "StationMapMarker", "LighthouseMapMarker", "FixMapMarker" };
+            for (int i = 0; i < families.Length; i++)
+            {
+                var type = FindSourceType(roots, families[i]);
+                if (type == null)
+                {
+                    problems.Add("type '" + families[i] + "' not found in Source/");
+                    continue;
+                }
+
+                var load = FindMethod(type, "LoadIconSprite");
+                if (load == null)
+                {
+                    problems.Add(families[i] + ".LoadIconSprite not found");
+                    continue;
+                }
+
+                if (!InvokesName(load, "LoadBundleAsset") && !InvokesName(load, "LoadBundleIconSprite"))
+                {
+                    problems.Add(families[i] + ".LoadIconSprite never routes through ModBootstrapper.LoadBundleAsset "
+                        + "(directly or via LoadBundleIconSprite) — ResourceManager/Resources.Load alone returns null (F229)");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} marker-icon violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         [Fact]
         public void MapMarkers_AreNativeMapPoints()
         {

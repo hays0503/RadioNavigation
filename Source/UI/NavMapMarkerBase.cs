@@ -665,6 +665,55 @@ namespace UBOAT.Mods.RadioNavigation
             return fallbackIconSprite;
         }
 
+        /// <summary>
+        /// F229 fallback for the marker icons: the game's ResourceManager never
+        /// registers the mod bundle on 2026.1-patch21, so every
+        /// RetrieveAsset()/Resources.Load() for a mod asset returns null and
+        /// the markers render as blank white squares. Load the icon straight
+        /// from the already-loaded bundle (the same escape hatch as the ocular
+        /// material and the star shader): the prefab first — its first UI
+        /// <see cref="Image"/> (active or inactive child) then its
+        /// <see cref="SpriteRenderer"/> — and, when a bare sub-asset name is
+        /// given, a directly loadable <see cref="Sprite"/> or the
+        /// <see cref="Texture2D"/> wrapped in a runtime sprite.
+        /// </summary>
+        protected static Sprite LoadBundleIconSprite(string prefabName, string spriteName)
+        {
+            GameObject prefab = ModBootstrapper.LoadBundleAsset(prefabName) as GameObject;
+            if (prefab != null)
+            {
+                Image[] images = prefab.GetComponentsInChildren<Image>(true);
+                for (int i = 0; i < images.Length; i++)
+                {
+                    if (images[i] != null && images[i].sprite != null)
+                        return images[i].sprite;
+                }
+
+                SpriteRenderer[] renderers = prefab.GetComponentsInChildren<SpriteRenderer>(true);
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    if (renderers[i] != null && renderers[i].sprite != null)
+                        return renderers[i].sprite;
+                }
+            }
+
+            if (string.IsNullOrEmpty(spriteName))
+                return null;
+
+            Sprite direct = ModBootstrapper.LoadBundleAsset(spriteName) as Sprite;
+            if (direct != null)
+                return direct;
+
+            Texture2D texture = ModBootstrapper.LoadBundleAsset(spriteName) as Texture2D;
+            if (texture != null)
+            {
+                return Sprite.Create(texture,
+                    new Rect(0f, 0f, texture.width, texture.height),
+                    new Vector2(0.5f, 0.5f));
+            }
+            return null;
+        }
+
         internal static Sprite GetBackdropSprite()
         {
             if (backdropSprite != null)
