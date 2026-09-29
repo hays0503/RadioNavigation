@@ -2,10 +2,14 @@
   Source\Data\MiniJson.cs : warning RCS1221: 
   Source\Data\SignalTypes.cs : warning RCS1161: 
   Source\Logic\CameraResolver.cs : warning RCS1146: 
+  Source\Logic\CelestialShaderResolver.cs : warning RCS1146: 
+  Source\Logic\CloudOcclusionBinding.cs : warning RCS1198: 
   Source\Logic\ConstellationMesh.cs : warning RCS1128: 
   Source\Logic\ConstellationMesh.cs : warning RCS1146: 
   Source\Logic\ConstellationMesh.cs : warning RCS1198: 
   Source\Logic\ConstellationMesh.cs : warning RCS1213: 
+  Source\Logic\GameStarLayerSuppressor.cs : warning RCS1146: 
+  Source\Logic\GameStarLayerSuppressor.cs : warning RCS1238: 
   Source\Logic\LighthouseBeamGlow.cs : warning RCS1163: 
   Source\Logic\LighthouseBeamGlow.cs : warning RCS1213: 
   Source\Logic\LighthouseCoastProbe.cs : warning RCS1129: 
@@ -30,16 +34,17 @@
   Source\Logic\LighthouseVisualModel.cs : warning RCS1238: 
   Source\Logic\Main.cs : warning RCS1129: 
   Source\Logic\Main.cs : warning RCS1169: 
-  Source\Logic\MoonDiscRenderer.cs : warning RCS1128: 
+  Source\Logic\ModBootstrapper.cs : warning RCS1221: 
   Source\Logic\MoonDiscRenderer.cs : warning RCS1146: 
   Source\Logic\MoonDiscRenderer.cs : warning RCS1213: 
   Source\Logic\MorseKeyer.cs : warning RCS1161: 
-  Source\Logic\PlanetRenderer.cs : warning RCS1128: 
   Source\Logic\PlanetRenderer.cs : warning RCS1146: 
   Source\Logic\PlanetRenderer.cs : warning RCS1213: 
   Source\Logic\RadioStoryIntegration.cs : warning RCS1163: 
   Source\Logic\SextantSightLineColor.cs : warning RCS1238: 
   Source\Logic\SkyBrightness.cs : warning RCS1238: 
+  Source\Logic\SkyMaterialProbe.cs : warning RCS1146: 
+  Source\Logic\SkyMaterialProbe.cs : warning RCS1213: 
   Source\Logic\SkyVisibilityResolver.cs : warning RCS1146: 
   Source\Logic\SkyVisibilityResolver.cs : warning RCS1169: 
   Source\Logic\SonneController.cs : warning RCS1169: 
@@ -53,7 +58,6 @@
   Source\Logic\StarsMesh.cs : warning RCS1198: 
   Source\Logic\StarsMesh.cs : warning RCS1213: 
   Source\Logic\StationScheduler.cs : warning RCS1161: 
-  Source\Logic\SunDiscRenderer.cs : warning RCS1128: 
   Source\Logic\SunDiscRenderer.cs : warning RCS1146: 
   Source\Logic\SunDiscRenderer.cs : warning RCS1213: 
   Source\Sound\DspPipeline.cs : warning RCS1169: 
@@ -73,6 +77,7 @@
   Source\UI\InformationPanelHandler.cs : warning RCS1238: 
   Source\UI\LighthouseMapMarker.cs : warning RCS1146: 
   Source\UI\NavMapMarkerBase.cs : warning RCS1129: 
+  Source\UI\NavMapMarkerBase.cs : warning RCS1146: 
   Source\UI\NavMapMarkerBase.cs : warning RCS1213: 
   Source\UI\PanelDragHandler.cs : warning RCS1213: 
   Source\UI\RadioHandler.cs : warning RCS1213: 
