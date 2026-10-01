@@ -79,7 +79,17 @@ namespace UBOAT.Mods.RadioNavigation
         private const float TubeShadowStart = 0.55f;
         private const float TubeShadowMid = 0.85f;
         private const float TubeShadowMidAlpha = 0.45f;
-        private const float TubeShadowFull = 0.97f;
+        /// <summary>
+        /// The tube shadow is fully opaque from here outward (author
+        /// 2026-10-02: "перекрой это внахлест"). The defect the author
+        /// reports lives at r/R 0.93-1.02; an opaque ring from 0.90 covers
+        /// it with margin, whatever the smeared content is. Price, stated
+        /// plainly: the picture loses the outer ~7 % of its radius to the
+        /// bezel. The steel bands are untouched — they sit on top of the
+        /// black tube as the designed highlight, static and
+        /// turn-independent; only the opacity underneath moved.
+        /// </summary>
+        private const float TubeShadowFull = 0.90f;
 
         /// <summary>
         /// Width of every band's rise and fall, in normalized radius. It is the

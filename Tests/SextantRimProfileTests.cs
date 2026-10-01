@@ -42,6 +42,27 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.InRange(lit.R, 0f, 0.35f);
         }
 
+        [Fact]
+        public void RimOverlapCoversTheDefectZone()
+        {
+            // The author's fix (2026-10-02): the ring must be OPAQUE from
+            // 0.90 outward, overlapping the zone where the turn arcs were
+            // measured (r/R 0.93-1.02). Opacity is the invariant, not
+            // blackness: the steel bevel lives on top of the black tube and
+            // is the designed bezel highlight (static, turn-independent), so
+            // only the alpha is pinned here. Where alpha is 1 no smeared
+            // scene content can show through, whatever it is.
+            for (float r = 0.90f; r <= 1.02f; r += 0.01f)
+            {
+                SextantRimSample sample = SextantRimProfile.Evaluate(r, 1f);
+                Assert.True(sample.A >= 0.98f,
+                    "rim must be opaque at r=" + r.ToString("F2") + ", got A=" + sample.A);
+            }
+            // ...and the glass just inside the overlap stays clear.
+            SextantRimSample glass = SextantRimProfile.Evaluate(0.84f, 0f);
+            Assert.True(glass.A < 0.6f, "glass must stay clear at r=0.84, got A=" + glass.A);
+        }
+
         [Theory]
         [InlineData(1f)]
         [InlineData(-1f)]
