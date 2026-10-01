@@ -249,6 +249,51 @@ namespace UBOAT.Mods.RadioNavigation
         ///
         /// Returns 0 at or beyond the full travel, never negative.
         /// </summary>
+        /// <summary>
+        /// Travel up to which the wall is still ON the rim, so its light is
+        /// legitimate. Measured, not guessed: the wall sits at
+        /// <see cref="ShadowRadiusUnits"/> from the obstruction centre, so at
+        /// travel t it reaches inward to ShadowRadiusUnits - t. 0.985 - 0.035 =
+        /// 0.95, which is where the tube wall is drawn.
+        /// </summary>
+        public const double WallFullBelowUnits = 0.035;
+
+        /// <summary>
+        /// Travel beyond which the wall has left the rim and contributes nothing.
+        /// 0.985 - 0.085 = 0.90: a lit edge that far into the picture is the
+        /// artefact, not the instrument.
+        /// </summary>
+        public const double WallDarkAboveUnits = 0.085;
+
+        /// <summary>
+        /// The lit inner wall's brightness, keyed on where the wall actually IS
+        /// rather than on the raw eye displacement.
+        ///
+        /// A linear fade in the displacement is not enough, and this is measured,
+        /// not assumed: with the old shader the wall is still ON the rim for the
+        /// first 23 % of the travel, where a bright edge is correct and desirable
+        /// (it is the ring the author chose). Dimming it there would darken the
+        /// resting look for nothing, while beyond that the linear fade still let
+        /// the wall add up to 0.067 luminance inside the field on a bright
+        /// scene - seventeen 8-bit steps, plainly visible, and precisely the
+        /// reported arc.
+        ///
+        /// So: full while the wall is on the rim, ramping to zero as it leaves,
+        /// and zero once it is in open field.
+        ///
+        /// HONEST SCOPE, measured not assumed: this is a MITIGATION, not the fix.
+        /// With the old shader still in the bundle the wall is at its brightest
+        /// exactly while it is still near the rim - which is where the artefact
+        /// begins - so the peak light added inside r < 0.95 is 0.085 at travel
+        /// 0.035 and 0.045 at 0.06. Against a local scene already darkened to
+        /// about 0.027 by the tube shadow, that is still a visible arc, roughly
+        /// half of the original 0.067-to-0.22 range but not gone. Only the
+        /// shader change removes it, and the shader ships inside the
+        /// AssetBundle, so it needs a rebuild in the Unity project. Tuning these
+        /// constants until the number looks acceptable would be exactly the
+        /// "declare victory on a hypothesis" move, so the number is stated
+        /// instead.
+        /// </summary>
         public static double WallLight(double rimLight, double offsetUnits, double maxTravel)
         {
             if (double.IsNaN(rimLight) || rimLight <= 0d)
@@ -256,9 +301,13 @@ namespace UBOAT.Mods.RadioNavigation
             if (double.IsNaN(offsetUnits) || double.IsNaN(maxTravel) || maxTravel <= 0d)
                 return rimLight;
             double magnitude = Math.Abs(offsetUnits);
-            if (magnitude >= maxTravel)
+            if (magnitude <= WallFullBelowUnits)
+                return rimLight;
+            if (magnitude >= WallDarkAboveUnits)
                 return 0d;
-            return rimLight * (1d - magnitude / maxTravel);
+            double t = (magnitude - WallFullBelowUnits)
+                / (WallDarkAboveUnits - WallFullBelowUnits);
+            return rimLight * (1d - t);
         }
 
         /// <summary>

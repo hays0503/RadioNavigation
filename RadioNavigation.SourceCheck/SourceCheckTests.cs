@@ -4322,6 +4322,37 @@ namespace RadioNavigation.SourceCheck
                     {
                         problems.Add("SextantLuneOverlay.Write must pass the live offset magnitude to WallLight - computing it and feeding a constant leaves the wall at full strength in the field");
                     }
+                    // The bundle-version check must exist AND be called: a marker
+                    // nobody reads is indistinguishable from no marker. Fourth
+                    // occurrence of the declared-vs-used trap in this project -
+                    // existence checks keep letting the mutation through, so this
+                    // one asserts the call site, not the declaration.
+                    var report = FindMethod(luneOverlay, "ReportBundleVersion");
+                    if (report == null)
+                    {
+                        problems.Add("SextantLuneOverlay has no ReportBundleVersion - the bundled shader's _LuneWallAnchor is never read, so a stale bundle looks like a working one");
+                    }
+                    else
+                    {
+                        var bind = FindMethod(luneOverlay, "Bind");
+                        if (bind == null || !InvokesName(bind, "ReportBundleVersion"))
+                        {
+                            problems.Add("SextantLuneOverlay.Bind must call ReportBundleVersion - a version check that is never called reports nothing");
+                        }
+                        if (report.ToString().IndexOf("HasProperty", StringComparison.Ordinal) < 0)
+                        {
+                            problems.Add("SextantLuneOverlay.ReportBundleVersion must check HasProperty - a stale shader has no _LuneWallAnchor at all, so GetFloat alone would read 0 and hide the difference");
+                        }
+                        // Counting, not "contains Warning": there are two stale
+                        // paths (property missing, property zero) and a mutation
+                        // that downgrades ONE of them to Debug.Log still leaves
+                        // the word "Warning" in the other.
+                        int warnings = Regex.Matches(luneOverlay.ToString(), @"Debug\.LogWarning").Count;
+                        if (warnings < 2)
+                        {
+                            problems.Add("SextantLuneOverlay must warn on BOTH stale-bundle paths (property missing and property zero) - " + warnings + " of 2 present");
+                        }
+                    }
                 }
 
                 var overlayText = FindSourceType(roots, "SextantOverlay");
@@ -4398,8 +4429,6 @@ namespace RadioNavigation.SourceCheck
             {
                 foreach (string required in new[]
                 {
-                    "fwidth(distanceFromAperture)",
-                    "_LuneOffset",
                     "_LuneRadius",
                     "_LuneStrength",
                     "_LuneRimLight",
@@ -4435,12 +4464,27 @@ namespace RadioNavigation.SourceCheck
                     // so renaming the variable cannot pass it, and the old form is
                     // banned outright so it cannot come back as a "simplification".
                     "float wallDistance = length(p) - _LuneRadius",
+                    // The version marker and its reader. Without them the whole
+                    // fix is unverifiable: the shader ships inside a COMPRESSED
+                    // bundle, so scanning the bundle from outside finds nothing
+                    // and a stale build is indistinguishable from a working one.
+                    //
+                    // The DECLARATION is required, not just the name: deleting the
+                    // property while leaving its use in the body keeps the name in
+                    // the file, and a "the string is present" check passes - the
+                    // same declared-vs-used trap, third occurrence.
+                    "saturate(_LuneWallAnchor)",
                 })
                 {
                     if (Regex.IsMatch(shader, @"float rim\s*=\s*1\.0\s*-\s*saturate\(abs\(shadeDistance"))
                         problems.Add("The lit wall must not be derived from shadeDistance - that carries the pupil offset and drags the wall across the field on a fast turn");
                     if (shader.IndexOf(required, StringComparison.Ordinal) < 0)
                         problems.Add("Aperture shader must keep: " + required);
+                }
+                if (!Regex.IsMatch(shader,
+                        @"_LuneWallAnchor\s*\(""[^""]*""\s*,\s*Float\s*\)\s*=\s*1\.0"))
+                {
+                    problems.Add("The shader must DECLARE _LuneWallAnchor as a Float defaulting to 1.0 - deleting the declaration while leaving its use in the body keeps the name in the file and defeats any name-only check");
                 }
                 if (shader.IndexOf("saturate(color.r * 4.0)", StringComparison.Ordinal) >= 0)
                     problems.Add("The lit wall must not gate on a hard luminance knee (it dashed the arc)");

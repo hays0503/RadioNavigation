@@ -432,18 +432,48 @@ namespace Tests
 
         [Theory]
         [InlineData(0d, 0.09)]
-        [InlineData(0.075, 0.045)]
+        [InlineData(0.035, 0.09)]        // still exactly on the rim
+        [InlineData(0.06, 0.045)]        // halfway through the fade
+        [InlineData(0.085, 0.0)]         // reach 0.90: in open field, dark
         [InlineData(0.15, 0.0)]
-        [InlineData(0.2, 0.0)]
-        [InlineData(-0.075, 0.045)]
+        [InlineData(-0.06, 0.045)]
         public void TheLitWallFadesAsThePupilLeavesTheAxis(double offset, double expected)
         {
-            // At rest the ring keeps the full strength the author chose
-            // (вариант д); by the time the pupil has travelled its full range the
-            // wall has left the rim and must not be lighting anything.
+            // The wall keeps full strength for as long as it is still ON the rim -
+            // that is the ring the author chose (вариант д) - and is gone once it
+            // has left. The fade is keyed on the wall's reach, not on the raw
+            // displacement, so it tracks the geometry the shader actually draws.
             double light = SextantLuneMath.WallLight(0.09, offset, SextantLuneMath.MaxOffsetUnits);
             Assert.True(Math.Abs(light - expected) < 1e-9,
                 "offset " + offset + " gave " + light + ", expected " + expected);
+        }
+
+        [Fact]
+        public void TheWallFadeIsMonotonicAndNeverGoesBackUp()
+        {
+            double previous = double.MaxValue;
+            for (int i = 0; i <= 30; i++)
+            {
+                double offset = SextantLuneMath.MaxOffsetUnits * i / 30d;
+                double light = SextantLuneMath.WallLight(0.09, offset, SextantLuneMath.MaxOffsetUnits);
+                Assert.True(light <= previous + 1e-12,
+                    "the wall brightened again at offset " + offset);
+                Assert.True(light >= 0d, "the wall went negative at " + offset);
+                previous = light;
+            }
+        }
+
+        [Fact]
+        public void TheFadeEndsBeforeTheWallIsWellIntoTheField()
+        {
+            // Measured bound on the mitigation: the wall is fully dark by the
+            // time its reach is 0.90, so it can never be lighting the middle of
+            // the picture. The shader fix is what removes the remaining band
+            // between 0.95 and 0.90, and that needs the bundle rebuild.
+            Assert.True(SextantLuneMath.ShadowRadiusUnits - SextantLuneMath.WallDarkAboveUnits
+                <= 0.901, "the wall is still lit too far into the field");
+            Assert.True(SextantLuneMath.WallFullBelowUnits < SextantLuneMath.WallDarkAboveUnits,
+                "the full-brightness band must end before the dark one begins");
         }
 
         [Fact]

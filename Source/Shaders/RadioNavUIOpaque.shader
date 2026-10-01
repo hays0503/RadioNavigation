@@ -16,6 +16,14 @@ Shader "RadioNav/UIOpaque"
         _LuneRadius ("Obstruction disc radius", Range(0.5, 1.0)) = 0.985
         _LuneStrength ("Shadow depth", Range(0, 1)) = 0.95
         _LuneRimLight ("Lit tube edge", Range(0, 0.5)) = 0.09
+        // VERSION MARKER, not a tuning knob. The lit wall must be measured from
+        // the aperture axis; a stale AssetBundle still carries the old shader
+        // compiled in, and nothing could tell that apart from "the fix is live" -
+        // the mod only ever saw a shader NAME. The overlay reads this and logs
+        // it, so a bundle that was not rebuilt becomes visible instead of
+        // silent. A stale bundle reports 0 and keeps the old behaviour, which
+        // is exactly why the line has to be read rather than assumed.
+        _LuneWallAnchor ("Lit wall anchored to tube (1 = fixed)", Float) = 1.0
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -153,6 +161,10 @@ Shader "RadioNav/UIOpaque"
                 // the tube. _LuneRimLight already falls off with the eye offset
                 // (SextantLuneMath.WallLight), so the two halves agree.
                 float wallDistance = length(p) - _LuneRadius;
+                // The lerp keeps the old form reachable ONLY for a bundle that
+                // predates the property, where the marker reads 0 - so the mod can
+                // report "stale bundle" instead of the defect being invisible.
+                wallDistance = lerp(shadeDistance, wallDistance, saturate(_LuneWallAnchor));
                 float rim = 1.0 - saturate(abs(wallDistance / (shadeEdge * 3.0)));
                 rim *= rim * _LuneRimLight * wallResponse;
 
