@@ -4524,6 +4524,33 @@ namespace RadioNavigation.SourceCheck
                     problems.Add("The aim rate must be measured BEFORE the washout stabilization");
                 if (poseText.IndexOf("SextantAimRate.Reset()", StringComparison.Ordinal) < 0)
                     problems.Add("The aim-rate latch must be reset with the other filters");
+
+                // The PIP far clip must NOT be mirrored from the eye camera again.
+                // Measured 2026-10-02: mirroring it sliced the ocean, and the tell
+                // was that the resulting hard boundary appeared ONLY inside the
+                // ocular (the main camera's far is 4500 and never showed it) and
+                // moved with the boat's pitch.
+                var pipClip = FindSourceType(roots, "SextantPipClip");
+                if (pipClip == null)
+                {
+                    problems.Add("SextantPipClip (the PIP clip contract) is missing");
+                }
+                else
+                {
+                    string clipText = pipClip.ToString();
+                    foreach (string required in new[]
+                    {
+                        "FarPlane", "MinNearPlane", "FarPlaneClearsTheWorld",
+                    })
+                    {
+                        if (clipText.IndexOf(required, StringComparison.Ordinal) < 0)
+                            problems.Add("The PIP clip contract must expose: " + required);
+                    }
+                }
+                if (poseText.IndexOf("farClipPlane = source.farClipPlane", StringComparison.Ordinal) >= 0)
+                    problems.Add("The PIP far clip must come from SextantPipClip, not from the eye camera (it sliced the sea)");
+                if (poseText.IndexOf("SextantPipClip.FarPlane", StringComparison.Ordinal) < 0)
+                    problems.Add("SextantPipPose must take its far clip from the tested SextantPipClip contract");
             }
 
             // The alidade must not be an input any more (author: "убрать

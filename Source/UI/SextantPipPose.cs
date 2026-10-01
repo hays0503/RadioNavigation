@@ -192,17 +192,42 @@ namespace UBOAT.Mods.RadioNavigation
                 manualRender();
         }
 
+        /// <summary>
+        /// Far clip for the PIP cameras, in metres. NOT mirrored from the FPP eye
+        /// camera any more (author's report, 2026-10-02).
+        ///
+        /// The eye camera's far clip is tuned for the bridge window - 40 m
+        /// inside, fog-dependent outside (FPPCameraController.cs:942) - and the
+        /// game rewrites it every frame, so copying it into the PIP sliced the
+        /// ocean. Measured: a razor-sharp horizontal boundary crossed the ocular
+        /// about 7 degrees below the axis (r = +0.37) with sky above and sea
+        /// below, it moved as the boat pitched, and it was present ONLY inside
+        /// the ocular - the main camera's far is 4500 and never showed it. It
+        /// survived with the eye shadow switched off entirely, which is what
+        /// cleared the lune, the lens, the constellation lines and the bezel.
+        ///
+        /// The value itself lives in the pure contract SextantPipClip, because a
+        /// number that caused a visible defect has to be assertable offline.
+        /// </summary>
+        public const float PipFarClipPlane = (float)SextantPipClip.FarPlane;
+
+        /// <summary>
+        /// Near clip floor. The eye camera's own near plane is mirrored so the
+        /// interior keeps its depth precision; the floor only stops a zero or a
+        /// negative value, which would collapse the projection.
+        /// </summary>
+        public const float PipMinNearClipPlane = (float)SextantPipClip.MinNearPlane;
+
         public static void SyncCameraState(Camera cam, Camera source, float fovDivisor,
             int interiorMask)
         {
             cam.fieldOfView = source.fieldOfView / fovDivisor;
-            // Camera params the game recomputes while the sextant is open:
-            // the FPP far clip follows the inside state and the weather fog
-            // (FPPCameraController.cs:942: 40 m inside, fog-dependent
-            // outside), the near clip changes with the view (:615-616). The
-            // PIP must stay 1:1 with the eyes, so copy them every frame.
-            cam.nearClipPlane = source.nearClipPlane;
-            cam.farClipPlane = source.farClipPlane;
+            // The near clip and the depth mode still track the eyes: the near
+            // clip changes with the view (:615-616) and the interior needs the
+            // precision. The far clip deliberately does NOT - see
+            // PipFarClipPlane for the measurement that decided it.
+            cam.nearClipPlane = Mathf.Max(source.nearClipPlane, PipMinNearClipPlane);
+            cam.farClipPlane = PipFarClipPlane;
             cam.depthTextureMode = source.depthTextureMode;
             // Inside the boat (interiorMask != 0) the PIP renders the interior
             // directly instead of the exterior view; the sun disc layer stays
