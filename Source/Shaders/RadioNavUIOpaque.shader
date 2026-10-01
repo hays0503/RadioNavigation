@@ -142,7 +142,18 @@ Shader "RadioNav/UIOpaque"
                 // wall off the rim and into the field.
                 float sceneLuma = dot(color.rgb, float3(0.299, 0.587, 0.114));
                 float wallResponse = 0.2 + 0.8 * saturate(sceneLuma * 2.0);
-                float rim = 1.0 - saturate(abs(shadeDistance / (shadeEdge * 3.0)));
+                // The lit wall belongs to the TUBE, not to the shadow. Deriving it
+                // from shadeDistance made it travel with the pupil: at rest it is
+                // a thin ring on the rim, on a sharp turn it is carried inward to
+                // _LuneRadius - the eye offset (0.835 of the radius), i.e. a
+                // bright edge sweeping across the middle of the picture, which is
+                // the "instrument displays wrongly on fast mouse movement" report.
+                // Anchored to the aperture axis it stays on the rim and the
+                // shadow reveals and hides it, which is what actually happens in
+                // the tube. _LuneRimLight already falls off with the eye offset
+                // (SextantLuneMath.WallLight), so the two halves agree.
+                float wallDistance = length(p) - _LuneRadius;
+                float rim = 1.0 - saturate(abs(wallDistance / (shadeEdge * 3.0)));
                 rim *= rim * _LuneRimLight * wallResponse;
 
                 // EVERYTHING the field adds is multiplied by the coverage, the lit rim included: outside the aperture the source alpha is 0, and a canvas that composites premultiplied adds the RGB regardless of it, which paints the rim as a bright arc OUTSIDE the ocular (the author's report, 2026-10-02). Gating the whole colour also covers the shadow term itself - on the near side of a displaced pupil the field beyond the edge is not fully shadowed, so scene * (1 - shade) leaked there too.

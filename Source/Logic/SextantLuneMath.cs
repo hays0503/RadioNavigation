@@ -227,6 +227,41 @@ namespace UBOAT.Mods.RadioNavigation
         public const double ShadowRadiusUnits = 0.985;
 
         /// <summary>
+        /// The lit inner wall's brightness for a given eye displacement.
+        ///
+        /// Why this exists. The shader draws the lit wall from the SAME distance
+        /// field as the shadow (`length(p - _LuneOffset) - _LuneRadius`), so the
+        /// wall travels with the pupil: at rest it is a thin ring on the rim,
+        /// and on a sharp turn it is carried inwards, down to
+        /// `ShadowRadiusUnits - MaxOffsetUnits` = 0.835 of the radius, i.e. deep
+        /// into the picture. A bright edge sitting in the middle of the field,
+        /// sweeping across as the view turns, is what the author reports as the
+        /// instrument displaying wrongly on fast mouse movement.
+        ///
+        /// The wall belongs to the TUBE, which does not move; the eye only
+        /// reveals and hides it. Fading it with the displacement is the
+        /// C#-expressible half of that fix: at rest (offset 0) the ring is at
+        /// full strength, which is exactly the resting look the author chose
+        /// (вариант д), and the further the pupil slides the less a wall that
+        /// has left the rim should be drawing light. The root fix - anchoring
+        /// the wall's radius in the shader rather than to the shadow - needs a
+        /// bundle rebuild and is tracked separately.
+        ///
+        /// Returns 0 at or beyond the full travel, never negative.
+        /// </summary>
+        public static double WallLight(double rimLight, double offsetUnits, double maxTravel)
+        {
+            if (double.IsNaN(rimLight) || rimLight <= 0d)
+                return 0d;
+            if (double.IsNaN(offsetUnits) || double.IsNaN(maxTravel) || maxTravel <= 0d)
+                return rimLight;
+            double magnitude = Math.Abs(offsetUnits);
+            if (magnitude >= maxTravel)
+                return 0d;
+            return rimLight * (1d - magnitude / maxTravel);
+        }
+
+        /// <summary>
         /// Default shadow depth (author 2026-10-01: "не прозрачность луны бы
         /// повысил, чтобы до 95 %"). At rest this is also the depth of the thin
         /// uniform ring, so a deeper value darkens the rim all the way round.

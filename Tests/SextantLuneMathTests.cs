@@ -430,6 +430,58 @@ namespace Tests
                 "the shadow must not eat more than 40 % of the radius, got " + near);
         }
 
+        [Theory]
+        [InlineData(0d, 0.09)]
+        [InlineData(0.075, 0.045)]
+        [InlineData(0.15, 0.0)]
+        [InlineData(0.2, 0.0)]
+        [InlineData(-0.075, 0.045)]
+        public void TheLitWallFadesAsThePupilLeavesTheAxis(double offset, double expected)
+        {
+            // At rest the ring keeps the full strength the author chose
+            // (вариант д); by the time the pupil has travelled its full range the
+            // wall has left the rim and must not be lighting anything.
+            double light = SextantLuneMath.WallLight(0.09, offset, SextantLuneMath.MaxOffsetUnits);
+            Assert.True(Math.Abs(light - expected) < 1e-9,
+                "offset " + offset + " gave " + light + ", expected " + expected);
+        }
+
+        [Fact]
+        public void TheLitWallCanNeverGoNegativeOrAddLight()
+        {
+            // Zero light means "off"; a negative setting must never become a
+            // positive glow.
+            Assert.Equal(0d, SextantLuneMath.WallLight(0d, 0d, 0.15), 9);
+            Assert.Equal(0d, SextantLuneMath.WallLight(-1d, 0d, 0.15), 9);
+            // A degenerate travel must not divide by zero and blow the wall up.
+            Assert.Equal(0.09, SextantLuneMath.WallLight(0.09, 0.01, 0d), 9);
+            // A NaN offset is a broken value, not a large displacement: keep the
+            // resting look rather than blacking out the rim because of it.
+            Assert.Equal(0.09, SextantLuneMath.WallLight(0.09, double.NaN, 0.15), 9);
+            Assert.Equal(0.09, SextantLuneMath.WallLight(0.09, 0.01, double.NaN), 9);
+            Assert.Equal(0.09, SextantLuneMath.WallLight(0.09, 0.01, double.PositiveInfinity), 9);
+        }
+
+        [Fact]
+        public void TheWallBandIsDarkBeforeItCanReachOpenField()
+        {
+            // The measured defect, stated as an invariant: the lit wall is drawn at
+            // ShadowRadiusUnits from the obstruction centre, so the furthest it can
+            // travel INWARDS is ShadowRadiusUnits - MaxOffsetUnits. A bright edge
+            // that far into the picture is the "bright arc in the middle of the
+            // field on a fast turn" the author reports, so the wall must already
+            // be dark by then.
+            double deepest = SextantLuneMath.ShadowRadiusUnits - SextantLuneMath.MaxOffsetUnits;
+            Assert.True(deepest > 0.83 && deepest < 0.86,
+                "the wall's deepest reach moved: " + deepest);
+            Assert.Equal(0d, SextantLuneMath.WallLight(0.09, deepest,
+                SextantLuneMath.MaxOffsetUnits), 9);
+            double atTwoThirds = SextantLuneMath.WallLight(0.09, 0.10,
+                SextantLuneMath.MaxOffsetUnits);
+            Assert.True(atTwoThirds < 0.09 * 0.34,
+                "too bright at two thirds of the travel: " + atTwoThirds);
+        }
+
         [Fact]
         public void ShadowDistance_IsContinuousAcrossTheBoundary()
         {

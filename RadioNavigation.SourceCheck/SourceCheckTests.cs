@@ -4288,6 +4288,42 @@ namespace RadioNavigation.SourceCheck
                 var eyecupFactor = Regex.Match(backing, @"EyecupFactor\s*=\s*SextantRimProfile\.EyecupFactor;");
                 if (!eyecupFactor.Success)
                     problems.Add("EyecupFactor must come from the pure coverage contract, not a local literal");
+                // The overlay must call WallLight where it pushes the shadow, so
+                // the wall's brightness and the shadow's position cannot drift
+                // apart between frames.
+                var luneOverlay = FindSourceType(roots, "SextantLuneOverlay");
+                if (luneOverlay == null)
+                {
+                    problems.Add("type 'SextantLuneOverlay' not found in Source/");
+                }
+                else
+                {
+                    var write = FindMethod(luneOverlay, "Write");
+                    if (write == null)
+                    {
+                        problems.Add("SextantLuneOverlay.Write not found");
+                    }
+                    else if (!InvokesName(write, "WallLight"))
+                    {
+                        problems.Add("SextantLuneOverlay.Write does not call SextantLuneMath.WallLight - the lit wall keeps full brightness while the eye offset drags it into the field");
+                    }
+                    else if (write.ToString().IndexOf("SetFloatIfPresent(RimLightId",
+                                 StringComparison.Ordinal) < 0)
+                    {
+                        problems.Add("SextantLuneOverlay.Write does not push the wall brightness to RimLightId");
+                    }
+                    // Calling WallLight is not enough - it must be called with the
+                    // LIVE offset. A mutation that passed 0d instead of the
+                    // magnitude compiled, passed every pure test (which only see
+                    // the function) and passed a gate that only saw the call: the
+                    // wall was computed and then thrown away, so it never faded.
+                    else if (!Regex.IsMatch(write.ToString(),
+                                 @"WallLight\([^;]*Offset\.Magnitude"))
+                    {
+                        problems.Add("SextantLuneOverlay.Write must pass the live offset magnitude to WallLight - computing it and feeding a constant leaves the wall at full strength in the field");
+                    }
+                }
+
                 var overlayText = FindSourceType(roots, "SextantOverlay");
                 if (overlayText == null
                     || overlayText.ToString().IndexOf("SextantOcularBuilder.ApplyEyecupSize(result, ocularSize)",
@@ -4389,8 +4425,20 @@ namespace RadioNavigation.SourceCheck
                     // way to keep that knee from coming back as a "simplification".
                     "wallResponse",
                     "0.2 + 0.8 * saturate(sceneLuma * 2.0)",
+                    // The lit wall belongs to the TUBE, so it is measured from the
+                    // aperture axis, NOT from the shadow's distance field. Deriving
+                    // it from shadeDistance made the wall travel with the pupil -
+                    // inwards to _LuneRadius - the eye offset, 0.835 of the radius
+                    // - so on a fast turn a bright edge swept across the middle of
+                    // the picture. That is the author's "the instrument displays
+                    // wrongly on fast mouse movement". Checked on the expression,
+                    // so renaming the variable cannot pass it, and the old form is
+                    // banned outright so it cannot come back as a "simplification".
+                    "float wallDistance = length(p) - _LuneRadius",
                 })
                 {
+                    if (Regex.IsMatch(shader, @"float rim\s*=\s*1\.0\s*-\s*saturate\(abs\(shadeDistance"))
+                        problems.Add("The lit wall must not be derived from shadeDistance - that carries the pupil offset and drags the wall across the field on a fast turn");
                     if (shader.IndexOf(required, StringComparison.Ordinal) < 0)
                         problems.Add("Aperture shader must keep: " + required);
                 }
