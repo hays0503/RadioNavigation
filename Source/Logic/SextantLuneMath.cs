@@ -122,6 +122,81 @@ namespace UBOAT.Mods.RadioNavigation
         public const string DeadZonePrefsKey = "RadioNav.LuneDead";
 
         /// <summary>
+        /// PlayerPrefs: brightness of the lit tube edge just past the shadow
+        /// boundary, in thousandths (90 = 0.09, the shader default, which is
+        /// 18 % of the shader's 0.5 range). It is a knob because this is the one
+        /// term that can read as a defect rather than as optics: the author
+        /// reported bright broken arcs hugging the rim on strong mouse
+        /// movement, and the only way to tell a lit wall from a rim glitch is to
+        /// be able to switch it off and look.
+        /// </summary>
+        public const string RimLightPrefsKey = "RadioNav.LuneRim";
+
+        /// <summary>Lit tube edge brightness when no preference is set.</summary>
+        public const double RimLight = 0.09;
+
+        /// <summary>Hard ceiling, matching the shader's own Range(0, 0.5).</summary>
+        public const double RimLightMax = 0.5;
+
+        /// <summary>
+        /// How much of the lit wall survives on a BLACK scene. A floor, not a
+        /// gate: see <see cref="WallResponse"/>.
+        /// </summary>
+        public const double WallResponseFloor = 0.2;
+
+        /// <summary>Scene luminance that reaches the full response.</summary>
+        public const double WallResponseFullLuma = 0.5;
+
+        /// <summary>
+        /// How brightly the lit inner wall of the tube shows, as a function of
+        /// the scene behind it.
+        ///
+        /// This is deliberately a SMOOTH ramp and not a threshold. The first
+        /// version gated on <c>saturate(color.r * 4)</c>, and a hard knee at
+        /// 0.25 luminance turns the wall into a DASHED arc wherever the scene
+        /// crosses that level - which on textured cloud is everywhere. The
+        /// author saw exactly that: bright broken arcs hugging the rim on strong
+        /// mouse movement, at r 0.89-1.0, i.e. the wall after the eye offset has
+        /// pulled it off the rim and into the field. A monotone ramp cannot
+        /// produce a seam, however the scene is textured.
+        ///
+        /// The floor exists so a dark sea does not turn the wall into a glow, and
+        /// it is small enough (0.2 * 0.09 = 0.018) to stay invisible.
+        /// </summary>
+        public static double WallResponse(double sceneLuminance)
+        {
+            double luma = Sanitize(sceneLuminance);
+            if (luma < 0d)
+                luma = 0d;
+            double scaled = luma / WallResponseFullLuma;
+            if (scaled > 1d)
+                scaled = 1d;
+            return WallResponseFloor + (1d - WallResponseFloor) * scaled;
+        }
+
+        /// <summary>
+        /// Turns the stored preference into the wall brightness, clamped to the
+        /// shader's own range.
+        ///
+        /// The arithmetic lives HERE, not in the overlay, and that is the whole
+        /// point. When the runtime did the clamping itself, two mutations
+        /// survived every gate: multiplying the ceiling by zero (the wall is
+        /// never lit) and clamping at 1 instead of 0 (the author's A/B is stuck
+        /// dark). A substring gate cannot see arithmetic, and this function is
+        /// unit-tested instead.
+        ///
+        /// Zero is a legal value on purpose: it is how the author switches the
+        /// lit wall off to tell it from a rim defect.
+        /// </summary>
+        public static double RimLightFrom(int thousandths)
+        {
+            if (thousandths <= 0)
+                return 0d;
+            double value = thousandths / 1000d;
+            return value > RimLightMax ? RimLightMax : value;
+        }
+
+        /// <summary>
         /// PlayerPrefs: VERIFICATION probe. 0 (the default) means "follow the
         /// player's aim". Any value 1..100 forces the shadow to that percentage
         /// of <see cref="MaxUnits"/> instead, which is how the crescent's shape

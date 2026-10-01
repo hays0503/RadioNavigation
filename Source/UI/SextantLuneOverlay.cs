@@ -33,6 +33,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static readonly int OffsetId = Shader.PropertyToID("_LuneOffset");
         private static readonly int RadiusId = Shader.PropertyToID("_LuneRadius");
         private static readonly int StrengthId = Shader.PropertyToID("_LuneStrength");
+        private static readonly int RimLightId = Shader.PropertyToID("_LuneRimLight");
 
         private Material material;
         private SextantLuneState state = SextantLuneState.Rest;
@@ -41,6 +42,7 @@ namespace UBOAT.Mods.RadioNavigation
         private double maxUnits = SextantLuneMath.MaxOffsetUnits;
         private double rateFull = SextantLuneMath.RateFullDegPerSec;
         private double deadZone = SextantLuneMath.DeadZoneDegPerSec;
+        private double rimLight = SextantLuneMath.RimLight;
         private int probePercent;
         private float settingsTimer;
         private float logTimer;
@@ -139,8 +141,10 @@ namespace UBOAT.Mods.RadioNavigation
             settingsTimer = SettingsPollSeconds;
             float strengthBefore = strength;
             double maxBefore = maxUnits;
+            double rimBefore = rimLight;
             ReadSettings();
-            if (Mathf.Abs(strengthBefore - strength) > 1e-4f || Math.Abs(maxBefore - maxUnits) > 1e-6)
+            if (Mathf.Abs(strengthBefore - strength) > 1e-4f || Math.Abs(maxBefore - maxUnits) > 1e-6
+                || Math.Abs(rimBefore - rimLight) > 1e-6)
                 Write();
         }
 
@@ -156,6 +160,16 @@ namespace UBOAT.Mods.RadioNavigation
             deadZone = Sanitize(PlayerPrefs.GetInt(SextantLuneMath.DeadZonePrefsKey,
                 (int)(SextantLuneMath.DeadZoneDegPerSec * 100d)),
                 SextantLuneMath.DeadZoneDegPerSec * 100d) / 100d;
+            // The conversion is the tested pure one, not arithmetic here: two
+            // mutations of the inline version survived every gate (the ceiling
+            // multiplied by zero, and a clamp at 1 instead of 0 which would have
+            // made the author's A/B impossible). A substring gate cannot check
+            // arithmetic, so the arithmetic is unit-tested instead.
+            // One line on purpose: the SourceCheck gate requires the literal
+            // "PlayerPrefs.GetInt(SextantLuneMath.RimLightPrefsKey", and a line
+            // break between the call and its key made that condition impossible
+            // to satisfy - the gate was red on a clean tree for a whole run.
+            rimLight = SextantLuneMath.RimLightFrom(PlayerPrefs.GetInt(SextantLuneMath.RimLightPrefsKey, (int)(SextantLuneMath.RimLight * 1000d)));
             probePercent = PlayerPrefs.GetInt(SextantLuneMath.ProbePrefsKey, 0);
             if (probePercent < 0)
                 probePercent = 0;
@@ -165,6 +179,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             SetFloatIfPresent(RadiusId, (float)SextantLuneMath.ShadowRadiusUnits);
             SetFloatIfPresent(StrengthId, strength);
+            SetFloatIfPresent(RimLightId, (float)rimLight);
         }
 
         private static double Sanitize(int value, double fallback)
@@ -193,9 +208,9 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             logTimer = 1f;
             Debug.Log(string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "{0} LUNE offset={1} hold={2:F2}s rate={3:F1},{4:F1}deg/s max={5:F3} full={6:F0} dead={7:F2} probe={8} strength={9:F2}",
+                "{0} LUNE offset={1} hold={2:F2}s rate={3:F1},{4:F1}deg/s max={5:F3} full={6:F0} dead={7:F2} rim={8:F3} probe={9} strength={10:F2}",
                 LogPrefix, state.Offset, state.ReleaseHoldSeconds, lastYawRate, lastPitchRate,
-                maxUnits, rateFull, deadZone, probePercent, strength));
+                maxUnits, rateFull, deadZone, rimLight, probePercent, strength));
         }
     }
 }

@@ -287,6 +287,116 @@ namespace Tests
         }
 
         [Fact]
+        public void TheLitWallIsASmoothRampAndNotAThreshold()
+        {
+            // The author's artefact: bright broken arcs hugging the rim on strong
+            // mouse movement. The cause was a hard knee in the wall's response to
+            // the scene (saturate(luma * 4) gated at 0.25), so on textured cloud
+            // the wall appeared only where the scene crossed that level - a
+            // dashed arc. The invariant is not "the wall is dimmer" but "the wall
+            // has no seam": the response must be continuous AND monotone, so no
+            // scene texture can break it into pieces.
+            double previous = double.NaN;
+            double slope = 0d;
+            const int steps = 4000;
+            for (int i = 0; i <= steps; i++)
+            {
+                double luma = i / (double)steps;
+                double response = SextantLuneMath.WallResponse(luma);
+                if (i > 0)
+                {
+                    double delta = response - previous;
+                    Assert.True(delta >= -1e-12,
+                        "the wall must not darken as the scene brightens: " + previous + " -> " + response);
+                    slope = delta;
+                }
+                previous = response;
+            }
+
+            // A gate shows up as a slope that jumps by orders of magnitude
+            // somewhere; a ramp does not. The widest step over 1/4000 of the
+            // luminance range is a hard bound on the local slope.
+            double steepest = 0d;
+            for (int i = 1; i <= steps; i++)
+            {
+                double lo = SextantLuneMath.WallResponse((i - 1) / (double)steps);
+                double hi = SextantLuneMath.WallResponse(i / (double)steps);
+                steepest = Math.Max(steepest, hi - lo);
+            }
+            Assert.True(steepest < 0.01,
+                "the wall response must not jump: steepest step " + steepest);
+
+            // Bounded, with a floor so a black sea does not glow and a ceiling
+            // of exactly 1 so a white cloud cannot overdrive it.
+            Assert.Equal(SextantLuneMath.WallResponseFloor, SextantLuneMath.WallResponse(0d), 9);
+            Assert.Equal(1d, SextantLuneMath.WallResponse(1d), 9);
+            Assert.Equal(1d, SextantLuneMath.WallResponse(4d), 9);
+            Assert.True(SextantLuneMath.WallResponse(0d) * SextantLuneMath.RimLight < 0.02,
+                "the floor must stay invisible on a black scene");
+            Assert.True(SextantLuneMath.WallResponse(0.25) > SextantLuneMath.WallResponseFloor + 0.2,
+                "a mid-bright scene must actually light the wall");
+
+            // And the crude gate it replaced is gone for good: a hard knee at
+            // 0.25 with a 0.2 floor would read 0.2 below and 0.2 above it.
+            Assert.NotEqual(
+                SextantLuneMath.WallResponse(0.2499), SextantLuneMath.WallResponse(0.2501), 6);
+            // Negative and NaN are treated as black, NOT as garbage: a NaN here
+            // would propagate into the material and blank the whole field.
+            Assert.Equal(SextantLuneMath.WallResponse(0d), SextantLuneMath.WallResponse(-3d), 9);
+            Assert.Equal(SextantLuneMath.WallResponse(0d), SextantLuneMath.WallResponse(double.NaN), 9);
+            Assert.Equal(SextantLuneMath.WallResponse(0d), SextantLuneMath.WallResponse(double.PositiveInfinity), 9);
+        }
+
+        [Fact]
+        public void TheLitWallStaysInsideTheShadersOwnRange()
+        {
+            // The pref is in thousandths and the shader declares Range(0, 0.5);
+            // a value above the ceiling would be silently clamped by Unity, so
+            // the contract is checked here rather than discovered on screen.
+            Assert.True(SextantLuneMath.RimLight >= 0d && SextantLuneMath.RimLight <= SextantLuneMath.RimLightMax,
+                "the default must sit inside the shader range");
+            Assert.InRange(SextantLuneMath.RimLight, 0.05, 0.2);
+            Assert.Equal(0.5, SextantLuneMath.RimLightMax, 9);
+        }
+
+        [Theory]
+        // The author's A/B depends on every one of these: 0 switches the lit wall
+        // off, a normal value passes through, and an over-large one must not
+        // exceed the shader's own Range or Unity would clamp it silently.
+        [InlineData(0, 0d)]
+        [InlineData(45, 0.045)]
+        [InlineData(90, 0.09)]
+        [InlineData(120, 0.12)]
+        [InlineData(500, 0.5)]
+        [InlineData(5000, 0.5)]
+        [InlineData(-90, 0d)]
+        [InlineData(int.MinValue, 0d)]
+        public void TheWallKnobIsClampedToTheShadersRange(int thousandths, double expected)
+        {
+            Assert.Equal(expected, SextantLuneMath.RimLightFrom(thousandths), 9);
+        }
+
+        [Fact]
+        public void TheWallKnobCanActuallySwitchTheWallOff()
+        {
+            // If 0 were treated as "unset" it would fall back to the default and
+            // the author's five-second A/B would silently do nothing - which is
+            // the one thing the knob exists to prevent.
+            Assert.Equal(0d, SextantLuneMath.RimLightFrom(0), 9);
+            Assert.True(SextantLuneMath.RimLightFrom(0) < SextantLuneMath.RimLight,
+                "0 must be darker than the default, not equal to it");
+        }
+
+        [Fact]
+        public void TheWallKnobPreservesTheDefaultForAbsentValues()
+        {
+            // The stored integer is the value in thousandths of the default, so a
+            // round trip has to be exact or the live pref would drift.
+            Assert.Equal(SextantLuneMath.RimLight,
+                SextantLuneMath.RimLightFrom((int)(SextantLuneMath.RimLight * 1000d)), 9);
+        }
+
+        [Fact]
         public void DefaultStrength_IsTheAuthorsNinetyFivePercent()
         {
             Assert.Equal(0.95, SextantLuneMath.DefaultStrength, 6);

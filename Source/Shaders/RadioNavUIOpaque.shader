@@ -131,10 +131,19 @@ Shader "RadioNav/UIOpaque"
                 float shade = smoothstep(-shadeEdge, shadeEdge, shadeDistance) * _LuneStrength;
 
                 // The lit inner wall just past the shadow boundary is what makes
-                // the crescent read as glass rather than a hole. Gated on the
-                // scene's own luminance so the black lens backing stays black.
+                // the crescent read as glass rather than a hole. Its response to
+                // the scene is a SMOOTH ramp (SextantLuneMath.WallResponse,
+                // mirrored here so the test can pin the curve): the first version
+                // gated on saturate(color.r * 4), and a hard knee at 0.25
+                // luminance turned the wall into a dashed arc wherever the scene
+                // crossed that level, which on textured cloud is everywhere - the
+                // author saw broken bright arcs hugging the rim on strong mouse
+                // movement, at r 0.89-1.0, i.e. after the eye offset pulled the
+                // wall off the rim and into the field.
+                float sceneLuma = dot(color.rgb, float3(0.299, 0.587, 0.114));
+                float wallResponse = 0.2 + 0.8 * saturate(sceneLuma * 2.0);
                 float rim = 1.0 - saturate(abs(shadeDistance / (shadeEdge * 3.0)));
-                rim *= rim * _LuneRimLight * saturate(color.r * 4.0);
+                rim *= rim * _LuneRimLight * wallResponse;
 
                 // EVERYTHING the field adds is multiplied by the coverage, the lit rim included: outside the aperture the source alpha is 0, and a canvas that composites premultiplied adds the RGB regardless of it, which paints the rim as a bright arc OUTSIDE the ocular (the author's report, 2026-10-02). Gating the whole colour also covers the shadow term itself - on the near side of a displaced pupil the field beyond the edge is not fully shadowed, so scene * (1 - shade) leaked there too.
                 // Ignore RT alpha (it is not coverage); retain full RGB inside

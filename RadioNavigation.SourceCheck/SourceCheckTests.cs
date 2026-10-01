@@ -4361,11 +4361,22 @@ namespace RadioNavigation.SourceCheck
                     // fwidth must be clamped: the gradient of a length() flips
                     // sign at its centre, and a noisy derivative blows the band up.
                     "clamp(fwidth(shadeDistance)",
+                    // The lit wall must answer to the scene with a SMOOTH ramp.
+                    // The gate it replaced (saturate(color.r * 4)) had a hard
+                    // knee at 0.25 luminance, so on textured cloud the wall broke
+                    // into a dashed arc - the author's report of bright broken
+                    // arcs hugging the rim on strong mouse movement, at r
+                    // 0.89-1.0. Banning the old expression by name is the only
+                    // way to keep that knee from coming back as a "simplification".
+                    "wallResponse",
+                    "0.2 + 0.8 * saturate(sceneLuma * 2.0)",
                 })
                 {
                     if (shader.IndexOf(required, StringComparison.Ordinal) < 0)
                         problems.Add("Aperture shader must keep: " + required);
                 }
+                if (shader.IndexOf("saturate(color.r * 4.0)", StringComparison.Ordinal) >= 0)
+                    problems.Add("The lit wall must not gate on a hard luminance knee (it dashed the arc)");
                 // "Antialiased" must survive an edge-width bump: a one-pixel
                 // ceiling is what made the rim look hard in the first place.
                 var range = Regex.Match(shader, @"_ApertureEdgePixels[^=]*Range\(([^)]*)\)");
@@ -4413,6 +4424,14 @@ namespace RadioNavigation.SourceCheck
                     "RateFullPrefsKey",
                     "DeadZonePrefsKey",
                     "ProbePrefsKey",
+                    // The lit wall must stay dialable: the one term that can read
+                    // as a defect rather than as optics, and a runtime material is
+                    // not addressable by name through reflection, so a preference
+                    // is the only way the author can A/B it.
+                    "RimLightPrefsKey",
+                    "WallResponse",
+                    "RimLightFrom",
+                    "RimLightMax",
                 })
                 {
                     if (math.ToString().IndexOf(required, StringComparison.Ordinal) < 0)
@@ -4431,12 +4450,36 @@ namespace RadioNavigation.SourceCheck
             }
 
             var overlay = FindSourceType(roots, "SextantLuneOverlay");
-            if (overlay == null
-                || overlay.ToString().IndexOf("SextantLuneMath.Step", StringComparison.Ordinal) < 0
-                || overlay.ToString().IndexOf("SextantLuneMath.FromCameraMotion", StringComparison.Ordinal) < 0
-                || overlay.ToString().IndexOf("SextantLuneMath.ObstructionCentre", StringComparison.Ordinal) < 0)
+            if (overlay == null)
             {
-                problems.Add("The shadow overlay must drive the tested math and push the offset into the material");
+                problems.Add("SextantLuneOverlay is missing or unparseable");
+            }
+            else
+            {
+                // One message per condition on purpose. A single combined
+                // condition reported "the overlay must drive the tested math" for
+                // a mutation that touched only SextantLuneMath, which sent the
+                // debugging in the wrong direction entirely.
+                foreach (var need in new[]
+                {
+                    new { Text = "SextantLuneMath.Step", Why = "drive the tested smoothing step" },
+                    new { Text = "SextantLuneMath.FromCameraMotion", Why = "drive the tested camera-rate response" },
+                    new { Text = "SextantLuneMath.ObstructionCentre", Why = "push the tested centre into the material" },
+                    // The wall brightness must travel the WHOLE way: pref -> pure
+                    // conversion -> field -> material. Requiring only the call is
+                    // not enough - hard-coding the default in the call keeps the
+                    // gate green while the author's A/B silently does nothing
+                    // (mutation). And the conversion must be the TESTED pure one:
+                    // when the runtime clamped inline, two mutations survived
+                    // every gate.
+                    new { Text = "SextantLuneMath.RimLightFrom(", Why = "use the tested wall-knob conversion" },
+                    new { Text = "SetFloatIfPresent(RimLightId, (float)rimLight)", Why = "push the wall knob into the material" },
+                    new { Text = "PlayerPrefs.GetInt(SextantLuneMath.RimLightPrefsKey", Why = "read the wall knob" },
+                })
+                {
+                    if (overlay.ToString().IndexOf(need.Text, StringComparison.Ordinal) < 0)
+                        problems.Add("The shadow overlay must " + need.Why + ": " + need.Text);
+                }
             }
             // The overlay must keep the STATE (offset + hold timer), not just the
             // offset: dropping the timer silently removes the stop lag.
