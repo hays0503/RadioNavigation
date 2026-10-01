@@ -23,7 +23,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// 4.0625× (GIMP overlay 48px→195px) so the filtered view shows the
         /// disc big enough to read sunspots. Angular size - scales with zoom.
         /// </summary>
-        private const float AngularDiameterDeg = 0.53f * 4.0625f;
+        internal const float AngularDiameterDeg = 0.53f * 4.0625f;
         private const float AngularRadiusRad = AngularDiameterDeg * 0.5f * Mathf.Deg2Rad;
         private const int TextureSize = 256;
         private const string LogPrefix = "[RadioNav][SunDisc]";

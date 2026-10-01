@@ -63,6 +63,11 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<int> triangles = new List<int>();
         private readonly List<Color> colors = new List<Color>();
         private readonly List<Vector2> uvs = new List<Vector2>();
+        // Per-star world center + intended rendered pixel diameter. The bundled
+        // PointSky shader uses this stream to rebuild the sprite in clip space
+        // for the camera currently drawing it (main view or either sextant PIP).
+        // The expanded world vertices remain as a fallback for stock shaders.
+        private readonly List<Vector4> screenSizeData = new List<Vector4>();
 
         private void Awake()
         {
@@ -301,6 +306,7 @@ namespace UBOAT.Mods.RadioNavigation
             triangles.Clear();
             colors.Clear();
             uvs.Clear();
+            screenSizeData.Clear();
 
             int visibleCount = 0;
             float safeRadius = CameraResolver.SafeRadius(cam);
@@ -362,6 +368,11 @@ namespace UBOAT.Mods.RadioNavigation
                 // Billboard quad (4 vertices, 2 triangles)
                 BillboardQuadBuilder.AddQuad(vertices, triangles, colors, uvs, worldPos, dir,
                     sizePx * worldPerPixel, color);
+                Vector4 centerAndPixelSize = new Vector4(worldPos.x, worldPos.y, worldPos.z, sizePx);
+                screenSizeData.Add(centerAndPixelSize);
+                screenSizeData.Add(centerAndPixelSize);
+                screenSizeData.Add(centerAndPixelSize);
+                screenSizeData.Add(centerAndPixelSize);
                 visibleCount++;
             }
 
@@ -375,7 +386,14 @@ namespace UBOAT.Mods.RadioNavigation
             mesh.SetTriangles(triangles, 0);
             mesh.SetColors(colors);
             mesh.SetUVs(0, uvs);
+            mesh.SetUVs(1, screenSizeData);
             mesh.RecalculateBounds();
+            // The bundled shader expands the point in clip space. Keep a small
+            // world-space guard for frustum culling, covering PIP targets that
+            // are denser than the view camera used for the fallback quad.
+            Bounds bounds = mesh.bounds;
+            bounds.Expand(worldPerPixel * StarBrightness.MaxSizePx);
+            mesh.bounds = bounds;
 
             if (visibleCount > 0 && Time.time - lastLogTime > 5f)
             {

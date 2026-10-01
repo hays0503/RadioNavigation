@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using UBOAT.Game.Scene.Camera;
 using UBOAT.Game.Scene.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -39,6 +40,35 @@ namespace UBOAT.Mods.RadioNavigation
         internal const float MinLengthDeg = 0.02f;
         internal const float MaxLengthDeg = 3f;
         internal const int MaxStars = 48;
+        private const float LensOpacity = 0.52f;
+        // uv 0.5 of the PIP target is the split between the horizon half and
+        // the alidade half of the ocular (SextantOcularBuilder uvRects).
+        private const float InteriorHalfSplit = 0.5f;
+        // Guard radius for the "compact source" test, in extended-solar-disc
+        // radii. Half the solar disc separates the two cases that matter
+        // inside the boat: a bare bulb is far below it, an instrument glass
+        // or a lit panel is well above it. Sizing it angularly keeps the
+        // selectivity zoom-invariant (both the guard and the source grow
+        // with the focal length).
+        private const float CompactnessRadiusScale = 0.5f;
+        // Interior line length/thickness relative to the star baseline. The
+        // star line is sized for a point PSF; a lamp bulb is far larger, so
+        // the same angular length would be swallowed by the source itself.
+        // A real cylindrical lens draws a line whose length comes from the
+        // aperture, not from the source, so the interior pass opens it up.
+        private const float InteriorStreakLengthScale = 2.5f;
+        private const float InteriorStreakThicknessScale = 1.5f;
+        private const string InteriorShaderName = "RadioNav/SternspreizInteriorOptics";
+        private const string InteriorMaterialAssetName = "RadioNavInteriorOpticsMaterial";
+        private const string InteriorShaderAssetName = "RadioNavInteriorOptics";
+        private static readonly int InteriorSceneTargetId = Shader.PropertyToID("_RadioNavInteriorScene");
+        private static readonly int InteriorGlowTargetAId = Shader.PropertyToID("_RadioNavInteriorGlowA");
+        private static readonly int InteriorGlowTargetBId = Shader.PropertyToID("_RadioNavInteriorGlowB");
+        private static readonly int InteriorGlowTextureId = Shader.PropertyToID("_RadioNavGlowTex");
+        private static readonly int InteriorStreakHalfLengthId = Shader.PropertyToID("_StreakHalfLengthTexels");
+        private static readonly int InteriorStreakHalfThicknessId = Shader.PropertyToID("_StreakHalfThicknessTexels");
+        private static readonly int InteriorStreakDirectionId = Shader.PropertyToID("_StreakDirection");
+        private static readonly int InteriorCompactnessRadiusId = Shader.PropertyToID("_CompactnessRadiusPixels");
 
         private const string LogPrefix = "[RadioNav][Sternspreiz][Lens]";
         private const string MaterialAssetName = "RadioNavSternspreizStreak";
@@ -49,9 +79,12 @@ namespace UBOAT.Mods.RadioNavigation
         private string setupError;
         private Mesh streakMesh;
         private Material streakMaterial;
+        private Material interiorMaterial;
         private Texture2D profileTexture;
         private CommandBuffer commandBuffer;
         private IPlayerPositionProvider positionProvider;
+        private bool interiorMaterialResolved;
+        private float interiorLogTimer;
 
         private readonly LensStar[] stars = new LensStar[MaxStars];
         private float[] positions;
@@ -77,6 +110,7 @@ namespace UBOAT.Mods.RadioNavigation
         private int lastCallbackFrame = -1;
         private int drawCount;
         private bool lastDrew;
+        private string lastMode = "off";
         private bool disposed;
 
         internal static bool Enabled
@@ -158,12 +192,27 @@ namespace UBOAT.Mods.RadioNavigation
             callbackCount++;
             lastCallbackFrame = Time.frameCount;
             lastDrew = false;
+            lastMode = "off";
 
-            if (!Enabled || !configured || streakMesh == null || disposed)
-                return;
-            if (!CanSightSky())
+            if (!Enabled || !configured || !rightEye || disposed || !SextantController.IsOpen)
                 return;
 
+            if (CanSightSky())
+            {
+                RenderStarField(context, source, destination, zBuffer);
+                return;
+            }
+
+            if (IsPlayerInsideBoat())
+                RenderInteriorOptics(context, source, destination, width, height);
+        }
+
+        private void RenderStarField(ScriptableRenderContext context,
+            RenderTargetIdentifier source, RenderTargetIdentifier destination,
+            RenderTargetIdentifier zBuffer)
+        {
+            if (streakMesh == null)
+                return;
             if (ShouldRebuild())
                 RebuildField();
             else
@@ -181,9 +230,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static bool CanSightSky()
         {
-            if (!SkyVisibilityResolver.IsPlayerOutside())
-                return false;
-            return SextantController.IsOpen;
+            return SkyVisibilityResolver.IsPlayerOutside();
+        }
+
+        private static bool IsPlayerInsideBoat()
+        {
+            return MainCamera.Instance?.IsInsideBoat == true;
         }
 
         private bool ShouldRebuild()
@@ -323,6 +375,114 @@ namespace UBOAT.Mods.RadioNavigation
 
             drawCount++;
             lastDrew = true;
+            lastMode = "outside";
+        }
+
+        private void RenderInteriorOptics(ScriptableRenderContext context,
+            RenderTargetIdentifier source, RenderTargetIdentifier destination,
+            int width, int height)
+        {
+            if (width <= 0 || height <= 0 || !EnsureInteriorMaterial())
+                return;
+
+            if (commandBuffer == null)
+            {
+                commandBuffer = new CommandBuffer();
+                commandBuffer.name = "RadioNav Sternspreiz Interior Optics";
+            }
+
+            int glowWidth = Mathf.Max(1, width / 2);
+            int glowHeight = Mathf.Max(1, height / 2);
+            UpdateInteriorProjection(width, glowWidth);
+            commandBuffer.Clear();
+            commandBuffer.GetTemporaryRT(InteriorGlowTargetAId, glowWidth, glowHeight, 0,
+                FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+            commandBuffer.GetTemporaryRT(InteriorGlowTargetBId, glowWidth, glowHeight, 0,
+                FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+
+            // Usually the pipeline already gives us distinct source/destination
+            // targets. Copy only for an aliased callback; all glow work remains
+            // half resolution so the interior effect stays bounded.
+            bool sourceAliasesDestination = source.Equals(destination);
+            RenderTargetIdentifier sceneSource = source;
+            if (sourceAliasesDestination)
+            {
+                commandBuffer.GetTemporaryRT(InteriorSceneTargetId, width, height, 0,
+                    FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
+                commandBuffer.Blit(source, new RenderTargetIdentifier(InteriorSceneTargetId));
+                sceneSource = new RenderTargetIdentifier(InteriorSceneTargetId);
+            }
+
+            commandBuffer.Blit(sceneSource,
+                new RenderTargetIdentifier(InteriorGlowTargetAId), interiorMaterial, 0);
+            commandBuffer.Blit(new RenderTargetIdentifier(InteriorGlowTargetAId),
+                new RenderTargetIdentifier(InteriorGlowTargetBId), interiorMaterial, 1);
+            commandBuffer.Blit(new RenderTargetIdentifier(InteriorGlowTargetBId),
+                new RenderTargetIdentifier(InteriorGlowTargetAId), interiorMaterial, 2);
+            commandBuffer.SetGlobalTexture(InteriorGlowTextureId,
+                new RenderTargetIdentifier(InteriorGlowTargetAId));
+            // Scoped to the alidade half by scissor, not by which camera the
+            // callback arrived on: the RawImage that shows uv 0.5..1 covers
+            // exactly this half of the target, so the horizon half stays
+            // byte-identical even when the SRP hands both PIP cameras the
+            // same colour buffer.
+            commandBuffer.EnableScissorRect(
+                new Rect(width * InteriorHalfSplit, 0f, width * (1f - InteriorHalfSplit), height));
+            commandBuffer.Blit(sceneSource, destination, interiorMaterial, 3);
+            commandBuffer.DisableScissorRect();
+            commandBuffer.SetGlobalTexture(InteriorGlowTextureId, Texture2D.blackTexture);
+            commandBuffer.ReleaseTemporaryRT(InteriorGlowTargetBId);
+            commandBuffer.ReleaseTemporaryRT(InteriorGlowTargetAId);
+            if (sourceAliasesDestination)
+                commandBuffer.ReleaseTemporaryRT(InteriorSceneTargetId);
+            context.ExecuteCommandBuffer(commandBuffer);
+
+            drawCount++;
+            lastDrew = true;
+            lastMode = "inside";
+        }
+
+        private void UpdateInteriorProjection(int targetWidth, int glowWidth)
+        {
+            if (interiorMaterial == null || pipCamera == null || targetWidth <= 0)
+                return;
+
+            double linePixels = SternspreizLineProfile.PixelsForAngle(
+                LengthDeg, pipCamera.fieldOfView, targetWidth);
+            double thicknessPixels = SternspreizLineProfile.PixelsForAngle(
+                BaselineThicknessDeg, pipCamera.fieldOfView, targetWidth);
+            // Guard radius for "is this a point source?". A lamp is a few
+            // pixels across, an instrument glass or a lit panel is wider than
+            // the extended solar disc, so the guard is sized from that disc
+            // and stays angularly correct at every zoom.
+            double extendedDiscPixels = SternspreizLineProfile.PixelsForAngle(
+                SunDiscRenderer.AngularDiameterDeg, pipCamera.fieldOfView, targetWidth);
+            float halfResolutionScale = glowWidth / (float)targetWidth * 0.5f;
+            float halfLengthTexels = Mathf.Max(
+                0.5f, (float)linePixels * InteriorStreakLengthScale * halfResolutionScale);
+            float halfThicknessTexels = Mathf.Max(
+                0.5f, (float)thicknessPixels * InteriorStreakThicknessScale * halfResolutionScale);
+            float compactnessRadiusPixels =
+                Mathf.Max(4f, (float)extendedDiscPixels * CompactnessRadiusScale);
+
+            float tiltRadians = SternspreizLensTilt.AngleDeg(Time.unscaledTime) * Mathf.Deg2Rad;
+            Vector4 direction = new Vector4(Mathf.Cos(tiltRadians), Mathf.Sin(tiltRadians), 0f, 0f);
+            SetFloatIfPresent(interiorMaterial, InteriorStreakHalfLengthId, halfLengthTexels);
+            SetFloatIfPresent(interiorMaterial, InteriorStreakHalfThicknessId, halfThicknessTexels);
+            SetFloatIfPresent(interiorMaterial, InteriorCompactnessRadiusId, compactnessRadiusPixels);
+            if (interiorMaterial?.HasProperty(InteriorStreakDirectionId) == true)
+                interiorMaterial.SetVector(InteriorStreakDirectionId, direction);
+
+            interiorLogTimer -= Time.unscaledDeltaTime;
+            if (interiorLogTimer > 0f)
+                return;
+            interiorLogTimer = 1f;
+            Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                "{0} INTERIOROPTICS rt={1}x{2} fov={3:F1} line={4:F2}px halfLen={5:F2}tex "
+                + "halfThick={6:F2}tex guard={7:F1}px dir={8:F3},{9:F3}",
+                LogPrefix, targetWidth, targetWidth, pipCamera.fieldOfView,
+                linePixels * InteriorStreakLengthScale, halfLengthTexels, halfThicknessTexels,
+                compactnessRadiusPixels, direction.x, direction.y));
         }
 
         private void EnsureBuffers()
@@ -396,10 +556,53 @@ namespace UBOAT.Mods.RadioNavigation
             streakMaterial.name = MaterialAssetName + (rightEye ? " (right)" : " (left)");
             streakMaterial.hideFlags = HideFlags.DontSave;
             SetProfileTexture();
+            // This is a cloned, lens-owned material. Use conventional source-
+            // over alpha blending here without changing the additive PointSky
+            // material used by the celestial renderer.
+            SetFloatIfPresent("_SrcBlend", (float)BlendMode.SrcAlpha);
+            SetFloatIfPresent("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            SetFloatIfPresent("_ZWrite", 0f);
             // DrawMesh explicitly selects pass 0 (Point). Its 2-D baked
             // profile owns softness/taper; these uniforms belong to the
             // unused reference Streak pass and would be a silent no-op here.
-            SetColorIfPresent("_Color", Color.white);
+            SetColorIfPresent("_Color", new Color(1f, 1f, 1f, LensOpacity));
+            return true;
+        }
+
+        private bool EnsureInteriorMaterial()
+        {
+            if (interiorMaterial != null)
+                return true;
+            if (interiorMaterialResolved)
+                return false;
+            interiorMaterialResolved = true;
+
+            Material bundled = ModBootstrapper.LoadBundleAsset(InteriorMaterialAssetName) as Material;
+            if (bundled != null)
+                interiorMaterial = new Material(bundled);
+            else
+            {
+                Shader shader = ModBootstrapper.LoadBundleAsset(InteriorShaderAssetName) as Shader
+                    ?? Shader.Find(InteriorShaderName);
+                if (shader == null)
+                {
+                    Debug.LogWarning(LogPrefix + " interior optics shader unavailable; interior lens is a no-op");
+                    return false;
+                }
+                interiorMaterial = new Material(shader);
+            }
+
+            interiorMaterial.name = InteriorShaderAssetName + " (right PIP)";
+            interiorMaterial.hideFlags = HideFlags.DontSave;
+            SetFloatIfPresent(interiorMaterial, "_BrightThreshold", 0.62f);
+            SetFloatIfPresent(interiorMaterial, "_BrightKnee", 0.24f);
+            SetFloatIfPresent(interiorMaterial, "_CompactnessStart", 0.04f);
+            SetFloatIfPresent(interiorMaterial, "_CompactnessEnd", 0.24f);
+            SetFloatIfPresent(interiorMaterial, "_CompactnessRadiusPixels", 16f);
+            SetFloatIfPresent(interiorMaterial, "_SceneBlur", 0.12f);
+            SetFloatIfPresent(interiorMaterial, "_GlowIntensity", 4f);
+            SetFloatIfPresent(interiorMaterial, "_GlowClamp", 0.2f);
+            SetFloatIfPresent(interiorMaterial, "_StreakEdgeFraction", 0.18f);
             return true;
         }
 
@@ -420,15 +623,35 @@ namespace UBOAT.Mods.RadioNavigation
             streakMaterial.SetColor(property, value);
         }
 
+        private void SetFloatIfPresent(string property, float value)
+        {
+            SetFloatIfPresent(streakMaterial, property, value);
+        }
+
+        private static void SetFloatIfPresent(Material material, string property, float value)
+        {
+            if (material?.HasProperty(property) != true)
+                return;
+            material.SetFloat(property, value);
+        }
+
+        private static void SetFloatIfPresent(Material material, int property, float value)
+        {
+            if (material?.HasProperty(property) != true)
+                return;
+            material.SetFloat(property, value);
+        }
+
         /// <summary>JSON for the existing /sextant snapshot.</summary>
         internal string SnapshotJson()
         {
             return string.Format(CultureInfo.InvariantCulture,
-                "{{\"enabled\":{0},\"configured\":{1},\"material\":\"{2}\",\"lengthDeg\":{3},\"thicknessDeg\":{4},\"tiltDeg\":{5},"
-                + "\"stars\":{6},\"emitted\":{7},\"draws\":{8},\"drew\":{9},\"rebuildFrame\":{10},"
-                + "\"callbackCount\":{11},\"lastFrame\":{12},\"setupError\":\"{13}\"}}",
+                "{{\"enabled\":{0},\"configured\":{1},\"material\":\"{2}\",\"mode\":\"{3}\",\"lengthDeg\":{4},\"thicknessDeg\":{5},\"tiltDeg\":{6},"
+                + "\"stars\":{7},\"emitted\":{8},\"draws\":{9},\"drew\":{10},\"rebuildFrame\":{11},"
+                + "\"callbackCount\":{12},\"lastFrame\":{13},\"setupError\":\"{14}\"}}",
                 Enabled ? "true" : "false", configured ? "true" : "false",
                 streakMaterial != null ? RadioNavProbeJson.Escape(streakMaterial.shader.name) : string.Empty,
+                RadioNavProbeJson.Escape(lastMode),
                 LengthDeg.ToString("F3", CultureInfo.InvariantCulture),
                 BaselineThicknessDeg.ToString("F3", CultureInfo.InvariantCulture),
                 (float.IsNaN(lastTiltDeg) || float.IsInfinity(lastTiltDeg) ? 0f : lastTiltDeg)
@@ -449,6 +672,7 @@ namespace UBOAT.Mods.RadioNavigation
         internal void NotifySuspended()
         {
             lastDrew = false;
+            lastMode = "off";
         }
 
         public void Dispose()
@@ -470,6 +694,11 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 UnityEngine.Object.Destroy(streakMaterial);
                 streakMaterial = null;
+            }
+            if (interiorMaterial != null)
+            {
+                UnityEngine.Object.Destroy(interiorMaterial);
+                interiorMaterial = null;
             }
             if (profileTexture != null)
             {

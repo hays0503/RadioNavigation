@@ -89,6 +89,9 @@ Shader "RadioNav/SternspreizStreak"
                 float4 vertex : POSITION;
                 fixed4 color : COLOR;
                 float2 uv : TEXCOORD0;
+                // StarsMesh supplies world center + target-pixel diameter here.
+                // Other celestial quads leave it zero and keep the legacy path.
+                float4 centerSize : TEXCOORD1;
             };
 
             struct pointV2f
@@ -102,10 +105,29 @@ Shader "RadioNav/SternspreizStreak"
             pointV2f vertPoint(pointAppdata v)
             {
                 pointV2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);
+                if (v.centerSize.w >= 2.0)
+                {
+                    // A single shared sky mesh is rendered by the main camera
+                    // and both zoomed PIP cameras. Expand point-star sprites in
+                    // the active target's pixels so zoom/FOV cannot multiply
+                    // their glyph size; keep the catalog center world-anchored.
+                    float4 centerClip = mul(UNITY_MATRIX_VP, float4(v.centerSize.xyz, 1.0));
+                    float2 pixelOffset = (v.uv - 0.5) * v.centerSize.w * 2.0
+                        / max(_ScreenParams.xy, float2(1.0, 1.0));
+                    centerClip.xy += pixelOffset * centerClip.w;
+                    o.pos = centerClip;
+                    o.worldPos = v.centerSize.xyz;
+                }
+                else
+                {
+                    // Planet and solar/lunar disc quads do not carry the star
+                    // stream; preserving this branch keeps their angular mesh
+                    // sizes and cloud-stage behavior unchanged.
+                    o.pos = UnityObjectToClipPos(v.vertex);
+                    o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
+                }
                 o.color = v.color * _Color;
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
                 return o;
             }
 
@@ -171,6 +193,7 @@ Shader "RadioNav/SternspreizStreak"
                 float4 vertex : POSITION;
                 fixed4 color : COLOR;
                 float2 uv : TEXCOORD0;
+                float4 centerSize : TEXCOORD1;
             };
 
             struct pointV2f
@@ -184,10 +207,22 @@ Shader "RadioNav/SternspreizStreak"
             pointV2f vertPoint(pointAppdata v)
             {
                 pointV2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);
+                if (v.centerSize.w >= 2.0)
+                {
+                    float4 centerClip = mul(UNITY_MATRIX_VP, float4(v.centerSize.xyz, 1.0));
+                    float2 pixelOffset = (v.uv - 0.5) * v.centerSize.w * 2.0
+                        / max(_ScreenParams.xy, float2(1.0, 1.0));
+                    centerClip.xy += pixelOffset * centerClip.w;
+                    o.pos = centerClip;
+                    o.worldPos = v.centerSize.xyz;
+                }
+                else
+                {
+                    o.pos = UnityObjectToClipPos(v.vertex);
+                    o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
+                }
                 o.color = v.color * _Color;
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
                 return o;
             }
 
@@ -255,6 +290,7 @@ Shader "RadioNav/SternspreizStreak"
                 float4 vertex : POSITION;
                 fixed4 color : COLOR;
                 float2 uv : TEXCOORD0;
+                float4 centerSize : TEXCOORD1;
             };
 
             struct pointV2f
@@ -268,10 +304,22 @@ Shader "RadioNav/SternspreizStreak"
             pointV2f vertPoint(pointAppdata v)
             {
                 pointV2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);
+                if (v.centerSize.w >= 2.0)
+                {
+                    float4 centerClip = mul(UNITY_MATRIX_VP, float4(v.centerSize.xyz, 1.0));
+                    float2 pixelOffset = (v.uv - 0.5) * v.centerSize.w * 2.0
+                        / max(_ScreenParams.xy, float2(1.0, 1.0));
+                    centerClip.xy += pixelOffset * centerClip.w;
+                    o.pos = centerClip;
+                    o.worldPos = v.centerSize.xyz;
+                }
+                else
+                {
+                    o.pos = UnityObjectToClipPos(v.vertex);
+                    o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
+                }
                 o.color = v.color * _Color;
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
                 return o;
             }
 
