@@ -5970,6 +5970,106 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>Rate-gated temporal-history reset: the pure decision
+        /// (SextantTemporalReset.ShouldReset + kill-switch + threshold at or
+        /// above probe motion) is consulted per-frame with the LIVE aim rate,
+        /// and the flag reaches the VIEW camera first (the smear follows the
+        /// main camera — a PIP-only reset was reverted as addressing nothing)
+        /// plus both PIP cameras. Mutations: constant arg, dropped camera,
+        /// unconditional reset, lowered threshold -&gt; FAIL.</summary>
+        [Fact]
+        public void SextantPip_TemporalResetIsRateGated()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var logic = FindSourceType(roots, "SextantTemporalReset");
+            if (logic == null)
+            {
+                problems.Add("type 'SextantTemporalReset' not found in Source/");
+            }
+            else
+            {
+                if (!HasFieldNamed(logic, "PrefsKey"))
+                    problems.Add("SextantTemporalReset does not declare PrefsKey - the kill-switch has no stable name");
+                if (!HasFieldNamed(logic, "ResetRateDegPerSec"))
+                    problems.Add("SextantTemporalReset does not declare ResetRateDegPerSec - the threshold has no stable name");
+                if (FindMethod(logic, "ShouldReset") == null)
+                    problems.Add("SextantTemporalReset.ShouldReset not found - the reset decision has no pure owner");
+                if (FindMethod(logic, "IsEnabled") == null)
+                    problems.Add("SextantTemporalReset.IsEnabled not found - the kill-switch has no reader");
+                var threshold = Regex.Match(logic.ToString(), @"ResetRateDegPerSec\s*=\s*([0-9.]+)");
+                double thresholdValue;
+                if (!threshold.Success
+                    || !double.TryParse(threshold.Groups[1].Value,
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out thresholdValue)
+                    || thresholdValue < 25.0)
+                {
+                    problems.Add("SextantTemporalReset.ResetRateDegPerSec must be a number at or above 25.0 - below probe motion it stops being a fast-turn-only reset");
+                }
+            }
+
+            var pose = FindSourceType(roots, "SextantPipPose");
+            if (pose == null)
+            {
+                problems.Add("type 'SextantPipPose' not found in Source/");
+            }
+            else
+            {
+                var update = FindMethod(pose, "Update");
+                if (update == null)
+                {
+                    problems.Add("SextantPipPose.Update not found");
+                }
+                else if (!Regex.IsMatch(update.ToString(),
+                    @"MaybeResetTemporalEffects\s*\(\s*factory\s*,\s*viewCamera\s*,\s*aimRateSample\.Magnitude\s*\)"))
+                {
+                    problems.Add("SextantPipPose.Update must call MaybeResetTemporalEffects(factory, viewCamera, aimRateSample.Magnitude) - the reset has to see the live view camera and the live aim rate, not a constant");
+                }
+
+                var maybe = FindMethod(pose, "MaybeResetTemporalEffects");
+                if (maybe == null)
+                {
+                    problems.Add("SextantPipPose.MaybeResetTemporalEffects not found - the per-frame reset has no owner");
+                }
+                else
+                {
+                    if (!InvokesOnType(maybe, "SextantTemporalReset", "ShouldReset"))
+                        problems.Add("SextantPipPose.MaybeResetTemporalEffects never calls SextantTemporalReset.ShouldReset - the reset would be unconditional and shimmer every still frame");
+                    if (!InvokesOnType(maybe, "SextantTemporalReset", "IsEnabled"))
+                        problems.Add("SextantPipPose.MaybeResetTemporalEffects never reads SextantTemporalReset.IsEnabled - the kill-switch is declared but never consulted");
+                    // The bare NAME is not enough here: viewCamera is also the
+                    // parameter name, so a name-only check passes with the
+                    // call deleted. Match the invocation instead.
+                    if (!Regex.IsMatch(maybe.ToString(),
+                        @"ResetTemporalEffects\s*\(\s*viewCamera\s*\)"))
+                        problems.Add("SextantPipPose.MaybeResetTemporalEffects never calls ResetTemporalEffects(viewCamera) - a PIP-only reset was already reverted as addressing nothing");
+                    if (maybe.ToString().IndexOf("LeftCamera", StringComparison.Ordinal) < 0
+                        || maybe.ToString().IndexOf("RightCamera", StringComparison.Ordinal) < 0)
+                        problems.Add("SextantPipPose.MaybeResetTemporalEffects must also feed BOTH PIP cameras - their own history may matter in scenes this probe never visited");
+                }
+
+                var reset = FindMethod(pose, "ResetTemporalEffects");
+                if (reset == null)
+                {
+                    problems.Add("SextantPipPose.ResetTemporalEffects not found - nothing writes the pipeline flag");
+                }
+                else if (!Regex.IsMatch(reset.ToString(),
+                    @"TemporalEffectsResetRequested\s*=\s*true"))
+                {
+                    problems.Add("SextantPipPose.ResetTemporalEffects must set TemporalEffectsResetRequested = true - anything else leaves the history intact");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} temporal-reset violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
         /// <summary>True when the method invokes <paramref name="member"/> on a
         /// receiver named <paramref name="receiver"/>. Checking the receiver is
         /// the point: a bare name match once passed this gate on the WRONG call

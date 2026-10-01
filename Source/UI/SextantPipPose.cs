@@ -171,6 +171,7 @@ namespace UBOAT.Mods.RadioNavigation
             double aimPitch = (testAimActive ? 0d : mainEuler.x) + probe.Pitch;
             aimRateState = SextantAimRate.Advance(aimRateState, targetYaw, aimPitch, dt,
                 out aimRateSample);
+            MaybeResetTemporalEffects(factory, viewCamera, aimRateSample.Magnitude);
             float yaw = StabilizeYaw(targetYaw, dt, stabilizationOn, locked);
             float pitch = (float)aimPitch;
             // Both beams follow the head pitch; the alidade adds the gap between
@@ -538,6 +539,40 @@ namespace UBOAT.Mods.RadioNavigation
         public static SextantAimRateSample AimRate
         {
             get { return aimRateSample; }
+        }
+
+        /// <summary>
+        /// Drops the pipeline's temporal history while the aim is swinging
+        /// fast (see SextantTemporalReset). The smear on fast mouse turns
+        /// follows the MAIN camera — a 220 deg/s probe spin (PIP only) renders
+        /// sharp — so the reset goes to the view camera first; the PIP pair
+        /// gets it too, in case their own history ever matters. Decided by the
+        /// pure ShouldReset (rate + kill-switch), never unconditionally.
+        /// </summary>
+        private static void MaybeResetTemporalEffects(SextantPipFactory factory,
+            Camera viewCamera, double rateDegPerSec)
+        {
+            if (!SextantTemporalReset.ShouldReset(rateDegPerSec, SextantTemporalReset.IsEnabled()))
+                return;
+            ResetTemporalEffects(viewCamera);
+            if (factory == null)
+                return;
+            ResetTemporalEffects(factory.LeftCamera);
+            ResetTemporalEffects(factory.RightCamera);
+        }
+
+        private static void ResetTemporalEffects(Camera camera)
+        {
+            if (camera == null)
+                return;
+            UBOAT.Game.Scene.Rendering.AdditionalCameraData data;
+            if (!addCache.TryGetValue(camera, out data) || data == null)
+            {
+                data = camera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                addCache[camera] = data;
+            }
+            if (data != null)
+                data.TemporalEffectsResetRequested = true;
         }
 
         /// <summary>Debug aim probe state, for reflection/telemetry.</summary>

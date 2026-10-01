@@ -105,6 +105,7 @@
     <Compile Include="BodySelectionTests.cs" />
     <Compile Include="SextantStabilizationTests.cs" />
     <Compile Include="SextantAimRateTests.cs" />
+    <Compile Include="SextantTemporalResetTests.cs" />
     <Compile Include="SextantAimProbeTests.cs" />
     <Compile Include="SextantBeamPoseMathTests.cs" />
     <Compile Include="SextantLuneMathTests.cs" />
@@ -259,6 +260,7 @@
     <Compile Include="..\Source\Logic\SextantStabilization.cs" Link="Source\Logic\SextantStabilization.cs" />
     <Compile Include="..\Source\Logic\SextantAimRate.cs" Link="Source\Logic\SextantAimRate.cs" />
     <Compile Include="..\Source\Logic\SextantAimProbe.cs" Link="Source\Logic\SextantAimProbe.cs" />
+    <Compile Include="..\Source\Logic\SextantTemporalReset.cs" Link="Source\Logic\SextantTemporalReset.cs" />
     <Compile Include="..\Source\Logic\SextantBeamPoseMath.cs" Link="Source\Logic\SextantBeamPoseMath.cs" />
     <Compile Include="..\Source\Logic\SextantLuneMath.cs" Link="Source\Logic\SextantLuneMath.cs" />
     <Compile Include="..\Source\Logic\SextantPipClip.cs" Link="Source\Logic\SextantPipClip.cs" />
