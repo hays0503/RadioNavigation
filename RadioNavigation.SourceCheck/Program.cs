@@ -15,12 +15,19 @@ namespace RadioNavigation.SourceCheck
         private static int passed;
         private static int failed;
 
-        private static int Main()
+        private static int Main(string[] args)
         {
             var assembly = typeof(Program).Assembly;
 
             Console.WriteLine("== RadioNavigation.SourceCheck (neural-slop guard, custom runner) ==");
             Console.WriteLine("Assembly: " + assembly.Location);
+            // Optional substring filter: mutation runs need one gate, not the
+            // whole suite, and the clean-reference comparison costs minutes once
+            // the mod sources change. `dotnet run --project
+            // RadioNavigation.SourceCheck -- AimProbe` runs just that gate.
+            string filter = args != null && args.Length > 0 ? args[0] : null;
+            if (!string.IsNullOrEmpty(filter))
+                Console.WriteLine("Filter: " + filter);
             Console.WriteLine();
 
             var testTypes = assembly.GetExportedTypes()
@@ -35,6 +42,9 @@ namespace RadioNavigation.SourceCheck
                     .Where(m => m.IsDefined(typeof(FactAttribute), false))
                     .OrderBy(m => m.Name))
                 {
+                    if (filter != null
+                        && method.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
                     Run(method);
                 }
             }

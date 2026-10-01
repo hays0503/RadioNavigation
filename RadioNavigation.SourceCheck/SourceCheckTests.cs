@@ -393,6 +393,12 @@ namespace RadioNavigation.SourceCheck
                         string eventName = EventNameOf(expr.Left);
                         if (eventName == null) continue;          // not a member access
                         if (!IsHandlerExpression(expr.Right)) continue; // compound, not a subscription
+                        // `state.SpinTotal += delta` is arithmetic on a double
+                        // field, not a subscription: the target must be an EVENT
+                        // field. Without this the gate reported the debug
+                        // probe's spin accumulator as a leaked handler, which is
+                        // the "check the meaning, not the shape" trap again.
+                        if (!IsEventFieldOfType(typeDecl, eventName)) continue;
 
                         if (isAdd)
                         {
@@ -4263,7 +4269,20 @@ namespace RadioNavigation.SourceCheck
                 // author saw an angular, unblended frame (74 -> 0 in one pixel).
                 if (Regex.IsMatch(backing, @"EyecupSizeUnits"))
                     problems.Add("The eyecup must be sized from the ocular, not in absolute units");
-                if (backing.IndexOf("public const float EyecupFactor", StringComparison.Ordinal) < 0
+                // Declaring the factor is not the same as USING it: a mutation that
+                // replaced the multiplication with a literal 1000f left every other
+                // check green, because nothing ever read the multiplication. The
+                // measured symptom of that mutation is the author's own bug - the
+                // rim stops covering the aperture at high resolution.
+                if (!Regex.IsMatch(backing, @"ocularSizeUnits\s*\*\s*EyecupFactor"))
+                    problems.Add("The eyecup side must be the ocular side times EyecupFactor (a literal here is the 1000-units bug)");
+                // `const` is no longer required here: the three rim layers became
+                // mutable on purpose (2026-10-02) so the author can A/B them at
+                // runtime and the radial profile can say which one actually
+                // causes the bright band outside the aperture. What still matters
+                // is that the eyecup is a MULTIPLE of the ocular and is applied,
+                // and that the value still comes from the pure contract.
+                if (backing.IndexOf("float EyecupFactor", StringComparison.Ordinal) < 0
                     || backing.IndexOf("ApplyEyecupSize(result, ocularSizeUnits)", StringComparison.Ordinal) < 0)
                     problems.Add("The eyecup must scale with the ocular side (EyecupFactor)");
                 var eyecupFactor = Regex.Match(backing, @"EyecupFactor\s*=\s*SextantRimProfile\.EyecupFactor;");
@@ -5711,6 +5730,201 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Debug aim probe gate (author 2026-10-02, "для отладки добавь вектор
+        /// ускорения ... игра будет крутить мышкой"): the probe is a debug tool
+        /// that MOVES THE PLAYER'S VIEW, so the properties that keep it harmless
+        /// are structural, not arithmetic. Rules:
+        ///  A) SextantAimProbe owns the three preference keys as constants;
+        ///  B) SextantPipPose.Update calls StepProbe, and StepProbe CALLS both
+        ///     SextantAimProbe.Advance and AdvanceSpin (a call with a named
+        ///     receiver, not a bare name - a probe that is never advanced does
+        ///     nothing, and SextantAimRate.Advance is a different call);
+        ///  C) the probe's yaw offset is added to the aim the camera uses;
+        ///  D) while the probe moves, the washout freeze is bypassed - the
+        ///     freeze holds the world still while the mouse is idle, which is
+        ///     exactly what must not happen during a probe;
+        ///  E) PollAimProbe reads all three keys and returns the state to rest
+        ///     when they are off, so a cleared preference stops the view at once;
+        ///  F) the acceleration keys are read with a default of 0, so a session
+        ///     that never heard of a probe cannot enter this path;
+        ///  G) ResetFilters drops the probe, so re-opening the instrument stops
+        ///     a coasting swing.
+        ///  H) the run counter is read and IsFreshRun gates arming, so an expired
+        ///     probe is not re-armed by the next poll;
+        ///  I) the spin mode is polled (ProbeSpinRate), armed with ArmedSpin and
+        ///     stepped by AdvanceSpin in Update - three separate links, because
+        ///     each can be missing alone and the mode then silently does
+        ///     nothing instead of erroring.
+        /// Mutations: drop B/C/D/E/F/G/H/I -> FAIL; move the probe behind the
+        /// freeze -> FAIL (D).
+        /// </summary>
+        [Fact]
+        public void SextantPip_AimProbeIsWiredInertAndSelfStopping()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var probe = FindSourceType(roots, "SextantAimProbe");
+            if (probe == null)
+            {
+                problems.Add("type 'SextantAimProbe' not found in Source/");
+            }
+            else
+            {
+                string[] keys =
+                {
+                    "YawAccelPrefsKey",
+                    "PitchAccelPrefsKey",
+                    "SecondsPrefsKey",
+                    "RunPrefsKey"
+                };
+                foreach (string key in keys)
+                {
+                    if (!HasFieldNamed(probe, key))
+                        problems.Add("SextantAimProbe does not declare " + key + " - the probe preference has no stable name");
+                }
+            }
+
+            var pose = FindSourceType(roots, "SextantPipPose");
+            if (pose == null)
+            {
+                problems.Add("type 'SextantPipPose' not found in Source/");
+            }
+            else
+            {
+                var update = FindMethod(pose, "Update");
+                if (update == null)
+                {
+                    problems.Add("SextantPipPose.Update not found");
+                }
+                else
+                {
+                    // The step may live in Update or in a helper it calls: what
+                    // matters is that the per-frame pose path actually steps the
+                    // probe, and that BOTH modes are stepped. Pinning the call to
+                    // `Update` itself was checking a location rather than the
+                    // contract - extracting StepProbe (to keep Update under the
+                    // complexity ceiling) turned the gate red on correct code.
+                    var step = FindMethod(pose, "StepProbe");
+                    if (step == null)
+                    {
+                        problems.Add("SextantPipPose.StepProbe not found - the per-frame probe step has to live somewhere, and Update must call it");
+                    }
+                    else
+                    {
+                        if (!InvokesOnType(step, "SextantAimProbe", "Advance"))
+                            problems.Add("SextantPipPose.StepProbe never calls SextantAimProbe.Advance - the swing mode is polled and armed but never stepped, so it cannot move the view (note: SextantAimRate.Advance is a different call)");
+                        if (!InvokesOnType(step, "SextantAimProbe", "AdvanceSpin"))
+                            problems.Add("SextantPipPose.StepProbe never calls SextantAimProbe.AdvanceSpin - the continuous-rotation mode is polled and armed but never stepped, so it would sit at zero");
+                    }
+                    if (!InvokesName(update, "StepProbe"))
+                        problems.Add("SextantPipPose.Update does not call StepProbe - the probe would be polled and armed but never advanced");
+                    if (!ReadsMemberOn(update, "probe", "Yaw"))
+                        problems.Add("SextantPipPose.Update does not read the probe's yaw - the offset is computed but never reaches the aim");
+                    if (!AssignsFalseWhen(update, "Moving"))
+                        problems.Add("SextantPipPose.Update does not disable stabilization while the probe moves - the aim freeze would hold the picture still and the probe would reproduce nothing");
+                }
+
+                var poll = FindMethod(pose, "PollAimProbe");
+                if (poll == null)
+                {
+                    problems.Add("SextantPipPose.PollAimProbe not found");
+                }
+                else
+                {
+                    string[] keyNames =
+                    {
+                        "YawAccelPrefsKey",
+                        "PitchAccelPrefsKey",
+                        "SecondsPrefsKey",
+                        "RunPrefsKey"
+                    };
+                    foreach (string key in keyNames)
+                    {
+                        if (!poll.ToString().Contains(key))
+                            problems.Add("SextantPipPose.PollAimProbe never reads " + key + " - that preference cannot arm the probe");
+                    }
+                    if (!poll.ToString().Contains("State.Rest"))
+                        problems.Add("SextantPipPose.PollAimProbe never returns the state to rest - a cleared preference would leave the view coasting to its timer");
+                    if (!poll.ToString().Contains("YawAccelPrefsKey, 0)"))
+                        problems.Add("SextantPipPose.PollAimProbe reads the yaw acceleration without a zero default - an absent key must mean 'no probe'");
+                    if (!poll.ToString().Contains("PitchAccelPrefsKey, 0)"))
+                        problems.Add("SextantPipPose.PollAimProbe reads the pitch acceleration without a zero default - an absent key must mean 'no probe'");
+                    if (!poll.ToString().Contains("RunPrefsKey"))
+                        problems.Add("SextantPipPose.PollAimProbe never reads the run counter - a timer alone lets an expired probe be re-armed forever, so a forgotten preference keeps swinging the view");
+                    if (!InvokesName(poll, "IsFreshRun"))
+                        problems.Add("SextantPipPose.PollAimProbe arms without testing IsFreshRun - the same run would be re-armed on every poll after it expired");
+                    if (!poll.ToString().Contains("SpinRatePrefsKey"))
+                        problems.Add("SextantPipPose.PollAimProbe never reads ProbeSpinRate - the continuous-rotation mode the author asked for ('крутись непрерывно') cannot be selected at all");
+                    if (!InvokesName(poll, "ArmedSpin"))
+                        problems.Add("SextantPipPose.PollAimProbe does not arm the spin state - reusing Armed would refuse it, because Armed reads 'no acceleration' as 'off' while a spin runs at a constant rate");
+                }
+
+                var reset = FindMethod(pose, "ResetFilters");
+                if (reset == null)
+                {
+                    problems.Add("SextantPipPose.ResetFilters not found");
+                }
+                else if (!reset.ToString().Contains("State.Rest"))
+                {
+                    problems.Add("SextantPipPose.ResetFilters does not drop the probe - re-opening the sextant would let a forgotten preference move the view");
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} aim-probe violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>True when the method invokes <paramref name="member"/> on a
+        /// receiver named <paramref name="receiver"/>. Checking the receiver is
+        /// the point: a bare name match once passed this gate on the WRONG call
+        /// (SextantAimRate.Advance standing in for SextantAimProbe.Advance),
+        /// which is the "check the call, not the name" rule from the lune gates
+        /// repeating itself in a new place.</summary>
+        private static bool ReadsMemberOn(MethodDeclarationSyntax method,
+            string receiver, string member)
+        {
+            return method.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                .Any(a => a.Name.Identifier.Text == member
+                    && a.Expression.ToString() == receiver);
+        }
+
+        /// <summary>True when the method calls <paramref name="typeName"/>'s
+        /// <paramref name="member"/> - a qualified static call, not any call
+        /// with that name.</summary>
+        private static bool InvokesOnType(MethodDeclarationSyntax method,
+            string typeName, string member)
+        {
+            return method.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Any(inv => inv.Expression is MemberAccessExpressionSyntax call
+                    && call.Expression.ToString() == typeName
+                    && call.Name.Identifier.Text == member);
+        }
+
+        /// <summary>True when the method has an `if (<member> ...)` branch whose
+        /// body assigns false to <paramref name="target"/>. Used for the probe's
+        /// stabilization bypass: the property that matters is that the freeze is
+        /// turned OFF on that condition, not that the token appears somewhere.</summary>
+        private static bool AssignsFalseWhen(MethodDeclarationSyntax method, string member)
+        {
+            foreach (var ifStatement in method.DescendantNodes().OfType<IfStatementSyntax>())
+            {
+                var condition = ifStatement.Condition.ToString();
+                if (!condition.Contains(member))
+                    continue;
+                bool assignsFalse = ifStatement.Statement.DescendantNodes()
+                    .OfType<AssignmentExpressionSyntax>()
+                    .Any(a => a.Right.IsKind(SyntaxKind.FalseLiteralExpression));
+                if (assignsFalse)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Aiming-reticle gate (author 2026-11-04/05, "из перекрестия вычесть
         /// круг", "линии должны идти дальше по сторонам"): the crosshair gap
         /// must mark the identification cone — the four arms start at the
@@ -7011,6 +7225,19 @@ namespace RadioNavigation.SourceCheck
             if (left is MemberAccessExpressionSyntax member && member.Name is IdentifierNameSyntax id)
                 return id.Identifier.Text;
             return null;
+        }
+
+        /// <summary>
+        /// True when <paramref name="name"/> is declared as an event field in the
+        /// given type. A `+=` on anything else - a double accumulator, an int
+        /// counter - is arithmetic, and reporting it as a leaked subscription is
+        /// a false positive that trains people to ignore the gate.
+        /// </summary>
+        private static bool IsEventFieldOfType(TypeDeclarationSyntax type, string name)
+        {
+            return type.Members.OfType<FieldDeclarationSyntax>()
+                .Any(f => f.Declaration.Variables.Any(v => v.Identifier.Text == name)
+                    && f.Modifiers.Any(m => m.IsKind(SyntaxKind.EventKeyword)));
         }
 
         /// <summary>

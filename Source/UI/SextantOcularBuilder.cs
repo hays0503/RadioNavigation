@@ -16,7 +16,19 @@ namespace UBOAT.Mods.RadioNavigation
     internal static class SextantOcularBuilder
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
-        private const float VeilAlpha = 0.85f;
+
+        /// <summary>
+        /// Veil opacity. NOT a constant, on purpose: the author reports a bright
+        /// band outside the aperture (2026-10-02, measured in his own capture:
+        /// light beyond the picture edge 0.43 below versus 0.019 above, and the
+        /// edge radius itself varying 544..629 px around a 633 px aperture).
+        /// Identifying which of the three layers produces that needs each one
+        /// switchable AT RUNTIME - with `const` they are baked into the
+        /// assembly and the only way to test is a rebuild, which costs a game
+        /// restart per candidate. Mutable so the bridge can zero one layer at a
+        /// time and the profile says which one actually moved.
+        /// </summary>
+        public static float VeilAlpha = 0.85f;
         /// <summary>
         /// Eyecup (наглазник) side, as a MULTIPLE of the ocular side — not an
         /// absolute unit count. The ocular is a fraction of the screen height
@@ -28,8 +40,12 @@ namespace UBOAT.Mods.RadioNavigation
         /// angular, unblended rim (measured: 74 -> 0 luminance in one pixel).
         /// This factor reproduces the ratio that worked and leaves the opaque
         /// margin clear of the aperture (SextantRimProfile.ShadeCoversAperture).
+        /// Mutable, not const, for the same reason as VeilAlpha: the measured
+        /// edge radius is not round (544..629 px against R=633), and the eyecup
+        /// is one of the three layers that could cause it, so it has to be
+        /// switchable at runtime to be told apart from the veil and the glare.
         /// </summary>
-        public const float EyecupFactor = SextantRimProfile.EyecupFactor;
+        public static float EyecupFactor = SextantRimProfile.EyecupFactor;
 
         /// <summary>
         /// NOT a tunable: kept as a named constant only so the sun-glare veil's
@@ -39,8 +55,10 @@ namespace UBOAT.Mods.RadioNavigation
         /// caused the author's light arc; the measurement did not support that
         /// (the leak is the lens backing's own shader term, gated by coverage),
         /// so the change was reverted rather than left in on a hypothesis.
+        /// Mutable, not const, for the same reason as VeilAlpha: it is the third
+        /// candidate in the same A/B, and a const cannot be zeroed at runtime.
         /// </summary>
-        public const float GlareScale = 1.0f;
+        public static float GlareScale = 1.0f;
 
         /// <summary>
         /// Sizes the eyecup from the live ocular side. Called at build and from

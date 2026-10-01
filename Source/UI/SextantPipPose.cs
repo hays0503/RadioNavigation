@@ -52,6 +52,16 @@ namespace UBOAT.Mods.RadioNavigation
         // measured rate. Reset with the other filters on the open edge.
         private static SextantAimRate.State aimRateState = SextantAimRate.State.Fresh;
         private static SextantAimRateSample aimRateSample = new SextantAimRateSample(0d, 0d);
+        // Debug aim probe state and the acceleration currently requested. Read
+        // from PlayerPrefs at 1 Hz; both are zero unless a probe is armed, so a
+        // normal session never enters this path.
+        private static SextantAimProbe.State probe = SextantAimProbe.State.Rest;
+        private static int probeRun;
+        private static double probeSpinRate;
+        private static double probeYawAccel;
+        private static double probePitchAccel;
+        private static float probePollTimer;
+        private static float probeLogTimer;
         // Aim freeze: while the mouse is still the world yaw is frozen, so the
         // boat's wobble cannot move the star across the crosshair. The raw
         // mouse axes drive the idle timer — the game's input blockade does not
@@ -124,9 +134,27 @@ namespace UBOAT.Mods.RadioNavigation
             bool locked = UpdateAimFreeze(insideBoat, dt, out stabilizationOn);
             Locked = locked;
 
+            PollAimProbe(dt);
+
             Transform mt = viewCamera.transform;
             Vector3 mainEuler = mt.eulerAngles;
-            float targetYaw = (testAimActive ? testAimYawDeg : mainEuler.y) + yawTrimDeg;
+
+            // Debug aim probe (2026-10-02): a reproducible angular acceleration
+            // so a motion-locked defect can be reproduced without a mouse. It is
+            // an OFFSET on top of the player's own aim, and while it is running
+            // the washout freeze is bypassed - the freeze exists to hold the
+            // world still while the mouse is idle, which is precisely what must
+            // NOT happen during a probe, or the picture would sit still and only
+            // the shadow would move. The probe has to reach the final camera
+            // rotation, not just the aim, because the artefact under
+            // investigation is in the picture.
+            probe = StepProbe(dt);
+            if (probe.Moving)
+                stabilizationOn = false;
+            LogAimProbe(dt);
+
+            float targetYaw = (testAimActive ? testAimYawDeg : mainEuler.y) + yawTrimDeg
+                + (float)probe.Yaw;
             // Eye-shadow input (author 2026-10-02): the angular RATE of where the
             // observer is asking to look, measured on the aim BEFORE the washout
             // stabilization. Two reasons it is not the stabilized output: the
@@ -140,7 +168,7 @@ namespace UBOAT.Mods.RadioNavigation
             // no shadow, which is also the cleanest proof of the author's rule
             // (a view that cannot turn has no lune): with RadioNav.TestAim=1 the
             // aperture must stay clean however fast the mouse moves.
-            double aimPitch = testAimActive ? 0d : mainEuler.x;
+            double aimPitch = (testAimActive ? 0d : mainEuler.x) + probe.Pitch;
             aimRateState = SextantAimRate.Advance(aimRateState, targetYaw, aimPitch, dt,
                 out aimRateSample);
             float yaw = StabilizeYaw(targetYaw, dt, stabilizationOn, locked);
@@ -217,6 +245,99 @@ namespace UBOAT.Mods.RadioNavigation
         /// negative value, which would collapse the projection.
         /// </summary>
         public const float PipMinNearClipPlane = (float)SextantPipClip.MinNearPlane;
+
+        /// <summary>
+        /// One step of whichever probe mode is selected: the continuous spin when
+        /// a spin rate is set, otherwise the acceleration swing. Split out of
+        /// Update because it is a mode choice, not part of the pose pipeline -
+        /// and because inlining it pushed Update to the complexity ceiling.
+        /// </summary>
+        private static SextantAimProbe.State StepProbe(float dt)
+        {
+            if (Math.Abs(probeSpinRate) > 1e-9)
+                return SextantAimProbe.AdvanceSpin(probe, probeSpinRate, dt);
+            return SextantAimProbe.Advance(probe, probeYawAccel, probePitchAccel, dt);
+        }
+
+        /// <summary>
+        /// Reads the probe preferences once a second and arms a fresh probe when
+        /// one is requested. Re-arming replaces the state rather than adding to
+        /// it, so setting the same vector twice gives the same swing - which is
+        /// the whole point of a probe.
+        /// </summary>
+        private static void PollAimProbe(float dt)
+        {
+            probePollTimer -= dt;
+            if (probePollTimer > 0f)
+                return;
+            probePollTimer = 1f;
+
+            double yaw = SextantAimProbe.AccelerationFrom(
+                PlayerPrefs.GetInt(SextantAimProbe.YawAccelPrefsKey, 0));
+            double pitch = SextantAimProbe.AccelerationFrom(
+                PlayerPrefs.GetInt(SextantAimProbe.PitchAccelPrefsKey, 0));
+            double seconds = SextantAimProbe.SecondsFrom(
+                PlayerPrefs.GetInt(SextantAimProbe.SecondsPrefsKey, 0));
+            double spin = SextantAimProbe.SpinRateFrom(
+                PlayerPrefs.GetInt(SextantAimProbe.SpinRatePrefsKey, 0));
+            int run = PlayerPrefs.GetInt(SextantAimProbe.RunPrefsKey, 0);
+
+            // Spin takes precedence: it is the mode the author asked for
+            // ("rotate continuously"), and mixing it with an acceleration swing
+            // would make the rate depend on two preferences at once.
+            probeSpinRate = spin;
+            if (Math.Abs(spin) > 1e-9 && seconds > 0d)
+            {
+                if (probe.SecondsLeft <= 0d && SextantAimProbe.IsFreshRun(run, probeRun))
+                {
+                    probeRun = run;
+                    probe = SextantAimProbe.ArmedSpin(seconds);
+                    probeYawAccel = 0d;
+                    probePitchAccel = 0d;
+                }
+                return;
+            }
+
+            if (seconds <= 0d || (Math.Abs(yaw) < 1e-9 && Math.Abs(pitch) < 1e-9))
+            {
+                // Off: drop any running probe, so a cleared preference stops the
+                // view immediately instead of coasting to its timer. The run
+                // counter is NOT consumed here - fixing a mistyped acceleration
+                // and firing again must still work.
+                probe = SextantAimProbe.State.Rest;
+                probeYawAccel = 0d;
+                probePitchAccel = 0d;
+                probeSpinRate = 0d;
+                return;
+            }
+
+            // A fresh run counter, not merely an armed preference: without this an
+            // expired probe is re-armed by the very next poll, so a forgotten
+            // preference swings the view in bursts forever and the timer stops
+            // being a safety property at all. One swing per deliberate bump.
+            if (probe.SecondsLeft <= 0d && SextantAimProbe.IsFreshRun(run, probeRun))
+            {
+                probeRun = run;
+                probe = SextantAimProbe.Armed(yaw, pitch, seconds);
+                probeYawAccel = yaw;
+                probePitchAccel = pitch;
+            }
+        }
+
+        /// <summary>1 Hz probe telemetry: the state a captured frame belongs to.</summary>
+        private static void LogAimProbe(float dt)
+        {
+            if (!probe.Moving)
+                return;
+            probeLogTimer -= dt;
+            if (probeLogTimer > 0f)
+                return;
+            probeLogTimer = 1f;
+            Debug.Log(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                "[RadioNav][Sextant] PROBE run={0} yaw={1:F2} spin={2:F1}deg/s total={3:F0}deg left={4:F1}s accel={5:F1},{6:F1}",
+                probeRun, probe.Yaw, probeSpinRate, probe.SpinTotal, probe.SecondsLeft,
+                probeYawAccel, probePitchAccel));
+        }
 
         public static void SyncCameraState(Camera cam, Camera source, float fovDivisor,
             int interiorMask)
@@ -335,6 +456,16 @@ namespace UBOAT.Mods.RadioNavigation
             // flash for one frame.
             aimRateState = SextantAimRate.Reset();
             aimRateSample = new SextantAimRateSample(0d, 0d);
+            // ...and a running debug probe must stop here: re-opening the
+            // instrument is an explicit act, and a coasting probe would move the
+            // view the moment the author looks into the ocular again.
+            probe = SextantAimProbe.State.Rest;
+            probeYawAccel = 0d;
+            probePitchAccel = 0d;
+            probePollTimer = 0f;
+            // probeRun is deliberately NOT cleared: it records which request was
+            // last consumed, and forgetting it would make re-opening the
+            // instrument fire a swing the author had already used.
         }
 
         /// <summary>Keyboard aim trim (author request 2026-11-04): the
@@ -407,6 +538,12 @@ namespace UBOAT.Mods.RadioNavigation
         public static SextantAimRateSample AimRate
         {
             get { return aimRateSample; }
+        }
+
+        /// <summary>Debug aim probe state, for reflection/telemetry.</summary>
+        public static SextantAimProbe.State AimProbe
+        {
+            get { return probe; }
         }
 
         /// <summary>Aim-stabilized yaw (2026-11-04, author feedback): RAW plus
