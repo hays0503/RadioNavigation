@@ -23,8 +23,14 @@ namespace UBOAT.Mods.RadioNavigation
         {
             public GameObject CanvasRoot;
             public RectTransform PipRect;
+            /// <summary>Eyecup (soft outward shade). Sized from the ocular
+            /// side, not absolutely — see SextantOcularBuilder.EyecupFactor.</summary>
+            public RectTransform EyecupRect;
             public RawImage LeftViewImage;
             public RawImage RightViewImage;
+            /// <summary>Black lens plate behind both halves: the instrument's
+            /// outer silhouette (antialiased, see SextantOcularBuilder).</summary>
+            public Image LensBackingImage;
             public Image FilterDimLeftImage;
             public Image FilterDimRightImage;
             public Image GlareImage;
@@ -173,6 +179,11 @@ namespace UBOAT.Mods.RadioNavigation
                 result.PipRect.sizeDelta = new Vector2(ocularSize, ocularSize);
                 result.PipRect.anchoredPosition = Vector2.zero;
             }
+            // The eyecup must stay a multiple of the ocular (SextantOcularBuilder.
+            // EyecupFactor): a shade that no longer reaches past the rim leaves
+            // the outer silhouette to the Mask's binary stencil, which is the
+            // angular rim the author reported at 2560x1440.
+            SextantOcularBuilder.ApplyEyecupSize(result, ocularSize);
             SextantColumnsBuilder.PlaceColumns(result, ocularSize);
 
             SextantOverlayLayout.FixColumnPlacement placement =

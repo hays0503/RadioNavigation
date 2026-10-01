@@ -43,6 +43,13 @@ namespace UBOAT.Mods.RadioNavigation
             // miss only leaves the old shared-_GBufferZ behaviour.
             PipCloneCameraPatch.Apply(harmony);
 
+            // Separate target assembly (com.uboat.rendering): inside the boat
+            // the ocular image comes from a per-half interior clone whose pose
+            // the engine rewrites from the game's Interior Camera every
+            // LateUpdate; the postfix puts the PIP camera's rotation back
+            // (author report 2026-09-30, ~50 deg yaw desync). Non-fatal.
+            InteriorClonePosePatch.Apply(harmony);
+
             // Phase-0-only per-PIP scope: temporarily disables only the
             // disposable Sternspreiz source renderer around its DeepPipeline
             // camera render, with a finalizer restoring it on every exit.

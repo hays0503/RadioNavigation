@@ -65,6 +65,7 @@ namespace UBOAT.Mods.RadioNavigation
         private int leftFilterCount;
         private int rightFilterCount;
         private SextantInputPoller inputPoller;
+        private readonly SextantLuneOverlay lune = new SextantLuneOverlay();
         private readonly SextantGlareCoordinator glare = new SextantGlareCoordinator();
         // Reading-column text lives in SextantReadout (extracted, P5.4
         // slice 4d); the controller applies Text/color.
@@ -270,6 +271,7 @@ namespace UBOAT.Mods.RadioNavigation
                     LogVectorState("rotate");
                 renderCheck.Update(Time.unscaledDeltaTime, arcAngle, pipFactory.LeftRt, pipFactory.RightRt);
                 UpdateGlare(Time.unscaledDeltaTime);
+                UpdateEyeShadow(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateSightLines();
                 UpdateReadout(false);
@@ -455,6 +457,8 @@ namespace UBOAT.Mods.RadioNavigation
 
             IsOpen = false;
             SextantPipPose.ClearTestAim();
+            // A closed sextant must never show a stale crescent.
+            lune.Reset();
             // The sky shell may breathe again (P7), and the shade filters no
             // longer shield the lookout's dark adaptation (P4).
             CameraResolver.UnfreezeRadius();
@@ -961,6 +965,21 @@ namespace UBOAT.Mods.RadioNavigation
         // ---- glare application lives in SextantGlareCoordinator
         // (extracted); the sun fetches stay here as adapters.
 
+        /// <summary>
+        /// Eye-pupil shadow ("lune dans le scope"): fed with the angular rate of
+        /// the view, which is what the author asked for (2026-10-02) — with the
+        /// cursor locked the camera cannot turn, the ocular cannot turn with it,
+        /// and there can be no shadow. The rate is measured on the aim before the
+        /// washout stabilization (SextantPipPose), so it needs no input plumbing
+        /// here at all: the mouse axes are deliberately NOT read, because they
+        /// keep reporting while the camera is blocked.
+        /// </summary>
+        private void UpdateEyeShadow(float dt)
+        {
+            SextantAimRateSample rate = SextantPipPose.AimRate;
+            lune.Tick(dt, IsOpen, rate.Yaw, rate.Pitch);
+        }
+
         private void UpdateGlare(float dt)
         {
             Vector3 sunDir = Vector3.zero;
@@ -1203,6 +1222,7 @@ namespace UBOAT.Mods.RadioNavigation
             canvasRoot = ui.CanvasRoot;
             leftViewImage = ui.LeftViewImage;
             rightViewImage = ui.RightViewImage;
+            lune.Bind(ui.OpaqueViewMaterial);
             filterDimLeftImage = ui.FilterDimLeftImage;
             filterDimRightImage = ui.FilterDimRightImage;
             glareImage = ui.GlareImage;

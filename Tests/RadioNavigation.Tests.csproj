@@ -104,6 +104,9 @@
     <Compile Include="SextantYawInputTests.cs" />
     <Compile Include="BodySelectionTests.cs" />
     <Compile Include="SextantStabilizationTests.cs" />
+    <Compile Include="SextantAimRateTests.cs" />
+    <Compile Include="SextantBeamPoseMathTests.cs" />
+    <Compile Include="SextantLuneMathTests.cs" />
     <Compile Include="SextantConeBoxTests.cs" />
     <Compile Include="MapMarkerPointsTests.cs" />
     <Compile Include="AimOffsetFormatTests.cs" />
@@ -252,6 +255,9 @@
     <Compile Include="..\Source\Logic\SextantYawInput.cs" Link="Source\Logic\SextantYawInput.cs" />
     <Compile Include="..\Source\Logic\BodySelection.cs" Link="Source\Logic\BodySelection.cs" />
     <Compile Include="..\Source\Logic\SextantStabilization.cs" Link="Source\Logic\SextantStabilization.cs" />
+    <Compile Include="..\Source\Logic\SextantAimRate.cs" Link="Source\Logic\SextantAimRate.cs" />
+    <Compile Include="..\Source\Logic\SextantBeamPoseMath.cs" Link="Source\Logic\SextantBeamPoseMath.cs" />
+    <Compile Include="..\Source\Logic\SextantLuneMath.cs" Link="Source\Logic\SextantLuneMath.cs" />
     <Compile Include="..\Source\Logic\SextantConeBox.cs" Link="Source\Logic\SextantConeBox.cs" />
     <Compile Include="..\Source\Logic\MapMarkerPoints.cs" Link="Source\Logic\MapMarkerPoints.cs" />
     <Compile Include="..\Source\Logic\AimOffsetFormat.cs" Link="Source\Logic\AimOffsetFormat.cs" />

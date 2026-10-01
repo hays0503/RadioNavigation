@@ -14,8 +14,10 @@ namespace UBOAT.Mods.RadioNavigation
     internal static class SextantSprites
     {
         // Eyecup (наглазник): solid black up to the ocular rim, long soft
-        // falloff outward (out-of-focus rubber close to the eye).
-        private const float EyecupSolidTo = 0.60f;
+        // falloff outward (out-of-focus rubber close to the eye). The radius it
+        // stays opaque to is what makes it able to hide the stencil cut — see
+        // SextantRimProfile.ShadeCoversAperture.
+        private const float EyecupSolidTo = SextantRimProfile.EyecupSolidTo;
 
         /// <summary>Creates the ring texture; caller owns and must destroy it.</summary>
         public static Texture2D CreateRingTexture()

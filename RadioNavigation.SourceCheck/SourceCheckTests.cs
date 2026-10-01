@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -924,6 +925,90 @@ namespace RadioNavigation.SourceCheck
             Assert.True(problems.Count == 0,
                 $"{problems.Count} live-optics profile violation(s):\n"
                 + string.Join("\n", problems));
+        }
+
+        [Fact]
+        public void SextantOcular_ApertureCoverageIsAntialiasedWithoutUsingRtAlpha()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var ocular = FindSourceType(roots, "SextantOcularBuilder");
+            var build = FindMethod(ocular, "BuildOcular");
+            if (build == null
+                || build.ToString().IndexOf("LeftViewImage.maskable = false", StringComparison.Ordinal) < 0
+                || build.ToString().IndexOf("RightViewImage.maskable = false", StringComparison.Ordinal) < 0)
+                problems.Add("Both PIP halves must bypass the binary stencil and use shader coverage");
+
+            string shaderPath = Path.Combine(ModCompiler.ModRoot, "Source", "Shaders", "RadioNavUIOpaque.shader");
+            string shader = File.Exists(shaderPath) ? File.ReadAllText(shaderPath) : string.Empty;
+            if (shader.IndexOf("Blend SrcAlpha OneMinusSrcAlpha", StringComparison.Ordinal) < 0
+                || shader.IndexOf("fwidth(distanceFromAperture)", StringComparison.Ordinal) < 0
+                || shader.IndexOf("smoothstep(-edge, edge, distanceFromAperture)", StringComparison.Ordinal) < 0
+                || shader.IndexOf("color.a = i.color.a * coverage", StringComparison.Ordinal) < 0
+                || shader.IndexOf("UNITY_UI_ALPHACLIP", StringComparison.Ordinal) >= 0)
+                problems.Add("Active UIOpaque shader must blend an SDF edge while ignoring RenderTexture alpha and binary alpha-clip");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} ocular aperture coverage violation(s):\n" + string.Join("\n", problems));
+        }
+
+        [Fact]
+        public void CelestialStars_UseActiveCameraPixelSizeAndKeepSkyStage()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var stars = FindSourceType(roots, "StarsMesh");
+            var rebuild = FindMethod(stars, "RebuildMesh");
+            if (rebuild == null
+                || rebuild.ToString().IndexOf("screenSizeData.Add(centerAndPixelSize)", StringComparison.Ordinal) < 0
+                || rebuild.ToString().IndexOf("SetUVs(1, screenSizeData)", StringComparison.Ordinal) < 0)
+                problems.Add("StarsMesh must upload per-star center and target-pixel size for camera-local projection");
+
+            string shaderPath = Path.Combine(ModCompiler.ModRoot, "Source", "Shaders", "RadioNavStarField.shader");
+            string shader = File.Exists(shaderPath) ? File.ReadAllText(shaderPath) : string.Empty;
+            if (CountOccurrences(shader, "float4 centerSize : TEXCOORD1") != 3
+                || CountOccurrences(shader, "if (v.centerSize.w >= 2.0)") != 3
+                || CountOccurrences(shader, "Tags { \"LightMode\" = \"Sky\" }") != 1
+                || CountOccurrences(shader, "centerClip.xy += pixelOffset * centerClip.w") != 3
+                || shader.IndexOf("_ScreenParams.xy", StringComparison.Ordinal) < 0
+                || shader.IndexOf("o.worldPos = v.centerSize.xyz", StringComparison.Ordinal) < 0
+                || shader.IndexOf("o.pos = UnityObjectToClipPos(v.vertex)", StringComparison.Ordinal) < 0)
+                problems.Add("Point passes must scale catalog sprites in the active target while retaining legacy celestial quads and the single Sky pass");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} camera-local star projection violation(s):\n" + string.Join("\n", problems));
+        }
+
+        [Fact]
+        public void InteriorLensShader_IsBlitOnlyAndPreservesHighlightCores()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            string shaderPath = Path.Combine(ModCompiler.ModRoot, "Source", "Shaders", "RadioNavInteriorOptics.shader");
+            string shader = File.Exists(shaderPath) ? File.ReadAllText(shaderPath) : string.Empty;
+            var problems = new List<string>();
+            foreach (string required in new[]
+            {
+                "Name \"BrightDownsample\"", "Name \"BlurHorizontal\"", "Name \"BlurVertical\"",
+                "Name \"Composite\"", "_BrightThreshold", "_CompactnessStart", "_CompactnessEnd",
+                "_CompactnessRadiusPixels",
+                "_StreakHalfLengthTexels", "_StreakHalfThicknessTexels", "_StreakDirection",
+                "_StreakEdgeFraction", "_GlowClamp", "_RadioNavGlowTex", "tap < 25",
+                "return float4(result, source.a);"
+            })
+            {
+                if (shader.IndexOf(required, StringComparison.Ordinal) < 0)
+                    problems.Add("missing shader contract: " + required);
+            }
+            if (shader.IndexOf("Tags { \"LightMode\"", StringComparison.Ordinal) >= 0)
+                problems.Add("interior-only Blit shader must not participate in the celestial/cloud pipeline");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} interior optics shader violation(s):\n" + string.Join("\n", problems));
         }
 
         /// <summary>
@@ -4123,6 +4208,460 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// The ocular rim must be antialiased at BOTH of its boundaries, and the
+        /// eye-pupil shadow ("lune dans le scope", author 2026-10-01) must stay
+        /// wired to the player's own aim input.
+        ///
+        /// Outer boundary: the black lens plate draws the instrument's
+        /// silhouette, and a stencil Mask cuts that silhouette in a one-pixel
+        /// step — against a sunlit sky (the Veil leaves 15% of it) that read as
+        /// a hard staircase all around the rim. The plate therefore bypasses
+        /// the stencil and shares the aperture shader's SDF edge.
+        ///
+        /// Inner boundary: the two scene images already use it. The gate keeps
+        /// the shader's aperture edge wide enough to actually soften (the old
+        /// upper bound of 2 px made "antialiased" a one-pixel notch) and keeps
+        /// the shadow term present with its four parameters.
+        /// </summary>
+        [Fact]
+        public void SextantOcularRim_IsAntialiasedAndCarriesTheEyeShadow()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var builder = FindSourceType(roots, "SextantOcularBuilder");
+            var builderText = builder != null ? builder.ToString() : string.Empty;
+            if (builder == null)
+            {
+                problems.Add("SextantOcularBuilder is missing");
+            }
+            else
+            {
+                var backing = FindSourceType(roots, "SextantOcularBuilder").ToString();
+                if (backing.IndexOf("backing.maskable = false", StringComparison.Ordinal) < 0)
+                    problems.Add("The lens plate must bypass the binary stencil Mask");
+                if (backing.IndexOf("result.LensBackingImage.material = result.OpaqueViewMaterial",
+                        StringComparison.Ordinal) < 0)
+                    problems.Add("The lens plate must share the antialiased aperture material");
+                // The shader default is NOT a fallback: a bundled Material does
+                // not inherit property defaults it never serialized, so the edge
+                // width has to be pushed from code (measured: 65 -> 3 luminance
+                // in one pixel without it).
+                if (backing.IndexOf("ApplyApertureEdge(result.OpaqueViewMaterial)", StringComparison.Ordinal) < 0)
+                    problems.Add("The aperture edge width must be applied from code, not left to the material");
+                var edgeConst = Regex.Match(backing, @"ApertureEdgePixels\s*=\s*([0-9.]+)f?;");
+                if (!edgeConst.Success
+                    || double.Parse(edgeConst.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) < 2d)
+                    problems.Add("ApertureEdgePixels must be at least 2 px (1 px is the staircase itself)");
+
+                // The outer silhouette belongs to the EYECUP, not to the stencil.
+                // The ocular is a fraction of the screen height, so an eyecup in
+                // absolute units stops covering it as the resolution grows: at
+                // 2560x1440 it left the Mask's binary cut as the rim, and the
+                // author saw an angular, unblended frame (74 -> 0 in one pixel).
+                if (Regex.IsMatch(backing, @"EyecupSizeUnits"))
+                    problems.Add("The eyecup must be sized from the ocular, not in absolute units");
+                if (backing.IndexOf("public const float EyecupFactor", StringComparison.Ordinal) < 0
+                    || backing.IndexOf("ApplyEyecupSize(result, ocularSizeUnits)", StringComparison.Ordinal) < 0)
+                    problems.Add("The eyecup must scale with the ocular side (EyecupFactor)");
+                var eyecupFactor = Regex.Match(backing, @"EyecupFactor\s*=\s*SextantRimProfile\.EyecupFactor;");
+                if (!eyecupFactor.Success)
+                    problems.Add("EyecupFactor must come from the pure coverage contract, not a local literal");
+                var overlayText = FindSourceType(roots, "SextantOverlay");
+                if (overlayText == null
+                    || overlayText.ToString().IndexOf("SextantOcularBuilder.ApplyEyecupSize(result, ocularSize)",
+                        StringComparison.Ordinal) < 0)
+                    problems.Add("A uiScale change must re-derive the eyecup size with the ocular");
+            }
+
+            // The rim overlay's own bands must share one softness constant: the
+            // staircase lived in their 0.7-px edges, and a literal reintroduced
+            // for one band would restore it invisibly.
+            var profile = FindSourceType(roots, "SextantRimProfile");
+            if (profile == null)
+            {
+                problems.Add("SextantRimProfile is missing");
+            }
+            else
+            {
+                string profileText = profile.ToString();
+                int bandCalls = Regex.Matches(profileText, @"SmoothBand\(radius, ").Count;
+                if (bandCalls != 3)
+                    problems.Add("Expected three rim bands, found " + bandCalls);
+                foreach (Match band in Regex.Matches(profileText, @"SmoothBand\(radius,[^;]*?\);"))
+                {
+                    if (band.Value.IndexOf("BandSoftness", StringComparison.Ordinal) < 0)
+                        problems.Add("Every rim band must use BandSoftness: " + band.Value);
+                }
+                var soft = Regex.Match(profileText, @"BandSoftness\s*=\s*([0-9.]+)f;");
+                if (!soft.Success
+                    || double.Parse(soft.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) < 0.01d)
+                    problems.Add("BandSoftness must be at least 0.01 (0.002 is the one-pixel staircase)");
+
+                // The shade's coverage invariant lives here too, because that is
+                // where the numbers are reachable by the offline sweep test.
+                foreach (string required in new[]
+                {
+                    "public static bool ShadeCoversAperture",
+                    "public static double ShadeOpaqueRadiusUnits",
+                    "public static double ApertureRadiusUnits",
+                    "public const float EyecupSolidTo",
+                    "public const float EyecupFactor",
+                })
+                {
+                    if (profileText.IndexOf(required, StringComparison.Ordinal) < 0)
+                        problems.Add("The shade coverage contract must expose: " + required);
+                }
+                var shadeFactor = Regex.Match(profileText, @"EyecupFactor\s*=\s*([0-9.]+)f;");
+                var solidTo = Regex.Match(profileText, @"EyecupSolidTo\s*=\s*([0-9.]+)f;");
+                if (!shadeFactor.Success || !solidTo.Success)
+                {
+                    problems.Add("EyecupFactor and EyecupSolidTo must be named constants");
+                }
+                else
+                {
+                    // The shade is opaque only to 0.5*solidTo of its side, so
+                    // covering the aperture needs factor * solidTo > 1.
+                    double factor = double.Parse(shadeFactor.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    double solid = double.Parse(solidTo.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    if (solid <= 0d || factor * solid <= 1d)
+                        problems.Add("The shade must stay opaque PAST the aperture (factor * EyecupSolidTo > 1), got "
+                            + factor.ToString(System.Globalization.CultureInfo.InvariantCulture) + " * "
+                            + solid.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+            }
+
+            var shaderPath = Path.Combine(ModCompiler.ModRoot, "Source", "Shaders", "RadioNavUIOpaque.shader");
+            string shader = File.Exists(shaderPath) ? File.ReadAllText(shaderPath) : string.Empty;
+            if (shader.Length == 0)
+            {
+                problems.Add("RadioNavUIOpaque.shader is missing");
+            }
+            else
+            {
+                foreach (string required in new[]
+                {
+                    "fwidth(distanceFromAperture)",
+                    "_LuneOffset",
+                    "_LuneRadius",
+                    "_LuneStrength",
+                    "_LuneRimLight",
+                    "length(p - _LuneOffset.xy)",
+                    // The shadow must be COMPUTED and APPLIED, not just named:
+                    // neutering either line used to pass while the gate was
+                    // still finding the property names (mutation-checked).
+                    "smoothstep(-shadeEdge, shadeEdge, shadeDistance)",
+                    // ...and the whole colour must die with the aperture. Outside
+                    // it the source alpha is 0, and a canvas that composites
+                    // premultiplied adds RGB regardless - which paints the lit rim
+                    // as a bright arc outside the ocular (author 2026-10-02).
+                    "color.rgb = (color.rgb * (1.0 - shade) + rim) * coverage",
+                    // fwidth must be clamped: the gradient of a length() flips
+                    // sign at its centre, and a noisy derivative blows the band up.
+                    "clamp(fwidth(shadeDistance)",
+                })
+                {
+                    if (shader.IndexOf(required, StringComparison.Ordinal) < 0)
+                        problems.Add("Aperture shader must keep: " + required);
+                }
+                // "Antialiased" must survive an edge-width bump: a one-pixel
+                // ceiling is what made the rim look hard in the first place.
+                var range = Regex.Match(shader, @"_ApertureEdgePixels[^=]*Range\(([^)]*)\)");
+                if (!range.Success)
+                {
+                    problems.Add("_ApertureEdgePixels must keep an explicit range");
+                }
+                else
+                {
+                    string[] bounds = range.Groups[1].Value.Split(',');
+                    double upper;
+                    if (bounds.Length < 2
+                        || !double.TryParse(bounds[1].Trim(), System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out upper)
+                        || upper < 3d)
+                        problems.Add("_ApertureEdgePixels must allow an edge of at least 3 px");
+                }
+            }
+
+            var math = FindSourceType(roots, "SextantLuneMath");
+            if (math == null)
+            {
+                problems.Add("SextantLuneMath (the tested shadow contract) is missing");
+            }
+            else
+            {
+                foreach (string required in new[]
+                {
+                    // Rate-driven (author 2026-10-02), and the alidade is not a
+                    // parameter at all: the signature itself must not grow a drum
+                    // term again.
+                    "public static SextantLuneOffset FromCameraMotion",
+                    "public static SextantLuneState Step",
+                    "public static double ShadowDistance",
+                    "public static bool IsShadowed",
+                    "public static double RimThickness",
+                    "public static SextantLuneOffset ObstructionCentre",
+                    // The stop lag is a TIMER, so it must live in the state the
+                    // runtime keeps, not in a throwaway local.
+                    "ReleaseHoldSeconds",
+                    "DefaultStrength",
+                    // The tunables the author can dial without a rebuild, and the
+                    // probe that makes the shape measurable without a mouse.
+                    "MaxUnitsPrefsKey",
+                    "RateFullPrefsKey",
+                    "DeadZonePrefsKey",
+                    "ProbePrefsKey",
+                })
+                {
+                    if (math.ToString().IndexOf(required, StringComparison.Ordinal) < 0)
+                        problems.Add("Shadow contract must expose: " + required);
+                }
+                // The author's 95 % and a real stop lag, not just a constant that
+                // happens to be named.
+                var strength = Regex.Match(math.ToString(), @"DefaultStrength\s*=\s*([0-9.]+);");
+                if (!strength.Success
+                    || double.Parse(strength.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) < 0.9)
+                    problems.Add("The shadow depth must reach the author's 95 %");
+                var hold = Regex.Match(math.ToString(), @"ReleaseHoldSeconds\s*=\s*([0-9.]+);");
+                if (!hold.Success
+                    || double.Parse(hold.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) <= 0d)
+                    problems.Add("The stop lag must be a positive dead time");
+            }
+
+            var overlay = FindSourceType(roots, "SextantLuneOverlay");
+            if (overlay == null
+                || overlay.ToString().IndexOf("SextantLuneMath.Step", StringComparison.Ordinal) < 0
+                || overlay.ToString().IndexOf("SextantLuneMath.FromCameraMotion", StringComparison.Ordinal) < 0
+                || overlay.ToString().IndexOf("SextantLuneMath.ObstructionCentre", StringComparison.Ordinal) < 0)
+            {
+                problems.Add("The shadow overlay must drive the tested math and push the offset into the material");
+            }
+            // The overlay must keep the STATE (offset + hold timer), not just the
+            // offset: dropping the timer silently removes the stop lag.
+            if (overlay != null
+                && overlay.ToString().IndexOf("SextantLuneState state", StringComparison.Ordinal) < 0)
+            {
+                problems.Add("The shadow overlay must keep the animation state (offset and hold timer)");
+            }
+
+            var controller = FindSourceType(roots, "SextantController");
+            var controllerText = controller != null ? controller.ToString() : string.Empty;
+            if (controller == null
+                || controllerText.IndexOf("SextantPipPose.AimRate", StringComparison.Ordinal) < 0
+                || controllerText.IndexOf("lune.Reset()", StringComparison.Ordinal) < 0)
+            {
+                problems.Add("The shadow must read the aim rate and reset on close");
+            }
+            // The author's rule (2026-10-02): the shadow follows the CAMERA, not
+            // the cursor - with the cursor locked the camera cannot turn, so
+            // there can be no shadow. Reading the mouse axes here would bring the
+            // exact bug back, and the mouse keeps reporting while the camera is
+            // blocked, so nothing downstream could filter it out.
+            if (controllerText.IndexOf("GetAxis(\"Mouse", StringComparison.Ordinal) >= 0)
+                problems.Add("The shadow path must not read the mouse axes; use the measured aim rate");
+
+            // The rate must be measured BEFORE the washout stabilization: the
+            // freeze holds the stabilized output still, so a shadow driven from
+            // it would vanish exactly while the hand is moving.
+            var pose = FindSourceType(roots, "SextantPipPose");
+            if (pose == null)
+            {
+                problems.Add("SextantPipPose is missing");
+            }
+            else
+            {
+                string poseText = pose.ToString();
+                int rateAt = poseText.IndexOf("SextantAimRate.Advance", StringComparison.Ordinal);
+                int stabilizeAt = poseText.IndexOf("StabilizeYaw(targetYaw", StringComparison.Ordinal);
+                if (rateAt < 0)
+                    problems.Add("SextantPipPose must measure the aim rate");
+                else if (stabilizeAt >= 0 && rateAt > stabilizeAt)
+                    problems.Add("The aim rate must be measured BEFORE the washout stabilization");
+                if (poseText.IndexOf("SextantAimRate.Reset()", StringComparison.Ordinal) < 0)
+                    problems.Add("The aim-rate latch must be reset with the other filters");
+            }
+
+            // The alidade must not be an input any more (author: "убрать
+            // совсем"): slewing the drum moves the instrument, not the view.
+            var poller = FindSourceType(roots, "SextantInputPoller");
+            if (poller == null)
+            {
+                problems.Add("SextantInputPoller is missing");
+            }
+            else
+            {
+                string pollerText = poller.ToString();
+                if (pollerText.IndexOf("LastYawRateDegPerSec", StringComparison.Ordinal) >= 0
+                    || pollerText.IndexOf("LastArcRateDegPerSec", StringComparison.Ordinal) >= 0)
+                    problems.Add("The input poller must not publish keyboard rates to the shadow (it follows the view now)");
+            }
+
+            // The dead switches the old driver carried (mirror / half selector) and
+            // the mouse gain must be GONE, not merely unused: they are named in
+            // the telemetry and invite the next person to believe there is still
+            // a choice to make. Checked by IDENTIFIER, not by the pref string, so
+            // the prose that explains the removal does not trip the gate.
+            if (math != null)
+            {
+                string mathText = math.ToString();
+                foreach (string dead in new[]
+                {
+                    "InvertPrefsKey",
+                    "RightHalfOnlyPrefsKey",
+                    "MouseGainUnits",
+                    "KeyboardGainUnitsPerDeg",
+                })
+                {
+                    if (mathText.IndexOf(dead, StringComparison.Ordinal) >= 0)
+                        problems.Add("The dead shadow switch/gain must be removed, not just unused: " + dead);
+                }
+            }
+
+            // The glare veil is a hard-edged white quad clipped by the parent
+            // Mask, so its cut lands on the aperture edge. That was the first
+            // suspect for the author's light arc and the measurement cleared it
+            // (the leak is the lens backing's shader term), so the veil is left
+            // alone - but the number must stay explicit rather than creeping
+            // back in as a bare 1.0.
+            // (a named constant, not a bare 1.0 creeping back in).
+            if (builder == null
+                || builder.ToString().IndexOf("GlareScale", StringComparison.Ordinal) < 0)
+                problems.Add("The glare veil size must be the named GlareScale, not a literal");
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} ocular rim violation(s):\n" + string.Join("\n", problems));
+        }
+
+        /// <summary>
+        /// No height (pitch) or rotation (yaw) desync between the observer's
+        /// gaze and anything that renders the ocular (author report
+        /// 2026-09-30: "the look vector and the sextant vector are different",
+        /// then "the PIP looks to the right").
+        ///
+        /// Two desyncs were found and are pinned here:
+        ///  1. the beams' pitch was hard-wired to 0 / -arc, so the instrument
+        ///     stopped following the head;
+        ///  2. inside the boat the interior clone camera — the thing that
+        ///     actually draws the picture — took the engine's Interior Camera
+        ///     pose (measured ~53 deg yaw adrift), so the ocular pointed
+        ///     somewhere else entirely.
+        ///
+        /// The unit tests in Tests/SextantBeamPoseMathTests.cs pin the angles;
+        /// this gate pins that the shipped code actually uses that math and
+        /// that the clone correction is installed, anchored by component type
+        /// name (never by object name or mod statics, so a stale second copy of
+        /// the assembly cannot silently no-op it).
+        /// </summary>
+        [Fact]
+        public void SextantBeamAim_HasNoHeightOrRotationDesync()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var math = FindSourceType(roots, "SextantBeamPoseMath");
+            if (math == null)
+            {
+                problems.Add("SextantBeamPoseMath (the tested angle contract) is missing");
+            }
+            else
+            {
+                foreach (string required in new[]
+                {
+                    "public static SextantBeamPose HorizonBeam",
+                    "public static SextantBeamPose IndexBeam",
+                    "public static SextantBeamPose InteriorClonePose",
+                    "public static double BeamPitchGap",
+                    "public static SextantBeamError BeamError",
+                })
+                {
+                    if (math.ToString().IndexOf(required, StringComparison.Ordinal) < 0)
+                        problems.Add("Beam contract must expose: " + required);
+                }
+            }
+
+            var pose = FindSourceType(roots, "SextantPipPose");
+            var poseText = pose != null ? pose.ToString() : string.Empty;
+            if (pose == null
+                || poseText.IndexOf("SextantBeamPoseMath.HorizonBeam", StringComparison.Ordinal) < 0
+                || poseText.IndexOf("SextantBeamPoseMath.IndexBeam", StringComparison.Ordinal) < 0
+                || poseText.IndexOf("mainEuler.x", StringComparison.Ordinal) < 0)
+            {
+                problems.Add("Both beams must take pitch and yaw from the gaze through SextantBeamPoseMath");
+            }
+            // The regression shape: a hard-coded level beam. Checking only for the old
+            // literal would not hold — the first live desync was reintroduced by
+            // writing Euler(0f, horizon.YawDeg, 0f), which still "uses the
+            // math" for yaw. So every Euler call must take BOTH the pitch and
+            // the yaw slot from a SextantBeamPose field.
+            foreach (InvocationExpressionSyntax euler in pose.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(i => CalledName(i) == "Euler"
+                    && i.ArgumentList.Arguments.Count >= 3))
+            {
+                string pitchArg = euler.ArgumentList.Arguments[0].Expression.ToString();
+                string yawArg = euler.ArgumentList.Arguments[1].Expression.ToString();
+                if (pitchArg.IndexOf(".PitchDeg", StringComparison.Ordinal) < 0)
+                    problems.Add("Beam pitch must come from a SextantBeamPose field, not a literal: "
+                        + pitchArg);
+                if (yawArg.IndexOf(".YawDeg", StringComparison.Ordinal) < 0)
+                    problems.Add("Beam yaw must come from a SextantBeamPose field, not a literal: "
+                        + yawArg);
+            }
+
+            var patch = FindSourceType(roots, "InteriorClonePosePatch");
+            var patchText = patch != null ? patch.ToString() : string.Empty;
+            if (patch == null)
+            {
+                problems.Add("InteriorClonePosePatch is missing: the engine rewrites the interior clone pose");
+            }
+            else
+            {
+                foreach (string required in new[]
+                {
+                    "UBOAT.Game.Scene.Effects.VirtualSceneRenderer",
+                    "\"LateUpdate\"",
+                    "clone.transform.rotation = pip.transform.rotation",
+                    "SextantInteriorPoseFollower",
+                    "SextantPipInteriorPose",
+                    "VirtualCamera",
+                    "[HarmonyPostfix]",
+                })
+                {
+                    if (patchText.IndexOf(required, StringComparison.Ordinal) < 0)
+                        problems.Add("Interior clone aim patch must keep: " + required);
+                }
+                var apply = FindMethod(patch, "Apply");
+                if (apply == null
+                    || apply.ToString().IndexOf("postfix: new HarmonyMethod", StringComparison.Ordinal) < 0
+                    || apply.ToString().IndexOf("ReaimInteriorClone", StringComparison.Ordinal) < 0)
+                    problems.Add("InteriorClonePosePatch must patch LateUpdate with the ReaimInteriorClone postfix");
+            }
+
+            var installer = FindSourceType(roots, "HarmonyPatchInstaller");
+            if (installer == null
+                || FindMethod(installer, "Apply")?.ToString()
+                    .IndexOf("InteriorClonePosePatch.Apply", StringComparison.Ordinal) < 0)
+            {
+                problems.Add("Startup must install the interior clone aim postfix");
+            }
+
+            var follower = FindSourceType(roots, "SextantInteriorPoseFollower");
+            if (follower == null
+                || FindSourceType(roots, "SextantInteriorPoseFollower").ToString()
+                    .IndexOf("CallCount", StringComparison.Ordinal) < 0)
+            {
+                problems.Add("The clone follower must keep its CallCount evidence channel");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} sextant beam aim violation(s):\n" + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// The Sternspreiz lens must stay an opt-in PIP-only feature: catalog
         /// streaks drawn through the proven IOpaqueImageEffect path, gated by
         /// the sky state, sized in angles (not pixels), loaded through the
@@ -4162,16 +4701,89 @@ namespace RadioNavigation.SourceCheck
                     problems.Add("Lens RenderImageOpaque callback is missing");
                 }
                 else if (!InvokesName(callback, "CanSightSky")
-                    || !InvokesName(callback, "DrawStreaks"))
+                    || !InvokesName(callback, "RenderStarField")
+                    || !InvokesName(callback, "IsPlayerInsideBoat")
+                    || !InvokesName(callback, "RenderInteriorOptics")
+                    || callback.ToString().IndexOf("!rightEye", StringComparison.Ordinal) < 0
+                    || callback.ToString().IndexOf("SextantController.IsOpen", StringComparison.Ordinal) < 0)
                 {
-                    problems.Add("Lens callback must gate on CanSightSky and then draw the streaks");
+                    problems.Add("Lens callback must route the open right PIP to either the sky streak or interior optics path");
                 }
 
                 var canSight = FindMethod(lens, "CanSightSky");
                 if (canSight == null
-                    || canSight.ToString().IndexOf("SkyVisibilityResolver.IsPlayerOutside", StringComparison.Ordinal) < 0
-                    || canSight.ToString().IndexOf("SextantController.IsOpen", StringComparison.Ordinal) < 0)
-                    problems.Add("Lens must gate on the shared outside/map resolver and the open sextant");
+                    || canSight.ToString().IndexOf("SkyVisibilityResolver.IsPlayerOutside", StringComparison.Ordinal) < 0)
+                    problems.Add("The outdoor star path must use the shared outside/map resolver");
+
+                var inside = FindMethod(lens, "IsPlayerInsideBoat");
+                if (inside == null
+                    || inside.ToString().IndexOf("MainCamera.Instance", StringComparison.Ordinal) < 0
+                    || inside.ToString().IndexOf("IsInsideBoat", StringComparison.Ordinal) < 0)
+                    problems.Add("Interior optics must be gated by the actual inside-boat camera state, not by !outside alone");
+
+                var interior = FindMethod(lens, "RenderInteriorOptics");
+                if (interior == null
+                    || !InvokesName(interior, "EnsureInteriorMaterial")
+                    || !InvokesName(interior, "UpdateInteriorProjection")
+                    || !InvokesName(interior, "GetTemporaryRT")
+                    || !InvokesName(interior, "ReleaseTemporaryRT")
+                    || interior.ToString().IndexOf("width / 2", StringComparison.Ordinal) < 0
+                    || interior.ToString().IndexOf("height / 2", StringComparison.Ordinal) < 0)
+                    problems.Add("Interior optical glow must use bounded temporary half-resolution buffers and release them");
+
+                var interiorMaterial = FindMethod(lens, "EnsureInteriorMaterial");
+                if (interiorMaterial == null
+                    || interiorMaterial.ToString().IndexOf("InteriorShaderAssetName", StringComparison.Ordinal) < 0
+                    || interiorMaterial.ToString().IndexOf("LoadBundleAsset", StringComparison.Ordinal) < 0
+                    || interiorMaterial.ToString().IndexOf("new Material", StringComparison.Ordinal) < 0)
+                    problems.Add("Interior optics material/shader must be loaded from the bundle into an owned material");
+                if (lensText.IndexOf("InteriorShaderAssetName = \"RadioNavInteriorOptics\"", StringComparison.Ordinal) < 0
+                    || lensText.IndexOf("InteriorMaterialAssetName = \"RadioNavInteriorOpticsMaterial\"", StringComparison.Ordinal) < 0)
+                    problems.Add("Interior optics asset keys must resolve to the bundled shader and material");
+
+                var interiorProjection = FindMethod(lens, "UpdateInteriorProjection");
+                if (interiorProjection == null
+                    || CountOccurrences(interiorProjection.ToString(), "PixelsForAngle") < 3
+                    || interiorProjection.ToString().IndexOf("BaselineThicknessDeg", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("SunDiscRenderer.AngularDiameterDeg", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("SternspreizLensTilt.AngleDeg", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("InteriorStreakHalfLengthId", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("InteriorCompactnessRadiusId", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("InteriorStreakDirectionId", StringComparison.Ordinal) < 0)
+                    problems.Add("Interior streak must use angular length/thickness, extended-disc guard and observer-frame roll at the live PIP FOV");
+                if (interiorProjection == null
+                    || interiorProjection.ToString().IndexOf("CompactnessRadiusScale", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("InteriorStreakLengthScale", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("InteriorStreakThicknessScale", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("Mathf.Max(4f,", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("INTERIOROPTICS", StringComparison.Ordinal) < 0)
+                    problems.Add("Interior compact-source guard must be sized from the extended disc (floored) and reported for live checks");
+
+                // Half-scoping contract: the composite must be clipped to the
+                // alidade half of the PIP target. A bare Blit leaks into the
+                // horizon half whenever the SRP shares one colour buffer
+                // between the two PIP cameras (observed live 2026-09-30).
+                // Checked structurally, not by substring: the two scissor
+                // calls must sit directly in the method body and the
+                // composite blit (pass 3) must be emitted between them.
+                var scissorOn = interior?.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .FirstOrDefault(i => CalledName(i) == "EnableScissorRect");
+                var scissorOff = interior?.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .FirstOrDefault(i => CalledName(i) == "DisableScissorRect");
+                var compositeBlit = interior?.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .FirstOrDefault(i => CalledName(i) == "Blit"
+                        && i.ArgumentList.Arguments.Count >= 4
+                        && i.ArgumentList.Arguments[3].Expression.ToString() == "3");
+                if (scissorOn == null || scissorOff == null || compositeBlit == null)
+                    problems.Add("Interior composite must be scissored to the alidade half of the PIP target");
+                else if (scissorOn.Parent?.Parent != interior.Body
+                    || scissorOff.Parent?.Parent != interior.Body)
+                    problems.Add("Interior scissor must not be wrapped in a condition or loop");
+                else if (compositeBlit.SpanStart <= scissorOn.SpanStart
+                    || compositeBlit.SpanStart >= scissorOff.SpanStart)
+                    problems.Add("Interior composite blit must run between EnableScissorRect and DisableScissorRect");
+                if (lensText.IndexOf("InteriorHalfSplit = 0.5f", StringComparison.Ordinal) < 0)
+                    problems.Add("Interior half split must stay at the ocular uv 0.5 seam");
 
                 var draw = FindMethod(lens, "DrawStreaks");
                 if (draw == null
@@ -4210,7 +4822,7 @@ namespace RadioNavigation.SourceCheck
                 if (lensText.IndexOf("HasProperty", StringComparison.Ordinal) < 0)
                     problems.Add("Lens must verify material properties before writing them (silent no-ops)");
 
-                foreach (string forbidden in new[] { "StarSkyRoot", "RebuildMesh", "Camera.main", "MainCamera" })
+                foreach (string forbidden in new[] { "StarSkyRoot", "RebuildMesh", "Camera.main" })
                 {
                     if (lensText.IndexOf(forbidden, StringComparison.Ordinal) >= 0)
                         problems.Add("Lens must not touch the celestial mesh or Main Camera: " + forbidden);
@@ -4393,6 +5005,22 @@ namespace RadioNavigation.SourceCheck
                 }
             }
             return false;
+        }
+
+        private static int CountOccurrences(string text, string value)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(value))
+                return 0;
+            int count = 0;
+            int offset = 0;
+            while (true)
+            {
+                int index = text.IndexOf(value, offset, StringComparison.Ordinal);
+                if (index < 0)
+                    return count;
+                count++;
+                offset = index + value.Length;
+            }
         }
 
         private static bool Texture2DHeightIsOne(MethodDeclarationSyntax method)

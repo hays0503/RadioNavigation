@@ -23,17 +23,99 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public const int TextureSize = 512;
 
+        /// <summary>
+        /// Eyecup (наглазник) texture: fully opaque up to this fraction of its
+        /// own radius, then a long soft falloff. Lives here, not in the sprite
+        /// baker, so the coverage invariant below can be tested without Unity.
+        /// </summary>
+        public const float EyecupSolidTo = 0.60f;
+
+        /// <summary>
+        /// Eyecup side as a multiple of the ocular side. The ocular is a
+        /// FRACTION of the screen height, so the shade must be derived from it:
+        /// the original fixed 1000 units covered a 603-unit ocular at 1360x768
+        /// and then stopped at a 1267-unit one (2560x1440), which left the
+        /// outer silhouette to the Mask's binary stencil cut — the angular,
+        /// unblended rim the author reported (74 -&gt; 0 luminance in one pixel).
+        ///
+        /// The number is not cosmetic: the shade is opaque only to
+        /// <c>0.5 * EyecupSolidTo</c> of its side, so covering the aperture
+        /// needs a factor above <c>1 / EyecupSolidTo = 1.667</c>. 1.75 leaves a
+        /// 5 % margin instead of landing exactly on the boundary.
+        /// </summary>
+        public const float EyecupFactor = 1.75f;
+
+        /// <summary>Aperture radius in ocular-side units (the SDF circle).</summary>
+        public static double ApertureRadiusUnits(double ocularSideUnits)
+        {
+            return Sanitize(ocularSideUnits) * 0.5d;
+        }
+
+        /// <summary>
+        /// Radius, in ocular-side units, out to which the eyecup is fully
+        /// opaque (and therefore able to hide the stencil cut).
+        /// </summary>
+        public static double ShadeOpaqueRadiusUnits(double ocularSideUnits)
+        {
+            return Sanitize(ocularSideUnits) * EyecupFactor * EyecupSolidTo * 0.5d;
+        }
+
+        /// <summary>
+        /// The invariant the angular rim broke: the shade's opaque part must
+        /// reach past the aperture at EVERY ocular size, so the silhouette is
+        /// always the shade's own soft falloff and never the stencil's binary
+        /// cut. Independent of resolution, uiScale and the ocular fraction.
+        /// </summary>
+        public static bool ShadeCoversAperture(double ocularSideUnits)
+        {
+            return ShadeOpaqueRadiusUnits(ocularSideUnits) > ApertureRadiusUnits(ocularSideUnits);
+        }
+
+        private static double Sanitize(double value)
+        {
+            return double.IsNaN(value) || double.IsInfinity(value) || value <= 0d ? 0d : value;
+        }
+
         private const float TubeShadowStart = 0.55f;
         private const float TubeShadowMid = 0.85f;
         private const float TubeShadowMidAlpha = 0.45f;
         private const float TubeShadowFull = 0.97f;
 
-        private const float InnerGrooveStart = 0.925f;
-        private const float InnerGrooveEnd = 0.941f;
-        private const float BevelStart = 0.940f;
-        private const float BevelEnd = 0.963f;
-        private const float OuterLipStart = 0.962f;
-        private const float OuterLipEnd = 0.978f;
+        /// <summary>
+        /// Width of every band's rise and fall, in normalized radius. It is the
+        /// author's 2026-10-01 staircase fix: at 0.002 the steel bevel ended in
+        /// 0.7 px, so its bright edge dropped 39 -> 4 luminance in a SINGLE
+        /// pixel (measured live) and read as a stepped silhouette. The bands
+        /// below were widened in step, because a soft edge inside a band
+        /// narrower than twice the softness would lose its peak.
+        /// </summary>
+        public const float BandSoftness = 0.016f;
+
+        private const float InnerGrooveStart = 0.910f;
+        private const float InnerGrooveEnd = 0.954f;
+        private const float BevelStart = 0.928f;
+        private const float BevelEnd = 0.976f;
+        private const float OuterLipStart = 0.954f;
+        private const float OuterLipEnd = 0.990f;
+
+        /// <summary>
+        /// One screen pixel in normalized-radius units, for the sharpest case
+        /// the overlay is drawn at (a 600-unit ocular side, i.e. the lower end
+        /// of the 0.6..0.95 screen-fraction band). Stating it here keeps the
+        /// smoothness budget in the same units the profile is authored in
+        /// instead of leaving it to a comment.
+        /// </summary>
+        public const float RadiusPerPixel = 0.0033f;
+
+        /// <summary>
+        /// Largest luminance change allowed between two neighbouring pixels of
+        /// the composited rim, measured over a sunlit sky (the case where a
+        /// step is most visible). The old 0.002 bands needed 0.11 here, i.e.
+        /// 28 of 255 levels in one pixel; the widened ones need 0.061. Alpha
+        /// alone cannot express this: the tube is already ~95% opaque at the
+        /// bevel, so the step shows up in the composited COLOUR.
+        /// </summary>
+        public const float MaxLuminanceRisePerPixel = 0.075f;
         /// <summary>Evaluates the source-over RGBA texture at a normalized radius.</summary>
         public static SextantRimSample Evaluate(float radius, float lightFacing)
         {
@@ -52,12 +134,12 @@ namespace UBOAT.Mods.RadioNavigation
             };
 
             // A narrow black groove separates the glass from the bevel.
-            float groove = SmoothBand(radius, InnerGrooveStart, InnerGrooveEnd, 0.0025f) * 0.24f;
+            float groove = SmoothBand(radius, InnerGrooveStart, InnerGrooveEnd, BandSoftness) * 0.24f;
             CompositeOver(ref sample, 0f, 0f, 0f, groove);
 
             // Muted, directional steel reflection. It is intentionally faint:
             // the glass remains the focus and the reticle stays unobscured.
-            float band = SmoothBand(radius, BevelStart, BevelEnd, 0.002f);
+            float band = SmoothBand(radius, BevelStart, BevelEnd, BandSoftness);
             if (float.IsNaN(lightFacing) || float.IsInfinity(lightFacing))
                 lightFacing = 0f;
             float light = 0.22f + 0.78f * Clamp01(lightFacing);
@@ -66,7 +148,7 @@ namespace UBOAT.Mods.RadioNavigation
             CompositeOver(ref sample, steel, steel * 1.02f, steel * 0.94f, highlightAlpha);
 
             // The outer lip rolls back into the original black tube shadow.
-            float outerLip = SmoothBand(radius, OuterLipStart, OuterLipEnd, 0.0025f) * 0.32f;
+            float outerLip = SmoothBand(radius, OuterLipStart, OuterLipEnd, BandSoftness) * 0.32f;
             CompositeOver(ref sample, 0f, 0f, 0f, outerLip);
             return sample;
         }

@@ -48,6 +48,10 @@ namespace UBOAT.Mods.RadioNavigation
         // rotate the view like the bridge binocular's arrow rotation; reset by
         // R (with the arc) and on open.
         private static float yawTrimDeg;
+        // Eye-shadow input: the anchor for the aim's angular rate and the last
+        // measured rate. Reset with the other filters on the open edge.
+        private static SextantAimRate.State aimRateState = SextantAimRate.State.Fresh;
+        private static SextantAimRateSample aimRateSample = new SextantAimRateSample(0d, 0d);
         // Aim freeze: while the mouse is still the world yaw is frozen, so the
         // boat's wobble cannot move the star across the crosshair. The raw
         // mouse axes drive the idle timer — the game's input blockade does not
@@ -123,17 +127,42 @@ namespace UBOAT.Mods.RadioNavigation
             Transform mt = viewCamera.transform;
             Vector3 mainEuler = mt.eulerAngles;
             float targetYaw = (testAimActive ? testAimYawDeg : mainEuler.y) + yawTrimDeg;
+            // Eye-shadow input (author 2026-10-02): the angular RATE of where the
+            // observer is asking to look, measured on the aim BEFORE the washout
+            // stabilization. Two reasons it is not the stabilized output: the
+            // freeze holds that output still, so a shadow driven from it would
+            // vanish exactly while the hand is moving and the washout offset
+            // (the model's real eye displacement) is at its largest; and the
+            // alidade is absent by construction, since it never enters
+            // targetYaw — it moves the instrument, not the view.
+            //
+            // The test aim pins both axes, so it produces no rate and therefore
+            // no shadow, which is also the cleanest proof of the author's rule
+            // (a view that cannot turn has no lune): with RadioNav.TestAim=1 the
+            // aperture must stay clean however fast the mouse moves.
+            double aimPitch = testAimActive ? 0d : mainEuler.x;
+            aimRateState = SextantAimRate.Advance(aimRateState, targetYaw, aimPitch, dt,
+                out aimRateSample);
             float yaw = StabilizeYaw(targetYaw, dt, stabilizationOn, locked);
+            float pitch = (float)aimPitch;
+            // Both beams follow the head pitch; the alidade adds the gap between
+            // them. The angles come from SextantBeamPoseMath so the shipped
+            // orientation and the offline tests cannot drift apart (the pitch
+            // used to be pinned to 0 here — see the class remarks).
+            SextantBeamPose horizon = SextantBeamPoseMath.HorizonBeam(pitch, yaw);
+            SextantBeamPose index = SextantBeamPoseMath.IndexBeam(pitch, yaw, arcAngle);
             // Position: bino parity (author decision 2026-11-04) — the game's
             // bridge binocular keeps its camera at the character's head with
             // no damping, and any position filtering/freeze showed as height
             // jumps in the ocular. Raw 1:1, always.
             Vector3 position = mt.position;
             factory.LeftCamera.transform.position = position;
-            factory.LeftCamera.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            factory.LeftCamera.transform.rotation =
+                Quaternion.Euler((float)horizon.PitchDeg, (float)horizon.YawDeg, 0f);
             factory.RightCamera.transform.position = position;
             // Positive Euler X pitches DOWN in Unity; the alidade looks UP.
-            factory.RightCamera.transform.rotation = Quaternion.Euler(-(float)arcAngle, yaw, 0f);
+            factory.RightCamera.transform.rotation =
+                Quaternion.Euler((float)index.PitchDeg, (float)index.YawDeg, 0f);
 
             // Inside the boat the hull blocks the sky, so each PIP renders the
             // interior directly: it takes the interior camera's culling mask
@@ -276,6 +305,11 @@ namespace UBOAT.Mods.RadioNavigation
             wasLocked = false;
             lockedYaw = 0f;
             Locked = false;
+            // The aim-rate latch must forget its anchor here too: the session
+            // open edge would otherwise read as a jump and the eye shadow would
+            // flash for one frame.
+            aimRateState = SextantAimRate.Reset();
+            aimRateSample = new SextantAimRateSample(0d, 0d);
         }
 
         /// <summary>Keyboard aim trim (author request 2026-11-04): the
@@ -344,6 +378,12 @@ namespace UBOAT.Mods.RadioNavigation
             get { return idleSeconds; }
         }
 
+        /// <summary>Angular rate of the aim, in deg/s (eye-shadow input).</summary>
+        public static SextantAimRateSample AimRate
+        {
+            get { return aimRateSample; }
+        }
+
         /// <summary>Aim-stabilized yaw (2026-11-04, author feedback): RAW plus
         /// a washout offset — no low-pass, so moving the mouse moves the view
         /// exactly (a filtered yaw made it slide behind the hand). While the
@@ -395,13 +435,23 @@ namespace UBOAT.Mods.RadioNavigation
             if (factory.RightCamera != null)
                 return factory.RightCamera.transform.forward;
             float yaw = 0f;
+            float pitch = 0f;
             if (testAimActive)
                 yaw = testAimYawDeg;
             else if (viewCamera != null)
-                yaw = viewCamera.transform.eulerAngles.y;
+            {
+                Vector3 euler = viewCamera.transform.eulerAngles;
+                yaw = euler.y;
+                pitch = euler.x;
+            }
             else if (gameMainCamera != null)
-                yaw = gameMainCamera.transform.eulerAngles.y;
-            Quaternion rot = Quaternion.Euler(-(float)arcAngle, yaw, 0f);
+            {
+                Vector3 euler = gameMainCamera.transform.eulerAngles;
+                yaw = euler.y;
+                pitch = euler.x;
+            }
+            SextantBeamPose index = SextantBeamPoseMath.IndexBeam(pitch, yaw, arcAngle);
+            Quaternion rot = Quaternion.Euler((float)index.PitchDeg, (float)index.YawDeg, 0f);
             return rot * Vector3.forward;
         }
     }

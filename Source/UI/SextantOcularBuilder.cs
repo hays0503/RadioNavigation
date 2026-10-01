@@ -17,11 +17,52 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
         private const float VeilAlpha = 0.85f;
-        private const float EyecupSizeUnits = 1000f;
+        /// <summary>
+        /// Eyecup (наглазник) side, as a MULTIPLE of the ocular side — not an
+        /// absolute unit count. The ocular is a fraction of the screen height
+        /// (0.88 by default), so a fixed 1000 units used to cover it at
+        /// 1360x768 (ocular 603 units) and then STOPPED covering it at
+        /// 2560x1440 (ocular 1267 units, eyecup radius 500 px against an
+        /// aperture of 634). With the soft shade missing, the outer silhouette
+        /// fell back to the Mask's BINARY stencil cut and the author saw an
+        /// angular, unblended rim (measured: 74 -> 0 luminance in one pixel).
+        /// This factor reproduces the ratio that worked and leaves the opaque
+        /// margin clear of the aperture (SextantRimProfile.ShadeCoversAperture).
+        /// </summary>
+        public const float EyecupFactor = SextantRimProfile.EyecupFactor;
+
+        /// <summary>
+        /// NOT a tunable: kept as a named constant only so the sun-glare veil's
+        /// rect reads as a deliberate number in the diff. Its value is still 1.0
+        /// (the veil covers the whole ocular and the parent Mask is the cutter).
+        /// It was briefly inset to 0.97 on the theory that its hard stencil cut
+        /// caused the author's light arc; the measurement did not support that
+        /// (the leak is the lens backing's own shader term, gated by coverage),
+        /// so the change was reverted rather than left in on a hypothesis.
+        /// </summary>
+        public const float GlareScale = 1.0f;
+
+        /// <summary>
+        /// Sizes the eyecup from the live ocular side. Called at build and from
+        /// <see cref="SextantOverlay.ApplyScale"/> (a uiScale change re-derives
+        /// the ocular, so the shade has to follow it or the rim goes angular
+        /// again).
+        /// </summary>
+        public static void ApplyEyecupSize(SextantOverlay.Result result, float ocularSizeUnits)
+        {
+            if (result == null || result.EyecupRect == null)
+                return;
+            float side = ocularSizeUnits * EyecupFactor;
+            if (side <= 0f || float.IsNaN(side))
+                return;
+            result.EyecupRect.sizeDelta = new Vector2(side, side);
+            result.EyecupRect.anchoredPosition = Vector2.zero;
+        }
         // Bundle asset names (manifest "Paths:" section): the opaque view
         // material and the shader it is built from.
         private const string OpaqueViewAssetName = "RadioNavOpaqueView";
         private const string OpaqueViewShaderName = "RadioNavUIOpaque";
+        private static readonly int ApertureEdgePixelsId = Shader.PropertyToID("_ApertureEdgePixels");
 
         /// <summary>
         /// Builds veil, eyecup, ocular, views, sights, dimmers, glare and
@@ -59,12 +100,16 @@ namespace UBOAT.Mods.RadioNavigation
             eyecup.sprite = eyecupSprite;
             result.OwnedSprites.Add(eyecupSprite);
             eyecup.raycastTarget = false;
-            AnchorCenter(eyecup.rectTransform, EyecupSizeUnits, EyecupSizeUnits);
+            AnchorCenter(eyecup.rectTransform, 0f, 0f);
+            result.EyecupRect = eyecup.rectTransform;
+            // The ocular side is already known here, so the shade can be sized
+            // immediately — ApplyScale keeps the two together afterwards.
+            ApplyEyecupSize(result, ocularSizeUnits);
 
             // Ocular: square container clipped to a circle (in-game finding
             // 2026-08-26: unclipped corners painted opaque black over the live
-            // horizon). Mask clips both RT views, glare and ring to the circle;
-            // outside it the veil shows through.
+            // horizon). The Mask still clips backing/overlays; the two PIP
+            // images use their own antialiased SDF coverage at the aperture.
             GameObject pipGo = new GameObject("Ocular", typeof(Image), typeof(Mask));
             pipGo.transform.SetParent(canvasRoot.transform, false);
             result.PipRect = pipGo.GetComponent<RectTransform>();
@@ -88,14 +133,34 @@ namespace UBOAT.Mods.RadioNavigation
             backing.color = new Color(0f, 0f, 0f, 1f);
             backing.raycastTarget = false;
             Stretch(backing.rectTransform);
+            // The plate draws the instrument's OUTER silhouette, and a stencil
+            // Mask cuts that silhouette in one pixel step. Against a sunlit sky
+            // (the Veil leaves 15% of it) that reads as a hard staircase all
+            // around the rim — the author's complaint of 2026-10-01. So the
+            // plate bypasses the stencil and takes the same antialiased
+            // aperture material as the two scene images: for a full-square quad
+            // the shader's `texcoord*2-1` circle is exactly the container's, so
+            // one shader serves both and the black rim keeps its width (the
+            // scene images' aperture sits inside it) with a soft outer edge.
+            backing.maskable = false;
+            result.LensBackingImage = backing;
 
-            // Left half: fixed-horizon camera view (pitch 0). Shows only the
-            // left half of its RT so the optical axis sits at the split line
-            // (screen center); the right half of the frame is not drawn.
+            // Left half: the horizon beam. It carries the observer's head PITCH as
+            // well as the yaw (SextantPipPose), so the instrument is swung with
+            // the eye and the ocular no longer stares straight ahead while you
+            // look up or down; the angular gap to the index beam stays exactly
+            // `arc`, which keeps the alidade reading the true altitude. Shows
+            // only the left half of its RT so the optical axis sits at the split
+            // line (screen center); the right half of the frame is not drawn.
             GameObject leftGo = new GameObject("LeftView", typeof(RawImage));
             leftGo.transform.SetParent(pipGo.transform, false);
             result.LeftViewImage = leftGo.GetComponent<RawImage>();
             result.LeftViewImage.raycastTarget = false;
+            // The stock stencil Mask is binary at the ocular edge. The active
+            // UIOpaque shader computes fractional SDF coverage instead, so the
+            // two scene images bypass that stencil while all overlays/backing
+            // remain clipped by the parent Mask.
+            result.LeftViewImage.maskable = false;
             result.LeftViewImage.texture = leftRt;
             result.LeftViewImage.rectTransform.anchorMin = new Vector2(0f, 0f);
             result.LeftViewImage.rectTransform.anchorMax = new Vector2(0.5f, 1f);
@@ -110,6 +175,7 @@ namespace UBOAT.Mods.RadioNavigation
             rightGo.transform.SetParent(pipGo.transform, false);
             result.RightViewImage = rightGo.GetComponent<RawImage>();
             result.RightViewImage.raycastTarget = false;
+            result.RightViewImage.maskable = false;
             result.RightViewImage.texture = rightRt;
             result.RightViewImage.rectTransform.anchorMin = new Vector2(0.5f, 0f);
             result.RightViewImage.rectTransform.anchorMax = new Vector2(1f, 1f);
@@ -124,8 +190,12 @@ namespace UBOAT.Mods.RadioNavigation
             result.OpaqueViewMaterial = ResolveOpaqueViewMaterial(resourceManager, assetContext);
             if (result.OpaqueViewMaterial != null)
             {
+                ApplyApertureEdge(result.OpaqueViewMaterial);
                 result.LeftViewImage.material = result.OpaqueViewMaterial;
                 result.RightViewImage.material = result.OpaqueViewMaterial;
+                // The backing shares it: its only job is the antialiased black
+                // rim, which is the same SDF circle at a larger radius.
+                result.LensBackingImage.material = result.OpaqueViewMaterial;
             }
 
             // Sight crosshair (1 physical pixel): the vertical drum-alignment
@@ -191,13 +261,15 @@ namespace UBOAT.Mods.RadioNavigation
                     Debug.LogWarning("[RadioNav][Sextant] DIMRECT proof failed: " + e.Message);
             }
 
+            // Glare flash inside the ocular only. It is a plain white quad (no sprite) whose alpha is the sun's glare, and it stays CLIPPED by the binary Mask: unlike LensBacking it uses the stock UI shader, so unmasking it would paint a white square over the whole screen (there is no SDF coverage to fade it). Its hard stencil cut therefore lands on the aperture edge - the first suspect for the author's light arc, but the measurement cleared it (outside the aperture the pixels are the LENS BACKING, whose shader adds the lune's lit rim without multiplying by coverage; that term is now gated). Left exactly as it was rather than "fixed" on a hypothesis.
             // Glare flash inside the ocular only.
             GameObject glareGo = new GameObject("Glare", typeof(Image));
             glareGo.transform.SetParent(pipGo.transform, false);
             result.GlareImage = glareGo.GetComponent<Image>();
             result.GlareImage.color = new Color(1f, 1f, 1f, 0f);
             result.GlareImage.raycastTarget = false;
-            Stretch(result.GlareImage.rectTransform);
+            AnchorCenter(result.GlareImage.rectTransform,
+                ocularSizeUnits * GlareScale, ocularSizeUnits * GlareScale);
 
             // Soft radial edge blending the ocular rim into the veil.
             GameObject ringGo = new GameObject("EdgeRing", typeof(Image));
@@ -308,6 +380,25 @@ namespace UBOAT.Mods.RadioNavigation
         /// darkened/gated. Returns null only when the asset is genuinely
         /// missing — the views then keep the stock UI shader.
         /// </summary>
+        /// <summary>
+        /// Width of the aperture edge ramp, in physical pixels. The shader's own
+        /// default is only a fallback: a Material loaded from an AssetBundle
+        /// does NOT inherit shader property defaults it never serialized, so the
+        /// bundled aperture material arrived with `_ApertureEdgePixels = 0` and
+        /// the SDF coverage degenerated into a one-pixel step — measured live
+        /// (65 -> 3 luminance over a single pixel at 1360x768), which is exactly
+        /// the hard staircase the author reported around the rim. The value is
+        /// therefore pushed from code, where it is visible and testable.
+        /// </summary>
+        public const float ApertureEdgePixels = 3f;
+
+        private static void ApplyApertureEdge(Material material)
+        {
+            if (material?.HasProperty(ApertureEdgePixelsId) != true)
+                return;
+            material.SetFloat(ApertureEdgePixelsId, ApertureEdgePixels);
+        }
+
         private static Material ResolveOpaqueViewMaterial(ResourceManager resourceManager, UnityEngine.Object assetContext)
         {
             if (resourceManager != null)
