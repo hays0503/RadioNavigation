@@ -4391,10 +4391,12 @@ namespace RadioNavigation.SourceCheck
                 foreach (string required in new[]
                 {
                     "public static bool ShadeCoversAperture",
+                    "public static bool ShadeClearsTheRimZone",
                     "public static double ShadeOpaqueRadiusUnits",
                     "public static double ApertureRadiusUnits",
                     "public const float EyecupSolidTo",
                     "public const float EyecupFactor",
+                    "public const float MinOpaqueRadiusRatio",
                 })
                 {
                     if (profileText.IndexOf(required, StringComparison.Ordinal) < 0)
@@ -4402,20 +4404,45 @@ namespace RadioNavigation.SourceCheck
                 }
                 var shadeFactor = Regex.Match(profileText, @"EyecupFactor\s*=\s*([0-9.]+)f;");
                 var solidTo = Regex.Match(profileText, @"EyecupSolidTo\s*=\s*([0-9.]+)f;");
-                if (!shadeFactor.Success || !solidTo.Success)
+                var minRatio = Regex.Match(profileText, @"MinOpaqueRadiusRatio\s*=\s*([0-9.]+)f;");
+                if (!shadeFactor.Success || !solidTo.Success || !minRatio.Success)
                 {
-                    problems.Add("EyecupFactor and EyecupSolidTo must be named constants");
+                    problems.Add("EyecupFactor, EyecupSolidTo and MinOpaqueRadiusRatio must be named constants");
                 }
                 else
                 {
-                    // The shade is opaque only to 0.5*solidTo of its side, so
-                    // covering the aperture needs factor * solidTo > 1.
+                    // The shade is opaque only to 0.5*solidTo of its side, so its
+                    // opaque radius is (factor*solidTo) aperture radii. Bare
+                    // coverage needs > 1; the leak the author reported
+                    // (2026-10-02) needs the standoff, because past the shade's
+                    // own edge the MAIN view shows through and smears on turns.
                     double factor = double.Parse(shadeFactor.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
                     double solid = double.Parse(solidTo.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-                    if (solid <= 0d || factor * solid <= 1d)
-                        problems.Add("The shade must stay opaque PAST the aperture (factor * EyecupSolidTo > 1), got "
+                    double min = double.Parse(minRatio.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                    if (min <= 1d)
+                        problems.Add("MinOpaqueRadiusRatio must exceed 1 (1.0 is bare coverage), got " + min);
+                    if (solid <= 0d || factor * solid < min)
+                        problems.Add("The shade must stand off the rim by MinOpaqueRadiusRatio, got "
                             + factor.ToString(System.Globalization.CultureInfo.InvariantCulture) + " * "
-                            + solid.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                            + solid.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                            + " = " + (factor * solid).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                            + " < " + min.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+                // Existence is not use: a ShadeClearsTheRimZone that returns
+                // true satisfies the member list above while checking nothing,
+                // and measured, a version of it that had degraded to the bare
+                // coverage test passed every unit test. The BODY has to mention
+                // the constant the contract is about.
+                var rimZoneBody = Regex.Match(profileText,
+                    @"ShadeClearsTheRimZone\s*\(\s*\)\s*\{(?<body>[^}]*)\}");
+                if (!rimZoneBody.Success)
+                {
+                    problems.Add("ShadeClearsTheRimZone() must be parameterless (the ratio is size-independent)");
+                }
+                else if (rimZoneBody.Groups["body"].Value.IndexOf("MinOpaqueRadiusRatio", StringComparison.Ordinal) < 0)
+                {
+                    problems.Add("ShadeClearsTheRimZone() must compare against MinOpaqueRadiusRatio, got body: "
+                        + rimZoneBody.Groups["body"].Value.Trim());
                 }
             }
 

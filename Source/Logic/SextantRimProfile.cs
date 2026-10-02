@@ -27,8 +27,33 @@ namespace UBOAT.Mods.RadioNavigation
         /// Eyecup (наглазник) texture: fully opaque up to this fraction of its
         /// own radius, then a long soft falloff. Lives here, not in the sprite
         /// baker, so the coverage invariant below can be tested without Unity.
+        ///
+        /// 0.60 -> 0.91 (author 2026-10-02: "закрыть щель непрозрачным
+        /// чёрным, чтобы внешний обод был толще"). Measured, not assumed: the
+        /// composite census (VeilAlpha 0.85, factor 1.75) and the live frame
+        /// agree that the world reached the screen starting at r/R 1.14 - i.e.
+        /// 0.4 % of the radius past the bezel - and the content there is the
+        /// MAIN view, the one layer that smears on fast turns (angular
+        /// autocorrelation 0.99 at lag 1, so it is the world, not our own
+        /// overlay). At 0.91 the shade is opaque to 1.59 R and the leak starts
+        /// at 1.62 R, 0.62 R = ~390 px clear of the bezel.
+        ///
+        /// Stated plainly, the limit of this number: the eyecup's alpha always
+        /// reaches 0 at its own edge (r = EyecupFactor = 1.75 R) while the
+        /// screen corner is at 2.32 R, so this MOVES the leak outward, it does
+        /// not remove it - only an opaque Veil can do that. Price: 27 % of the
+        /// screen (the annulus 1.05-1.59 R) goes from world-at-15 % to black.
         /// </summary>
-        public const float EyecupSolidTo = 0.60f;
+        public const float EyecupSolidTo = 0.91f;
+
+        /// <summary>
+        /// The shade's opaque radius must clear the aperture by this factor.
+        /// 1.0 is the bare minimum (the stencil cut just hidden); 1.05 was the
+        /// old build and is what let the leak start at 1.14 R. 1.4 sits
+        /// between them with ~14 % margin on the current 1.59, so a regression
+        /// to 0.60 fails instead of passing quietly.
+        /// </summary>
+        public const float MinOpaqueRadiusRatio = 1.4f;
 
         /// <summary>
         /// Eyecup side as a multiple of the ocular side. The ocular is a
@@ -39,9 +64,13 @@ namespace UBOAT.Mods.RadioNavigation
         /// unblended rim the author reported (74 -&gt; 0 luminance in one pixel).
         ///
         /// The number is not cosmetic: the shade is opaque only to
-        /// <c>0.5 * EyecupSolidTo</c> of its side, so covering the aperture
-        /// needs a factor above <c>1 / EyecupSolidTo = 1.667</c>. 1.75 leaves a
-        /// 5 % margin instead of landing exactly on the boundary.
+        /// <c>0.5 * EyecupSolidTo</c> of its side, so its opaque radius is
+        /// <c>0.5 * factor * solidTo</c> times the aperture radius. With
+        /// solidTo at 0.91 that is <c>0.5 * 1.75 * 0.91 = 0.796</c> of the
+        /// ocular side past the bezel - see <see cref="MinOpaqueRadiusRatio"/>
+        /// for the contract that number has to satisfy. (The old pairing,
+        /// 1.75 with solidTo 0.60, cleared the bare 1.0 threshold by 5 % and
+        /// that thin margin is exactly why the leak sat at 1.14 R.)
         /// </summary>
         public const float EyecupFactor = 1.75f;
 
@@ -69,6 +98,28 @@ namespace UBOAT.Mods.RadioNavigation
         public static bool ShadeCoversAperture(double ocularSideUnits)
         {
             return ShadeOpaqueRadiusUnits(ocularSideUnits) > ApertureRadiusUnits(ocularSideUnits);
+        }
+
+        /// <summary>
+        /// The stronger invariant the leak needed (author 2026-10-02). Clearing
+        /// the aperture is not enough: past the shade's own edge the MAIN view
+        /// shows through at VeilAlpha's complement, and the main view is the
+        /// layer that smears during fast turns. The opaque radius therefore has
+        /// to stand off the bezel by <see cref="MinOpaqueRadiusRatio"/>, or the
+        /// smear reads as bright arcs hugging the rim.
+        ///
+        /// No size parameter, deliberately. The opaque radius is
+        /// <c>factor * solidTo</c> APERTURE radii at every ocular size, so a
+        /// size argument could not change the answer - it would only make a
+        /// sweep look thorough while proving nothing, which is how the first
+        /// version of this passed a mutation that deleted the check outright.
+        /// The size dimension is carried by the derived radii instead
+        /// (<see cref="ShadeOpaqueRadiusUnits"/>), which the offline sweep
+        /// exercises at nine ocular sizes.
+        /// </summary>
+        public static bool ShadeClearsTheRimZone()
+        {
+            return EyecupFactor * EyecupSolidTo >= MinOpaqueRadiusRatio;
         }
 
         private static double Sanitize(double value)

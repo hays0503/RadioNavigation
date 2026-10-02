@@ -139,17 +139,66 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
-        public void ShadeFactorHasMarginOverTheCoverageThreshold()
+        public void ShadeStandsOffTheRimByTheAgreedMargin()
         {
-            // Coverage needs factor > 1 / EyecupSolidTo. Landing exactly on the
-            // threshold would put the stencil cut at the last opaque pixel, so
-            // the margin is part of the contract.
-            double threshold = 1d / SextantRimProfile.EyecupSolidTo;
-            Assert.True(SextantRimProfile.EyecupFactor > threshold,
-                "EyecupFactor " + SextantRimProfile.EyecupFactor
-                    + " must clear the coverage threshold " + threshold);
-            Assert.True(SextantRimProfile.EyecupFactor <= threshold + 0.2d,
-                "EyecupFactor must not grow so far that the shade swallows the screen");
+            // The floor is a LITERAL, not MinOpaqueRadiusRatio. A test that
+            // reads the very constant it is meant to defend moves with the
+            // mutation, and 1.4 -> 1.0 then passes - measured, that is exactly
+            // how it slipped through the first mutation run.
+            //
+            // float, not double: (double)1.4f is 1.39999997615814208984375, so
+            // a double floor of 1.4 would make `MinOpaqueRadiusRatio >= floor`
+            // fail against its own value. Messages go through InvariantCulture
+            // because this test host runs under a comma-decimal culture.
+            const float floor = 1.4f;
+            double ratio = SextantRimProfile.EyecupFactor * SextantRimProfile.EyecupSolidTo;
+            Assert.True(ratio >= floor, Fmt(
+                "opaque radius ratio {0} must clear the aperture by {1}", ratio, floor));
+            Assert.True(SextantRimProfile.MinOpaqueRadiusRatio >= floor, Fmt(
+                "MinOpaqueRadiusRatio {0} must not be lowered under the agreed floor {1}",
+                SextantRimProfile.MinOpaqueRadiusRatio, floor));
+            Assert.True(SextantRimProfile.ShadeClearsTheRimZone());
+            // ...and not so far that the falloff has no band left to fade
+            // across (the shade's alpha reaches 0 at EyecupFactor).
+            Assert.True(ratio <= 0.95d * SextantRimProfile.EyecupFactor, Fmt(
+                "opaque radius {0} leaves the falloff no band", ratio));
+        }
+
+        private static string Fmt(string format, params object[] args)
+        {
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, format, args);
+        }
+
+        [Fact]
+        public void DerivedRadiiHonourTheRimContractAtEveryOcularSize()
+        {
+            // The leak the author reported (2026-10-02): the world reached the
+            // screen at r/R 1.14, i.e. 0.4 of the radius past the bezel, and
+            // what showed there was the MAIN view - the layer that smears on
+            // fast turns. This sweep is the size dimension of that contract: it
+            // proves the radii the code actually derives stay on the right side
+            // of the floor from a 400-unit ocular to a 4000-unit one, instead
+            // of only at some convenient size.
+            const float floor = 1.4f;
+            double[] ocularSizes = { 400d, 603.43d, 674d, 900d, 1126d, 1267d, 1600d, 2400d, 4000d };
+            foreach (double ocular in ocularSizes)
+            {
+                double aperture = SextantRimProfile.ApertureRadiusUnits(ocular);
+                double opaque = SextantRimProfile.ShadeOpaqueRadiusUnits(ocular);
+                double shadeRadius = ocular * SextantRimProfile.EyecupFactor * 0.5d;
+                Assert.True(aperture > 0d, Fmt("aperture radius must be positive at {0}", ocular));
+                Assert.True(opaque / aperture >= floor, Fmt(
+                    "opaque radius ratio {0} at ocular={1} must clear {2}",
+                    opaque / aperture, ocular, floor));
+                Assert.True(opaque < shadeRadius, Fmt(
+                    "opaque radius {0} must stay inside the shade {1} so the falloff still has a band",
+                    opaque, shadeRadius));
+            }
+
+            // A degenerate ocular yields no radius rather than a trusted one.
+            Assert.Equal(0d, SextantRimProfile.ApertureRadiusUnits(0d), 9);
+            Assert.Equal(0d, SextantRimProfile.ApertureRadiusUnits(double.NaN), 9);
+            Assert.Equal(0d, SextantRimProfile.ShadeOpaqueRadiusUnits(double.PositiveInfinity), 9);
         }
 
         [Fact]
