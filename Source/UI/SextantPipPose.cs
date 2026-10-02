@@ -62,6 +62,12 @@ namespace UBOAT.Mods.RadioNavigation
         // from PlayerPrefs at 1 Hz; both are zero unless a probe is armed, so a
         // normal session never enters this path.
         private static SextantAimProbe.State probe = SextantAimProbe.State.Rest;
+        // View-camera pose captured on the first frame the probe drives it, and
+        // whether it is doing so right now. Without the capture the offset would
+        // be read back from the camera every frame and integrate into the
+        // player's own aim; without the flag the restore would be guessed at.
+        private static Vector3 viewProbeHome;
+        private static bool viewProbeDriving;
         private static int probeRun;
         private static double probeSpinRate;
         private static double probeYawAccel;
@@ -157,9 +163,15 @@ namespace UBOAT.Mods.RadioNavigation
             probe = StepProbe(dt);
             if (probe.Moving)
                 stabilizationOn = false;
+            // The base pose the rest of this method must measure FROM. While the
+            // probe drives the view camera the camera's own euler already carries
+            // the offset, so reading it would apply the probe twice: the ocular
+            // would spin at twice the commanded rate and the aim rate the eye
+            // shadow is fed from would double as well. One source, both consumers.
+            Vector3 baseEuler = ApplyProbeToViewCamera(mt, mainEuler, probe);
             LogAimProbe(dt);
 
-            float targetYaw = (testAimActive ? testAimYawDeg : mainEuler.y) + yawTrimDeg
+            float targetYaw = (testAimActive ? testAimYawDeg : baseEuler.y) + yawTrimDeg
                 + (float)probe.Yaw;
             // Eye-shadow input (author 2026-10-02): the angular RATE of where the
             // observer is asking to look, measured on the aim BEFORE the washout
@@ -174,7 +186,7 @@ namespace UBOAT.Mods.RadioNavigation
             // no shadow, which is also the cleanest proof of the author's rule
             // (a view that cannot turn has no lune): with RadioNav.TestAim=1 the
             // aperture must stay clean however fast the mouse moves.
-            double aimPitch = (testAimActive ? 0d : mainEuler.x) + probe.Pitch;
+            double aimPitch = (testAimActive ? 0d : baseEuler.x) + probe.Pitch;
             aimRateState = SextantAimRate.Advance(aimRateState, targetYaw, aimPitch, dt,
                 out aimRateSample);
             MaybeResetTemporalEffects(factory, viewCamera, aimRateSample.Magnitude);
@@ -332,6 +344,55 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>1 Hz probe telemetry: the state a captured frame belongs to.</summary>
+        /// <summary>
+        /// Turns the view camera while the probe runs, and puts it back when the
+        /// probe stops. Returns the pose the caller must measure from.
+        ///
+        /// Why this exists (measured 2026-10-02): the probe only ever moved the
+        /// instrument's own cameras, so a 220 deg/s spin left the PLAYER's view -
+        /// and therefore the rendered frame - bit-identical to rest. The picture
+        /// was the thing under test, so a probe that cannot reach it measures
+        /// nothing; that is a blind instrument, not a clean result.
+        ///
+        /// Three properties, each of which is a bug if lost:
+        ///   - gated on RadioNav.ProbeViewSpin, so the shipped default does not
+        ///     move the player's view;
+        ///   - the pose is written from a pose captured once, never read back, so
+        ///     the offset cannot integrate and the view returns exactly;
+        ///   - drive and restore share SextantAimProbe.ViewAngle, so the two
+        ///     cannot drift apart, and the restore runs on the first frame the
+        ///     probe is no longer moving - including the frame after the
+        ///     instrument is closed, which is what clears it on re-open.
+        /// </summary>
+        private static Vector3 ApplyProbeToViewCamera(Transform mt, Vector3 mainEuler,
+            SextantAimProbe.State probeState)
+        {
+            bool drive = probeState.Moving
+                && SextantAimProbe.ViewSpinFrom(
+                    PlayerPrefs.GetInt(SextantAimProbe.ViewSpinPrefsKey, 0));
+
+            if (drive)
+            {
+                if (!viewProbeDriving)
+                {
+                    viewProbeHome = mainEuler;
+                    viewProbeDriving = true;
+                }
+                mt.eulerAngles = new Vector3(
+                    (float)SextantAimProbe.ViewAngle(viewProbeHome.x, probeState.Pitch),
+                    (float)SextantAimProbe.ViewAngle(viewProbeHome.y, probeState.Yaw),
+                    viewProbeHome.z);
+                return viewProbeHome;
+            }
+
+            if (!viewProbeDriving)
+                return mainEuler;
+
+            mt.eulerAngles = viewProbeHome;
+            viewProbeDriving = false;
+            return viewProbeHome;
+        }
+
         private static void LogAimProbe(float dt)
         {
             if (!probe.Moving)

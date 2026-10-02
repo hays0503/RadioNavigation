@@ -318,6 +318,47 @@ namespace UBOAT.Mods.RadioNavigation
             return state;
         }
 
+        /// <summary>
+        /// PlayerPrefs: also drive the VIEW camera with the probe (1 = yes).
+        ///
+        /// Off by default and it has to stay that way: with it on the probe stops
+        /// being a diagnostic overlay on the instrument's own cameras and starts
+        /// turning what the player is looking through. No diagnostic may do that
+        /// unless it was asked to.
+        /// </summary>
+        public const string ViewSpinPrefsKey = "RadioNav.ProbeViewSpin";
+
+        /// <summary>
+        /// Whether the preference asks for the view camera to be driven.
+        /// Anything non-zero is yes, matching the other probe preferences: a
+        /// mistyped value should not silently read as "off".
+        /// </summary>
+        public static bool ViewSpinFrom(int value)
+        {
+            return value != 0;
+        }
+
+        /// <summary>
+        /// The angle to write to the view camera: the pose captured when the
+        /// probe STARTED, plus the probe's offset.
+        ///
+        /// The home pose is a parameter rather than read from the camera because
+        /// reading it back every frame would integrate the offset into the
+        /// player's own aim - the view would walk away and never return, and the
+        /// spin would grow without bound. Driving and restoring go through this
+        /// one function, so "the probe stops where it started" is the SAME
+        /// arithmetic as "the probe turns the view" and cannot drift apart.
+        /// Wrapped like the game's euler, because a full turn is a turn.
+        /// </summary>
+        public static double ViewAngle(double homeDeg, double offsetDeg)
+        {
+            if (double.IsNaN(homeDeg) || double.IsNaN(offsetDeg))
+                return 0d;
+            if (double.IsInfinity(homeDeg) || double.IsInfinity(offsetDeg))
+                return 0d;
+            return BodyRowFormatter.Wrap180(homeDeg + offsetDeg);
+        }
+
         private static double Clamp(double value, double min, double max)
         {
             if (double.IsNaN(value))

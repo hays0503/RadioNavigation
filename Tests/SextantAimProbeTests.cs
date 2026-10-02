@@ -330,5 +330,80 @@ namespace Tests
             Assert.True(state.Pitch < 0d, "a negative pitch acceleration must turn down");
             Assert.True(state.Pitch < 0d, "pitch must follow its own acceleration, got " + state.Pitch);
         }
+
+        // ---- the view-camera drive (RadioNav.ProbeViewSpin) ------------------
+        //
+        // The probe moved the instrument's cameras and not the player's, so a
+        // 220 deg/s spin produced a rendered frame bit-identical to rest
+        // (measured 2026-10-02): a blind instrument. These pin the two
+        // properties that make the new drive safe, because each one failing is
+        // a way to wreck the player's view.
+
+        [Fact]
+        public void TheViewCameraIsOnlyDrivenWhenThePreferenceAsksForIt()
+        {
+            Assert.False(SextantAimProbe.ViewSpinFrom(0), "0 must mean off - it is the shipped default");
+            Assert.True(SextantAimProbe.ViewSpinFrom(1), "1 must mean on");
+            // A mistyped value must not read as "off" and silently skip the run:
+            // that is how the earlier probe knobs behaved and it cost a session.
+            Assert.True(SextantAimProbe.ViewSpinFrom(-1));
+            Assert.True(SextantAimProbe.ViewSpinFrom(99));
+        }
+
+        [Fact]
+        public void DrivingTheViewAndRestoringItAreTheSameArithmetic()
+        {
+            // The restore is not a second formula that has to agree with the
+            // drive; it is the drive with a zero offset, so they cannot drift.
+            const double home = 137.4d;
+            const double offset = -63.25d;
+            double driven = SextantAimProbe.ViewAngle(home, offset);
+            // Restoring from the driven pose must land back on the captured pose,
+            // and the restore is literally the drive with a zero offset - not a
+            // second formula that has to be kept in agreement with the first.
+            Assert.Equal(home, SextantAimProbe.ViewAngle(driven, -offset), 9);
+            Assert.Equal(home, SextantAimProbe.ViewAngle(home, 0d), 9);
+            Assert.True(Math.Abs(driven - (home + offset)) < 1e-9,
+                "the drive must be the plain sum, got " + driven);
+        }
+
+        [Fact]
+        public void TheOffsetNeverIntegratesIntoThePlayersAim()
+        {
+            // The whole reason the home pose is a parameter: if the caller fed
+            // the camera's own euler back in, every frame would add the offset
+            // again and the view would walk away for good.
+            const double home = 20d;
+            double oneStep = SextantAimProbe.ViewAngle(home, 5d);
+            double stillOnHome = SextantAimProbe.ViewAngle(home, 5d);
+            Assert.Equal(oneStep, stillOnHome, 12);
+            Assert.Equal(25d, oneStep, 9);
+            // And a second, larger offset from the SAME home is not cumulative.
+            Assert.Equal(45d, SextantAimProbe.ViewAngle(home, 25d), 9);
+        }
+
+        [Fact]
+        public void AFullTurnOfTheProbeIsStillTheSameView()
+        {
+            // The spin is deliberately unclamped, so the view angle wraps; a
+            // wrapped camera is correct, a drifting one is not.
+            Assert.Equal(10d, SextantAimProbe.ViewAngle(10d, 360d), 9);
+            Assert.Equal(10d, SextantAimProbe.ViewAngle(10d, -360d), 9);
+            Assert.Equal(10d, SextantAimProbe.ViewAngle(10d, 2160d), 9);
+        }
+
+        [Theory]
+        [InlineData(double.NaN, 5d)]
+        [InlineData(5d, double.NaN)]
+        [InlineData(double.PositiveInfinity, 5d)]
+        [InlineData(5d, double.NegativeInfinity)]
+        public void GarbageCannotPoisonTheViewCamera(double home, double offset)
+        {
+            // A NaN written into eulerAngles is not a small error: Unity turns it
+            // into an undefined rotation and the camera never comes back.
+            double result = SextantAimProbe.ViewAngle(home, offset);
+            Assert.False(double.IsNaN(result), "ViewAngle returned NaN");
+            Assert.False(double.IsInfinity(result), "ViewAngle returned an infinity");
+        }
     }
 }

@@ -4836,9 +4836,26 @@ namespace RadioNavigation.SourceCheck
             if (pose == null
                 || poseText.IndexOf("SextantBeamPoseMath.HorizonBeam", StringComparison.Ordinal) < 0
                 || poseText.IndexOf("SextantBeamPoseMath.IndexBeam", StringComparison.Ordinal) < 0
-                || poseText.IndexOf("mainEuler.x", StringComparison.Ordinal) < 0)
+                || poseText.IndexOf("mainEuler.x", StringComparison.Ordinal) < 0
+                    && poseText.IndexOf("baseEuler.x", StringComparison.Ordinal) < 0)
             {
                 problems.Add("Both beams must take pitch and yaw from the gaze through SextantBeamPoseMath");
+            }
+            // The gaze source is named `baseEuler` since the view-camera drive
+            // (2026-10-02): it is mainEuler, except while RadioNav.ProbeViewSpin
+            // turns the player's view, and reading the driven camera back would
+            // apply the probe a second time. So the rule that actually matters
+            // here is that BOTH axes come from the same pose - the original
+            // desync was one axis taken from the view and the other pinned.
+            if (pose != null
+                && poseText.IndexOf("baseEuler.x", StringComparison.Ordinal) >= 0)
+            {
+                if (poseText.IndexOf("baseEuler.y", StringComparison.Ordinal) < 0)
+                {
+                    problems.Add("both beam axes must come from the same gaze pose - "
+                        + "the yaw reads baseEuler but the pitch does not, which is the "
+                        + "height/rotation desync this gate exists for");
+                }
             }
             // The regression shape: a hard-coded level beam. Checking only for the old
             // literal would not hold — the first live desync was reintroduced by
@@ -5917,6 +5934,58 @@ namespace RadioNavigation.SourceCheck
         /// Mutations: drop B/C/D/E/F/G/H/I -> FAIL; move the probe behind the
         /// freeze -> FAIL (D).
         /// </summary>
+        /// </summary>
+        /// The view-camera drive (RadioNav.ProbeViewSpin, author approved
+        /// 2026-10-02). MEASURED 2026-10-02: the probe only moved the
+        /// instrument's own cameras, so a 220 deg/s spin left the rendered frame
+        /// bit-identical to rest - a blind instrument, and it read as "no
+        /// artefact". This gate exists because the drive has three ways to be
+        /// wrong that no test of the pure arithmetic would notice:
+        ///  A) the preference key exists and 0 means OFF (the shipped default may
+        ///     never turn the player's view);
+        ///  B) the camera is written from a pose captured once, NEVER from the
+        ///     camera's own euler - reading it back integrates the offset and the
+        ///     view walks away for good;
+        ///  C) the restore writes the captured pose and runs on the branch where
+        ///     the probe is no longer moving, so closing the instrument puts the
+        ///     view back;
+        ///  D) the caller measures the ocular from the CAPTURED pose, not from
+        ///     the driven camera - otherwise the probe is applied twice and the
+        ///     ocular spins at twice the commanded rate.
+        /// </summary>
+        [Fact]
+        public void SextantPip_ProbeCanDriveTheViewCameraAndAlwaysPutsItBack()
+        {
+            var problems = new List<string>();
+            string text = File.ReadAllText(Path.Combine(ModCompiler.ModRoot,
+                "Source", "UI", "SextantPipPose.cs"));
+            string math = File.ReadAllText(Path.Combine(ModCompiler.ModRoot,
+                "Source", "Logic", "SextantAimProbe.cs"));
+
+            if (math.IndexOf("\"RadioNav.ProbeViewSpin\"", StringComparison.Ordinal) < 0)
+                problems.Add("SextantAimProbe must declare the preference key \"RadioNav.ProbeViewSpin\"");
+            if (math.IndexOf("return value != 0;", StringComparison.Ordinal) < 0)
+                problems.Add("ViewSpinFrom must treat any non-zero as ON - a mistyped value reading as 'off' silently skips the run");
+
+            // Gated: the preference is read in the update that writes the camera,
+            // not merely declared. "Declared" is the trap this gate keeps hitting.
+            if (text.IndexOf("SextantAimProbe.ViewSpinFrom(", StringComparison.Ordinal) < 0)
+                problems.Add("SextantPipPose must consult ViewSpinFrom before driving the view camera - the shipped default may never turn the player's view");
+            if (text.IndexOf("viewProbeHome = mainEuler", StringComparison.Ordinal) < 0)
+                problems.Add("SextantPipPose must capture the view pose once (viewProbeHome = mainEuler) - reading the camera back every frame integrates the offset into the player's aim");
+            if (text.IndexOf("mt.eulerAngles = viewProbeHome", StringComparison.Ordinal) < 0)
+                problems.Add("SextantPipPose must restore the captured pose (mt.eulerAngles = viewProbeHome) - otherwise the probe leaves the view turned");
+            if (text.IndexOf("SextantAimProbe.ViewAngle(", StringComparison.Ordinal) < 0)
+                problems.Add("the view camera must be written through SextantAimProbe.ViewAngle, so the drive and the restore cannot drift apart");
+            if (text.IndexOf("Vector3 baseEuler = ApplyProbeToViewCamera", StringComparison.Ordinal) < 0)
+                problems.Add("UpdatePipPose must take the ocular's base pose from ApplyProbeToViewCamera - measuring from the driven camera applies the probe twice");
+            if (text.IndexOf("baseEuler.y", StringComparison.Ordinal) < 0
+                || text.IndexOf("baseEuler.x", StringComparison.Ordinal) < 0)
+                problems.Add("both ocular axes must be measured from baseEuler, or the probe is applied twice on one axis only");
+
+            Assert.True(problems.Count == 0, string.Join("\n", problems));
+        }
+
         [Fact]
         public void SextantPip_AimProbeIsWiredInertAndSelfStopping()
         {
