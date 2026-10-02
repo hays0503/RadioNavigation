@@ -6085,10 +6085,28 @@ namespace RadioNavigation.SourceCheck
                 {
                     problems.Add("SextantPipPose.ResetTemporalEffects not found - nothing writes the pipeline flag");
                 }
-                else if (!Regex.IsMatch(reset.ToString(),
-                    @"TemporalEffectsResetRequested\s*=\s*true"))
+                else
                 {
-                    problems.Add("SextantPipPose.ResetTemporalEffects must set TemporalEffectsResetRequested = true - anything else leaves the history intact");
+                    if (!Regex.IsMatch(reset.ToString(),
+                        @"TemporalEffectsResetRequested\s*=\s*true"))
+                    {
+                        problems.Add("SextantPipPose.ResetTemporalEffects must set TemporalEffectsResetRequested = true - anything else leaves the history intact");
+                    }
+                    // The flag alone is HALF the game's own reset, and the half
+                    // that does nothing on its own: measured at 70 deg/s with
+                    // this gate green, the flag was set every frame and the
+                    // smear was fully intact. GameCamera.ResetTemporalEffectsNow
+                    // (MainCamera.cs:148-163) clears the PostProcessLayer's own
+                    // history FIRST and then sets the flag, and the game's
+                    // InterruptTemporalAntiAliasing / InterruptMotionBlur
+                    // (MainCamera.cs:1083-1089) are empty bodies in this build,
+                    // so there is no higher-level call to delegate to. This gate
+                    // accepted the incomplete version for exactly as long as the
+                    // defect survived.
+                    if (!Regex.IsMatch(reset.ToString(), @"\.\s*ResetHistory\s*\(\s*\)"))
+                    {
+                        problems.Add("SextantPipPose.ResetTemporalEffects must call PostProcessLayer.ResetHistory() - the flag alone was measured to leave the smear intact (the history buffer is what a fast rotation smears into)");
+                    }
                 }
             }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using UBOAT.Game.Scene.Camera;
 using UnityEngine;
+using UnityEngine.Rendering.PostProcessing;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -26,6 +27,11 @@ namespace UBOAT.Mods.RadioNavigation
         private static Camera lastGoodViewCamera;
         private static readonly Dictionary<Camera, UBOAT.Game.Scene.Rendering.AdditionalCameraData> addCache =
             new Dictionary<Camera, UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+        // The PP layer owns the buffer the smear actually lives in, so the
+        // reset has to reach it as well as the camera-data flag. Cleared with
+        // addCache on teardown.
+        private static readonly Dictionary<Camera, PostProcessLayer> layerCache =
+            new Dictionary<Camera, PostProcessLayer>();
         private static readonly Dictionary<Camera, int> maskCache =
             new Dictionary<Camera, int>();
 
@@ -432,6 +438,7 @@ namespace UBOAT.Mods.RadioNavigation
         public static void Reset()
         {
             addCache.Clear();
+            layerCache.Clear();
             maskCache.Clear();
             lastGoodViewCamera = null;
             ResetFilters();
@@ -565,6 +572,22 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (camera == null)
                 return;
+            // The game clears BOTH halves (GameCamera.ResetTemporalEffectsNow,
+            // MainCamera.cs:148-163): the PP layer's own history buffer AND the
+            // AdditionalCameraData flag. Setting only the flag was MEASURED to
+            // leave the smear fully intact at 70 deg/s - the flag is a request
+            // the pipeline honours on its own schedule, while the history is
+            // the buffer the fast rotation smears into. Note the game's own
+            // InterruptTemporalAntiAliasing / InterruptMotionBlur
+            // (MainCamera.cs:1083-1089) are empty bodies in this build, so
+            // there is no higher-level call to make: this is the whole reset.
+            PostProcessLayer layer;
+            if (!layerCache.TryGetValue(camera, out layer) || layer == null)
+            {
+                layer = camera.GetComponent<PostProcessLayer>();
+                layerCache[camera] = layer;
+            }
+            layer?.ResetHistory();
             UBOAT.Game.Scene.Rendering.AdditionalCameraData data;
             if (!addCache.TryGetValue(camera, out data) || data == null)
             {
