@@ -253,15 +253,36 @@ namespace UBOAT.Mods.RadioNavigation
         /// Travel up to which the wall is still ON the rim, so its light is
         /// legitimate. Measured, not guessed: the wall sits at
         /// <see cref="ShadowRadiusUnits"/> from the obstruction centre, so at
-        /// travel t it reaches inward to ShadowRadiusUnits - t. 0.985 - 0.035 =
-        /// 0.95, which is where the tube wall is drawn.
+        /// travel t it reaches inward to ShadowRadiusUnits - t.
+        ///
+        /// REVERTED 2026-10-02 after measuring what the zero cost. The wall is
+        /// drawn at ShadowRadiusUnits from the OBSTRUCTION CENTRE, so a displaced
+        /// pupil carries the ring OUTWARD to ShadowRadiusUnits + t and it crosses
+        /// r/R 1.0 at t = 0.015 - which is why this was briefly set to 0. Zeroing
+        /// it did remove the artefact (measured 0.0000 in the band 0.975-1.05 at a
+        /// proven 70 deg/s spin), but rim peaks ON the shadow boundary, whose
+        /// pupil-side arm sits at ShadowRadiusUnits - t = 0.835, INSIDE the
+        /// picture, and that highlight is what made the crescent read as a crisp
+        /// moving edge. With the wall off the shadow is not visible at all: the
+        /// profile at r/R 0.86 differs between a 70 deg/s spin and rest by 0.013,
+        /// where a 0.95-strength shadow would read about 0.02. The boundary that
+        /// belongs to the defect is the APERTURE, not this constant - see the
+        /// coverage gate on rim in RadioNavUIOpaque.shader.
         /// </summary>
         public const double WallFullBelowUnits = 0.035;
 
         /// <summary>
         /// Travel beyond which the wall has left the rim and contributes nothing.
         /// 0.985 - 0.085 = 0.90: a lit edge that far into the picture is the
-        /// artefact, not the instrument.
+        /// artefact, not the instrument. This was briefly 0.001, chosen so the
+        /// wall would be dark before the ring could cross the aperture - the ring
+        /// is 3 screen pixels in half-width (3/R in aperture radii), so its outer
+        /// edge is at ShadowRadiusUnits + t + 3/R. That treated the symptom in the
+        /// wrong place (see WallFullBelowUnits) and cost the crescent its edge
+        /// highlight. The gate that actually does this job is the coverage
+        /// multiply on rim in RadioNavUIOpaque.shader: it clips the out-of-
+        /// aperture half while leaving the in-aperture half at full strength,
+        /// which is the split no single travel threshold can express.
         /// </summary>
         public const double WallDarkAboveUnits = 0.085;
 

@@ -439,10 +439,15 @@ namespace Tests
         [InlineData(-0.06, 0.045)]
         public void TheLitWallFadesAsThePupilLeavesTheAxis(double offset, double expected)
         {
-            // The wall keeps full strength for as long as it is still ON the rim -
-            // that is the ring the author chose (вариант д) - and is gone once it
-            // has left. The fade is keyed on the wall's reach, not on the raw
-            // displacement, so it tracks the geometry the shader actually draws.
+            // MEASURED 2026-10-02: the full-brightness band is now empty. The
+            // wall is drawn at ShadowRadiusUnits from the OBSTRUCTION CENTRE, so
+            // a displaced pupil carries the ring OUTWARD to ShadowRadiusUnits + t:
+            // at t = 0.015 the centre-line is already on the aperture rim, and past
+            // there it is painted onto the bezel - LensBacking has no mask and the
+            // canvas composite adds RGB regardless of alpha, which measured up to
+            // 0.0900 (23/255) over a 163-degree arc. Any positive band left the
+            // defect in place, so the wall is lit at rest only. The resting ring is
+            // the look the author chose and is unchanged.
             double light = SextantLuneMath.WallLight(0.09, offset, SextantLuneMath.MaxOffsetUnits);
             Assert.True(Math.Abs(light - expected) < 1e-9,
                 "offset " + offset + " gave " + light + ", expected " + expected);
@@ -468,8 +473,12 @@ namespace Tests
         {
             // Measured bound on the mitigation: the wall is fully dark by the
             // time its reach is 0.90, so it can never be lighting the middle of
-            // the picture. The shader fix is what removes the remaining band
-            // between 0.95 and 0.90, and that needs the bundle rebuild.
+            // the picture. The shader is what removes the remaining band between
+            // 0.95 and 0.90: the coverage multiply on rim clips the out-of-aperture
+            // half while leaving the crescent's own edge highlight at full
+            // strength (measured 2026-10-02 - anchoring the wall to the tube
+            // instead moved it to 0.985, under the opaque tube, and the crescent
+            // stopped reading as a moving edge altogether).
             Assert.True(SextantLuneMath.ShadowRadiusUnits - SextantLuneMath.WallDarkAboveUnits
                 <= 0.901, "the wall is still lit too far into the field");
             Assert.True(SextantLuneMath.WallFullBelowUnits < SextantLuneMath.WallDarkAboveUnits,
@@ -479,7 +488,7 @@ namespace Tests
         [Fact]
         public void TheLitWallCanNeverGoNegativeOrAddLight()
         {
-            // Zero light means "off"; a negative setting must never become a
+            // Zero light means off; a negative setting must never become a
             // positive glow.
             Assert.Equal(0d, SextantLuneMath.WallLight(0d, 0d, 0.15), 9);
             Assert.Equal(0d, SextantLuneMath.WallLight(-1d, 0d, 0.15), 9);

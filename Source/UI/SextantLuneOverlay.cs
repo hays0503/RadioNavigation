@@ -186,13 +186,20 @@ namespace UBOAT.Mods.RadioNavigation
             if (settingsTimer > 0f)
                 return;
             settingsTimer = SettingsPollSeconds;
-            float strengthBefore = strength;
-            double maxBefore = maxUnits;
-            double rimBefore = rimLight;
             ReadSettings();
-            if (Mathf.Abs(strengthBefore - strength) > 1e-4f || Math.Abs(maxBefore - maxUnits) > 1e-6
-                || Math.Abs(rimBefore - rimLight) > 1e-6)
-                Write();
+            // MEASURED 2026-10-02. ReadSettings pushes the RAW knob into the
+            // material; Write is what applies the WallLight attenuation. Gating
+            // Write on a settings change meant every poll tick landing on a
+            // stationary offset left the material at FULL brightness, and Tick
+            // also skips Write whenever the offset has not moved, so nothing put
+            // the attenuated value back. Frame simulation of the real call order:
+            // material 0.0900 while WallLight prescribed 0.0000, on 100% of frames
+            // above 4 deg/s - the C# fade never reached the shader at all. That
+            // is also why the earlier A/B measured exactly 0.000: it compared a
+            // material whose wall was pinned on against one pinned off, while
+            // the telemetry wallnow reported the pure function, not the material.
+            // Unconditional now.
+            Write();
         }
 
         private void ReadSettings()

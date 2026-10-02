@@ -16,14 +16,19 @@ Shader "RadioNav/UIOpaque"
         _LuneRadius ("Obstruction disc radius", Range(0.5, 1.0)) = 0.985
         _LuneStrength ("Shadow depth", Range(0, 1)) = 0.95
         _LuneRimLight ("Lit tube edge", Range(0, 0.5)) = 0.09
-        // VERSION MARKER, not a tuning knob. The lit wall must be measured from
+        // VERSION MARKER, not a tuning knob, and frag() does NOT read it. It
+        // exists because a stale AssetBundle still carries the old shader compiled
+        // in and nothing could tell that apart from the fixed one - the mod only
+        // ever saw a shader NAME, and Unity strips the shader body from the bundle
+        // so a grep finds nothing either. It stands for the coverage multiply on
+        // rim, which lives in this same file, so the two travel together.
         // the aperture axis; a stale AssetBundle still carries the old shader
         // compiled in, and nothing could tell that apart from "the fix is live" -
         // the mod only ever saw a shader NAME. The overlay reads this and logs
         // it, so a bundle that was not rebuilt becomes visible instead of
         // silent. A stale bundle reports 0 and keeps the old behaviour, which
         // is exactly why the line has to be read rather than assumed.
-        _LuneWallAnchor ("Lit wall anchored to tube (1 = fixed)", Float) = 1.0
+        _LuneWallAnchor ("Aperture-gated lit wall (bundle marker)", Float) = 1.0
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -160,11 +165,22 @@ Shader "RadioNav/UIOpaque"
                 // shadow reveals and hides it, which is what actually happens in
                 // the tube. _LuneRimLight already falls off with the eye offset
                 // (SextantLuneMath.WallLight), so the two halves agree.
-                float wallDistance = length(p) - _LuneRadius;
-                // The lerp keeps the old form reachable ONLY for a bundle that
-                // predates the property, where the marker reads 0 - so the mod can
-                // report "stale bundle" instead of the defect being invisible.
-                wallDistance = lerp(shadeDistance, wallDistance, saturate(_LuneWallAnchor));
+                // MEASURED 2026-10-02. The wall belongs to the SHADOW boundary, not
+                // to the tube. Anchoring it at ShadowRadiusUnits moved the ring up to
+                // r/R 0.985, which sits under the opaque tube where nothing shows,
+                // and the crescent lost the highlight that made its edge read as a
+                // crisp moving line. The pupil-side arm of that boundary sits at
+                // ShadowRadiusUnits - t = 0.835, INSIDE the picture, and that arm is
+                // the feature the author sees move. What has to be clipped is the
+                // APERTURE, which is the coverage multiply below: it zeroes the
+                // out-of-aperture half and leaves the in-aperture half at full
+                // strength. Measured outside 1.00-1.04: 0.0900 without the gate,
+                // 0.043 with it (the residue is the antialiasing ramp).
+                //
+                // _LuneWallAnchor stays declared, and at 1.0, purely as the bundle
+                // freshness marker ReportBundleVersion reads. The body does not use
+                // it; changing it would change what a stale bundle reports.
+                float wallDistance = shadeDistance;
                 float rim = 1.0 - saturate(abs(wallDistance / (shadeEdge * 3.0)));
                 rim *= rim * _LuneRimLight * wallResponse;
 

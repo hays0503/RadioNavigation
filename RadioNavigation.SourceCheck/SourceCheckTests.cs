@@ -4320,7 +4320,43 @@ namespace RadioNavigation.SourceCheck
                     else if (!Regex.IsMatch(write.ToString(),
                                  @"WallLight\([^;]*Offset\.Magnitude"))
                     {
-                        problems.Add("SextantLuneOverlay.Write must pass the live offset magnitude to WallLight - computing it and feeding a constant leaves the wall at full strength in the field");
+                    }
+                    // The PollSettings ordering (measured 2026-10-02). ReadSettings
+                    // pushes the RAW knob into the material; Write is what applies
+                    // WallLight. Gating Write on a settings change meant every poll
+                    // tick landing on a stationary offset left the material at FULL
+                    // brightness, and Tick also skips Write when the offset has not
+                    // moved, so nothing put the attenuated value back: frame
+                    // simulation of the real call order gave material 0.0900 while
+                    // WallLight prescribed 0.0000, on 100% of frames above 4 deg/s.
+                    // No unit test can see call ORDER, and both mutations of this
+                    // (raising WallDarkAboveUnits, re-gating this Write) passed all
+                    // 1353 tests before this check existed - the fifth occurrence in
+                    // this project of a change that every gate accepted.
+                    var poll = FindMethod(luneOverlay, "PollSettings");
+                    if (poll == null)
+                    {
+                        problems.Add("SextantLuneOverlay.PollSettings not found - the poll that re-pushes the wall after re-reading the knob is gone");
+                    }
+                    else
+                    {
+                        var pollText = poll.ToString();
+                        int writeAt = pollText.IndexOf("Write();", StringComparison.Ordinal);
+                        if (writeAt < 0)
+                        {
+                            problems.Add("SextantLuneOverlay.PollSettings never calls Write - the wall brightness is not re-applied after the knob is re-read");
+                        }
+                        else
+                        {
+                            // An if on the same line as the call is the shape that
+                            // reinstates the defect; a plain statement is the fix.
+                            int lineStart = pollText.LastIndexOf('\n', writeAt) + 1;
+                            var callLine = pollText.Substring(lineStart, writeAt - lineStart);
+                            if (callLine.IndexOf("if", StringComparison.Ordinal) >= 0)
+                            {
+                                problems.Add("SextantLuneOverlay.PollSettings must call Write() unconditionally - gating it on a settings change pinned the wall at FULL brightness on every poll tick that landed on a stationary offset");
+                            }
+                        }
                     }
                     // The bundle-version check must exist AND be called: a marker
                     // nobody reads is indistinguishable from no marker. Fourth
@@ -4481,30 +4517,34 @@ namespace RadioNavigation.SourceCheck
                     // way to keep that knee from coming back as a "simplification".
                     "wallResponse",
                     "0.2 + 0.8 * saturate(sceneLuma * 2.0)",
-                    // The lit wall belongs to the TUBE, so it is measured from the
-                    // aperture axis, NOT from the shadow's distance field. Deriving
-                    // it from shadeDistance made the wall travel with the pupil -
-                    // inwards to _LuneRadius - the eye offset, 0.835 of the radius
-                    // - so on a fast turn a bright edge swept across the middle of
-                    // the picture. That is the author's "the instrument displays
-                    // wrongly on fast mouse movement". Checked on the expression,
-                    // so renaming the variable cannot pass it, and the old form is
-                    // banned outright so it cannot come back as a "simplification".
-                    "float wallDistance = length(p) - _LuneRadius",
-                    // The version marker and its reader. Without them the whole
-                    // fix is unverifiable: the shader ships inside a COMPRESSED
-                    // bundle, so scanning the bundle from outside finds nothing
-                    // and a stale build is indistinguishable from a working one.
+                    // REVERSED 2026-10-02 by measurement. This used to demand the wall
+                    // be measured from the aperture axis, because deriving it from
+                    // shadeDistance carries the pupil and dragged a bright edge across
+                    // the field on a fast turn. Anchoring does stop that - but it moves
+                    // the ring to r/R 0.985, UNDER the opaque tube where nothing shows,
+                    // and it deletes the crescent own edge highlight, which sits on the
+                    // shadow boundary at ShadowRadiusUnits - t = 0.835, inside the
+                    // picture. Measured with the anchor off, at a proven 70 deg/s spin:
+                    // the radial profile at r/R 0.86 differs from rest by 0.013, where a
+                    // 0.95-strength shadow would read about 0.02 - the crescent is simply
+                    // not visible without the highlight. So the wall belongs to the SHADOW
+                    // boundary, and what has to be clipped is the APERTURE: the coverage
+                    // multiply required above zeroes the out-of-aperture half and leaves
+                    // the in-aperture half at full strength. Measured outside r/R 1.00-1.04:
+                    // 0.0900 without the multiply, 0.043 with it (antialiasing ramp).
+                    "float wallDistance = shadeDistance;",
+                    // The version marker. Without it the fix is unverifiable: the shader
+                    // ships inside a COMPRESSED bundle and Unity strips the shader BODY
+                    // from it, so scanning finds nothing and a stale build cannot be told
+                    // from a working one. Its DECLARATION is required by the check below,
+                    // not just the name: deleting the property while leaving a use of it in
+                    // the body keeps the name in the file and defeats a name-only check.
                     //
-                    // The DECLARATION is required, not just the name: deleting the
-                    // property while leaving its use in the body keeps the name in
-                    // the file, and a "the string is present" check passes - the
-                    // same declared-vs-used trap, third occurrence.
-                    "saturate(_LuneWallAnchor)",
+                    // REVERSED: the marker is no longer a switch the body reads. It is a
+                    // freshness stamp only, which is why no USE of it is required here and
+                    // why the reversal above is enforced by the exact expression instead.
                 })
                 {
-                    if (Regex.IsMatch(shader, @"float rim\s*=\s*1\.0\s*-\s*saturate\(abs\(shadeDistance"))
-                        problems.Add("The lit wall must not be derived from shadeDistance - that carries the pupil offset and drags the wall across the field on a fast turn");
                     if (shader.IndexOf(required, StringComparison.Ordinal) < 0)
                         problems.Add("Aperture shader must keep: " + required);
                 }
@@ -6685,7 +6725,6 @@ namespace RadioNavigation.SourceCheck
                         if (valueAt > tagAt && valueEnd > valueAt)
                             tag = body.Substring(valueAt + 1, valueEnd - valueAt - 1);
                     }
-
                     if (tag == null || tag.Length == 0)
                     {
                         problems.Add("pass '" + passName + "' declares no LightMode tag - "
@@ -6759,20 +6798,41 @@ namespace RadioNavigation.SourceCheck
         /// </summary>
         private static string ResolveStarFieldShaderPath()
         {
+            return ResolveTestUiShaderPath("RadioNavStarField.shader");
+        }
+
+        /// <summary>
+        /// Locates a mod shader inside the Unity source project, which lives
+        /// OUTSIDE this repo and is what BuildTestUIBundle actually compiles.
+        /// Overridable via UBOAT_TESTUI_PROJECT; returns null when the project
+        /// is absent so the caller skips on machines without it.
+        ///
+        /// Every shader the bundle compiles has to be reachable here. It used
+        /// to be star-field-only, and that gap shipped a real defect: the
+        /// aperture shader's Unity copy was left behind while the mod copy was
+        /// edited, the bundle was rebuilt from the stale one, and the freshness
+        /// marker still read 1 - because the marker is a Properties entry and
+        /// the marker was present in BOTH versions. See
+        /// ShaderCopies_InSyncWithTheUnityProject.
+        /// </summary>
+        private static string ResolveTestUiShaderPath(string fileName)
+        {
             var candidates = new List<string>();
             string project = Environment.GetEnvironmentVariable("UBOAT_TESTUI_PROJECT");
             if (!string.IsNullOrEmpty(project))
             {
                 candidates.Add(Path.Combine(project, "Assets", "Packages", "testui",
-                    "RadioNavStarField.shader"));
+                    fileName));
             }
-            candidates.Add(@"C:\Users\Sergey Pimenov\Desktop\TestUI\Assets\Packages\testui\RadioNavStarField.shader");
+            candidates.Add(Path.Combine(
+                @"C:\Users\Sergey Pimenov\Desktop\TestUI", "Assets", "Packages", "testui",
+                fileName));
             try
             {
                 candidates.Add(Path.GetFullPath(Path.Combine(ModCompiler.ModRoot,
                     "..", "..", "..", "..", "..", "..",
                     "Desktop", "TestUI", "Assets", "Packages", "testui",
-                    "RadioNavStarField.shader")));
+                    fileName)));
             }
             catch (ArgumentException) { }
 
@@ -6782,6 +6842,81 @@ namespace RadioNavigation.SourceCheck
                     return candidates[i];
             }
             return null;
+        }
+
+        /// <summary>
+        /// The bundle is built from the Unity project, not from Source/, so a
+        /// shader edited in the repo and never copied over is silently compiled
+        /// from the OLD file. Unity strips the shader BODY out of the bundle,
+        /// so no offline scan can see it: on 2026-10-02 a rebuild from the
+        /// stale aperture shader produced a bundle whose freshness marker read
+        /// "fixed" while the body was the previous version - the one failure
+        /// mode a marker is supposed to catch, caused by the marker itself.
+        ///
+        /// Rules:
+        ///  A) every shader the bundle compiles has a copy in the Unity project;
+        ///  B) it is byte-identical to the mod copy (line endings normalised,
+        ///     since a hand copy through an editor may flip them);
+        ///  C) if UBOAT_TESTUI_PROJECT is set but the file is missing that is a
+        ///     FAILURE, not a skip - otherwise pointing the gate at the wrong
+        ///     directory would turn it off silently;
+        ///  D) with no project at all the shader checks skip, matching the
+        ///     star-field gate, because the gate must run on machines that
+        ///     have no Unity install.
+        /// </summary>
+        [Fact]
+        public void ShaderCopies_InSyncWithTheUnityProject()
+        {
+            var problems = new List<string>();
+            string[] shared =
+            {
+                "RadioNavUIOpaque.shader",
+                "RadioNavStarField.shader",
+                "RadioNavInteriorOptics.shader",
+            };
+            bool anyProjectFound = false;
+            for (int i = 0; i < shared.Length; i++)
+            {
+                string modPath = Path.Combine(ModCompiler.ModRoot, "Source", "Shaders", shared[i]);
+                if (!File.Exists(modPath))
+                {
+                    problems.Add(shared[i] + " is missing from Source/Shaders - it must exist there, "
+                        + "the Unity copy is the build input and the repo copy is the one anyone edits");
+                    continue;
+                }
+
+                string unityPath = ResolveTestUiShaderPath(shared[i]);
+                if (unityPath == null)
+                {
+                    if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("UBOAT_TESTUI_PROJECT")))
+                    {
+                        problems.Add("UBOAT_TESTUI_PROJECT is set but " + shared[i]
+                            + " was not found under it - fix the variable or the asset, do not let the "
+                            + "check fall through to a skip");
+                    }
+                    continue;
+                }
+
+                anyProjectFound = true;
+                string modText = File.ReadAllText(modPath).Replace("\r\n", "\n");
+                string unityText = File.ReadAllText(unityPath).Replace("\r\n", "\n");
+                if (modText != unityText)
+                {
+                    problems.Add(shared[i] + " differs between the mod and the Unity project that builds the "
+                        + "bundle: mod=" + modPath + " unity=" + unityPath
+                        + ". The bundle is compiled from the Unity copy and Unity strips the shader body, "
+                        + "so a stale copy ships invisibly while the freshness marker still reads 1. "
+                        + "Copy the mod file over before rebuilding.");
+                }
+            }
+
+            if (!anyProjectFound && problems.Count == 0)
+            {
+                // Rule D: no Unity project on this machine - skip, do not fail.
+                return;
+            }
+
+            Assert.True(problems.Count == 0, string.Join("\n", problems));
         }
 
         /// Native map points gate (author 2026-11-05): every mod marker must
