@@ -2,7 +2,7 @@
 
 > Статус: **Proposed** (2026-08-19); исходный набор дат не подтверждён полностью.
 >
-> Связи: `STAR_SKY_PLAN.md`, `Source/Logic/StarSkyPhase0Probe.cs`, ADR-021, ADR-024
+> Связи: `docs/plans/STAR_SKY_PLAN.md`, `Source/Logic/StarSkyPhase0Probe.cs`, ADR-021, ADR-024
 
 ## Уточнение 2026-10-04
 
@@ -21,7 +21,7 @@ Production-каталог, StarsMesh, Meeus/топоцентрическая Л�
 
 ## Контекст
 
-- `STAR_SKY_PLAN.md:10` Phase0 требует 1 вечер логов: `weather.Sky.MoonAltitude/MoonAzimuth` vs Stellarium, `SunAltitude`, `farClipPlane` мостик/перископ/бинокль, `Shader.Find("Sprites/Default")`, вода `ZTest`, `GeoPositionConverter` север.
+- `docs/plans/STAR_SKY_PLAN.md:10` Phase0 требует 1 вечер логов: `weather.Sky.MoonAltitude/MoonAzimuth` vs Stellarium, `SunAltitude`, `farClipPlane` мостик/перископ/бинокль, `Shader.Find("Sprites/Default")`, вода `ZTest`, `GeoPositionConverter` север.
 - `ADR-018` `CameraResolver.SafeRadius 3900<0.9*farClip:150` — без живого `farClip` нельзя выбрать `R`.
 - Принцип: код ради кода не генерим — Phase0 только диагностика, без `StarCatalog.cs`/`AstroMath.cs`.
 

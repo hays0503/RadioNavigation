@@ -61,7 +61,7 @@
 ## Проверки
 
 - Offline (2026-10-05): **1411 PASS / 0 FAIL**, в том числе 32 новых
-  behavioral tests в `Tests/SextantSaveTests.cs` — round-trip всех слотов/полей,
+  behavioral tests в `Dev/Tests/SextantSaveTests.cs` — round-trip всех слотов/полей,
   масок, курса, Unicode/культуры; повреждения, будущая версия, границы и
   точное владение ключами.
 - Wiring: `AstroNavigation_IsSavedPerCampaignAndRestoredWithoutRecalculation`
@@ -75,11 +75,11 @@
   перезапись drag-позиции при первом принятии точки. После восстановления кода
   полный behavioral/SourceCheck прогон зелёный; нулевой набор тестов не считается PASS.
 - Физический drag/ластик остаются отдельной открытой приёмкой
-  (`../MAP_MARKERS_PLAN.md`); прямой map API не доказывает физический pointer.
+  (`plans/MAP_MARKERS_PLAN.md`); прямой map API не доказывает физический pointer.
 
 ## Живая приёмка (2026-10-05)
 
-Перезапуск через `run-game.ps1 -SkipBuild` после clean csc/PVS; код действительно
+Перезапуск через `Tools/run-game.ps1 -SkipBuild` после clean csc/PVS; код действительно
 скомпилирован игрой. Все имена тестовых сейвов имеют суффикс `20261004` — дата
 начала работы. Пустая исходная worksheet не заменяется тестовыми наблюдениями.
 

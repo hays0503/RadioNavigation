@@ -16,7 +16,7 @@ Compiled UBOAT/mod knowledge base (free-token window 2026-08-24).
 Для действующих правил **мода**, а не исходного API:
 
 - `../docs/CAMERA_GUIDE.md` — текущий PIP, интерьерный culling, поза и деплой;
-- `../SEXTANT_PLAN.md` — контракт секстанта и журнал приёмки (§16.24–16.25);
+- `../docs/plans/SEXTANT_PLAN.md` — контракт секстанта и журнал приёмки (§16.24–16.25);
 - `../docs/live-diagnostics.md` — MCP, память, восстановление настроек и границы
   доказательства.
 

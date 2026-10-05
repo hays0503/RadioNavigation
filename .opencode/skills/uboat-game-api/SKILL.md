@@ -30,4 +30,4 @@ Compiled knowledge lives in `knowledge/` at the mod root. ALWAYS check it before
 ## Rules
 
 - Verify a signature in knowledge/ before using it; if missing, read game source once and ADD the finding to the relevant KB file.
-- Never re-derive facts already written here (see STAR_SKY_PLAN.md §3 for sky/camera verified facts).
+- Never re-derive facts already written here (see docs/plans/STAR_SKY_PLAN.md §3 for sky/camera verified facts).

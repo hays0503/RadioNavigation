@@ -1,7 +1,7 @@
 # ADR-022: Созвездия — линии из Stellarium index.json
 
 > Статус: Accepted (2026-08-19)  
-> Связи: `STAR_SKY_PLAN.md`, `Source/Data/ConstellationLines.cs`, `Source/Logic/ConstellationMesh.cs`, `ADR-021`
+> Связи: `docs/plans/STAR_SKY_PLAN.md`, `Source/Data/ConstellationLines.cs`, `Source/Logic/ConstellationMesh.cs`, `ADR-021`
 
 ## Контекст
 

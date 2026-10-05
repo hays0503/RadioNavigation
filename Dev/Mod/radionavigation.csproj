@@ -1,0 +1,102 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>radionavigation</AssemblyName>
+    <RootNamespace>UBOAT.Mods.RadioNavigation</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <OutputType>Library</OutputType>
+    <OutputPath>..\..\artifacts\ide\$(Configuration)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- F88: removed dead NoWarn (CS8600..CS8625) — Nullable analysis is not
+         enabled, so the suppressions never matched anything. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <!-- F10: the game path is a single MSBuild property now; override it with
+       `-p:GamePath=...`, the UBOAT_GAME_PATH env var, or the Steam default. -->
+  <PropertyGroup>
+    <GamePath Condition="'$(GamePath)' == ''">$([System.Environment]::GetEnvironmentVariable('UBOAT_GAME_PATH'))</GamePath>
+    <GamePath Condition="'$(GamePath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\UBOAT</GamePath>
+    <GameManaged>$(GamePath)\UBOAT_Data\Managed</GameManaged>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\Source\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameManaged)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(GameManaged)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameManaged)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(GameManaged)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GameManaged)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(GameManaged)\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(GameManaged)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(GameManaged)\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(GameManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(GameManaged)\UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameManaged)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.uboat.dependencies">
+      <HintPath>$(GameManaged)\com.uboat.dependencies.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.uboat.game">
+      <HintPath>$(GameManaged)\com.uboat.game.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.uboat.modapi">
+      <HintPath>$(GameManaged)\com.uboat.modapi.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(GameManaged)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.uboat.rendering">
+      <HintPath>$(GameManaged)\com.uboat.rendering.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.unity.postprocessing.Runtime">
+      <HintPath>$(GameManaged)\com.unity.postprocessing.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="com.playway.water.Runtime">
+      <HintPath>$(GameManaged)\com.playway.water.Runtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(GameManaged)\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

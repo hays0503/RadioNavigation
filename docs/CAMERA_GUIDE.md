@@ -5,7 +5,7 @@
 2026-09-17…19:
 13 контролируемых A/B, декомпилят `com.dws.pipeline.Runtime.dll` (ilspycmd),
 исходники игры (`C:\code\projects\uboat`), live-замеры стенда «Трубы».
-Детали расследования — `SEXTANT_PLAN.md` §16; здесь только нормы и механизмы.
+Детали расследования — `docs/plans/SEXTANT_PLAN.md` §16; здесь только нормы и механизмы.
 
 Термины — в §16. Числа старого стенда «Трубы» — датированные результаты, не
 универсальные значения для всех отсеков/разрешений. Границы инструментов и
@@ -27,7 +27,7 @@
 - **История:** на open-edge сбрасываются обе PIP (`ResetHistory` + флаг reset),
   не главный вид. При быстрых поворотах отдельно действует rate-gated сброс
   main и обеих PIP; эти механизмы нельзя смешивать.
-- **Доказательства:** `SEXTANT_PLAN.md` §16.23 (parent frame), §16.24 (первый
+- **Доказательства:** `docs/plans/SEXTANT_PLAN.md` §16.23 (parent frame), §16.24 (первый
   кадр: 24/24 записанных B-открытий на 30 fps), §16.25 (лампа: PIP 0→12→0,
   main 1→1→1; 12 checkpoints). Обычный проход через люк остаётся pending.
 
@@ -251,16 +251,16 @@ RT-как-финал (Overlay UI после поста) → неси полны�
 
 ## 12. Build / test / deploy
 
-Raw `csc` (`build.ps1`) + **блокирующий PVS-гейт**; C# **7.0** + игровые дефайны
+Raw `csc` (`Tools/build.ps1`) + **блокирующий PVS-гейт**; C# **7.0** + игровые дефайны
 без `DEBUG` (`default;` = CS8107 → битый assembly; `const bool`-гейты = CS0162
-→ `static readonly`); `SourceCheck` (neural-slop guard, 98); `tests.ps1`
-(свой раннер, 1379); `analyze.ps1` (RN0001–RN0010 + IDE-аудит, complexity ≤15 —
+→ `static readonly`); `SourceCheck` (neural-slop guard, 98); `Tools/tests.ps1`
+(свой раннер, 1379); `Tools/analyze.ps1` (RN0001–RN0010 + IDE-аудит, complexity ≤15 —
 экстрактить); анализаторы 68 PASS. Снимок счётчиков — 2026-10-04.
 
-Деплой — `run-game.ps1` / `deploy-radionav.ps1`: touch источников и рестарт,
+Деплой — `Tools/run-game.ps1` / `Tools/deploy-radionav.ps1`: touch источников и рестарт,
 чтобы **игра сама скомпилировала Source**. Не копировать локальную DLL в `Temp`:
 cached assembly load может вернуть null и тихо пропустить инициализацию.
-`run-game.ps1` — стендовый скрипт: требует ровно McpBridge + RadioNavigation в
+`Tools/run-game.ps1` — стендовый скрипт: требует ровно McpBridge + RadioNavigation в
 modlist, останавливает игру и quick-load'ит последний сейв. Даже `-NoRestart`
 останавливает текущий процесс; это не безопасный dry-run. В документационном
 проходе скрипт запуска игры не нужен. Hot-reload не является рабочим деплоем.

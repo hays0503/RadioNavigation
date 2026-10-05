@@ -82,7 +82,8 @@ def segments(env, threshold):
 
 
 def main():
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).with_name("rec.wav")
+    default = Path(__file__).resolve().parents[2] / "artifacts" / "audio" / "pause_check" / "rec.wav"
+    path = Path(sys.argv[1]) if len(sys.argv) > 1 else default
     if not path.exists():
         raise SystemExit(f"no file: {path}")
     mono, rate = load_wav(path)

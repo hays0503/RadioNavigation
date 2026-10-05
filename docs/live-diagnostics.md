@@ -73,7 +73,7 @@ Invoke-RestMethod 'http://127.0.0.1:28777/render/snapshot?limit=8'
 ## 4. Камеры секстанта: действующие инварианты
 
 Подробности — [CAMERA_GUIDE.md](CAMERA_GUIDE.md), доказательства —
-[SEXTANT_PLAN.md](../SEXTANT_PLAN.md) §16.23–16.25.
+[SEXTANT_PLAN.md](plans/SEXTANT_PLAN.md) §16.23–16.25.
 
 | Проверка | Действующее правило / подтверждённый результат |
 |---|---|

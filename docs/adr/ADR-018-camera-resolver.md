@@ -1,7 +1,7 @@
 # ADR-018: CameraResolver — общий резолвер камеры для маяков и звезды
 
 > Статус: Accepted (2026-08-19)  
-> Связи: `LighthouseBeamGlow.cs:361` `ResolveCamera`, `Source/Logic/CameraResolver.cs`, `STAR_SKY_PLAN.md:76`, `LighthouseBeamGlow.cs:74` статика, `ADR-017`
+> Связи: `LighthouseBeamGlow.cs:361` `ResolveCamera`, `Source/Logic/CameraResolver.cs`, `docs/plans/STAR_SKY_PLAN.md:76`, `LighthouseBeamGlow.cs:74` статика, `ADR-017`
 
 ## Контекст
 

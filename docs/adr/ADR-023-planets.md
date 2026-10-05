@@ -1,7 +1,7 @@
 # ADR-023: Планеты в STAR_SKY
 
 > Статус: Accepted (2026-08-19)  
-> Связи: `STAR_SKY_PLAN.md`, `Source/Logic/AstroMath.cs`, `Source/Logic/PlanetRenderer.cs`
+> Связи: `docs/plans/STAR_SKY_PLAN.md`, `Source/Logic/AstroMath.cs`, `Source/Logic/PlanetRenderer.cs`
 
 ## Контекст
 

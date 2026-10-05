@@ -1,4 +1,5 @@
 # Build output
+/artifacts/
 radionavigation.dll
 radionavigation.pdb
 radionavigation.deps.json

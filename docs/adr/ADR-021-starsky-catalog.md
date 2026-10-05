@@ -1,7 +1,7 @@
 # ADR-021: StarSky — точное звёздное небо для астронавигации
 
 > Статус: Accepted (2026-08-19)  
-> Связи: `STAR_SKY_PLAN.md`, `CELESTIAL_REALISM_PLAN.md`, `Source/Logic/AstroMath.cs`, `Source/Logic/CelestialEphemeris.cs`, `Source/Data/StarCatalog.cs`, `Source/Logic/StarsMesh.cs`
+> Связи: `docs/plans/STAR_SKY_PLAN.md`, `docs/plans/CELESTIAL_REALISM_PLAN.md`, `Source/Logic/AstroMath.cs`, `Source/Logic/CelestialEphemeris.cs`, `Source/Data/StarCatalog.cs`, `Source/Logic/StarsMesh.cs`
 
 ## Дополнение: действующая реализация (2026-10-04)
 
@@ -31,7 +31,7 @@
   каталог → эфемериды → камера → измерение. Офлайн-тесты и GPU-приёмка cloud
   stage не заменяют ещё открытую внешнюю эстетическую приёмку звёзд/PSF.
 
-Контракты и ограничения — `CELESTIAL_REALISM_PLAN.md`,
+Контракты и ограничения — `docs/plans/CELESTIAL_REALISM_PLAN.md`,
 `docs/sextant-optical-visuals.md`, `docs/sky-vs-clouds.md`; свежие счётчики — `DOCS.md`.
 
 ## Исходная запись решения (2026-08-19)

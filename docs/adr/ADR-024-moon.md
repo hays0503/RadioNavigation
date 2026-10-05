@@ -1,13 +1,13 @@
 # ADR-024: Луна в STAR_SKY
 
 > Статус: Accepted (2026-08-19)  
-> Связи: `STAR_SKY_PLAN.md`, `CELESTIAL_REALISM_PLAN.md`, `Source/Logic/AstroMath.cs`, `Source/Logic/CelestialEphemeris.cs`, `Source/Logic/MoonDiscRenderer.cs`
+> Связи: `docs/plans/STAR_SKY_PLAN.md`, `docs/plans/CELESTIAL_REALISM_PLAN.md`, `Source/Logic/AstroMath.cs`, `Source/Logic/CelestialEphemeris.cs`, `Source/Logic/MoonDiscRenderer.cs`
 
 ## Дополнение: действующая реализация (2026-10-04)
 
 Луна реализована; **low-precision элементы, пятый planet-quad и системное время
 ниже — исходная версия 2026-08-19, не текущая архитектура**. Подход заменён P2
-в `CELESTIAL_REALISM_PLAN.md`, дата исходного Accepted сохранена.
+в `docs/plans/CELESTIAL_REALISM_PLAN.md`, дата исходного Accepted сохранена.
 
 - `AstroMath.MoonRaDec` — усечённый ряд Meeus гл.47 (долгота, широта, нутация),
   а не прежняя кеплерова база и не полный ELP2000. Оценка порядка 0.05° в коде

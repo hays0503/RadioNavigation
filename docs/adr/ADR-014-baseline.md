@@ -1,7 +1,7 @@
 # ADR-014: Baseline 182 + farClip — точка отката для сопровождаемости
 
 > Статус: Accepted (2026-08-19)  
-> Связи: `SAD/11_Testing_Strategy.md`, `SAD/03_Current_Architecture.md`, `STAR_SKY_PLAN.md:10`, `refactoring-plan/hypothesis/INDEX.md`, `graphify-out/GRAPH_REPORT.md`
+> Связи: `SAD/11_Testing_Strategy.md`, `SAD/03_Current_Architecture.md`, `docs/plans/STAR_SKY_PLAN.md:10`, `refactoring-plan/hypothesis/INDEX.md`, `graphify-out/GRAPH_REPORT.md`
 
 ## Контекст
 
@@ -9,7 +9,7 @@
 - `radionavigation.csproj` `netstandard2.0` `Release`+`Debug` собирается без ошибок ( warnings `MSB3277` по `Assembly-CSharp` ожидаемы).
 - `graphify-out/GRAPH_REPORT.md:13` от `8b3021fa` 3473/4293/351 — помечен как свежий (`git rev-parse HEAD` == `8b3021fa`).
 - Нет точки отката до `Ф1-Щит` — любой фикс без baseline = регресс вслепую (god `SonneController 49` `GRAPH_REPORT:365`).
-- Требуется зафиксировать `farClipPlane` + `LerpValue` формулу `STAR_SKY_PLAN.md:55` до `Ф4 CameraResolver`.
+- Требуется зафиксировать `farClipPlane` + `LerpValue` формулу `docs/plans/STAR_SKY_PLAN.md:55` до `Ф4 CameraResolver`.
 
 ## Решение
 
