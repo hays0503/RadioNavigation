@@ -201,6 +201,54 @@ namespace UBOAT.Mods.RadioNavigation
             result.RightViewImage.rectTransform.offsetMax = Vector2.zero;
             result.RightViewImage.uvRect = new Rect(0.5f, 0f, 0.5f, 1f);
 
+            // Subtle glass contamination is a separate UGUI layer: it cannot
+            // alter the PIP, shader, aperture geometry, or sight-line layout.
+            GameObject grimeGo = new GameObject("OpticsGrime", typeof(Image));
+            grimeGo.transform.SetParent(pipGo.transform, false);
+            result.OpticsGrimeImage = grimeGo.GetComponent<Image>();
+            result.OpticsGrimeTexture = SextantSprites.CreateOpticsGrimeTexture();
+            Sprite grimeSprite = Sprite.Create(result.OpticsGrimeTexture,
+                new Rect(0f, 0f, result.OpticsGrimeTexture.width, result.OpticsGrimeTexture.height),
+                new Vector2(0.5f, 0.5f));
+            result.OwnedSprites.Add(grimeSprite);
+            result.OpticsGrimeImage.sprite = grimeSprite;
+            result.OpticsGrimeImage.color = Color.white;
+            result.OpticsGrimeImage.raycastTarget = false;
+            Stretch(result.OpticsGrimeImage.rectTransform);
+            result.OpticsGrimeImage.gameObject.SetActive(PlayerPrefs.GetInt("RadioNav.OpticsGrime", 1) != 0);
+
+            const int moteSize = 8;
+            var moteTex = new Texture2D(moteSize, moteSize, TextureFormat.RGBA32, false);
+            moteTex.name = "RadioNavSextantOpticsMote";
+            moteTex.hideFlags = HideFlags.DontSave;
+            var motePixels = new Color32[moteSize * moteSize];
+            for (int y = 0; y < moteSize; y++)
+            for (int x = 0; x < moteSize; x++)
+            {
+                float dx = (x + 0.5f - moteSize * 0.5f) / (moteSize * 0.5f);
+                float dy = (y + 0.5f - moteSize * 0.5f) / (moteSize * 0.5f);
+                float a = Mathf.Clamp01((1f - Mathf.Sqrt(dx * dx + dy * dy)) * 0.65f);
+                motePixels[y * moteSize + x] = new Color32(210, 205, 185, (byte)Mathf.RoundToInt(a * 255f));
+            }
+            moteTex.SetPixels32(motePixels);
+            moteTex.Apply(false, true);
+            result.OpticsMoteTexture = moteTex;
+            Sprite moteSprite = Sprite.Create(moteTex, new Rect(0f, 0f, moteSize, moteSize), new Vector2(0.5f, 0.5f));
+            result.OwnedSprites.Add(moteSprite);
+            result.OpticsMotes = new Image[SextantOpticsProfile.MoteCount];
+            for (int i = 0; i < result.OpticsMotes.Length; i++)
+            {
+                GameObject moteGo = new GameObject("OpticsMote" + i, typeof(Image));
+                moteGo.transform.SetParent(pipGo.transform, false);
+                Image mote = moteGo.GetComponent<Image>();
+                mote.sprite = moteSprite;
+                mote.color = new Color(1f, 0.96f, 0.84f, 0.16f);
+                mote.raycastTarget = false;
+                AnchorCenter(mote.rectTransform, 3f + (i % 3), 3f + (i % 3));
+                mote.gameObject.SetActive(PlayerPrefs.GetInt("RadioNav.OpticsMotes", 1) != 0);
+                result.OpticsMotes[i] = mote;
+            }
+
             // Opaque view material (bundle shader RadioNav/UIOpaque, Blend
             // One Zero): the game's post stack writes alpha < 1 into the
             // RTs and the stock UI shader blends the black lens backing

@@ -34,7 +34,6 @@ namespace UBOAT.Mods.RadioNavigation
         private static readonly int RadiusId = Shader.PropertyToID("_LuneRadius");
         private static readonly int StrengthId = Shader.PropertyToID("_LuneStrength");
         private static readonly int RimLightId = Shader.PropertyToID("_LuneRimLight");
-
         private Material material;
         private SextantLuneState state = SextantLuneState.Rest;
         private SextantAimRateSample rate;
@@ -49,6 +48,7 @@ namespace UBOAT.Mods.RadioNavigation
         private float logTimer;
         private double lastYawRate;
         private double lastPitchRate;
+        private bool bundleHasCoverageFix;
 
         /// <summary>Current eye offset (aperture radii) — MCP/reflection probe.</summary>
         internal SextantLuneOffset Offset
@@ -71,20 +71,18 @@ namespace UBOAT.Mods.RadioNavigation
             Write();
         }
 
-        /// <summary>Shader property carrying the lit-wall fix version.</summary>
+        /// <summary>Legacy shader version marker for the lit-wall revision.</summary>
         private static readonly int WallAnchorId = Shader.PropertyToID("_LuneWallAnchor");
 
+        /// <summary>Shader property proving the inward-only coverage revision.</summary>
+        private static readonly int ApertureCoverageVersionId =
+            Shader.PropertyToID("_ApertureCoverageVersion");
+
         /// <summary>
-        /// Reports whether the shader actually in the AssetBundle carries the
-        /// lit-wall fix.
-        ///
-        /// This exists because the fix cannot be verified any other way. The
-        /// shader ships inside the compiled bundle, the mod only ever saw a shader
-        /// NAME, and scanning the bundle from outside finds nothing because it is
-        /// compressed - so a bundle that was never rebuilt looks exactly like a
-        /// working one. Measured: with the stale shader the wall still adds up to
-        /// 0.085 luminance inside the field, and the C# fade alone cannot remove
-        /// it. The only honest evidence either way is this property.
+        /// Reports both the legacy lit-wall marker and the distinct aperture
+        /// coverage revision marker. Unity strips the shader body from the
+        /// AssetBundle, so the distinct property is required to tell whether the
+        /// newly approved coverage fix is actually loaded.
         /// </summary>
         private void ReportBundleVersion()
         {
@@ -95,18 +93,36 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 bundleHasFix = false;
                 Debug.LogWarning("[RadioNav][Sextant] the aperture shader in the "
-                    + "AssetBundle has NO _LuneWallAnchor property: the bundle is "
-                    + "STALE, the lit wall still rides the pupil, and the arc in the "
-                    + "field on fast turns is expected. Rebuild Bundles/testui in "
-                    + "the Unity project.");
+                    + "AssetBundle has NO legacy _LuneWallAnchor property. Rebuild "
+                    + "Bundles/testui in the Unity project.");
+            }
+            else
+            {
+                anchored = material.GetFloat(WallAnchorId);
+                bundleHasFix = anchored >= 0.5f;
+                if (!bundleHasFix)
+                {
+                    Debug.LogWarning("[RadioNav][Sextant] legacy _LuneWallAnchor = 0 "
+                        + "in the bundled shader. Rebuild Bundles/testui.");
+                }
+            }
+
+            if (!material.HasProperty(ApertureCoverageVersionId))
+            {
+                bundleHasCoverageFix = false;
+                Debug.LogWarning("[RadioNav][Sextant] the aperture shader in the "
+                    + "AssetBundle has NO _ApertureCoverageVersion property: the "
+                    + "bundle predates inward-only aperture coverage. Rebuild "
+                    + "Bundles/testui in the Unity project.");
                 return;
             }
-            anchored = material.GetFloat(WallAnchorId);
-            bundleHasFix = anchored >= 0.5f;
-            if (!bundleHasFix)
+
+            bundleHasCoverageFix = material.GetFloat(ApertureCoverageVersionId) >= 0.5f;
+            if (!bundleHasCoverageFix)
             {
-                Debug.LogWarning("[RadioNav][Sextant] _LuneWallAnchor = 0 in the "
-                    + "bundled shader: the bundle is STALE. Rebuild Bundles/testui.");
+                Debug.LogWarning("[RadioNav][Sextant] _ApertureCoverageVersion = 0 "
+                    + "in the bundled shader: the bundle predates inward-only "
+                    + "aperture coverage. Rebuild Bundles/testui.");
             }
         }
 
@@ -269,11 +285,12 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             logTimer = 1f;
             Debug.Log(string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "{0} LUNE offset={1} hold={2:F2}s rate={3:F1},{4:F1}deg/s max={5:F3} full={6:F0} dead={7:F2} rim={8:F3} probe={9} strength={10:F2} wallfix={11} wallnow={12:F4}",
+                "{0} LUNE offset={1} hold={2:F2}s rate={3:F1},{4:F1}deg/s max={5:F3} full={6:F0} dead={7:F2} rim={8:F3} probe={9} strength={10:F2} wallfix={11} wallnow={12:F4} aperturefix={13}",
                 LogPrefix, state.Offset, state.ReleaseHoldSeconds, lastYawRate, lastPitchRate,
                 maxUnits, rateFull, deadZone, rimLight, probePercent, strength,
                 bundleHasFix ? 1 : 0,
-                SextantLuneMath.WallLight(rimLight, state.Offset.Magnitude, maxUnits)));
+                SextantLuneMath.WallLight(rimLight, state.Offset.Magnitude, maxUnits),
+                bundleHasCoverageFix ? 1 : 0));
         }
     }
 }

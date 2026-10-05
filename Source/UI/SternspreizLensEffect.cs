@@ -267,10 +267,13 @@ namespace UBOAT.Mods.RadioNavigation
             double limitingMag = StarSkyConditions.LimitingMagnitude(utc, lat, lon);
             double adaptation = StarsMesh.CurrentAdaptation;
 
+            LensCamera camera = BuildCamera();
+            float tiltDeg = SternspreizLensTilt.AngleDeg(Time.unscaledTime);
             lastStarCount = SternspreizLensField.CollectVisibleStars(lat, lstDeg, jd,
-                (float)limitingMag, fogginess, adaptation, MaxStars, stars);
+                (float)limitingMag, fogginess, adaptation, camera, LengthDeg,
+                BaselineThicknessDeg, tiltDeg, MaxStars, stars);
 
-            RebuildStreakMesh(SternspreizLensTilt.AngleDeg(Time.unscaledTime));
+            RebuildStreakMesh(tiltDeg);
 
             lastRebuildFrame = Time.frameCount;
             lastCamPos = pipCamera.transform.position;
@@ -311,6 +314,8 @@ namespace UBOAT.Mods.RadioNavigation
                 Rx = t.right.x, Ry = t.right.y, Rz = t.right.z,
                 Ux = t.up.x, Uy = t.up.y, Uz = t.up.z,
                 Fx = t.forward.x, Fy = t.forward.y, Fz = t.forward.z,
+                TanHalfFovX = Mathf.Tan(pipCamera.fieldOfView * 0.5f * Mathf.Deg2Rad)
+                    * pipCamera.aspect,
                 TanHalfFovY = Mathf.Tan(pipCamera.fieldOfView * 0.5f * Mathf.Deg2Rad)
             };
         }

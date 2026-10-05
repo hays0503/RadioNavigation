@@ -1,4 +1,4 @@
-"""Has the AssetBundle been rebuilt with the lit-wall fix?
+"""Has the AssetBundle been rebuilt with inward-only aperture coverage?
 
 Two facts that shape this checker, both established by probing the real file:
 
@@ -9,9 +9,10 @@ Two facts that shape this checker, both established by probing the real file:
      block survives, with the variable names and their display names.
 
 So the body cannot be verified from the bundle, and any checker that looks for
-`wallDistance = length(p)` there is looking for something Unity removed. What
-IS verifiable offline is the property declaration `_LuneWallAnchor`: it is in
-the Properties block now, and it is absent from a bundle built before the fix.
+`smoothstep` there is looking for something Unity removed. The older
+`_LuneWallAnchor` marker existed in both shader revisions and cannot prove this
+change. What IS verifiable offline is the exact coverage-version display label
+in the Properties block.
 
 The control property matters as much as the marker. If the control is missing
 too, the scan method does not work on this file and a zero for the marker means
@@ -21,8 +22,8 @@ reporting a bare absence.
 import re
 import sys
 
-CONTROL = "_LuneRimLight"      # in the shader today; must be in any good build
-MARKER = "_LuneWallAnchor"     # added by the lit-wall fix
+CONTROL = "_LuneRimLight"  # in the shader today; must be in any good build
+MARKER = "Inward-only aperture coverage (bundle marker)"
 
 
 def count(blob, token):
@@ -46,17 +47,16 @@ def main(path):
         return 2
     if marker == 0:
         print("\n  RESULT: STALE BUNDLE. The shader properties are readable and")
-        print("  the lit-wall marker is not there, so the bundle predates the")
-        print("  fix and the game is still running the old shader - the lit wall")
-        print("  still rides the pupil and the arc in the field is expected.")
+        print("  the coverage-version marker is not there, so the bundle")
+        print("  predates the inward-only aperture coverage change.")
         print("\n  To fix: in the Unity project (TestUI, 2021.3.33f1) run")
         print("  Assets/Editor/BuildTestUIBundle.cs -> menu 'Build/Build TestUI")
         print("  Bundle', then re-run this check, then restart the game.")
         return 1
-    print("\n  RESULT: the bundle carries the fixed shader. Start the game and")
-    print("  confirm in the log: the LUNE line must show wallfix=1 (and no")
-    print("  'bundle is STALE' warning). The log is the in-game proof; this is")
-    print("  only the offline one.")
+    print("\n  RESULT: the bundle carries the inward-only coverage revision.")
+    print("  Restart the game and confirm the LUNE line shows aperturefix=1")
+    print("  (and no stale-coverage warning). This is the offline proof;")
+    print("  the in-game log confirms that this bundle is actually loaded.")
     return 0
 
 

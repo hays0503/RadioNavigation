@@ -1,23 +1,32 @@
 # Testing Strategy — RadioNavigation Mod
 
-> **Save-приёмка 2026-10-05:** codec v1 добавил 32 behavioral cases и два
-> SourceCheck-гейта; пять save-мутаций пойманы ожидаемыми тестами/гейтами.
-> Реальные save/reload/изоляция, продолжение, drag-hidden с линией и возврат
-> кампании проверены (`docs/astro-save.md`). Это не физический drag/ластик;
-> счётчики полного рабочего дерева в receipt не являются процентом покрытия.
-
-> **⚠️ Baseline (2026-08-19, ADR-014) → актуализировано 2026-08-24:** Инфраструктура тестов РЕАЛИЗОВАНА (F22): xunit 2.9 + собственный раннер (`Tests/Runner`), **263 теста PASS** (`powershell -ExecutionPolicy Bypass -File tests.ps1`; история роста: baseline-182 `8b3021fa` → 232 → 253 → 255 → 257 → 260 → 263, детали в AGENTS.md). `dotnet build -c Release -c Debug` 0 errors. ADR-007 «Deferred» (F45) — полный охват интеграционных/производительных тестов целевой (см. `docs/adr/ADR-014-baseline.md`). Секции 3.x — целевые примеры (могут не совпадать с `Tests/`).
+> **Актуально 2026-10-05:** xunit 2.9 + собственный раннер `Tests/Runner`,
+> **1411 PASS / 0 FAIL**; анализаторы **68 PASS**, SourceCheck **100 PASS**.
+> ADR-014 baseline — 182, не текущий счётчик. Количество PASS не равно coverage.
+> Runtime-мод проверяется raw csc/PVS через `build.ps1`, а игра компилирует Source
+> самостоятельно. Секции 3.x и 7.x ниже — **исторические иллюстрации NUnit/API,
+> не исполняемые тесты текущего проекта**; реальный контракт читать в Tests.
 
 ## 1. Testing Overview
 
 | Test Type | Coverage Target | Current | Priority |
 |-----------|-----------------|---------|----------|
-| Unit Tests | >60% | 263 PASS (baseline ADR-014 → рост 2026-08-22/23; core logic + DSP без Unity) | High |
-| Integration Tests | >80% | Частично (DspPipeline, StationScheduler) | Medium |
-| Manual Testing | 100% | Partial (см. Фазу live-валидации) | Medium |
-| Performance Tests | Baseline + 10% | None | Low |
+| Unit Tests | >60% — историческая цель | 1411 PASS, pure logic + DSP; текущий % не измерялся | High |
+| Integration Tests | >80% — историческая цель | Offline DSP/контракты + отдельная живая приёмка Unity/игры | Medium |
+| Manual Testing | сценарии с явными постусловиями | Partial; lamp/open-frame проверены, hatch/external PSF pending | Medium |
+| Performance Tests | baseline сравнимых сценариев | отдельные измерения; общей текущей perf-приёмки нет | Low |
 
-## 2. Test Architecture (реализовано, 2026-08-02)
+## 2. Test Architecture
+
+Ниже исходная выборка 2026-08-02, не полный список. Сейчас также покрыты
+астрономия/прецессия/топоцентрическая Луна, running/triangle fix, snapshot и
+layout policy, aim-rate/probe/lune/rim, PIP parent-frame и выбор render route.
+Save codec v1 добавил 32 behavioral cases; пять save-мутаций пойманы ожидаемыми
+гейтами. Отдельно проверены реальные save/reload/изоляция/drag-hidden-линией
+и возврат кампании (`docs/astro-save.md`); это не физический drag/ластик.
+Тестовый csproj линкует выбранные Source-файлы со stubs; игровой runtime не
+поднимается. Собственный раннер нужен из-за ограничений vstest/testhost на
+этой машине, а не потому, что linking Source принципиально запрещает dotnet test.
 
 ```
 Tests/  [xunit 2.9 + собственный раннер Tests/Runner; без Unity-рантайма]
@@ -39,11 +48,10 @@ Tests/  [xunit 2.9 + собственный раннер Tests/Runner; без Un
 ├── MorseAlphabetTests.cs
 ├── Helpers/    [WavWriter, KeyingEnvelope — golden-audio рендер]
 ├── Stubs/      [UnityEngineMathf/Debug/Mathf/Transform/Vector2/PlayerPrefs, GameStubs]
-└── Runner/Program.cs [самописный запускатель xunit (dotnet test неприменим:
-                      тесты подключают исходники мода напрямую)]
+└── Runner/Program.cs [самописный запускатель xunit, без vstest/testhost]
 ```
 
-## 3. Unit Tests
+## 3. Исторические примеры unit-тестов (не копировать как текущий API)
 
 ### 3.1 Data Layer Tests
 
@@ -292,7 +300,7 @@ public class DspPipelineTests {
 | UI update time | < 1ms | Profiler |
 | Memory usage | < 10MB | Memory profiler |
 
-## 7. Test Data
+## 7. Исторические примеры test data (не текущие fixtures)
 
 ### 7.1 Test Stations
 
@@ -342,18 +350,27 @@ public static class TestMeasurements {
 
 ### 8.1 Test Infrastructure (F22 ✅ реализовано)
 
-```bash
-# xunit + самописный раннер (dotnet test неприменим: тестовый проект линкует
-# исходники мода напрямую, без сборки игровой DLL)
-powershell -ExecutionPolicy Bypass -File tests.ps1
-# ожидаемый результат: "Passed: 263, Failed: 0" (текущий; baseline-история — ADR-014)
+```powershell
+# Единая точка входа: build → SourceCheck/quick → tests → PVS
+powershell -ExecutionPolicy Bypass -File gates.ps1 -Parallel
+# Только behavioral tests; закрепляет DOTNET_TieredCompilation=0
+powershell -ExecutionPolicy Bypass -File tests.ps1 -Configuration Release
+# Снимок 2026-10-04: Passed: 1379, Failed: 0
+dotnet run --project RadioNavigation.Analyzers.Tests -c Release
+dotnet run --project RadioNavigation.SourceCheck -c Release
 ```
+
+Этот документационный проход повторил tests **1379/0**, analyzers **68/0** и
+полный SourceCheck **98/0** (включая семь гейтов документации). Full build,
+Roslynator и PVS относятся к приёмке лампы (§16.25 `SEXTANT_PLAN.md`), не к новому
+запуску здесь. Не выдавать прежний full-gate за новый запуск.
 
 ### 8.2 Run Specific Test Category
 
 ```bash
-# Фильтр по имени теста — через раннер не поддержан; запускать через
-# TestDriven/dotnet test нельзя (см. выше). Регрессионный прогон = весь набор.
+# Регрессионный прогон Tests/Runner = весь набор.
+# SourceCheck принимает подстроку ИМЕНИ МЕТОДА, не класса:
+dotnet run --project RadioNavigation.SourceCheck -c Release -- Docs_
 ```
 
 ### 8.3 Generate Coverage Report
@@ -364,7 +381,8 @@ dotnet tool install -g dotnet-coverage   # once
 powershell -ExecutionPolicy Bypass -File coverage.ps1
 # -> ./coverage.cobertura.xml
 ```
-Ceiling: only the 70/138 Source files linked into `Tests/*.csproj` are
+Historical coverage snapshot 2026-09-04 (not measured again in this pass):
+only the 70/138 Source files then linked into `Tests/*.csproj` were
 reachable (2026-09-04 inventory: Data 12/14, Logic 48/72, UI 8/50,
 Sound 2/2). The rest is MonoBehaviour/scene code — live-gate territory.
 Measured 2026-09-04: Source-only 7213/7435 lines (97.0%), branch 84%,
@@ -380,7 +398,27 @@ on a Unity codebase (report only).
 1. All new code must have tests
 2. All bug fixes must have regression tests
 3. Tests must be reviewed with code
-4. Test coverage must meet targets
+4. Покрытие и live-сценарии проверять отдельно; PASS-count не заменяет coverage.
+
+### 9.3 Граница гейтов и мутационный протокол
+
+- SourceCheck clean-reference ловит неверные game API и C# 7.0; структурные
+  гейты не доказывают pure-семантику, GPU submission или внешний вид.
+- Behavioral tests держат pure-математику; live A/B с положительным стимулом —
+  Unity/SRP и presented-картинку. `accepted=true` не доказывает результат ввода.
+- Проверять **вызов и аргументы**, не присутствие имени. Мутация считается
+  пойманной при падении ожидаемого гейта/теста; постороннее падение не зачёт.
+  Чистые baseline до/после, восстановление в finally и чистая пересборка после
+  отката обязательны; reused бинарь может ложно подтвердить прежнюю мутацию.
+- Полная документационная гигиена — `DocumentationTests`: UTF-8/no BOM/newline,
+  ADR uniqueness/table, DOCS paths, registry inventory, SAD class references.
+  `Agents_DocStatesCurrentFacts` всё ещё ищет исторический литерал **1135**,
+  а не вычисляет 1379: это известная граница теста, не основание оставить старый
+  счётчик текущим. В этом проходе код гейтов не менялся. Фильтр с результатом
+  Passed: 0 / Failed: 0 не является проверкой; все семь hygiene-гейтов входят
+  в полный SourceCheck, а пример Docs_ запускает только три Docs_-метода.
+- Живая приёмка и сохранность — `docs/live-diagnostics.md`; не менять защищённые
+  сейвы и не объявлять pending-пункт закрытым по конфигурационному snapshot.
 
 ### 9.2 Test Debt
 
@@ -388,12 +426,12 @@ on a Unity codebase (report only).
 |------|----------|--------|--------|
 | Базовая xunit-инфраструктура | High | — | ✅ F22, 2026-08-01 |
 | Тесты UI-хендлеров (зависимы от Unity) | Medium | 3-4h | Открыто |
-| Тесты циклов Consol 60/240s | Medium | 1-2h | Открыто (Фаза 4) |
+| Тесты циклов Consol 60/240s | Medium | — | Offline покрытие есть (AudioRenderPauseTests, MorseKeyerTests); слуховая live-приёмка отдельно |
 | Покрытие (OpenCover/ReportGenerator) | Low | 2-3h | ✅ 2026-09-04: `coverage.ps1` (dotnet-coverage, без vstest), Source-only 97.0% |
-| Обновление manual-чеклистов под live-игру | Low | 1-2h | Открыто |
+| Manual-чеклисты | Low | — | актуализированы 2026-10-04, часть игровых сценариев остаётся pending |
 
 ---
 
-*Document Version: 2.1*  
-*Last Updated: 2026-08-24 (263 PASS; baseline-история в ADR-014, tag baseline-182-20260819)*  
-*Updated: 263 PASS; статусы F01–F207 в `refactoring-plan/hypothesis/INDEX.md`, закрытие — `refactoring-plan/RESOLVED_LEDGER.md`.*  
+*Document Version: 2.2*
+
+*Last Updated: 2026-10-04 (1379 / 68 / 98; baseline-история в ADR-014).*

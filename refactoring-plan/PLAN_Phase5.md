@@ -1,4 +1,31 @@
-# Phase 5: Deep-Dive досье + декомпозиция нового поколения god-объектов — план без кода
+# Phase 5: декомпозиция — статус реализации и исходный план
+
+## Сверка с текущим Source (2026-10-04)
+
+**Частично реализован, не новый чеклист на исполнение.** Слайсы существуют под
+уточнёнными именами; наличие helpers не означает выполнения всех исходных целей
+или живого гейта P5.2. Счётчики 253, LOC и команды ниже — история 2026-08-23.
+
+| Область | Реализация / остаток |
+|---|---|
+| P5.0 / P5.1 | Dead/hot-path правки проводились последующими проходами. Не объявляются новым полным audit zero-callers/GC; current baseline и последующие гейты — `DOCS.md`, Phase6. |
+| P5.3 | `ChronometerCursorArt`, `ShipControlUIBridge`, `ChronometerScaleSubsystem`, `ChronometerDragProtocol`, cursor/raise/hover helpers существуют. Оркестратор 402 строки, исходная цель ≤300 не достигнута. |
+| P5.4 | `LighthouseDotUi`, `LighthouseDiagnostics` выделены; `LighthouseBeamGlow` 544 строки. Наличие выносов не доказывает выполнение всех предложенных static/DI изменений. |
+| P5.5 | `Main` 24 строки; bootstrap/patches/content/prefab validation выделены в `ModBootstrapper`, `HarmonyPatchInstaller`, `SceneContentBuilder`, `PrefabValidator`. |
+| P5.6 | `SignalDecoder`, `StationManager`, `StationFleet` существуют; `SonneController` 279 строк. Отдельного `AudioCoordinator` нет; исходный snapshot API не внедрён. |
+| P5.7 | `UIElementFactory` и `PanelState` существуют; `InformationPanelHandler` 381 строк. Отдельный `DiagnosticsBinder` не реализован, цель ≤280 не достигнута. |
+| P5.8 | Параллельные массивы аудио остаются, count ограничен кратчайшим; `IReadOnlyStationState`/immutable snapshot из предложения не внедрены. Volatile/length guards не являются выполнением этого дизайна. |
+
+LOC — снимок текущих файлов, не критерий качества сам по себе. Это сверка объёма,
+а не разрешение автоматически дописывать отсутствующие слайсы.
+
+**Живой остаток:** F71 pause/×2/×32, визуальный DASH и повторные жизненные циклы
+панели — `LIVE_VALIDATION_CHECKLIST.md`. Preflight 5/5 был подтверждён в поздних
+запусках. Hot-reload Source в этой версии игры не является рабочим деплоем:
+нужны touch источников и restart, не копия DLL в Temp (`docs/CAMERA_GUIDE.md`).
+Офлайн teardown-тесты не выдаются за live reload без утечек.
+
+## Исходный план (2026-08-23, исторический)
 
 > Дата: 2026-08-23. Статус: план, код не трогаем до green live-гейта (P5.2).
 > Базовая линия: **253 PASS** (ADR-014 baseline, с 2026-08-22), `dotnet build -c Release` 0 errors.
@@ -52,10 +79,10 @@ Merge критерий: 253 PASS, Build OK, profiler-проверка GC/frame �
 
 Повторяет `LIVE_VALIDATION_CHECKLIST.md` B/C — pending:
 - [ ] F71 pause/×2/×32 в игре
-- [ ] preflight log без `target methods not found`
+- [x] preflight log без `target methods not found` — поздние загрузки дали `Patches applied: 5/5`; это не закрывает остальные пункты P5.2.
 - [ ] DASH order `▬→◆◆→•` live
-- [ ] F83 hot-reload (вкл/выкл мода в игре)
-- [ ] event leaks после reload
+- [x] F83 hot-reload — ограничение исследовано: смена Source не даёт надёжной загрузки новой сборки; этот протокол заменён restart, не объявлен успешным hot-reload.
+- [ ] event leaks после повторной инициализации — отделять офлайн баланс подписок от живого результата.
 
 ## P5.3 ChronometerOverlayHandler slices (№3 god-node, 6–8ч, риск средний)
 

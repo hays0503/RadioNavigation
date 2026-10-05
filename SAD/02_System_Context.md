@@ -1,10 +1,30 @@
 # System Context — RadioNavigation Mod
 
-> **Сохранение астронавигации (2026-10-05):** активная worksheet-серия и frozen
-> карточка/FIX/LOP/скрытие хранятся в campaign `SceneObject` внутри `.save`;
-> drag-позиции и фигуры — в нативной БД того же сейва. Это не архив старых
-> безымянных точек: отсутствующие наблюдения не выдумываются. Формат v1 и
-> реальная save/reload-приёмка — `docs/astro-save.md`.
+## Действующий контекст (2026-10-05)
+
+- Game API: `com.uboat.game.dll` / `com.uboat.modapi.dll`, Unity **2021.3.45f2**,
+  Harmony **2.2.2**. `Assembly-CSharp.dll` в ранней диаграмме — устаревшее имя.
+- Мод C# **7.0**, .NET Standard 2.0/Unity Mono. Локально raw-csc `build.ps1` с
+  PVS; SDK-проекты net48 нужны анализу, не являются runtime-сборкой мода.
+- `Main` — IUserMod-фасад, `ModBootstrapper` владеет DI, сценами и ресурсами;
+  `HarmonyPatchInstaller` — preflight/установка. Помимо пяти radio/locale-целей
+  есть render/sky-патчи; «5» ниже не полный размер всех текущих hooks.
+- CAP 59: **пять** станций из C# `BeaconData`, не 14 из раннего аудита. Панель
+  сохраняет предпочтения в PlayerPrefs; нативные чарт-точки — в БД сейва игры,
+  активная worksheet-серия секстанта и frozen FIX/LOP/скрытие — в отдельном
+  `SceneObject` того же сейва (формат v1, `docs/astro-save.md`). Это не архив
+  старых безымянных точек: отсутствующие наблюдения не выдумываются.
+- Рабочая установка — `%USERPROFILE%/AppData/LocalLow/Deep Water Studio/UBOAT/Mods/RadioNavigation`.
+  Игра компилирует более новый Source в свой Temp; DLL локальной сборки туда не
+  копируется. `Bundles/testui` обязателен, `deps.json` для этого пути не нужен.
+- Совместимость проверена на **2026.1-patch21**. Канарейка версии/preflight есть,
+  Manifest supportedGameVersions не обеспечивает runtime enforcement. Отсутствие
+  ошибок snapshot не является испытанием другой версии игры.
+
+Актуальные цепочки всего мода — `SAD/03`, `SAD/04`; deployment и PIP —
+`docs/CAMERA_GUIDE.md`, сохранность/приёмка — `docs/live-diagnostics.md`.
+Далее — **исторические radio-диаграммы 2026-07/08**, не полная схема секстанта,
+маяков, native map или точный размер текущего проекта.
 
 ## 1. System Boundary
 
@@ -73,12 +93,13 @@
 
 | Class | Method Patched | Patch Type | Purpose |
 |-------|----------------|------------|---------|
-| `RadioStory` | `ContinueStory` | Prefix (Main.cs:39) | Lock radio story state during processing |
-| `Locale` | `RetrieveString` (2 overloads) | Postfix + Prefix (Main.cs:40-41) | Override locale strings with mod names |
-| `RadioStory` | `OnDecisionSelected` | Postfix (Main.cs:42) | Handle custom decision selection |
-| `RadioStory` | `OnStopped` | Postfix (Main.cs:43) | Hide radio when story stops |
+| `RadioStory` | `ContinueStory` | Postfix | Inject custom radio decision |
+| `Locale` | `RetrieveString` (2 overloads) | Prefix + Prefix | Override locale strings with mod names |
+| `RadioStory` | `OnDecisionSelected` | Prefix | Handle custom decision selection |
+| `RadioStory` | `OnStopped` | Postfix | Hide radio when story stops |
 
-**Total**: 5 patches (2 prefix, 3 postfix) on 2 classes using imperative `harmony.Patch()` API.
+**Radio/locale total**: 5 targets (3 prefix, 2 postfix), imperative `harmony.Patch()`
+in `HarmonyPatchInstaller`; this does not count the additional render/sky hooks.
 
 ### 2.3 Runtime Environment
 
@@ -117,31 +138,11 @@ Game Version: 2026.1
 
 ### 4.1 Harmony Patch Points
 
-```csharp
-// Main.cs — Entry point (imperative API, NOT attributes)
-private void PatchHarmony() {
-    harmony.Patch(
-        typeof(RadioStory).GetMethod("ContinueStory"),
-        prefix: new HarmonyMethod(typeof(Main), nameof(RadioStoryContinueStoryPrefix))
-    );
-    harmony.Patch(
-        typeof(Locale).GetMethod("RetrieveString", new[] { typeof(string) }),
-        postfix: new HarmonyMethod(typeof(Main), nameof(LocaleRetrieveStringPostfix))
-    );
-    harmony.Patch(
-        typeof(Locale).GetMethod("RetrieveString", new[] { typeof(string), typeof(string) }),
-        prefix: new HarmonyMethod(typeof(Main), nameof(LocaleRetrieveString2Prefix))
-    );
-    harmony.Patch(
-        typeof(RadioStory).GetMethod("OnDecisionSelected"),
-        postfix: new HarmonyMethod(typeof(Main), nameof(RadioStoryOnDecisionSelectedPostfix))
-    );
-    harmony.Patch(
-        typeof(RadioStory).GetMethod("OnStopped"),
-        postfix: new HarmonyMethod(typeof(Main), nameof(RadioStoryOnStoppedPostfix))
-    );
-}
-```
+Устаревший пример handlers в Main удалён из справочного пути: действующая
+реализация — `Source/Logic/HarmonyPatchInstaller.cs` (`ResolveTargets`,
+`ApplyTargets`, preflight/rollback) и `Source/Logic/RadioStoryIntegration.cs`.
+`OnLoaded` — IUserMod callback, не Harmony target; scene injection не выполняется
+патчем `ContinueStory`.
 
 ### 4.2 Unity Lifecycle Integration
 
@@ -199,7 +200,7 @@ OnAudioFilterRead(float[] data, int channels)
 | 2026.x | ✅ Supported (2026.1) | Version-gate validation not implemented |
 | Earlier | ❌ Not Supported | API incompatible |
 
-## 6. Deployment Context
+## 6. Исторический deployment context (отменён; читать актуальную шапку)
 
 ```
 Installation Path:

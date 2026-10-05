@@ -16,19 +16,15 @@ Shader "RadioNav/UIOpaque"
         _LuneRadius ("Obstruction disc radius", Range(0.5, 1.0)) = 0.985
         _LuneStrength ("Shadow depth", Range(0, 1)) = 0.95
         _LuneRimLight ("Lit tube edge", Range(0, 0.5)) = 0.09
-        // VERSION MARKER, not a tuning knob, and frag() does NOT read it. It
-        // exists because a stale AssetBundle still carries the old shader compiled
-        // in and nothing could tell that apart from the fixed one - the mod only
-        // ever saw a shader NAME, and Unity strips the shader body from the bundle
-        // so a grep finds nothing either. It stands for the coverage multiply on
-        // rim, which lives in this same file, so the two travel together.
-        // the aperture axis; a stale AssetBundle still carries the old shader
-        // compiled in, and nothing could tell that apart from "the fix is live" -
-        // the mod only ever saw a shader NAME. The overlay reads this and logs
-        // it, so a bundle that was not rebuilt becomes visible instead of
-        // silent. A stale bundle reports 0 and keeps the old behaviour, which
-        // is exactly why the line has to be read rather than assumed.
+        // Legacy version marker for the lit-wall change. Kept so its existing
+        // runtime diagnostic remains meaningful; this is not a tuning knob and
+        // frag() does not read it.
         _LuneWallAnchor ("Aperture-gated lit wall (bundle marker)", Float) = 1.0
+        // Version marker for the one-sided aperture coverage revision. Unity
+        // strips the shader body from the AssetBundle, so the exact Properties
+        // label is the offline bundle proof and the property ID is its runtime
+        // proof. Update it whenever the coverage/blending semantics change.
+        _ApertureCoverageVersion ("Inward-only aperture coverage (bundle marker)", Float) = 1.0
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -126,7 +122,12 @@ Shader "RadioNav/UIOpaque"
                 float2 p = i.texcoord * 2.0 - 1.0;
                 float distanceFromAperture = length(p) - 1.0;
                 float edge = max(fwidth(distanceFromAperture) * max(_ApertureEdgePixels, 0.5), 1e-5);
-                float coverage = 1.0 - smoothstep(-edge, edge, distanceFromAperture);
+                // Keep the antialias ramp wholly inside the aperture. The old
+                // symmetric ramp left nonzero coverage outside the circle, so
+                // moving PIP pixels leaked into the surrounding black bezel.
+                float coverage = distanceFromAperture < 0.0
+                    ? 1.0 - smoothstep(-edge, 0.0, distanceFromAperture)
+                    : 0.0;
 
                 #ifdef UNITY_UI_CLIP_RECT
                 coverage *= UnityGet2DClipping(i.worldPosition.xy, _ClipRect);
@@ -144,27 +145,13 @@ Shader "RadioNav/UIOpaque"
                 float shade = smoothstep(-shadeEdge, shadeEdge, shadeDistance) * _LuneStrength;
 
                 // The lit inner wall just past the shadow boundary is what makes
-                // the crescent read as glass rather than a hole. Its response to
-                // the scene is a SMOOTH ramp (SextantLuneMath.WallResponse,
-                // mirrored here so the test can pin the curve): the first version
-                // gated on saturate(color.r * 4), and a hard knee at 0.25
-                // luminance turned the wall into a dashed arc wherever the scene
-                // crossed that level, which on textured cloud is everywhere - the
-                // author saw broken bright arcs hugging the rim on strong mouse
-                // movement, at r 0.89-1.0, i.e. after the eye offset pulled the
-                // wall off the rim and into the field.
+                // the crescent read as glass rather than a hole. It follows the
+                // shadow boundary; its response to scene luminance is a smooth
+                // ramp (SextantLuneMath.WallResponse, mirrored here so the test
+                // can pin the curve). The earlier hard knee at 0.25 luminance
+                // broke the wall into dashes on textured clouds.
                 float sceneLuma = dot(color.rgb, float3(0.299, 0.587, 0.114));
                 float wallResponse = 0.2 + 0.8 * saturate(sceneLuma * 2.0);
-                // The lit wall belongs to the TUBE, not to the shadow. Deriving it
-                // from shadeDistance made it travel with the pupil: at rest it is
-                // a thin ring on the rim, on a sharp turn it is carried inward to
-                // _LuneRadius - the eye offset (0.835 of the radius), i.e. a
-                // bright edge sweeping across the middle of the picture, which is
-                // the "instrument displays wrongly on fast mouse movement" report.
-                // Anchored to the aperture axis it stays on the rim and the
-                // shadow reveals and hides it, which is what actually happens in
-                // the tube. _LuneRimLight already falls off with the eye offset
-                // (SextantLuneMath.WallLight), so the two halves agree.
                 // MEASURED 2026-10-02. The wall belongs to the SHADOW boundary, not
                 // to the tube. Anchoring it at ShadowRadiusUnits moved the ring up to
                 // r/R 0.985, which sits under the opaque tube where nothing shows,
@@ -172,22 +159,25 @@ Shader "RadioNav/UIOpaque"
                 // crisp moving line. The pupil-side arm of that boundary sits at
                 // ShadowRadiusUnits - t = 0.835, INSIDE the picture, and that arm is
                 // the feature the author sees move. What has to be clipped is the
-                // APERTURE, which is the coverage multiply below: it zeroes the
-                // out-of-aperture half and leaves the in-aperture half at full
-                // strength. Measured outside 1.00-1.04: 0.0900 without the gate,
-                // 0.043 with it (the residue is the antialiasing ramp).
+                // APERTURE, through the one-sided coverage alpha below. The old
+                // symmetric ramp still had nonzero coverage outside the circle; the
+                // inward-only ramp now makes the outside contribution exactly zero.
                 //
-                // _LuneWallAnchor stays declared, and at 1.0, purely as the bundle
-                // freshness marker ReportBundleVersion reads. The body does not use
-                // it; changing it would change what a stale bundle reports.
+                // _LuneWallAnchor is the legacy lit-wall marker checked by
+                // ReportBundleVersion; the distinct _ApertureCoverageVersion
+                // property identifies this coverage revision.
                 float wallDistance = shadeDistance;
                 float rim = 1.0 - saturate(abs(wallDistance / (shadeEdge * 3.0)));
                 rim *= rim * _LuneRimLight * wallResponse;
 
-                // EVERYTHING the field adds is multiplied by the coverage, the lit rim included: outside the aperture the source alpha is 0, and a canvas that composites premultiplied adds the RGB regardless of it, which paints the rim as a bright arc OUTSIDE the ocular (the author's report, 2026-10-02). Gating the whole colour also covers the shadow term itself - on the near side of a displaced pupil the field beyond the edge is not fully shadowed, so scene * (1 - shade) leaked there too.
-                // Ignore RT alpha (it is not coverage); retain full RGB inside
-                // the lens and blend only the sub-pixel aperture boundary.
-                color.rgb = (color.rgb * (1.0 - shade) + rim) * coverage;
+                // Blend SrcAlpha expects straight RGB. Coverage belongs in the
+                // output alpha only; multiplying RGB by it as well applied edge
+                // coverage twice. The one-sided ramp above makes alpha exactly
+                // zero outside the aperture, clipping both the shaded scene and
+                // the additive rim without a moving-image fringe.
+                // Ignore RT alpha: it is post-stack transparency, not aperture
+                // coverage. Preserve full scene RGB inside the lens.
+                color.rgb = color.rgb * (1.0 - shade) + rim;
                 color.a = i.color.a * coverage;
                 return color;
             }

@@ -43,11 +43,17 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public SextantLuneOffset Offset;
         public double ReleaseHoldSeconds;
+        public double ReleaseElapsedSeconds;
+        public SextantLuneOffset ReleaseOrigin;
+        public bool ReleaseStarted;
 
         public SextantLuneState(SextantLuneOffset offset, double releaseHoldSeconds)
         {
             Offset = offset;
             ReleaseHoldSeconds = releaseHoldSeconds;
+            ReleaseElapsedSeconds = 0d;
+            ReleaseOrigin = SextantLuneOffset.Zero;
+            ReleaseStarted = false;
         }
 
         public static SextantLuneState Rest
@@ -96,12 +102,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>
         /// PlayerPrefs: how far the shadow may travel, in percent of an aperture
-        /// radius. The default is 15 %: the shadow's NEAR boundary sits at
-        /// <c>0.985 - offset</c>, so a 34 % travel eats a third of the radius and
-        /// reads as a wide black bite instead of a lune. At 15 % the far boundary
-        /// (0.985 + 0.15 = 1.135) only just leaves the field, which is what
-        /// keeps the shape a crescent. Raised live by the author if the full
-        /// bite is preferred.
+        /// radius. The default is 22 %: the shadow's near boundary reaches
+        /// <c>0.985 - 0.22 = 0.765</c>, making the crescent more visible on turns
+        /// while remaining below the 40 % aperture bite limit. The far boundary
+        /// (0.985 + 0.22 = 1.205) passes just outside the field. A 34 % travel
+        /// would instead read as a wide black bite.
         /// </summary>
         public const string MaxUnitsPrefsKey = "RadioNav.LuneMax";
 
@@ -209,12 +214,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>
         /// How far the obstruction centre may travel, in aperture radii, when no
-        /// preference overrides it (see <see cref="MaxUnitsPrefsKey"/>).
+        /// preference overrides it (see <see cref="MaxUnitsPrefsKey"/>). Raised
+        /// from 0.15 to 0.22 so turns produce a fuller, more visible crescent.
         /// </summary>
-        public const double MaxOffsetUnits = 0.15;
+        public const double MaxOffsetUnits = 0.22;
 
         /// <summary>Aim rate that maps to the full travel, in deg/s.</summary>
-        public const double RateFullDegPerSec = 70.0;
+        public const double RateFullDegPerSec = 55.0;
 
         /// <summary>Rates below this count as "not moving", in deg/s.</summary>
         public const double DeadZoneDegPerSec = 0.35;
@@ -336,17 +342,17 @@ namespace UBOAT.Mods.RadioNavigation
         /// повысил, чтобы до 95 %"). At rest this is also the depth of the thin
         /// uniform ring, so a deeper value darkens the rim all the way round.
         /// </summary>
-        public const double DefaultStrength = 0.95;
+        public const double DefaultStrength = 0.97;
 
         /// <summary>
-        /// Eye inertia: the shadow snaps in quickly (a flick of the mouse) and
-        /// relaxes more slowly, like a real eye returning to centre. Without
-        /// the asymmetry a moving cursor would leave a permanent smear.
+        /// Eye inertia: the shadow eases toward the eye offset with a noticeable
+        /// lag instead of snapping to it. It relaxes more slowly after a turn,
+        /// like a real eye returning to centre.
         /// </summary>
-        public const double AttackSeconds = 0.08;
+        public const double AttackSeconds = 0.22;
 
         /// <summary>Relaxation time constant back to a centred eye.</summary>
-        public const double ReleaseSeconds = 0.45;
+        public const double ReleaseSeconds = 0.65;
 
         /// <summary>
         /// Dead time before the shadow starts letting go (author 2026-10-01:
@@ -356,7 +362,11 @@ namespace UBOAT.Mods.RadioNavigation
         /// decays, which is what the eye does after a flick — the hand stops,
         /// the shadow does not.
         /// </summary>
-        public const double ReleaseHoldSeconds = 0.18;
+        public const double ReleaseHoldSeconds = 0.22;
+        /// <summary>Small, damped optical overshoot after a hard stop.</summary>
+        public const double StopSwayDampingPerSecond = 3.6;
+        public const double StopSwayRadiansPerSecond = 7.5;
+        public const double StopSwayAmount = 0.18;
 
         /// <summary>
         /// Clamps an offset to the aperture-safe disc and rejects NaN. The bound
@@ -433,7 +443,7 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// One smoothing step toward the target: hard attack while the view is
+        /// One smoothing step toward the target: eased tracking while the view is
         /// turning, and — only once the input is DEAD — a dead time followed by
         /// a soft decay (see <see cref="AttackSeconds"/>,
         /// <see cref="ReleaseHoldSeconds"/>, <see cref="ReleaseSeconds"/>).
@@ -457,22 +467,41 @@ namespace UBOAT.Mods.RadioNavigation
                 return SextantLuneState.Rest;
 
             bool idle = target.Magnitude <= 1e-12;
-            double tau;
             if (idle)
             {
                 double hold = state.ReleaseHoldSeconds + dt;
                 if (hold < ReleaseHoldSeconds)
                     // Frozen: the crescent keeps its size while the eye settles.
-                    return new SextantLuneState(state.Offset, hold);
+                {
+                    state.ReleaseHoldSeconds = hold;
+                    return state;
+                }
+
+                if (!state.ReleaseStarted)
+                {
+                    state.ReleaseStarted = true;
+                    state.ReleaseElapsedSeconds = 0d;
+                    state.ReleaseOrigin = state.Offset;
+                }
                 state.ReleaseHoldSeconds = ReleaseHoldSeconds;
-                tau = ReleaseSeconds;
+                state.ReleaseElapsedSeconds += dt;
+                double phase = StopSwayRadiansPerSecond * state.ReleaseElapsedSeconds;
+                double spring = Math.Exp(-StopSwayDampingPerSecond * state.ReleaseElapsedSeconds)
+                    * (Math.Cos(phase) + StopSwayAmount * Math.Sin(phase));
+                SextantLuneOffset swaying = Clamp(state.ReleaseOrigin.X * spring,
+                    state.ReleaseOrigin.Y * spring, maxUnits);
+                if (swaying.Magnitude < 5e-4)
+                    return SextantLuneState.Rest;
+                state.Offset = swaying;
+                return state;
             }
-            else
-            {
-                state.ReleaseHoldSeconds = 0d;
-                // A live but shrinking target tracks down smoothly (no hold).
-                tau = target.Magnitude > state.Offset.Magnitude ? AttackSeconds : ReleaseSeconds;
-            }
+
+            state.ReleaseHoldSeconds = 0d;
+            state.ReleaseElapsedSeconds = 0d;
+            state.ReleaseOrigin = SextantLuneOffset.Zero;
+            state.ReleaseStarted = false;
+            // A live but shrinking target tracks down smoothly (no hold).
+            double tau = target.Magnitude > state.Offset.Magnitude ? AttackSeconds : ReleaseSeconds;
 
             double blend = 1d - Math.Exp(-dt / tau);
             return new SextantLuneState(

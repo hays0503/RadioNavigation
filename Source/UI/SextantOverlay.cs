@@ -81,6 +81,10 @@ namespace UBOAT.Mods.RadioNavigation
             public Texture2D RingTexture;
             public Texture2D CircleMaskTexture;
             public Texture2D EyecupTexture;
+            public Texture2D OpticsGrimeTexture;
+            public Texture2D OpticsMoteTexture;
+            public Image OpticsGrimeImage;
+            public Image[] OpticsMotes;
             public Material OpaqueViewMaterial;
             // Sprites created with Sprite.Create are NOT owned by the canvas
             // GameObject; the controller must Destroy() them explicitly.

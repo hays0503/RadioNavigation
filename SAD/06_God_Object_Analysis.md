@@ -1,5 +1,13 @@
 # God Object Analysis — RadioNavigation Mod
 
+> **Сверка 2026-10-04:** ниже сохранён журнал аудита/слайсов, а не новое LOC-review.
+> `Main` 24, RSI 165, Sonne 279, IPH 381, ChronometerOverlayHandler 402,
+> LighthouseBeamGlow 544 строки. Gateway/bootstrap и ряд helpers реально выделены,
+> но весь исходный Phase5 (immutable snapshot, AudioCoordinator, DiagnosticsBinder,
+> его размерные цели) **не** считается завершённым. «DONE» в записи 2026-09-06
+> относится к записанным 15 слайсам, не к любому первоначальному предложению.
+> Текущие владельцы — `SAD/04`, объём/остаток — `PLAN_Phase5.md` и ledger §7.
+
 > **✅ Decomposition Update (2026-09-06):** F02/F03/F04/F21 decomposition DONE across 15 slices (branch `refactor/p5-frame-hot`, gates: 635 PASS, SourceCheck 44/44, PVS clean). Former gods are now facades: `SonneController` 508→271 (`StationManager`, `SignalDecoder`), `InformationPanelHandler` 474→345 (`PanelViewBinder`, `PanelState`), `RadioStoryIntegration` 381→164 (`RadioLocale`), `Main.cs`→`ModBootstrapper` 198 (`SceneContentBuilder`), `SextantController` 1111→556 (16 satellites), `ChronometerOverlayHandler` 431→396, `LighthouseBeamGlow` 546→516 (`LighthouseBeamGate`). The F47-rejected names (`StationManager`, `SignalDecoder`) now EXIST — the rejection below is superseded. Remaining god: `LighthousePlacer` 542 (game-bound glue, intentionally untouched — needs live stand). Body below is historical, kept as-is.
 
 > **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Актуальные god-объекты, отложенные в roadmap SAD 08 (Фаза 4): `SonneController` (F02), `InformationPanelHandler` (F03), `Main.cs` (F21), `AudioSynthesisEngine` (F25); + новое поколение из graph-аудита (`LighthouseBeamGlow`, `ChronometerOverlayHandler` — см. `refactoring-plan/PLAN_Phase5.md`). `RadioStoryIntegration` (F04/F83) — мёртвая цепочка G1–G4 **закрыта 2026-08-23** через `StoryDecisionGateway.cs` (commit 28f4a62). Реальные кандидаты на выделение: `SonneSignalGenerator` (146 LOC), `SignalRichTextFormatter` (86). Причины отложения — в `refactoring-plan/DEFERRED.md`. Несуществующие классы extraction plan (F47: `StationManager`, `SignalDecoder`, `AudioController`, `UIElementFactory`, `StationInfoDisplay`, `StationFinder`) — отклонены.

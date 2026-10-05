@@ -187,14 +187,40 @@ namespace Tests
         }
 
         [Fact]
+        public void TurnsUseTheLargerLuneTravel()
+        {
+            Assert.Equal(0.22, SextantLuneMath.MaxOffsetUnits, 9);
+            Assert.Equal(0.22,
+                FromMotion(SextantLuneMath.RateFullDegPerSec, 0d).Magnitude, 9);
+        }
+
+        [Fact]
+        public void TurningHasNoticeableInertiaAndCarriesMomentumThroughAReversal()
+        {
+            SextantLuneOffset target = FromMotion(SextantLuneMath.RateFullDegPerSec, 0d);
+            SextantLuneState starting = Step(SextantLuneState.Rest, target, 0.05);
+            double firstStepRatio = starting.Offset.Magnitude / target.Magnitude;
+            Assert.InRange(firstStepRatio, 0.20, 0.30);
+
+            SextantLuneState turningRight = Step(SextantLuneState.Rest, target, 0.4);
+            SextantLuneState reversing = Step(turningRight,
+                FromMotion(-SextantLuneMath.RateFullDegPerSec, 0d), 0.05);
+            Assert.True(turningRight.Offset.X > 0d);
+            Assert.True(reversing.Offset.X > 0d && reversing.Offset.X < turningRight.Offset.X,
+                "the crescent must ease through the reversal instead of snapping sides: "
+                    + turningRight.Offset + " -> " + reversing.Offset);
+        }
+
+        [Fact]
         public void Smoothing_AttacksFastAndHoldsThenReleasesSlowly()
         {
             SextantLuneState rest = SextantLuneState.Rest;
             SextantLuneOffset target = FromMotion(60d, 0d);
 
             SextantLuneState attacked = Step(rest, target, 0.05);
-            Assert.True(attacked.Offset.Magnitude > target.Magnitude * 0.35,
-                "a 50 ms flick must already show a good part of the crescent, got "
+            Assert.InRange(attacked.Offset.Magnitude / target.Magnitude, 0.20, 0.35);
+            Assert.True(attacked.Offset.Magnitude > target.Magnitude * 0.20,
+                "a 50 ms turn must already show the eased-in crescent, got "
                     + attacked.Offset + " of " + target);
 
             double held = attacked.Offset.Magnitude;
@@ -218,6 +244,29 @@ namespace Tests
             for (int i = 0; i < 400; i++)
                 settling = Step(settling, SextantLuneOffset.Zero, 0.05);
             Assert.True(settling.Offset.Magnitude < 1e-3, "the shadow must settle back to the ring");
+        }
+
+        [Fact]
+        public void HardStopAddsASmallDampedOpticalSwayBeforeComingToRest()
+        {
+            SextantLuneState state = Step(SextantLuneState.Rest,
+                FromMotion(SextantLuneMath.RateFullDegPerSec, 0d), 0.4);
+            double beforeStop = state.Offset.X;
+            for (int i = 0; i < 20; i++)
+                state = Step(state, SextantLuneOffset.Zero, 0.01);
+            Assert.Equal(beforeStop, state.Offset.X, 6);
+            Assert.True(state.ReleaseHoldSeconds < SextantLuneMath.ReleaseHoldSeconds);
+
+            bool reversed = false;
+            double previous = state.Offset.X;
+            for (int i = 0; i < 100; i++)
+            {
+                state = Step(state, SextantLuneOffset.Zero, 0.01);
+                if (state.Offset.X * previous < 0d) reversed = true;
+                previous = state.Offset.X;
+            }
+            Assert.True(reversed, "a hard stop should produce a small damped overshoot");
+            Assert.True(state.Offset.Magnitude < 1e-3, "the sway must settle completely");
         }
 
         [Fact]
@@ -397,9 +446,9 @@ namespace Tests
         }
 
         [Fact]
-        public void DefaultStrength_IsTheAuthorsNinetyFivePercent()
+        public void DefaultStrength_IsSlightlyRaisedForADeeperTurnShadow()
         {
-            Assert.Equal(0.95, SextantLuneMath.DefaultStrength, 6);
+            Assert.Equal(0.97, SextantLuneMath.DefaultStrength, 6);
             Assert.InRange(SextantLuneMath.DefaultStrength, 0.9, 1.0);
         }
 
@@ -421,9 +470,8 @@ namespace Tests
         [Fact]
         public void TheCrescentStaysInsideTheRimAtFullTravel()
         {
-            // 0.34 travelled 35 % of the radius and read as a black bite; the
-            // default travel keeps the far boundary just outside the field so
-            // the shape still reads as a lune.
+            // The enlarged 0.22 travel reaches 23.5 % into the aperture on the
+            // near side, still below the 40 % limit; 0.34 read as a black bite.
             SextantLuneOffset full = FromMotion(SextantLuneMath.RateFullDegPerSec * 4d, 0d);
             double near = 1d - SextantLuneMath.ShadowRadiusUnits + full.Magnitude;
             Assert.True(near < 0.4,
@@ -511,7 +559,7 @@ namespace Tests
             // field on a fast turn" the author reports, so the wall must already
             // be dark by then.
             double deepest = SextantLuneMath.ShadowRadiusUnits - SextantLuneMath.MaxOffsetUnits;
-            Assert.True(deepest > 0.83 && deepest < 0.86,
+            Assert.True(deepest > 0.76 && deepest < 0.77,
                 "the wall's deepest reach moved: " + deepest);
             Assert.Equal(0d, SextantLuneMath.WallLight(0.09, deepest,
                 SextantLuneMath.MaxOffsetUnits), 9);

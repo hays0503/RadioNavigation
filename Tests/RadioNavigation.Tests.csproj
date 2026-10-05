@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <Compile Include="Stubs\UnityEngineMathf.cs" />
+    <Compile Include="Stubs\UnityEngineQuaternion.cs" />
     <Compile Include="Stubs\UnityEngineAudio.cs" />
     <Compile Include="Stubs\UnityEngineObject.cs" />
     <Compile Include="Stubs\UnityEngineVector2.cs" />
@@ -75,6 +76,7 @@
     <Compile Include="StarBrightnessTests.cs" />
     <Compile Include="StarSpriteMathTests.cs" />
     <Compile Include="SextantRimProfileTests.cs" />
+    <Compile Include="SextantOpticsProfileTests.cs" />
     <Compile Include="SternspreizPsfMathTests.cs" />
     <Compile Include="SternspreizLineProfileTests.cs" />
     <Compile Include="StarColorTests.cs" />
@@ -106,8 +108,10 @@
     <Compile Include="SextantStabilizationTests.cs" />
     <Compile Include="SextantAimRateTests.cs" />
     <Compile Include="SextantTemporalResetTests.cs" />
+    <Compile Include="SextantPipRenderPolicyTests.cs" />
     <Compile Include="SextantAimProbeTests.cs" />
     <Compile Include="SextantBeamPoseMathTests.cs" />
+    <Compile Include="SextantPipFrameMathTests.cs" />
     <Compile Include="SextantLuneMathTests.cs" />
     <Compile Include="SextantPipClipTests.cs" />
     <Compile Include="SextantConeBoxTests.cs" />
@@ -232,6 +236,7 @@
     <Compile Include="..\Source\Logic\StarBrightness.cs" Link="Source\Logic\StarBrightness.cs" />
     <Compile Include="..\Source\Logic\StarSpriteMath.cs" Link="Source\Logic\StarSpriteMath.cs" />
     <Compile Include="..\Source\Logic\SextantRimProfile.cs" Link="Source\Logic\SextantRimProfile.cs" />
+    <Compile Include="..\Source\Logic\SextantOpticsProfile.cs" Link="Source\Logic\SextantOpticsProfile.cs" />
     <Compile Include="..\Source\Logic\SternspreizPsfMath.cs" Link="Source\Logic\SternspreizPsfMath.cs" />
     <Compile Include="..\Source\Logic\SternspreizLineProfile.cs" Link="Source\Logic\SternspreizLineProfile.cs" />
     <Compile Include="..\Source\Logic\StarColor.cs" Link="Source\Logic\StarColor.cs" />
@@ -262,7 +267,9 @@
     <Compile Include="..\Source\Logic\SextantAimRate.cs" Link="Source\Logic\SextantAimRate.cs" />
     <Compile Include="..\Source\Logic\SextantAimProbe.cs" Link="Source\Logic\SextantAimProbe.cs" />
     <Compile Include="..\Source\Logic\SextantTemporalReset.cs" Link="Source\Logic\SextantTemporalReset.cs" />
+    <Compile Include="..\Source\Logic\SextantPipRenderPolicy.cs" Link="Source\Logic\SextantPipRenderPolicy.cs" />
     <Compile Include="..\Source\Logic\SextantBeamPoseMath.cs" Link="Source\Logic\SextantBeamPoseMath.cs" />
+    <Compile Include="..\Source\Logic\SextantPipFrameMath.cs" Link="Source\Logic\SextantPipFrameMath.cs" />
     <Compile Include="..\Source\Logic\SextantLuneMath.cs" Link="Source\Logic\SextantLuneMath.cs" />
     <Compile Include="..\Source\Logic\SextantPipClip.cs" Link="Source\Logic\SextantPipClip.cs" />
     <Compile Include="..\Source\Logic\SextantConeBox.cs" Link="Source\Logic\SextantConeBox.cs" />

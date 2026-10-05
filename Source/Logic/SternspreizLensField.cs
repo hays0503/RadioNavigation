@@ -9,6 +9,7 @@ namespace UBOAT.Mods.RadioNavigation
         public float Rx, Ry, Rz;   // camera right (screen +x)
         public float Ux, Uy, Uz;   // camera up (screen +y)
         public float Fx, Fy, Fz;   // camera forward
+        public float TanHalfFovX;
         public float TanHalfFovY;
     }
 
@@ -74,13 +75,15 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Collects the visible stars for the given observer/time/sky, capped at
-        /// maxStars (the catalog is sorted by brightness, so the cap keeps the
-        /// brightest). Returns the number written to <paramref name="buffer"/>.
-        /// The visibility gates mirror StarsMesh.RebuildMesh.
+        /// Collects the visible stars for the given observer/time/sky and PIP
+        /// camera, capped at maxStars. The catalog is brightness-sorted, so the
+        /// cap keeps the brightest stars whose streaks actually intersect this
+        /// camera's frustum. Returns the number written to <paramref name="buffer"/>.
+        /// The sky-visibility gates mirror StarsMesh.RebuildMesh.
         /// </summary>
         public static int CollectVisibleStars(float latDeg, double lstDeg, double jd,
-            float limitingMag, float fogginess, double adaptation, int maxStars,
+            float limitingMag, float fogginess, double adaptation, LensCamera camera,
+            float lineLengthDeg, float thicknessDeg, float rollDeg, int maxStars,
             LensStar[] buffer)
         {
             if (buffer == null)
@@ -99,13 +102,53 @@ namespace UBOAT.Mods.RadioNavigation
                     continue; // no-HIP sentinel: never sightable
 
                 if (!TryProject(star, latDeg, lstDeg, jd, limitingMag, fogginess,
-                        adaptation, out LensStar lensStar))
+                        adaptation, out LensStar lensStar)
+                    || !StreakIntersectsFrustum(lensStar, camera, lineLengthDeg,
+                        thicknessDeg, rollDeg))
                     continue;
 
                 buffer[count] = lensStar;
                 count++;
             }
             return count;
+        }
+
+        /// <summary>
+        /// Tests whether the screen-aligned streak quad intersects the camera
+        /// frustum. The angular half-size is divided by forward depth because
+        /// the streak is emitted on the spherical star shell; this also admits a
+        /// star just outside the view when its streak itself crosses the edge.
+        /// The rolled rectangle's projected half-extents are used so candidates
+        /// near a viewport edge are neither dropped nor admitted by a loose
+        /// circular padding approximation.
+        /// </summary>
+        public static bool StreakIntersectsFrustum(LensStar star, LensCamera camera,
+            float lineLengthDeg, float thicknessDeg, float rollDeg)
+        {
+            float forward = star.DirX * camera.Fx + star.DirY * camera.Fy + star.DirZ * camera.Fz;
+            if (!(forward > 0f)
+                || !(camera.TanHalfFovX >= 0f)
+                || !(camera.TanHalfFovY >= 0f)
+                || !(lineLengthDeg >= 0f)
+                || !(thicknessDeg >= 0f)
+                || float.IsNaN(rollDeg)
+                || float.IsInfinity(rollDeg))
+                return false;
+
+            float screenX = (star.DirX * camera.Rx + star.DirY * camera.Ry
+                + star.DirZ * camera.Rz) / forward;
+            float screenY = (star.DirX * camera.Ux + star.DirY * camera.Uy
+                + star.DirZ * camera.Uz) / forward;
+            float halfLength = (float)Math.Tan(lineLengthDeg * Math.PI / 360d) / forward;
+            float halfThickness = (float)Math.Tan(thicknessDeg * Math.PI / 360d) / forward;
+            double rollRadians = rollDeg * Math.PI / 180d;
+            float cosRoll = (float)Math.Abs(Math.Cos(rollRadians));
+            float sinRoll = (float)Math.Abs(Math.Sin(rollRadians));
+            float extentX = halfLength * cosRoll + halfThickness * sinRoll;
+            float extentY = halfLength * sinRoll + halfThickness * cosRoll;
+
+            return Math.Abs(screenX) <= camera.TanHalfFovX + extentX
+                && Math.Abs(screenY) <= camera.TanHalfFovY + extentY;
         }
 
         private static bool TryProject(StarEntry star, float latDeg, double lstDeg, double jd,

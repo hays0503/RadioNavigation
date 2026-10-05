@@ -1,6 +1,33 @@
 ## Deferred findings (live-validation required)
 
-These findings require validation on the live in-game panel. Status synchronized 2026-08-04:
+## Current reading guide — 2026-10-04
+
+This is a historical deferral register, not a current total of unresolved bugs.
+The recorded F202/F203 live results remain valid for their scenario; they do not
+close F71, lifecycle, pointer or astronomy acceptance. Current scope checks are in
+`PLAN_Phase5.md` and `RESOLVED_LEDGER.md` §7; no new complete 194-file audit was run.
+
+- F02/F03 have real extractions (`SignalDecoder`, `StationManager`,
+  `UIElementFactory`, `PanelState`), but not every proposed interface/slice.
+- F04/G1–G4 lives in `StoryDecisionGateway`; F21/F179 bootstrap responsibilities
+  moved out of the 24-line `Main` into bootstrap/patch/content helpers.
+- F25 still exposes parallel raw arrays; removing a scheduler parameter was a
+  partial change, not the immutable-snapshot design.
+- F83 hot-reload is not a reliable runtime deployment path. Use game compilation
+  of newer Source plus restart; repeated initialization/decision dedup requires
+  its own live evidence.
+- F31/F181 diagnostic policy is now PlayerPrefs-gated and cached (with release
+  structural gates); `#if DEBUG` alone cannot enable logs in the game's compiler.
+  Remaining unconditional diagnostics are not re-audited here as a new count.
+
+The legacy radio `PositionFixCalculator` was removed; the current **sextant**
+running/three-sight fix is a different chain. Do not read the removal below as
+removal of today's FIX/LOP features. Gameplay items and evidence rules:
+`LIVE_VALIDATION_CHECKLIST.md`, `MAP_MARKERS_PLAN.md`, `docs/live-diagnostics.md`.
+
+## Historical notes (2026-08-04, later additions dated separately)
+
+These findings required validation on the live in-game panel at that stage:
 
 > **2026-08-24:** полная сверка решённости всех гипотез — в `RESOLVED_LEDGER.md`. Открытыми остаются 22; записи ниже сохраняют историческую формулировку.
 >

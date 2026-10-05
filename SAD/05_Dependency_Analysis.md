@@ -1,5 +1,13 @@
 # Dependency Analysis — RadioNavigation Mod
 
+> **Граница актуальности 2026-10-04:** граф/LOC/cohesion в этой главе — исторические
+> замеры ранней радиопанели, не текущие метрики всего мода. Helpers, секстант и
+> карта описаны в `SAD/03`/`SAD/04`; актуальная частичная декомпозиция — Phase5 и
+> `RESOLVED_LEDGER.md` §7. F47 отвергал тогдашние утверждения о реализации, а не
+> запретил позже создать `StationManager`/`SignalDecoder`/`UIElementFactory`.
+> Текущий граф запрашивать через graphify с явным project path; новые coupling
+> scores здесь не измерялись. Deep Scan ниже — состояние на свою дату.
+
 > **⚠️ Deep Scan Update (2026-08-01):** Проведён тотальный перекрёстный аудит (SAD vs code, git, build/config, cross-file consistency). Всего **207 проблем** (F01–F207); статусы — `refactoring-plan/hypothesis/INDEX.md`, закрытие — `refactoring-plan/RESOLVED_LEDGER.md`.
 > - **F45:** ADR-002/003/004/005/007 статус «Deferred» (был «Accepted» — 0% реализовано)
 > - **F46:** Harmony patch targets исправлены — `Game.OnLoaded` → реальность `RadioStory.ContinueStory` (5 патчей)
@@ -17,10 +25,10 @@
 
 | Package | Version | Purpose | Risk |
 |---------|---------|---------|------|
-| Unity Engine | 2020.x | Runtime framework | Low |
-| Assembly-CSharp.dll | UBOAT | Game-specific APIs | **High** |
-| Harmony | 2.x | Runtime patching | **High** |
-| .NET Framework | 4.x | Base class library | Low |
+| Unity Engine | 2021.3.45f2 | Runtime framework | историческая оценка Low |
+| com.uboat.game / com.uboat.modapi | 2026.1-patch21 | Game-specific APIs; DLL metadata may be obfuscated | **High** |
+| Harmony | 2.2.2 | Runtime patching | **High** |
+| Unity managed BCL / .NET Standard 2.0 | game Managed DLLs | Runtime; аналитический проект отдельно net48 (см. `AGENTS.md`) | историческая оценка Low |
 
 ### 1.2 Internal Dependency Graph
 

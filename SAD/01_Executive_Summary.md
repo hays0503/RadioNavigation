@@ -2,15 +2,38 @@
 
 ## Project Overview
 
-**RadioNavigation** is a mod for the submarine simulation game **UBOAT** that implements realistic World War II-era Sonne (Consol) radio navigation beacon system. The mod adds interactive radio equipment to U-boats, allowing players to determine their position using bearing measurements from multiple shore-based radio beacons.
+**RadioNavigation** is a UBOAT mod for Sonne/Consol radio navigation, lighthouse
+and native chart markers, chronometer UI, a dated celestial sky and a two-beam
+PIP sextant with running/three-observation fixes. Namespace
+`UBOAT.Mods.RadioNavigation`, manifest version **2.1**.
 
-## Current State Assessment
+## Current State Assessment — 2026-10-04
 
-| Metric | Current (SAD v2.0) | Actual (2026-08-24) |
+| Область | Подтверждённое состояние |
+|---|---|
+| Offline behavioral tests | **1379 PASS / 0 FAIL**, xunit/custom runner; не процент coverage |
+| Custom analyzers / SourceCheck | **68 / 98 PASS**; C# 7.0 и clean game API, structural gates |
+| Runtime deployment | игра компилирует Source; raw-csc DLL — локальная проверка, не runtime-артефакт |
+| PIP камеры | один маршрут attached/standalone, один writer внутри, единый parent frame обоих лучей, внутри full culling viewport |
+| Live evidence | parent-frame ориентация, 24/24 записанных single-route открытий, Lamp GPU A/B/A′ 0→12→0 при неизменном main; ссылки в SEXTANT_PLAN §16.23–16.25 |
+| Открытая приёмка | обычный hatch traversal, внешняя эстетика star/PSF, незавершённые radio/live чеклисты |
+| Реестр / решения | **241** строка F001–F243 (F225/F230 свободны), **21** ADR-файл; статусы — записанные доказательства, не новый полный аудит |
+
+Карта документации — `DOCS.md`; ответственность компонентов — `SAD/04`,
+эксплуатация камер — `docs/CAMERA_GUIDE.md`, границы приборов —
+`docs/live-diagnostics.md`. Документационный проход не меняет code/shaders/bundle
+и не закрывает pending по отсутствию ошибки в snapshot.
+
+## Historical State Assessment — 2026-08-24
+
+Снимок раннего аудита ниже сохранён для истории. LOC, оценки 4/10, сроки,
+проценты и предлагаемый ROI **не являются актуальными измерениями**.
+
+| Metric | Initial SAD v2.0 estimate | Recorded 2026-08-24 |
 |--------|--------------------|---------------------|
 | Overall Rating | 4/10 | 4/10 |
 | God Classes (>300 lines) | 2 | 6+ (SonneController, IPH, ChronometerOverlayHandler, LighthouseBeamGlow, LighthousePlacer, LighthouseMapMarker — см. `refactoring-plan/PLAN_Phase5.md`) |
-| Unit Test Coverage | 0% | **263 PASS** (xunit, baseline ADR-014; математика/DSP покрыты, UI — нет) |
+| Test count (not coverage) | tests отсутствовали в исходной оценке | **263 PASS** (тогдашний прогон) |
 | Magic Numbers | ~40 | частично вынесены в `Constants.cs` (F28) |
 | Code Duplication Groups | 7 | сокращены (GeoMath/Constants, F12/F73) |
 | Thread Safety Issues | Widespread | смягчено (volatile-флаги, main-thread keyer); остаток — Phase 5 |
@@ -18,7 +41,14 @@
 | Documented Problems | — | **207** (F01–F207), статусы в `hypothesis/INDEX.md`, закрытие в `RESOLVED_LEDGER.md` |
 | Total Refactoring Effort | — | ~95–130 hours |
 
-## Key Findings
+## Historical Key Findings (audit 2026-08)
+
+Декомпозиция позднее выполнена **частично**: bootstrap и gateway вынесены,
+Sonne/IPH получили helpers, но не весь предложенный snapshot/interface-дизайн.
+Сверка — `refactoring-plan/PLAN_Phase5.md` и `refactoring-plan/RESOLVED_LEDGER.md`
+§7. Следующий список — происхождение задач,
+не команда повторить уже сделанные слайсы; совместимость game API всё ещё
+требует version-aware guards и реальной приёмки, не обещания «Stable».
 
 ### Strengths
 - **Strong Domain Logic**: Mathematically correct Sonne navigation, Morse timing, and bearing diagnostics
@@ -49,7 +79,7 @@
 - File counts, LOC, array sizes, method signatures corrected (F48-F52, исправлено)
 - Added F65–F199 (аудит завершён на **207 проблемах**, F01–F207) across all layers: documentation, data, localization, UI, sound, logic
 
-## Recommended Approach
+## Historical Recommended Approach (не текущий план исполнения)
 
 ### Phase SAD: Documentation Overhaul (Priority) — 8-12 hours
 - Fix all SAD inaccuracies (F45-F52)
@@ -72,7 +102,7 @@
 - Add unit tests for mathematical functions
 - Clean up dead code
 
-## Business Impact
+## Historical Business Impact (прогноз, не измеренный результат)
 
 | Impact Area | Current Risk | Post-Refactoring |
 |-------------|--------------|------------------|
@@ -81,7 +111,7 @@
 | Bug Discovery | Hard — no tests, tangled dependencies | Easy — unit tests catch regressions |
 | New Developer Onboarding | Difficult — unclear responsibilities | Clear — single-responsibility classes |
 
-## Investment Summary
+## Historical Investment Summary (оценка исходного аудита)
 
 - **Total Effort**: ~95–130 hours (12 phases, 207 tasks)
 - **Risk Level**: Medium-High (audio thread changes require careful testing)
@@ -92,7 +122,7 @@
 
 | Phase | Focus | Hours | Key Tasks |
 |-------|-------|-------|-----------|
-| Phase 0 | Test infrastructure | 8-12h | F22: Set up CSC + NUnit |
+| Phase 0 | Test infrastructure | 8-12h | F22: исходно предлагался NUnit; реализован xunit + custom runner |
 | Phase 1 | Quick wins | 5-8h | F77-F164: Low-risk fixes |
 | Phase 2 | Safety & correctness | 15-25h | F01, F13, F29: Thread safety |
 | Phase 3 | Architecture blockers | 12-18h | F05, F23: Static state, reflection |
@@ -101,6 +131,7 @@
 
 ---
 
-*Document Version: 2.1*  
-*Last Updated: 2026-08-24*  
+*Document Version: 2.2*
+
+*Last Updated: 2026-10-04 (актуальная сводка отдельно от истории аудита)*
 *Note: Updated for 207 problems (F01–F207). Статусы каждой гипотезы — `refactoring-plan/hypothesis/INDEX.md`; закрытие с доказательствами — `refactoring-plan/RESOLVED_LEDGER.md`.*

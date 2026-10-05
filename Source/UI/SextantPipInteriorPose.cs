@@ -15,15 +15,15 @@ namespace UBOAT.Mods.RadioNavigation
     /// VSR.LateUpdate, so clone-to-PIP copying is a feedback loop. The game's
     /// InteriorCamera instead is positioned by the game's own pipeline
     /// independently of anything the mod moves, so copying FROM it cannot
-    /// feed back. Rotation is deliberately untouched: Update already set the
-    /// yaw/alidade rotation on the root and nothing moves it afterwards, so
-    /// copying rotation would only destroy the alidade pitch on the right eye.
+    /// feed back. Rotation is deliberately untouched: SextantController's
+    /// LateUpdate (order 5000) sets the gaze/alidade rotation, and this helper
+    /// only replaces position, so copying rotation would destroy the alidade
+    /// pitch on the right eye.
     ///
     /// Ordering: the interior camera is positioned by the game's LateUpdates
-    /// (default order); this runs at 10000. Next frame's SextantPipPose.Update
-    /// re-seeds the root pose from the view camera, so toggling inside/outside
-    /// stays clean. Outside the boat this is a no-op (Update already restored
-    /// the exterior pose).
+    /// (default order); this runs at 10000. SextantController.LateUpdate
+    /// (order 5000) seeds the PIP pose from the view camera first. Outside the
+    /// boat this helper is a no-op, so the controller's exterior pose remains.
     /// </summary>
     [DefaultExecutionOrder(10000)]
     internal sealed class SextantPipInteriorPose : MonoBehaviour

@@ -158,8 +158,16 @@ namespace UBOAT.Mods.RadioNavigation
                 // GBuffer writers and the ocular goes black (live 2026-09-19:
                 // suppression alone + root RenderScene=false = black ocular).
                 AdditionalCameraData pipData = e.PipCamera.GetComponent<AdditionalCameraData>();
-                if (pipData?.RenderScene == false)
+                if (pipData != null)
+                {
                     pipData.RenderScene = true;
+                    // The view's portal rect restricts EXTERIOR geometry, not
+                    // this interior writer. RenderDoc A/B/A (2026-10-04): it
+                    // culled the ceiling lamp before submission (0/12/0 draws).
+                    // Apply after the factory mirror, inside only; outside the
+                    // factory restores the live view rect on the next sync.
+                    pipData.CullingScissorRect = new Rect(0f, 0f, 1f, 1f);
+                }
             }
         }
 

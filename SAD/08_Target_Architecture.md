@@ -1,5 +1,13 @@
 # Target Architecture — RadioNavigation Mod
 
+> **Статус на 2026-10-04:** это историческое **предложение**, не approved execution
+> plan. Универсальный service-layer/RadioContext/double-buffer не внедрён. Ряд
+> одноимённых helpers (`StationManager`, `SignalDecoder`, `UIElementFactory`,
+> ReceiverDsp) теперь существует, но это не означает реализации всего дизайна
+> главы; раннее «всё proposed отсутствует» не является текущей инвентаризацией.
+> Владельцы в Source — `SAD/04`, объём частичной реализации — `PLAN_Phase5.md` и
+> `SAD/12` §1.1. Эта документационная актуализация не поручает реализовать схему.
+
 > **⚠️ Deep Scan Update (2026-08-01):** Этот документ описывает целевую архитектуру — **все классы и интерфейсы, отмеченные `⚠ proposed`, не реализованы**. Всего **207 проблем** (F01–F207). ADR-002/003/004/005/007 changed «Accepted» → «Deferred» (F45, исправлено). Пропущены `RadioStoryIntegration` (замещён фасадом + `StoryDecisionGateway.cs`, 2026-08-23), `SonneSignalGenerator` (146), `SignalRichTextFormatter` (86) теперь добавлены в текущую архитектуру вместо phantom классов. Полные описания: `refactoring-plan/hypothesis/INDEX.md`.
 
 ## 1. Target Layer Architecture

@@ -1,12 +1,35 @@
 # Правильная камера: интерьер + экстерьер (UBOAT SRP)
 
-Практическое руководство по камере, которая корректно рендерит и интерьер лодки,
-и экстерьер. Собрано из цикла работ по окуляру секстанта (2026-09-17…19):
+Практическое руководство по камере, которая рендерит интерьер лодки и экстерьер.
+**Действующие правила актуализированы 2026-10-04**; исходная база — работы
+2026-09-17…19:
 13 контролируемых A/B, декомпилят `com.dws.pipeline.Runtime.dll` (ilspycmd),
 исходники игры (`C:\code\projects\uboat`), live-замеры стенда «Трубы».
 Детали расследования — `SEXTANT_PLAN.md` §16; здесь только нормы и механизмы.
 
-Термины — в §21. Числа без ссылки — из live-замеров стенда (день, торпедный отсек).
+Термины — в §16. Числа старого стенда «Трубы» — датированные результаты, не
+универсальные значения для всех отсеков/разрешений. Границы инструментов и
+восстановление — [live-diagnostics.md](live-diagnostics.md).
+
+### Действующий контракт (читать раньше старых A/B)
+
+- **Один маршрут на PIP:** attached при живом корне и фактическом членстве в
+  `AttachedCameras`; иначе enabled standalone fallback. Attached + enabled
+  воспроизводит старый двойной рендер (`RadioNav.PipSingleRender=0`).
+- **Один GBuffer writer внутри:** VSR позиционирует VirtualScene, клон подавлен
+  патчем, root рисует интерьер с `RenderScene=true`. После внешнего миррора
+  `SextantInteriorMirror.Sync` задаёт root полный `CullingScissorRect=(0,0,1,1)`
+  **только внутри**; снаружи возвращается живой rect view-камеры.
+- **Поза:** оба луча используют pitch/yaw взгляда, правая ветка добавляет дугу.
+  Внутри оба поворота переводятся в parent frame одним
+  `Quaternion.Inverse(parentWorldRotation) * worldRotation`; позиция берётся
+  с игровой InteriorCamera, не с зависимого мод-клона.
+- **История:** на open-edge сбрасываются обе PIP (`ResetHistory` + флаг reset),
+  не главный вид. При быстрых поворотах отдельно действует rate-gated сброс
+  main и обеих PIP; эти механизмы нельзя смешивать.
+- **Доказательства:** `SEXTANT_PLAN.md` §16.23 (parent frame), §16.24 (первый
+  кадр: 24/24 записанных B-открытий на 30 fps), §16.25 (лампа: PIP 0→12→0,
+  main 1→1→1; 12 checkpoints). Обычный проход через люк остаётся pending.
 
 ## 0. Главный инвариант: ОДИН писатель `_GBufferZ` на проход
 
@@ -32,8 +55,9 @@ light-combine → чёрные тайлы, маджента, вспышки (§1
 Схема:
 
 - **Root-камера** — кадр и compositing. **Клон** (`CopyFrom(InteriorCamera)`) —
-  писатель интерьера. **VSR на объекте ROOT** (не клона!): `virtualCamera=клон`,
-  `virtualScene=PlayerShip.Interior.VirtualScene`; добавить ДО первого `Render()`
+  виртуальная камера интерьера; в текущем PIP её writer подавлен, но VSR остаётся.
+  **VSR на объекте ROOT** (не клона!): `virtualCamera=клон`,
+  `virtualScene=PlayerShip.Interior.VirtualScene`; добавить ДО первого SRP-рендера
   (`DeepCameraData` кэширует VSR в ctor).
 - Пайплайн композитит `cameras[1]` в кадр root ТОЛЬКО при активном VSR
   (guard: `enabled && RenderingEnabled && VirtualCamera.isActiveAndEnabled`).
@@ -91,7 +115,8 @@ decals по `RenderDecals`.
 | Passes | дефолтная структура как у main-root (`UseCustomPasses=false` — так и так live!) | кастомный 1-pass лист игнорируется пайплайном |
 | `RenderDecals` / `Desaturation` | как у писателя (сейчас `false`/`0` везде) | — |
 | GUI-флаги (`RenderPostprocessedGUI`, `ClearStencilFor3DGUI`, `GUITarget*`) | дефолты, не трогать | чужой GUI-контекст |
-| `RenderScene` | живьём с view-камеры, НЕ пинить | `true` = белый шар; `false` + подавленный клон = чёрный окуляр |
+| `RenderScene` | сначала миррор view, затем `true` на интерьерном root при подавленном клоне | внешний `true` поверх активного клона = двойной writer; `false` + подавленный клон = чёрный окуляр |
+| `CullingScissorRect` | полный `(0,0,1,1)` на интерьерном root после миррора | внешний portal rect режет интерьер до submission; снаружи — живой rect view |
 | `StencilMask` | `false` (как Interior) | `true` течёт экстерьером сквозь корпус |
 | `MotionVectorsTarget` | `null` (образец `Periscope.cs:602`) | — |
 
@@ -114,35 +139,41 @@ overflow light-combine в Inf/NaN, доказано RenderDoc).
 с root-камеры (§2), а warmth глаз идёт из baked проб + main-PPv2 (измерено:
 main-PPv2 off уводит глаза в `b_r −33`).
 
-TAA-рецепт на будущее: свои TAA-параметры (образец `Periscope.cs:1295–1303`) +
-`ResetHistory` через `FrameDelay(1)` + НЕ шарить `temporalAntialiasing`-инстанс;
-под апскейлом пайплайн форсит `jitterSpread=1`.
+История TAA: текущий `ResetTemporalEffects` делает **обе** операции —
+`PostProcessLayer.ResetHistory()` и `TemporalEffectsResetRequested=true`.
+Open-edge затрагивает только PIP; rate-gated путь при быстром повороте — также
+view-камеру. Один флаг без `ResetHistory` был неполным фиксом. Не шарить
+`temporalAntialiasing`-инстанс; под апскейлом пайплайн форсит `jitterSpread=1`.
 
-Bloom-cut при RT ≤512² обязателен (`Bloom.enabled=false`, PIP-only том, слои
-6/7, priority 1000): иначе NaN-блоки в мип-цепочке от ярких ламп (`max RT>1.0`
-— сигнатура).
+Bloom-cut сейчас always-on при открытом секстанте (`Bloom.enabled=false`,
+PIP-only том, слои 6/7, priority 1000). Он вводился против чрезмерных ореолов
+маленькой RT. Жёсткие NaN-блоки и `max RT>1.0` сами по себе не доказывают bloom:
+в расследовании были также ambient/GBuffer-дефекты.
 
 ## 5. VSR и позиционирование
 
 - Граф: `MainCamera.Instance → InteriorCamera → Camera + AdditionalCameraData`;
   `PlayerShip.Interior.VirtualScene + Target`; сериализованное поле VSR
   (`virtualScene`) в игре null — сцена приходит через per-frame override.
-- Клон parented строго к `InteriorCamera.transform.parent` (locator space
-  `(0,100,0)`, identity rotation) — иначе ~100 м смещения. Fallback —
+- Клон parented к `InteriorCamera.transform.parent` (locator space;
+  `(0,100,0)` и identity — значения старого стенда, не универсальная поза). Fallback —
   `VirtualScene.Target`.
 - `interiorCamera` поле VSR — static, НЕ ТРОГАТЬ. `SetRenderingEnabled(true)`
   пишет `clearFlags=Nothing` на `localCamera` — восстанавливать свой clear.
-- Follower клона: ротация с PIP после VSR (`[DefaultExecutionOrder(10000)]`,
-  early-return при закрытом секстанте — иначе спам POSE в лог).
-- PIP-root: позиция с InteriorCamera, поворот НЕ трогать (yaw/алидада из Update).
+- Поворот клона переутверждает Harmony-постфикс `InteriorClonePosePatch` на
+  `VirtualSceneRenderer.LateUpdate`; один follower с order 10000 проигрывал
+  порядку VSR. Компоненты-якоря сохраняются, привязка — по типу, не имени GO.
+- PIP-root: позиция с InteriorCamera; поворот отдельно задаёт `SextantPipPose`
+  в parent frame, одинаково для обеих веток и с сохранением угла алидады.
 
 ## 6. Маски, порталы, стенсил, вода
 
 - Маски: interior `545264640`, PIP `545264768` (= +sun-бит 128, слой 7).
 - Порталы (`ExteriorViewPortalsController.PreCull`): guard-fail → `RenderScene`+
   full scissor; иначе bbox порталов в 4.5 м (`sqrMagnitude>20.25` — пропуск) по
-  проекциям Interior-камеры; валидный → scissor, иначе `false`. Миррорить ПАРУ
-  целиком, иначе блочные вспышки у дверей.
+  проекциям Interior-камеры; валидный → scissor, иначе `false`. Это **внешний**
+  culling rect. Его миррор сохраняется снаружи, но внутри root-writer получает
+  полный viewport после миррора — иначе лампа отсекается до отрисовки.
 - Stencil: проход пишет refs = passIndex; light-компайл `Equal(3)` vs
   `GreaterEqual(7)` для passIndex 2; `_SurfaceType` global; GUI-стенил и
   портальный `Equal`-тест — не пересекать.
@@ -154,10 +185,13 @@ Bloom-cut при RT ≤512² обязателен (`Bloom.enabled=false`, PIP-on
 
 ## 7. Поза, резолвер, зум
 
-- Левая: yaw view; правая: yaw + pitch алидады (`-arcAngle`); FOV/divisor;
-  `near/far/depthTextureMode` — с view-камеры покадрово (FPP far пересчитывается
-  игрой: 40 м внутри, 170 м во external-сценах, снаружи — туманная формула с
-  clamp 300..far; `FPPCameraController:942`).
+- Левая: pitch и yaw view; правая: тот же взгляд + pitch алидады (`-arcAngle`).
+  `SextantBeamPoseMath` задаёт оба луча, `SextantPipFrameMath` переводит оба
+  поворота в интерьерный parent frame. Игнорировать pitch view нельзя.
+   FOV = view FOV / divisor; `near` (с нижним пределом) и `depthTextureMode`
+   зеркалятся покадрово. **Far не зеркалится:** `SextantPipClip.FarPlane=9000 м`.
+   Игровой FPP far меняется по интерьеру/туману; старый совет копировать его
+   в PIP отменён. Увеличение far само по себе не исправило дуги на поворотах.
 - Зум `{6,4.5,3,2,1.5,1}`, default idx 5 (×1); липкий (не сбрасывается на
   reopen) — фиксировать в протоколе.
 - TestAim — только гейтированный проб, всегда сбрасывать (`ClearTestAim`).
@@ -181,13 +215,15 @@ sun disc (`Active = IsOpen && rightFilters>0`), exterior-фог.
 
 ## 9. RT и дисплей
 
-`512²/32bit/ARGBHalf/Linear`, clear `SolidColor` black; обе камеры `enabled`
-(SRP-цикл, ручной `Render()` — no-op для disabled!). Материал — непрозрачный
+Квадратная RT `ARGBHalf/Linear`, depth 32, clear `SolidColor` black. Размер
+вычисляет `SextantPipSize.ForOcularPixels` по физическому окуляру (256…1536),
+не фиксированные 512². Камеры используют **attached либо standalone**, не оба;
+ручного `Render()` нет. Материал — непрозрачный
 из бандла (цепочка `ResourceManager → bundle → Assets/Packages/testui/<name>`;
 стоковый UI-шейдер × alpha RT!). Аудит цветов: views/RawImages white,
-dims transparent, glare ~0.05, backing black. Какая часть RT показывается в
-круге окуляра — НЕ верифицировано (гипотеза «половина RT» из §16.11, остаток);
-при расхождениях проверить crop-соответствие явно.
+dims transparent, backing black. `uvRect` левой/правой RawImage — 0…0.5 / 0.5…1;
+это половины соответствующих RT. Координаты измерения выводятся из текущего
+layout, uiScale и разрешения; не переносить DISC-боксы старого стенда вслепую.
 
 ## 10. Тома и перископ-эталон
 
@@ -217,10 +253,17 @@ RT-как-финал (Overlay UI после поста) → неси полны�
 
 Raw `csc` (`build.ps1`) + **блокирующий PVS-гейт**; C# **7.0** + игровые дефайны
 без `DEBUG` (`default;` = CS8107 → битый assembly; `const bool`-гейты = CS0162
-→ `static readonly`); `SourceCheck` (neural-slop guard, 53); `tests.ps1`
-(свой раннер, 815); `analyze.ps1` (RN0001–RN0010 + IDE-аудит, complexity ≤15 —
-экстрактить); деплой копией DLL в `Temp` + **рестарт** (hot-reload сломан —
-DOUBLE LOAD); live-работа через McpBridge.
+→ `static readonly`); `SourceCheck` (neural-slop guard, 98); `tests.ps1`
+(свой раннер, 1379); `analyze.ps1` (RN0001–RN0010 + IDE-аудит, complexity ≤15 —
+экстрактить); анализаторы 68 PASS. Снимок счётчиков — 2026-10-04.
+
+Деплой — `run-game.ps1` / `deploy-radionav.ps1`: touch источников и рестарт,
+чтобы **игра сама скомпилировала Source**. Не копировать локальную DLL в `Temp`:
+cached assembly load может вернуть null и тихо пропустить инициализацию.
+`run-game.ps1` — стендовый скрипт: требует ровно McpBridge + RadioNavigation в
+modlist, останавливает игру и quick-load'ит последний сейв. Даже `-NoRestart`
+останавливает текущий процесс; это не безопасный dry-run. В документационном
+проходе скрипт запуска игры не нужен. Hot-reload не является рабочим деплоем.
 
 ## 13. Стенд приёмки (обязательный минимум)
 
@@ -228,10 +271,13 @@ DOUBLE LOAD); live-работа через McpBridge.
 пары A/B в одном окне; settle 15 с после load / 5 с после тогглов;
 `screen 1920×1080`; метрика DISC (`r250@(960,540)`) + BRIGHT (`min>110,
 max<250`) + GRID + `b_r`/`b_g`/max/blackfrac; порог `|Δb_r|<5`; гигиена гейтов
-до/после; позитивное доказательство срабатывания. Гочи: PNG-превью лжёт
-(только числа); R-кадры дрейфуют unpaused; keyword-транзиенты; load-fade.
-Мост: `input_key Minus → bad-key` (зум только кодом — фолбэк freeze текущего
-div с записью!); `screen_set 1920×1080` каждый прогон (окно плывёт!).
+до/после; позитивное доказательство срабатывания. Это **метод старого цветового
+стенда**, не универсальный критерий. Нативные кадры и вырезки проверять глазами
+вместе с целевой метрикой; агрегат может пропустить явный смаз (§16.24).
+R-кадры дрейфуют unpaused; keyword-транзиенты и load-fade учитывать.
+Старый `input_key Minus → bad-key` — результат той версии моста, не текущая
+инструкция. Сейчас проверять ответ, доступные key names и постусловие зума.
+Размер экрана читать обратно; временную смену разрешения затем восстановить.
 
 ## 14. Диагностика по сигнатурам
 
@@ -242,13 +288,15 @@ div с записью!); `screen_set 1920×1080` каждый прогон (ок
 `rt=True`-строки: самоследование. L/R-разъезд: дивергенция поз при `arc=0`.
 NaN-блоки + `max RT>1.0`: bloom на 512.
 
-## 15. Открытый реестр (как закрывать)
+## 15. Исследовательский реестр стенда 2026-09-19
 
 Слои ламп (`dump_scene component=Light` → `reflect_get layer` — решает вопрос
 дележа света по проходам!); содержимое прохода Interior[1] (слой 17);
 бинарник шейдера бандла (RenderDoc-дизассемблер draw вида); тюнинги томов;
 `CP_SSSSS/TOD/FogOfWar` внутренности; `StreamingController` bias;
-`_SurfaceType` downstream; контент decals; 512-vs-1024 цена (`perf_sample`).
+`_SurfaceType` downstream; контент decals; стоимость разных RT (`perf_sample`).
+Это исторические вопросы, не все являются текущими блокерами. Лампа в §16.25
+уже проверена на стадии culling/submission; новая маска света ей не требовалась.
 
 ## 16. Глоссарий
 
@@ -260,7 +308,7 @@ settle; lens vs fullscreen; FPP NG; `__N`-привязки.
 
 | Раздел гайда | Статус | Комментарий |
 |---|---|---|
-| Инвариант, архитектура, пайплайн, данные, пост, VSR, маски, вода, поза, ночь, RT, тома, перископ, инфра, build, стенд, диагностика, числа, процессы, реестр | OK | Сверены с кодом/декомпилятом/live — расхождений нет |
+| Исходные разделы стенда | Историческая сверка 2026-09-19 | Не подтверждает поздние изменения; действующие исключения приведены в начале гайда |
 | Телеметрия | Было отсутствует | См. §17.1 |
 | Open/Close lifecycle | Было частично | См. §17.2 |
 | Wiring мода | Было отсутствует | См. §17.3 |
@@ -281,12 +329,12 @@ readonly keeps the gate checks live.`
 
 ### 17.2. Open/Close — точные эффекты (`SextantController`)
 
-Open: blockade + canvas + `AttachToMain` (регистрация в `AttachedCameras`!) +
-`enabled=true` обеим камерам + поза + `IsOpen=true` + `bloomCut.Update` на edge
-(иначе ждёт первого keypress!). Close: `IsOpen=false` → `ClearTestAim` →
+Open: blockade + canvas + `ResumeRendering` (attachment + выбор маршрута) +
+сброс обеих PIP-историй + `ResetFilters` + `IsOpen=true` + `bloomCut.Update` на edge;
+поза применяется в LateUpdate. Close: `IsOpen=false` → `ClearTestAim` →
 снять blockade → `Detach` (вода!) → VSR off → sun disc off/reset →
 `bloomCut.Hide()` → камеры `enabled=false` → UI hide → лог `closed`.
-**Переживают закрытие** (важно для A/B!): камеры, RT, зум (липкий!),
+**Переживают закрытие** (важно для A/B!): камеры, RT, дуга, зум (липкий!), worksheet,
 `lastGoodViewCamera`, `SuppressionCount`, PlayerPrefs-гейты.
 
 ### 17.3. Wiring-минимум (`Manifest.json` дословно)
@@ -386,7 +434,7 @@ RN0001 (metadata-фолбэк) / RN0002 (ambiguous) / RN0003 (сигнатуры
 `OnAudioFilterRead`) / RN0008 (Unity-API только main thread) / RN0009 (prefix
 → `bool`/`void`, postfix → `void`) / RN0010 (рефлексия по строкам — null-guard
 обязателен) + IDE0051/52 CLI-аудит + complexity ≤15 (экстрактить!) +
-SourceCheck 53 + tests 815. СЛЕПЫЕ ПЯТНА (не ловятся ничем статическим):
+SourceCheck 98 + tests 1379 (2026-10-04). СЛЕПЫЕ ПЯТНА (не ловятся ничем статическим):
 `__N`-привязки Harmony, hook-cache staleness, keyword-транзиенты шейдеров,
 дрейф стоек, содержимое томов.
 
@@ -463,8 +511,9 @@ FPPBody/UI-логика (только точки касания: `canSight`, blo
 дословно:
 `IsLiveViewMode` (SectionView/FPP **строкой** — хрупко к переименованиям!) +
 живой резолв камеры + `GameInput` (иначе `cannot-open` / `Z ignored` в логе).
-Мод НЕ реализует `IImageEffect` — своих эффект-стейджей у PIP нет вообще
-(только тома + `WaterCamera`).
+Текущий мод имеет собственный `IOpaqueImageEffect` астигматизатора
+`SternspreizLensEffect` только на правом PIP. Старое утверждение «своих
+эффект-стейджей нет» предшествовало линзе и больше не действует.
 
 ### 19.3. Per-pass свет и RAW-разрыв (фиксация)
 
@@ -518,20 +567,25 @@ FPPBody/UI-логика (только точки касания: `canSight`, blo
 - Split: дивергенция поз при `arc=0` → разные пути/моменты половин.
 - NaN: `max RT>1.0` → bloom на 512 → bloom-cut; мягкие ореолы — мимо.
 
-## 20. Статус приёмки и внедрения (что шиппнуто, что предложено)
+## 20. Статус приёмки и внедрения (актуально 2026-10-04)
 
 **Закрыто (шиппед, live-проверено):** single-writer + прямое позиционирование
 (§16.22); `SyncContactShadows` (паритет, визуально нейтрален); `SyncPostProfile`
 (паритет, SRP PPv1 не исполняет — нейтрален); `SyncAmbientMode` (тинт Δ25.8→0.3,
 подтверждено пользователем); guard самоследования (молчание в норме =
-здоров); bloom-cut; scissor+`RenderScene` миррор; bundle-материал.
+здоров); bloom-cut; внешнее зеркало scissor+`RenderScene` с **интерьерным
+full-viewport override**; bundle-материал. Позднее подтверждены parent-frame
+поворот обоих лучей (§16.23), одиночный маршрут и PIP-only open reset (§16.24),
+лампа в финальной RT/композите и 12 интерьерных checkpoints (§16.25).
 
 **Предложено, НЕ шиппнуто** (не принимать за внедрённое!): `ShadowDistance`
 30 с Interior (замерено нейтрально — низкий приоритет); warming volume
-(не тестировался — фолбэк при регрессе тинта); 1024² RT (цена не мерялась);
+(не тестировался — фолбэк при регрессе тинта); отдельный perf-бенчмарк RT
+(размер уже динамический, не предложенная фиксированная 1024²);
 Interior-PPv1-профиль на PIP (moot-при-inert).
 
-**Открытая валидация:** сложный вид (рубка, возврат коррупции); ночь
+**Открытая валидация:** обычный проход через люк и корректная смена `insideBoat`,
+эстетика внешних звёзд/PSF на чистом небе; широкая регрессия сложных видов; ночь
 (экспозиция); Low/Ultra пресеты; SectionView; перископ/UZO параллельно;
 карта при открытом окуляре; bloom-cut OFF (deferred X).
 

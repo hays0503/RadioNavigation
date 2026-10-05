@@ -42,6 +42,7 @@ namespace UBOAT.Mods.RadioNavigation
         public bool WaterAttached => registeredWaterData != null;
 
         private UBOAT.Game.Scene.Rendering.AdditionalCameraData registeredWaterData;
+        private Camera registeredRootCamera;
         private bool waterAttachWarned;
         private SextantEffectMirror effectMirror;
 
@@ -206,6 +207,36 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        /// <summary>Resume via the attached route OR the standalone camera
+        /// list, not both. DeepPipeline.Render recurses into AttachedCameras
+        /// independently of Camera.enabled (Periscope.FullScreenView).</summary>
+        public void ResumeRendering()
+        {
+            AttachToMain();
+            SyncRenderRoutes();
+        }
+
+        private void SyncRenderRoutes()
+        {
+            bool rootRendering = registeredRootCamera != null && registeredRootCamera.isActiveAndEnabled;
+            bool singleRender = PlayerPrefs.GetInt(SextantPipRenderPolicy.PrefsKey, 1) != 0;
+            SetRenderRoute(LeftCamera, rootRendering, singleRender);
+            SetRenderRoute(RightCamera, rootRendering, singleRender);
+        }
+
+        private void SetRenderRoute(Camera camera, bool rootRendering, bool singleRender)
+        {
+            if (camera == null)
+                return;
+            bool attached = registeredWaterData != null
+                && registeredWaterData.AttachedCameras != null
+                && registeredWaterData.AttachedCameras.Contains(camera);
+            bool standalone = SextantPipRenderPolicy.UseStandaloneCamera(
+                attached, rootRendering, singleRender);
+            if (camera.enabled != standalone)
+                camera.enabled = standalone;
+        }
+
         // Water renders itself only for cameras listed on the main camera's
         // AdditionalCameraData (periscope pattern, Periscope.cs:581).
         // Must be MainCamera, not the transient viewCamera (device probe).
@@ -232,6 +263,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             registeredWaterData = data;
+            registeredRootCamera = main.GetComponent<Camera>();
             // The game's list itself can be null after an update РІР‚вЂќ guard the
             // deref, not just the component.
             if (data.AttachedCameras == null)
@@ -262,6 +294,7 @@ namespace UBOAT.Mods.RadioNavigation
                     registeredWaterData.AttachedCameras.Remove(RightCamera);
             }
             registeredWaterData = null;
+            registeredRootCamera = null;
         }
 
         public void Destroy()
@@ -298,6 +331,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void RefreshMirroredState(Camera viewCamera)
         {
+            // Camera modes can activate/deactivate Main Camera while the device
+            // remains open. Keep the fallback live without adding a second pass.
+            SyncRenderRoutes();
             if (effectMirror != null)
             {
                 effectMirror.RefreshSsms(sourceSsmsFog, sourceSsms);
@@ -1066,6 +1102,9 @@ namespace UBOAT.Mods.RadioNavigation
             // PIP drew the exterior scene over the WHOLE frame РІР‚вЂќ the blocky
             // over-dark/over-bright ocular artifact that flashes with the
             // portal state (live 2026-09-18).
+            // This is the exterior baseline. SextantInteriorMirror.Sync runs
+            // afterwards and restores the full rect for the interior writer;
+            // inheriting the portal rect there culled the lamp (2026-10-04).
             Rect scissor = cachedViewData.CullingScissorRect;
             if (leftData != null && leftData.CullingScissorRect != scissor)
                 leftData.CullingScissorRect = scissor;

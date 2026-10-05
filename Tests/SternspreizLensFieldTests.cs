@@ -19,7 +19,51 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Rx = 1f, Ry = 0f, Rz = 0f,
                 Ux = 0f, Uy = 1f, Uz = 0f,
                 Fx = 0f, Fy = 0f, Fz = 1f,
+                TanHalfFovX = 0.6f,
                 TanHalfFovY = 0.6f
+            };
+        }
+
+        private static LensCamera WideSkyCamera()
+        {
+            return new LensCamera
+            {
+                Rx = 1f, Ry = 0f, Rz = 0f,
+                Ux = 0f, Uy = 0f, Uz = -1f,
+                Fx = 0f, Fy = 1f, Fz = 0f,
+                TanHalfFovX = 1000000f,
+                TanHalfFovY = 1000000f
+            };
+        }
+
+        private static LensCamera CameraLookingAt(LensStar target, float tanHalfFov)
+        {
+            float forwardLength = (float)Math.Sqrt(target.DirX * target.DirX
+                + target.DirY * target.DirY + target.DirZ * target.DirZ);
+            float fx = target.DirX / forwardLength;
+            float fy = target.DirY / forwardLength;
+            float fz = target.DirZ / forwardLength;
+            const float upRefX = 0f;
+            float upRefY = Math.Abs(fy) > 0.99f ? 0f : 1f;
+            float upRefZ = Math.Abs(fy) > 0.99f ? 1f : 0f;
+
+            float rx = upRefY * fz - upRefZ * fy;
+            float ry = upRefZ * fx - upRefX * fz;
+            float rz = upRefX * fy - upRefY * fx;
+            float rightLength = (float)Math.Sqrt(rx * rx + ry * ry + rz * rz);
+            rx /= rightLength;
+            ry /= rightLength;
+            rz /= rightLength;
+
+            return new LensCamera
+            {
+                Rx = rx, Ry = ry, Rz = rz,
+                Ux = fy * rz - fz * ry,
+                Uy = fz * rx - fx * rz,
+                Uz = fx * ry - fy * rx,
+                Fx = fx, Fy = fy, Fz = fz,
+                TanHalfFovX = tanHalfFov,
+                TanHalfFovY = tanHalfFov
             };
         }
 
@@ -48,7 +92,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             // Equinox, 48 N, midnight UTC: a real sky must yield some stars.
             var buffer = new LensStar[32];
             int count = SternspreizLensField.CollectVisibleStars(48f, 180d, 2451545d,
-                6.5f, 0f, 1d, buffer.Length, buffer);
+                6.5f, 0f, 1d, WideSkyCamera(), 1.5f, 0.189f, 0f, buffer.Length, buffer);
 
             Assert.True(count > 0);
             for (int i = 0; i < count; i++)
@@ -66,17 +110,90 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             var buffer = new LensStar[4];
             int count = SternspreizLensField.CollectVisibleStars(48f, 180d, 2451545d,
-                6.5f, 0f, 1d, 4, buffer);
+                6.5f, 0f, 1d, WideSkyCamera(), 1.5f, 0.189f, 0f, 4, buffer);
             Assert.True(count <= 4);
+        }
+
+        [Fact]
+        public void CollectVisibleStars_AppliesTheCapAfterFrustumFiltering()
+        {
+            const float latDeg = 48f;
+            const double lstDeg = 180d;
+            const double jd = 2451545d;
+            const float limitingMag = 6.5f;
+            var allVisible = new LensStar[StarCatalog.Stars.Length];
+            int allCount = SternspreizLensField.CollectVisibleStars(latDeg, lstDeg, jd,
+                limitingMag, 0f, 1d, WideSkyCamera(), 0.02f, 0.01f,
+                0f, allVisible.Length, allVisible);
+
+            Assert.True(allCount > 64, "The deterministic sky must contain candidates beyond the cap.");
+
+            // Choose a catalog candidate below the old global top-48 cutoff and
+            // away from every other visible star. A narrow camera around it must
+            // still select that star before the one-slot cap is applied.
+            LensStar target = default(LensStar);
+            bool foundIsolatedTarget = false;
+            double isolationCos = Math.Cos(0.05d * Math.PI / 180d);
+            for (int i = 48; i < allCount && !foundIsolatedTarget; i++)
+            {
+                bool isolated = true;
+                for (int j = 0; j < allCount; j++)
+                {
+                    if (i == j)
+                        continue;
+                    double dot = allVisible[i].DirX * allVisible[j].DirX
+                        + allVisible[i].DirY * allVisible[j].DirY
+                        + allVisible[i].DirZ * allVisible[j].DirZ;
+                    if (dot > isolationCos)
+                    {
+                        isolated = false;
+                        break;
+                    }
+                }
+
+                if (isolated)
+                {
+                    target = allVisible[i];
+                    foundIsolatedTarget = true;
+                }
+            }
+            Assert.True(foundIsolatedTarget, "Expected an isolated candidate beyond catalog slot 48.");
+
+            var selected = new LensStar[1];
+            int selectedCount = SternspreizLensField.CollectVisibleStars(latDeg, lstDeg, jd,
+                limitingMag, 0f, 1d, CameraLookingAt(target, 0.00001f),
+                0.02f, 0.01f, 0f, 1, selected);
+
+            Assert.Equal(1, selectedCount);
+            Assert.Equal(target.DirX, selected[0].DirX, 5);
+            Assert.Equal(target.DirY, selected[0].DirY, 5);
+            Assert.Equal(target.DirZ, selected[0].DirZ, 5);
+        }
+
+        [Fact]
+        public void StreakIntersectsFrustum_IncludesQuadOverhangButRejectsDistantStars()
+        {
+            LensCamera camera = IdentityCamera(0f);
+            camera.TanHalfFovX = 0.5f;
+            camera.TanHalfFovY = 0.4f;
+
+            Assert.True(SternspreizLensField.StreakIntersectsFrustum(
+                Star(0.505f, 0f, 1f), camera, 1f, 0.2f, 0f));
+            Assert.False(SternspreizLensField.StreakIntersectsFrustum(
+                Star(0.52f, 0f, 1f), camera, 1f, 0.2f, 0f));
+            Assert.False(SternspreizLensField.StreakIntersectsFrustum(
+                Star(0f, 0f, -1f), camera, 1f, 0.2f, 0f));
         }
 
         [Fact]
         public void CollectVisibleStars_RejectsBadBuffer()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                SternspreizLensField.CollectVisibleStars(48f, 0d, 2451545d, 6f, 0f, 1d, 1, null));
+                SternspreizLensField.CollectVisibleStars(48f, 0d, 2451545d, 6f, 0f, 1d,
+                    WideSkyCamera(), 1f, 0.2f, 0f, 1, null));
             Assert.Throws<ArgumentException>(() =>
-                SternspreizLensField.CollectVisibleStars(48f, 0d, 2451545d, 6f, 0f, 1d, 8, new LensStar[2]));
+                SternspreizLensField.CollectVisibleStars(48f, 0d, 2451545d, 6f, 0f, 1d,
+                    WideSkyCamera(), 1f, 0.2f, 0f, 8, new LensStar[2]));
         }
 
         [Fact]

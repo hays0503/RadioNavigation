@@ -1,7 +1,23 @@
 # ADR-020: StarSky Phase0 — только лог, 0 прод кода
 
-> Статус: Proposed (2026-08-19) → Accepted после живого замера  
-> Связи: `STAR_SKY_PLAN.md:10`, `Source/Logic/CameraResolver.cs`, `Source/Logic/LighthouseBeamGlow.cs:549`, `Source/Data/StarCatalog.cs` (будущий)
+> Статус: **Proposed** (2026-08-19); исходный набор дат не подтверждён полностью.
+>
+> Связи: `STAR_SKY_PLAN.md`, `Source/Logic/StarSkyPhase0Probe.cs`, ADR-021, ADR-024
+
+## Уточнение 2026-10-04
+
+Production-каталог, StarsMesh, Meeus/топоцентрическая Луна и игровые часы уже
+реализованы; они не являются «будущими» и не заблокированы исполнением этого
+старого probe. Но их наличие не подтверждает **именно протокол двух дат** ниже,
+поэтому дата/статус ADR не переписаны ретроактивно в Accepted. Прежнее намерение
+«не писать AstroMath до Phase0» осталось историей решения.
+
+Настоящие shader/pass/far-clip контракты изменились: fallback `Sprites/Default`
+не доказывает draw в Deep-SRP. Читать текущие ADR-021/024,
+`docs/sky-vs-clouds.md`, `docs/CAMERA_GUIDE.md`. Инструкция включения probe ниже
+— диагностический исторический протокол, не задание менять дату/погоду живой игры.
+
+## Исходный протокол (2026-08-19)
 
 ## Контекст
 

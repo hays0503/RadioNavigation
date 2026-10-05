@@ -1,14 +1,9 @@
 # Component Architecture — RadioNavigation Mod
 
-## Дополнение 2026-10-05: астронавигация в сейве
-
-`SextantSavePersistence` связывает worksheet с `LoadingInitialization`,
-`Loaded` и `SavingStarted`. `SextantSaveData : SceneObject` хранит bounded
-`Payload` v1; `SextantSaveSnapshot` / `SextantSaveCodec` проверяют наблюдения,
-frozen карточку/результат, калибровку/track/FIX/LOP/скрытие. Restore идёт через
-хвост очереди без пересчёта; loading guard и source latch у `NavMapMarkerBase`
-сохраняют native drag/ссылки фигур. Контракт и live reload/изоляция —
-`docs/astro-save.md`.
+> **Актуализация 2026-10-04:** §10.7 исправлен по текущему Source, §10.10 —
+> по эпохе каталога, добавлены §10.12–10.15 (секстант, PIP, астрономия, карта).
+> Старые LOC/досье с датой 2026-08-23 — снимок, а не текущий census. Схема §1
+> показывает исходное ядро радиопанели; полный мод больше этой схемы.
 
 ## 1. Component Hierarchy
 
@@ -18,7 +13,7 @@ RadioNavigation Mod (Source/)
 ├─── Entry Point
 │    └── Logic/Main.cs (Harmony patches, mod initialization)
 │
-├─── UI Components (15 files — flat in Source/UI/)
+├─── UI Components (selected radio-panel files in Source/UI/)
 │    ├── RadioHandler.cs (Main radio panel)
 │    ├── ToggleHandler.cs (Power switch)
 │    ├── ZoneHandler.cs (Zone selector)
@@ -35,7 +30,7 @@ RadioNavigation Mod (Source/)
 │    ├── RadioInstaller.cs (UI instantiation)
 │    └── PrefabNames.cs (Prefab path constants)
 │
-├─── Logic Components (11 files — flat in Source/Logic/)
+├─── Logic Components (selected radio-panel files in Source/Logic/)
 │    ├── SonneController.cs (Main controller — God Class)
 │    ├── RadioStoryIntegration.cs (Game story/locale patches)
 │    ├── StationScheduler.cs (Station cycle state machine)
@@ -604,7 +599,19 @@ LighthouseBeamGlow
   - Рефлексия молча вернёт false при переименовании полей игры — искать префикс `[RadioNav][Chronometer]` в логе.
 - Тесты: `ChronometerCursorPolicyTests` (двухзонная политика, emit-only-on-change) и `ChronometerMapDragMathTests` (нормализация PosOverride, ADR-034); сам обработчик напрямую не покрыт — тонкая связка с Unity/игрой.
 
-### 10.7 StationMapOverlay
+### 10.7 StationMapOverlay — legacy cleanup, не renderer
+
+**Сверено 2026-10-04:** текущий `Source/UI/StationMapOverlay.cs` только убирает
+legacy-точки. `Update` раз в 0.5 с ищет карту до первой успешной очистки;
+`GetComponentsInChildren<MapPointUI>(true)` включает неактивные точки.
+Удаляется точка с точным именем станции и расстоянием ≤0.05 до её координат;
+GO с префиксом `RadioNavStationMarker_` пропускаются. Затем поллинг прекращается.
+Подписок SavesManager, создания Duplicate, списка транзиентных точек и OnDestroy
+в текущем классе нет. Новые станции рисует `StationMapMarker` (§10.15), маяки —
+`LighthouseMapMarker`, не этот компонент.
+
+**Историческое досье 2026-08-23 ниже:** прежний transient-renderer заменён
+нативными точками; его ответственность и lifecycle больше не действуют.
 - Source: `Source/UI/StationMapOverlay.cs`
 - Generated: 2026-08-23 · проверять по исходнику
 
@@ -648,6 +655,10 @@ LighthouseBeamGlow
 ### 10.8 LighthousePlacer
 - Source: `Source/Logic/LighthousePlacer.cs`
 - Generated: 2026-08-23 · проверять по исходнику
+
+**Уточнение 2026-10-04:** карту-метку маяка сейчас рисует `LighthouseMapMarker`,
+не упомянутый в историческом описании ниже `StationMapOverlay`. Bundle fallback
+описан в `docs/map-marker-icons-f229.md`; один ResourceManager недостаточен.
 
 - Назначение: расставляет 3D-префаб маяка для каждого активного `LighthouseProfile` как декоративную sandbox-сущность игры; собственной карты-метки у сущности нет — точку на карте с подписью рисует `StationMapOverlay`. При ненулевой `RotationDegreesPerSecond` в профиле вешает `LighthouseRotator` на дочерний ротатор префаба и инициализирует `LighthouseBeamGlow`. Паттерн «группа+сущность» позаимствован у воркшоп-мода Expanded Ice: `SandboxGroup.Create` + `SandboxEntity.Create` поверх синтетического `EntityType`, собранного из рантайм-`GameDataRow` (префаб резолвится из AssetBundle мода через `ResourceManager`); парентинг в `SceneSpawnContainer` группы держит модель приклеенной к карте при сдвиге плавающего origin сцены.
 - Ключевые ответственности:
@@ -733,7 +744,9 @@ LighthouseBeamGlow
 
 - Назначение: статический каталог из 5046 звёзд для звёздного неба и астронавигации — единственные данные о положениях/яркости звёзд в моде.
 - Сгенерирован автоматически (см. заголовок файла) из каталожного файла Stellarium `hip_gaia3` (`stars_0_0v0_21.cat`).
-- Координаты приведены с учётом собственного движения и прецессии на эпоху J1942.0 (STAR_SKY_PLAN §7.2).
+- Заголовок каталога говорит J1942.0, но измеренная baked-эпоха — **1926.0**.
+  `CelestialEphemeris.CatalogEpochJd=2424516.5` задаёт начало рантайм-прецессии
+  к дате наблюдения; доказательство — `CELESTIAL_REALISM_PLAN.md` P1b.
 - Ключевые ответственности:
   - Хранение неизменяемого массива `StarEntry[5046]` с координатами, яркостью и флагом навигационной звезды.
   - Никакой логики: чистые данные, без методов; единственное состояние — сам массив.
@@ -741,7 +754,7 @@ LighthouseBeamGlow
   - `StarCatalog.Stars` — `static readonly StarEntry[]`, 5046 элементов.
   - Массив отсортирован по убыванию яркости: Sirius (`Hip=32349`, Vmag −1.46) — элемент 0; хвост — звёзды Vmag ≈ 5.99–6.00.
   - `struct StarEntry.Hip` — `int`, номер Hipparcos.
-  - `struct StarEntry.RaDeg` / `DecDeg` — `float`, RA/Dec в градусах, эпоха J1942.0.
+  - `struct StarEntry.RaDeg` / `DecDeg` — `float`, RA/Dec в градусах, baked-эпоха 1926.0.
   - `struct StarEntry.Vmag` — `float`, звёздная величина.
   - `struct StarEntry.Bv` — `float`, показатель цвета B−V.
   - `struct StarEntry.IsNav` — `bool`, признак навигационной звезды.
@@ -756,13 +769,16 @@ LighthouseBeamGlow
 - Инварианты и грабли:
   - Объём: файл ~554 КБ / 5067 строк — один литерал массива.
   - Правка только через регенерацию из Stellarium: руками данные не менять.
-  - Эпоха координат J1942.0 (военный период игры), а не J2000 — потребители не должны смешивать с современными координатами.
-  - `IsNav=true` ровно у 48 ярчайших звёзд (Vmag ≤ ~1.97); остальные 4998 — фон неба.
+  - Не читать сырой RA/Dec как of-date/J2000/1942: использовать `PrecessCatalog`
+    или датированный `TryGetStarRaDec` и единый путь эфемерид.
+  - Навигационный набор — **57** именованных звёзд; это не 48 ярчайших. Лимит
+    48 у линзового renderer — отдельный бюджет, не размер навигационного каталога.
   - Индексы `ConstellationLines.cs` жёстко привязаны к порядку массива: перестановка или укорачивание `Stars` ломает созвездия.
   - Защита в `ConstellationMesh` — только bounds-check `starIdx >= Stars.Length`: перестановки он не ловит.
   - Память: static readonly живёт всегда, ~5046 × 24 байта ≈ 120 КБ — приемлемо; дублировать копии не нужно, читайте напрямую.
   - Имён звёзд и привязок к созвездиям в файле нет — `IsNav` единственная семантическая разметка.
-- Тесты: `Tests/StarCatalogTests.cs`, 5 тестов:
+- Тесты: `Tests/StarCatalogTests.cs` (перечень ниже — исходная выборка),
+  `Tests/StarPrecessionTests.cs` защищает эпоху и датированный путь:
   - Массив непуст (`StarCatalog_HasStars`).
   - Есть навигационные звёзды (`StarCatalog_NavigationStars_Exist`).
   - Координаты в диапазонах RA 0–360, Dec −90..+90 (`StarCatalog_CoordinatesInRange`).
@@ -781,8 +797,85 @@ LighthouseBeamGlow
 - Связи: фасад `RadioStoryIntegration` → gateway; pre-flight проверка таргетов в `Main`.
 - Тесты: `Tests/StoryDecisionGatewayTests.cs` + контракт игры в `Tests/GameContractTests.cs`.
 
+### 10.12 Секстант: контроллер, UI и снимок наблюдений
+
+Сверено 2026-10-04. `SextantController` — lifecycle/input-оркестратор, не
+единственный владелец математического и render-состояния.
+
+| Компонент | Ответственность и контракт |
+|---|---|
+| `Source/UI/SextantController.cs` | Z/open/close, blockade, клавиши дуги/зум/фильтры/линза, вызовы pose и readout. На open сбрасывает фильтры/selection, не дугу и не worksheet; R сбрасывает дугу/трим, O — серию |
+| `Source/UI/SextantOverlay.cs` | overlay Canvas, колонки, live uiScale/layout, связь RT с RawImage; owned UI уничтожается симметрично |
+| `SextantArc` / `SextantZoom` | квант **0.1′ = 1/600°**, дуга 0…130°; default zoom ×1, FOV=main/divisor |
+| `Source/UI/SextantStarId.cs` | HoldTracker 2.5 с, фиксированный конус 1°, sticky BodySelection с lost-timeout 5 с. HasSelection разрешает I вне конуса; InCone отдельно требуется для burst и C-калибровки; внутри hull ID запрещён |
+| `Source/Logic/SextantBurstSampler.cs` | авто-тапы описывают σ/n/отбросы, **не заменяют отсчёт барабана по I**; изменение барабана перезапускает burst |
+| `Source/UI/SextantWorksheet.cs` | запись UT/DR/body/Ho с индекс-поправкой до квантования; №1→№2→№3, последующие I заменяют №3. Физически невозможное тело под горизонтом отклоняется |
+| `SextantRunningFix` / `FixCardComposer` | running fix по двум, triangle fix по трём; расчётная секция фиксируется на CaptureObservation, не пересчитывается от 1-Гц часов |
+| `SextantSavePersistence` / `SextantSaveData` / `SextantSaveCodec` | дополнение 2026-10-05: active-серия, frozen карточка/результат, калибровка/track/FIX/LOP/скрытие в campaign SceneObject; save hook до сериализации, load через хвост очереди без пересчёта. Native drag/ссылки фигур сохраняются в БД того же сейва; live reload/изоляция — `docs/astro-save.md` |
+| `FixCardLayout` / `SextantBodiesReadout` | font-fit от base-font измерения, hysteresis full/compact; список и recommendation используют общий пул, live-прогноз не мутирует карточку наблюдения |
+
+Контракты snapshot/fit/selection защищены behavioral tests и SourceCheck;
+проверка реального UI отдельно от них. Управление — `README.md`, история решений —
+`SEXTANT_PLAN.md` / `CELESTIAL_REALISM_PLAN.md`.
+
+### 10.13 PIP: ownership, порядок и единственный render route
+
+| Компонент | Владеет / делает |
+|---|---|
+| `Source/UI/SextantPipFactory.cs` | две камеры/RT, attachment, cloned effects. ResumeRendering выбирает attached при живом main + членстве, иначе standalone fallback; Suspend/Detach/Destroy освобождают только owned ресурсы |
+| `Source/Logic/SextantPipRenderPolicy.cs` | чистый выбор маршрута; default PipSingleRender=1, 0 возвращает старый двойной путь только для A/B |
+| `Source/UI/SextantPipPose.cs` | оба beam targets от одной позы, yaw-stabilization без position-фильтра, trim/probe/aim-rate, state sync и temporal reset |
+| `Source/Logic/SextantPipFrameMath.cs` | inverse-parent × world для **обоих** лучей внутри, без потери угла алидады |
+| `Source/UI/SextantInteriorMirror.cs` | clone + VSR для позиционирования VirtualScene; после view-миррора inside-only root RenderScene=true + full CullingScissorRect |
+| `SextantPipInteriorPose` / `InteriorClonePosePatch` | позиция root только от игровой InteriorCamera; rotation клона после VSR берётся от своей PIP, не чужой статики/имени GO |
+| `SextantBloomCut` / `SternspreizLensEffect` | PIP-only bloom override при open; opt-in правый IOpaqueImageEffect линзы, main/sky-путь отдельно |
+
+Порядок обязателен: **RefreshMirroredState(viewCamera) → InteriorMirror.Sync(insideBoat)**.
+Иначе view-миррор вернёт внешний portal rect и вырежет интерьерную лампу до Cull.
+На выходе наружу зеркало main остаётся действующим. Single-writer и single-render
+— разные контракты: подавление клона само по себе не убирает attached+enabled.
+
+Open-edge чистит обе PIP-истории (`ResetHistory` + флаг), не main; rate-gated
+сброс при быстром повороте — отдельный путь main+PIP. Доказательства лампы и
+первого кадра: `SEXTANT_PLAN.md` §16.23–16.25; эксплуатация — `docs/CAMERA_GUIDE.md`.
+
+### 10.14 Астрономия и видимость
+
+- `Source/Logic/AstroMath.cs` — JD/GMST/LST, ENU, прецессия, Солнце/Луна/планеты.
+  `CelestialEphemeris` связывает UT/TT, ΔT и body routing; звёзды прецессируются
+  от baked-эпохи 1926.0, Луна считается топоцентрически для наблюдателя и в рендере,
+  и в редукции. Старые утверждения «параллакс отсутствует» больше не действуют.
+- `StarsMesh`, `ConstellationMesh`, `PlanetRenderer`, `MoonDiscRenderer` — разные
+  render-ответственности. Единственный pipeline-visible star pass — PointSky;
+  `GameStarLayerSuppressor` скрывает декоративный игровой dome при рабочем bundled shader.
+- `AtmosphericExtinction`, `SkyBrightness`, `DarkAdaptationState` задают видимость,
+  не запрещают тусклую цель произвольным mag-гейтом. `CelestialForecast` и
+  `BodyRecommendation` выбирают геометрию пары/тройки из согласованного пула.
+- Проверенный численный ephemeris-контракт не заменяет внешнюю эстетическую
+  приёмку star-size/PSF; она остаётся pending (`docs/sextant-optical-visuals.md`).
+
+### 10.15 Карта: нативные точки, save database и защита статичных маркеров
+
+| Компонент | Контракт |
+|---|---|
+| `Source/UI/NavMapMarkerBase.cs` | desired keys → реконсиляция каждую 1 с; MapChartingUI.CreatePoint, adoption сохранённых точек, includeInactive, family ownership, ограниченное создание и explicit removals; для FIX loading guard и latch сохраняют native drag при queued restore |
+| `Source/UI/MapMarkerPointBridge.cs` | mod-visual детьми реального MapPointUI; нейтрализует нативные image/label, компенсирует scale/offset, транслирует policy/позицию в LateUpdate |
+| `StationMapMarker` / `LighthouseMapMarker` | защищённые статичные точки: позиция возвращается к источнику, marker не удаляется ластиком |
+| `Source/UI/FixMapMarker.cs` | динамический FIX и LOP-вершины: drag/erase/Delete, подавление после удаления до нового I/O; расчётный snapshot не стирается вместе с pin |
+| `Source/UI/MapShapeEraser.cs` | до ванильного LateUpdate удаляет line/angle/circle/bearing и очищает hoveredPoint. Фактический guard `IsOwned` охватывает **все** наши точки, включая FIX/LOP; соответствие исходному динамическому удалению остаётся открытым (`MAP_MARKERS_PLAN.md`) |
+| `Source/Logic/MapSaveSanitizer.cs` | Loaded/SavingStarted: дедуп только owned RadioNav и legacy MCP Point; предпочитает endpoint используемой фигуры. RemovePointDataBeforeDestroy предотвращает воскрешение в сейве того же кадра |
+| `MapProbe` | проверяемые map-операции MCP с ownership, finite/range-гейтами и отказом дублей/self-line; uGUI drag не заменяет картографический путь |
+
+Не удалять stale-набор другой копии сборки по одному несовпавшему desired set:
+double-load guards используют имена типов, точные дубли и семейства ключей.
+Иконки загружаются через общий `LoadBundleIconSprite` и leaf fallback по
+контейнерным именам бандла; ResourceManager один не видит ассеты мода (F229).
+Детали и датированная live-приёмка — `MAP_MARKERS_PLAN.md`,
+`docs/map-marker-icons-f229.md`; инструментальные ограничения — `docs/live-diagnostics.md`.
+
 ----
 
-*Document Version: 1.5*  
-*Last Updated: 2026-08-24*  
+*Document Version: 1.6*
+
+*Last Updated: 2026-10-04 (актуальные цепочки §10.7, §10.10, §10.12–10.15; ранние досье сохраняют даты)*
 *Corrections: Fixed component hierarchy (flat structure, added ComparisonExtensions), fixed array sizes 4→14 (F48), file counts (F49), added missing classes (F52). See F01–F207 (total 207 issues) — статусы в `hypothesis/INDEX.md`, закрытие в `RESOLVED_LEDGER.md`. v1.4: merged class dossiers from docs/dossiers/ into §10 (lossless). v1.5: added StoryDecisionGateway (§10.11).*

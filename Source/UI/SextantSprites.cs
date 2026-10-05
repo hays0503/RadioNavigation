@@ -82,10 +82,42 @@ namespace UBOAT.Mods.RadioNavigation
                         float t = (r - EyecupSolidTo) / (1f - EyecupSolidTo);
                         a = 1f - t * t * (3f - 2f * t);
                     }
-                    tex.SetPixel(x, y, new Color(0f, 0f, 0f, a));
+                    // Subtle rubber grain changes RGB only; the established alpha
+                    // silhouette/falloff is intentionally untouched.
+                    float grain = SextantOpticsProfile.Hash01(x / 3, y / 3, 73) - 0.5f;
+                    float rubber = Mathf.Clamp(0.012f + grain * 0.008f, 0.006f, 0.018f);
+                    tex.SetPixel(x, y, new Color(rubber, rubber * 0.98f, rubber * 0.94f, a));
                 }
             }
             tex.Apply();
+            return tex;
+        }
+
+        /// <summary>Low-contrast dust/oil texture; transparent at centre and rim.</summary>
+        public static Texture2D CreateOpticsGrimeTexture()
+        {
+            const int size = 256;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.name = "RadioNavSextantOpticsGrime";
+            tex.hideFlags = HideFlags.DontSave;
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float px = ((x + 0.5f) / size) * 2f - 1f;
+                float py = ((y + 0.5f) / size) * 2f - 1f;
+                float r = Mathf.Sqrt(px * px + py * py);
+                float coverage = SextantOpticsProfile.GrimeCoverage(r);
+                float noise = SextantOpticsProfile.Hash01(x, y, 191);
+                float fleck = noise > 0.992f ? (noise - 0.992f) * 0.035f : 0f;
+                byte alpha = ToByte(Mathf.Clamp(coverage * (0.018f + fleck), 0f, 0.025f));
+                byte shade = ToByte(0.72f + noise * 0.18f);
+                pixels[y * size + x] = new Color32(shade, shade, shade, alpha);
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
             return tex;
         }
 

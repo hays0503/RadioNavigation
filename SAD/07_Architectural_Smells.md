@@ -1,5 +1,12 @@
 # Architectural Smells — RadioNavigation Mod
 
+> **Граница актуальности 2026-10-04:** таблицы smells, LOC и приоритеты ниже —
+> снимок аудита 2026-08, не новый подсчёт текущего проекта. Набор CAP 59 теперь
+> состоит из пяти станций, legacy radio PositionFix удалён, а bootstrap/gateway
+> и ряд helpers выделены. Действующие компоненты — `SAD/03`/`SAD/04`, остатки
+> предложенных слайсов — `PLAN_Phase5.md`, выборочная сверка находок — ledger §7.
+> Исторические примеры нельзя выдавать за текущие дефекты без повторной проверки.
+
 > **⚠️ Deep Scan Update (2026-08-02):** Аудит закрыт (F01–F207, статусы в `refactoring-plan/hypothesis/INDEX.md`). Ключевые исправления выполнены (42 коммита `fix/audit-and-issue-files` + `refactor/deferred-code`); оставшиеся архитектурные smells отложены в `refactoring-plan/DEFERRED.md` (god-объекты F02/F03/F18/F21/F25 → SAD 08/09 Фаза 4). Историческая сводка:
 > - **F45 (исправлено):** 5 ADR changed «Accepted» → «Deferred»
 > - **F46 (исправлено):** Harmony targets corrected (RadioStory, not Game)

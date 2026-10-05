@@ -133,3 +133,59 @@ private void Hide()
   переживают сцену).
 - `GameUI.SetMode` игнорирует повторную установку того же режима (`uiMode != this.uiMode`),
   так что «лишних» событий `ModeChanged` не будет — но и пинка при рестарте тоже.
+
+## 7. PIP и активность главной камеры (проверено 2026-10-03)
+
+- `AdditionalCameraData.AttachedCameras` — `List<UnityEngine.Camera>` (публичный
+  getter); в этой сборке список может быть null. Это **маршрут рендера**, а не
+  только список для воды: `DeepPipeline.RenderDeferredCamera` рекурсивно вызывает
+  `Render(context, list)` для каждого attachment без проверки `Camera.enabled`.
+  Проверено по декомпиляту `com.dws.pipeline.Runtime.dll` и живыми счётчиками.
+- Камера одновременно в `AttachedCameras` и с `enabled=true` рисуется дважды:
+  attachment + внешний список Unity. Родной оконный перископ использует
+  `periscopeCamera.enabled=false` + attachment (`Periscope.FullScreenView`,
+  `UBOAT.Game.Scene.Items/Periscope.cs:569–583`). Ручной `Camera.Render()` для
+  этого маршрута не нужен.
+- Для PIP мода отключать standalone можно **только** при фактическом членстве
+  конкретной камеры в списке и `rootCamera.isActiveAndEnabled`. При выключенном
+  главном виде или отсутствующем attachment сохранять standalone-fallback.
+  Проверять это при смене camera mode: корень может выключиться при открытом UI.
+- `PostProcessLayer.ResetHistory()` сбрасывает истории PPv2. Игровой
+  `GameCamera.ResetTemporalEffectsNow()` дополняет его присваиванием
+  `AdditionalCameraData.TemporalEffectsResetRequested=true`. Для открытия PIP
+  применять к своим двум камерам до первого рендера, не сбрасывать главный вид.
+  Один сброс при сохранённом двойном маршруте не устранил смаз первого кадра.
+- Рецепт и живая приёмка: `SEXTANT_PLAN.md` §16.24. 24 записанных открытия
+  нового маршрута на 30 fps чистые; старый путь даёт положительный контроль.
+   Это не замена отдельной приёмке внешнего звёздного поля.
+
+## 8. CullingScissorRect и интерьерный PIP (проверено RenderDoc 2026-10-04)
+
+- `AdditionalCameraData.CullingScissorRect` — **не пиксельные ножницы**:
+  `DeepPipeline.CameraSettings.Initialize` сужает им четыре боковые плоскости
+  `ScriptableCullingParameters` **до** `context.Cull`. Отключение
+  `Camera.useOcclusionCulling` не отменяет это геометрическое отсечение.
+- `ExteriorViewPortalsController.PreCull` задаёт этот rect по viewport bbox
+  внешних порталов (`:106–109`), либо полный `(0,0,1,1)` (`:40–43`). Это
+  ограничение внешнего writer, не всей интерьерной сцены.
+- Корневой интерьерный PIP single-writer не должен наследовать portal rect
+  основной камеры. В живой сцене скопированный X=0.7284 отсекал AABB лампы
+  с viewport X=0.4533–0.5399 ещё до submission. Большие меши стен пересекали
+  frustum и оставались видимыми, маскируя ошибку.
+- Изолированный A→B→A′ (только rect PIP, поза/FOV/маски/main без правок):
+  Lamp draws в 1267² target **0 → 12 → 0**, в main **1 → 1 → 1**; лампа на
+  финальной PIP RT отсутствует → видна → отсутствует. Меш подтверждён теми
+  же VB/IB и SHA-256 IB. Это причинный эксперимент до продуктовой правки.
+- Доказательства: `%LOCALAPPDATA%\Temp\opencode\captures\lamp-mesh\LAMP_CULLING_FINDING.md`
+  и `lamp_scissor_frame5980/16201/19323.rdc`; сравнение `lamp-culling-ABA.png`.
+- **Исправлено 2026-10-04:** `SextantInteriorMirror.Sync` вместе с включением
+  корневого интерьерного writer задаёт `(0,0,1,1)`, строго после выхода для
+  `!inside`. `SextantPipFactory.SyncRenderScene` по-прежнему зеркалирует rect
+  основной камеры на обе PIP перед интерьерным override, поэтому внешний
+  путь и основная камера не меняются. Поза/наклон алидады не затронуты.
+- Игровая перекомпиляция **без зонда**, RTX 4080 SUPER:
+  `lamp_scissor_productfix_frame6082.rdc`, Lamp PIP **12**, main **1**,
+  тот же SHA-256 IB; лампа видна в цветовой PIP RT и в полном UI-композите.
+  Гейт `SextantPip_InteriorWriterUsesFullCullingViewport` защищает реальную
+  запись, inside-only scope, порядок и восстановление внешнего rect;
+  **8/8** мутаций пойманы. Детали приёмки и её границы — `SEXTANT_PLAN.md` §16.25.

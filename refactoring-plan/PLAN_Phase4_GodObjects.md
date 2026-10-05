@@ -2,6 +2,13 @@
 
 > **Статус 2026-08-24:** Slice 4.1 (F04 → `StoryDecisionGateway.cs`) ВЫПОЛНЕН — commit 28f4a62; остаток слайсов superseded планом `PLAN_Phase5.md` (P5.1–P5.8). Этот документ — исторический.
 
+> **Уточнение 2026-10-04:** G1–G4 исправлены именно gateway-фиксом 2026-08-23;
+> ранняя фраза «уже закрыто 2026-08-01» ниже была неверной оценкой исходного плана.
+> Часть слайсов Phase5 реализована, часть предложений отсутствует — читать его
+> актуальную шапку. Для мода использовать raw-csc `build.ps1`, не `dotnet build`.
+> Preflight подтверждён поздними загрузками (5/5), но остальные live-критерии
+> §4.0 не закрываются этим результатом. Hot-reload заменён restart.
+
 > Дата: 2026-08-21. Статус: план, код не трогаем до green live 1-3.
 > Принцип: 1 PR = 1 god-object slice + 208 PASS + Build OK (best practice).
 
@@ -27,7 +34,7 @@
 ## Порядок по best practice (1 slice = 1 PR)
 
 ### 4.0 Gate (обязательно)
-- [ ] `Player.log` без `target methods not found` / `[RadioNav]` ошибок (live load)
+- [x] Preflight `target methods not found` — поздний live `Patches applied: 5/5`; не подтверждение отсутствия любых ошибок всего проекта.
 - [ ] `StarSkyPhase0Probe` 2 даты vs Stellarium → `ADR-020 Accepted`
 - [ ] `F71` pause/fast-forward live ок, `callsign` один, `DASH ▬→◆◆→•` live ок
 
@@ -73,4 +80,6 @@ git checkout -b refactor/f04-gateway
 powershell -File tests.ps1
 ```
 
-Refs: `SAD/06_God_Object_Analysis.md`, `SAD/08_Target_Architecture.md`, `SAD/09_Roadmap`, `hypothesis/INDEX.md` F02-F04, `game-source-findings/G1-G4`, `LIVE_VALIDATION_CHECKLIST.md`.
+Refs: `SAD/06_God_Object_Analysis.md`, `SAD/08_Target_Architecture.md`,
+`archive/09_Refactoring_Roadmap.md`, `hypothesis/INDEX.md` F02-F04,
+`game-source-findings/` (G1–G4), `LIVE_VALIDATION_CHECKLIST.md`.

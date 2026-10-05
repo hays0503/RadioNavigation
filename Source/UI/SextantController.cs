@@ -26,6 +26,10 @@ namespace UBOAT.Mods.RadioNavigation
     /// Layout is resolution-independent: own overlay canvas + CanvasScaler
     /// (1920x1080 reference, match height), SEXTANT_PLAN §13.
     /// </summary>
+    // Game view-camera LateUpdates run at the default/low execution orders.
+    // Run after them so the ocular PIPs use this frame's gaze, but before the
+    // interior pose followers at order 10000.
+    [DefaultExecutionOrder(5000)]
     public sealed class SextantController : MonoBehaviour
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
@@ -47,6 +51,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>Live device instance for the MCP probe (set in Awake).</summary>
         internal static SextantController Instance { get; private set; }
+
+        private bool openPoseLogPending;
 
         /// <summary>
         /// True when the camera is one of the two sextant PIP halves. Used by
@@ -121,6 +127,8 @@ namespace UBOAT.Mods.RadioNavigation
         private Texture2D ringTexture;
         private Texture2D circleMaskTexture;
         private Texture2D eyecupTexture;
+        private Texture2D opticsGrimeTexture;
+        private Texture2D opticsMoteTexture;
         private System.Collections.Generic.List<Sprite> ownedSprites;
 
         // Cached delegates for the per-frame input poller: method-group
@@ -269,14 +277,11 @@ namespace UBOAT.Mods.RadioNavigation
                 inputPoller.PollFilters(setFiltersDelegate);
                 inputPoller.PollLens(toggleLensDelegate);
                 inputPoller.PollZoom(zoomInDelegate, zoomOutDelegate, resetArcDelegate);
-                UpdatePipPose();
-                if (vectorLog.OnViewRotate(viewCamera))
-                    LogVectorState("rotate");
                 renderCheck.Update(Time.unscaledDeltaTime, arcAngle, pipFactory.LeftRt, pipFactory.RightRt);
                 UpdateGlare(Time.unscaledDeltaTime);
-                UpdateEyeShadow(Time.unscaledDeltaTime);
                 UpdateStarId(Time.unscaledDeltaTime);
                 UpdateSightLines();
+                UpdateOpticsMotes();
                 UpdateReadout(false);
                 UpdateBodiesReadout(Time.unscaledDeltaTime);
                 UpdateMoonParity(Time.unscaledDeltaTime);
@@ -291,6 +296,30 @@ namespace UBOAT.Mods.RadioNavigation
             else if (Input.GetKeyDown(KeyCode.Z) && !ShiftHeld())
             {
                 TryOpen();
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (!IsOpen)
+                return;
+
+            // FPPCameraController.LateUpdate writes the final head/camera pose
+            // after Update. The old Update-time sample therefore left both PIPs
+            // one frame behind the visible gaze during mouse turns. This
+            // controller's order (5000) keeps the PIP pose late, while the
+            // interior helpers (10000) apply their corrections afterwards.
+            UpdatePipPose();
+            UpdateEyeShadow(Time.unscaledDeltaTime);
+
+            if (openPoseLogPending)
+            {
+                openPoseLogPending = false;
+                LogVectorState("open");
+            }
+            else if (vectorLog.OnViewRotate(viewCamera))
+            {
+                LogVectorState("rotate");
             }
         }
 
@@ -312,6 +341,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (ringTexture != null) Destroy(ringTexture);
             if (circleMaskTexture != null) Destroy(circleMaskTexture);
             if (eyecupTexture != null) Destroy(eyecupTexture);
+            if (opticsGrimeTexture != null) Destroy(opticsGrimeTexture);
+            if (opticsMoteTexture != null) Destroy(opticsMoteTexture);
             if (ownedSprites != null)
             {
                 for (int i = 0; i < ownedSprites.Count; i++)
@@ -404,19 +435,12 @@ namespace UBOAT.Mods.RadioNavigation
         {
             gameInput.AddBlockade(this);
             canvasRoot.SetActive(true);
-            pipFactory.AttachToMain();
-            // Both PIP cameras take the SAME render path: enabled=true, so the
-            // game's SRP camera loop renders each one once per frame with the
-            // pose set in Update (i.e. after LateUpdate positioned the sun disc
-            // and the interior clone). The old split (left disabled + manual
-            // Render() in Update) left the left RT effectively black —
-            // GPU-verified 2026-09-17 (RenderDoc): left RT RGB <= 0.025 vs
-            // right RT RGB <= 0.917, the disabled camera's manual render being
-            // a no-op. Water still needs the AttachedCameras registration.
-            if (pipFactory.LeftCamera != null)
-                pipFactory.LeftCamera.enabled = true;
-            if (pipFactory.RightCamera != null)
-                pipFactory.RightCamera.enabled = true;
+            pipFactory.ResumeRendering();
+            // Clear only the two PIP histories before their first SRP render.
+            // They must render once: an attached + enabled camera renders twice,
+            // so a reset on the first pass alone cannot protect the final image.
+            // The main view and its temporal history are deliberately untouched.
+            SextantPipPose.ResetPipTemporalEffects(pipFactory);
             int attachedCount = pipFactory.AttachedCount();
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} ATTACH water={1} attached={2} leftEn={3} rightEn={4} fov={5:F1} pipFov={6:F1}",
@@ -425,11 +449,10 @@ namespace UBOAT.Mods.RadioNavigation
                 pipFactory.RightCamera != null && pipFactory.RightCamera.enabled,
                 viewCamera != null ? viewCamera.fieldOfView : 0f,
                 viewCamera != null ? viewCamera.fieldOfView / zoom.FovDivisor : 0f));
-            // Fresh filters each session: the first pose below snaps instead
-            // of gliding from the pose frozen at Close (swarm review 2026-11-04).
+            // Fresh filters each session: the first pose in LateUpdate snaps
+            // instead of gliding from the pose frozen at Close (swarm review 2026-11-04).
             SextantPipPose.ResetFilters();
-            UpdatePipPose();
-            LogVectorState("open");
+            openPoseLogPending = true;
             IsOpen = true;
             // Freeze the sky-shell radius (P7): the PIP mirrors its far clip
             // every frame, so a live radius would make the stars jump mid-sight.
@@ -460,6 +483,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             IsOpen = false;
+            openPoseLogPending = false;
             SextantPipPose.ClearTestAim();
             // A closed sextant must never show a stale crescent.
             lune.Reset();
@@ -1036,6 +1060,30 @@ namespace UBOAT.Mods.RadioNavigation
                 SextantConeBox.ArmLengthUnits(gap, overlayResult.OcularSizeUnits), color);
         }
 
+        private void UpdateOpticsMotes()
+        {
+            if (overlayResult == null || overlayResult.OpticsMotes == null || overlayResult.PipRect == null)
+                return;
+            bool grimeOn = PlayerPrefs.GetInt("RadioNav.OpticsGrime", 1) != 0;
+            if (overlayResult.OpticsGrimeImage != null
+                && overlayResult.OpticsGrimeImage.gameObject.activeSelf != grimeOn)
+                overlayResult.OpticsGrimeImage.gameObject.SetActive(grimeOn);
+            bool motesOn = PlayerPrefs.GetInt("RadioNav.OpticsMotes", 1) != 0;
+            float seconds = Time.unscaledTime;
+            for (int i = 0; i < overlayResult.OpticsMotes.Length; i++)
+            {
+                Image mote = overlayResult.OpticsMotes[i];
+                if (mote == null) continue;
+                if (mote.gameObject.activeSelf != motesOn)
+                    mote.gameObject.SetActive(motesOn);
+                if (!motesOn) continue;
+                float x, y;
+                SextantOpticsProfile.MotePosition(i, seconds, out x, out y);
+                float half = overlayResult.OcularSizeUnits * 0.5f;
+                mote.rectTransform.anchoredPosition = new Vector2(x * half, y * half);
+            }
+        }
+
         private void UpdateBodiesReadout(float dt)
         {
             float eyeHeightM = viewCamera != null
@@ -1239,6 +1287,8 @@ namespace UBOAT.Mods.RadioNavigation
             ringTexture = ui.RingTexture;
             circleMaskTexture = ui.CircleMaskTexture;
             eyecupTexture = ui.EyecupTexture;
+            opticsGrimeTexture = ui.OpticsGrimeTexture;
+            opticsMoteTexture = ui.OpticsMoteTexture;
             ownedSprites = ui.OwnedSprites;
             // NOTE: ui.OpaqueViewMaterial intentionally not cached here — the
             // ocular images already hold it (SextantOcularBuilder assigns

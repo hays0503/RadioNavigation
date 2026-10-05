@@ -949,12 +949,19 @@ namespace RadioNavigation.SourceCheck
 
             string shaderPath = Path.Combine(ModCompiler.ModRoot, "Source", "Shaders", "RadioNavUIOpaque.shader");
             string shader = File.Exists(shaderPath) ? File.ReadAllText(shaderPath) : string.Empty;
+            string shaderCode = Regex.Replace(shader, @"//[^\r\n]*|/\*[\s\S]*?\*/", string.Empty);
             if (shader.IndexOf("Blend SrcAlpha OneMinusSrcAlpha", StringComparison.Ordinal) < 0
-                || shader.IndexOf("fwidth(distanceFromAperture)", StringComparison.Ordinal) < 0
-                || shader.IndexOf("smoothstep(-edge, edge, distanceFromAperture)", StringComparison.Ordinal) < 0
-                || shader.IndexOf("color.a = i.color.a * coverage", StringComparison.Ordinal) < 0
-                || shader.IndexOf("UNITY_UI_ALPHACLIP", StringComparison.Ordinal) >= 0)
-                problems.Add("Active UIOpaque shader must blend an SDF edge while ignoring RenderTexture alpha and binary alpha-clip");
+                || !Regex.IsMatch(shader,
+                    @"_ApertureCoverageVersion\s*\(""Inward-only aperture coverage \(bundle marker\)""\s*,\s*Float\s*\)\s*=\s*1\.0")
+                || shaderCode.IndexOf("fwidth(distanceFromAperture)", StringComparison.Ordinal) < 0
+                || !Regex.IsMatch(shaderCode,
+                    @"float\s+coverage\s*=\s*distanceFromAperture\s*<\s*0\.0\s*\?\s*1\.0\s*-\s*smoothstep\s*\(\s*-edge\s*,\s*0\.0\s*,\s*distanceFromAperture\s*\)\s*:\s*0\.0\s*;")
+                || shaderCode.IndexOf("color.rgb = color.rgb * (1.0 - shade) + rim;", StringComparison.Ordinal) < 0
+                || shaderCode.IndexOf("color.a = i.color.a * coverage", StringComparison.Ordinal) < 0
+                || shaderCode.IndexOf("smoothstep(-edge, edge, distanceFromAperture)", StringComparison.Ordinal) >= 0
+                || Regex.IsMatch(shaderCode, @"color\.rgb\s*(?:\*=|=)[^;\r\n]*\bcoverage\b")
+                || shaderCode.IndexOf("UNITY_UI_ALPHACLIP", StringComparison.Ordinal) >= 0)
+                problems.Add("Active UIOpaque shader must use inward-only SDF coverage, straight RGB with SrcAlpha blending, ignore RenderTexture alpha, and avoid binary alpha-clip");
 
             Assert.True(problems.Count == 0,
                 $"{problems.Count} ocular aperture coverage violation(s):\n" + string.Join("\n", problems));
@@ -4375,18 +4382,26 @@ namespace RadioNavigation.SourceCheck
                         {
                             problems.Add("SextantLuneOverlay.Bind must call ReportBundleVersion - a version check that is never called reports nothing");
                         }
-                        if (report.ToString().IndexOf("HasProperty", StringComparison.Ordinal) < 0)
+                        string reportText = report.ToString();
+                        if (reportText.IndexOf("HasProperty", StringComparison.Ordinal) < 0
+                            || reportText.IndexOf("ApertureCoverageVersionId", StringComparison.Ordinal) < 0
+                            || reportText.IndexOf("GetFloat(ApertureCoverageVersionId)", StringComparison.Ordinal) < 0)
                         {
-                            problems.Add("SextantLuneOverlay.ReportBundleVersion must check HasProperty - a stale shader has no _LuneWallAnchor at all, so GetFloat alone would read 0 and hide the difference");
+                            problems.Add("SextantLuneOverlay.ReportBundleVersion must read the distinct _ApertureCoverageVersion property so an old bundle cannot report the inward-only coverage fix as loaded");
                         }
-                        // Counting, not "contains Warning": there are two stale
-                        // paths (property missing, property zero) and a mutation
-                        // that downgrades ONE of them to Debug.Log still leaves
-                        // the word "Warning" in the other.
+                        // Counting, not "contains Warning": each of the two
+                        // independent bundle markers has missing/zero stale paths.
                         int warnings = Regex.Matches(luneOverlay.ToString(), @"Debug\.LogWarning").Count;
-                        if (warnings < 2)
+                        if (warnings < 4)
                         {
-                            problems.Add("SextantLuneOverlay must warn on BOTH stale-bundle paths (property missing and property zero) - " + warnings + " of 2 present");
+                            problems.Add("SextantLuneOverlay must warn on all four stale-bundle paths (both markers missing or zero) - " + warnings + " of 4 present");
+                        }
+                        var log = FindMethod(luneOverlay, "LogRateLimited");
+                        if (log == null
+                            || log.ToString().IndexOf("aperturefix={13}", StringComparison.Ordinal) < 0
+                            || log.ToString().IndexOf("bundleHasCoverageFix ? 1 : 0", StringComparison.Ordinal) < 0)
+                        {
+                            problems.Add("SextantLuneOverlay.LogRateLimited must report the loaded aperture coverage marker so the in-game bundle proof is observable");
                         }
                     }
                 }
@@ -4500,11 +4515,10 @@ namespace RadioNavigation.SourceCheck
                     // neutering either line used to pass while the gate was
                     // still finding the property names (mutation-checked).
                     "smoothstep(-shadeEdge, shadeEdge, shadeDistance)",
-                    // ...and the whole colour must die with the aperture. Outside
-                    // it the source alpha is 0, and a canvas that composites
-                    // premultiplied adds RGB regardless - which paints the lit rim
-                    // as a bright arc outside the ocular (author 2026-10-02).
-                    "color.rgb = (color.rgb * (1.0 - shade) + rim) * coverage",
+                    // Straight RGB for the explicit SrcAlpha blend; aperture
+                    // coverage is applied once, through output alpha. The dedicated
+                    // coverage gate above also pins that it is exactly zero outside.
+                    "color.rgb = color.rgb * (1.0 - shade) + rim;",
                     // fwidth must be clamped: the gradient of a length() flips
                     // sign at its centre, and a noisy derivative blows the band up.
                     "clamp(fwidth(shadeDistance)",
@@ -4528,21 +4542,12 @@ namespace RadioNavigation.SourceCheck
                     // the radial profile at r/R 0.86 differs from rest by 0.013, where a
                     // 0.95-strength shadow would read about 0.02 - the crescent is simply
                     // not visible without the highlight. So the wall belongs to the SHADOW
-                    // boundary, and what has to be clipped is the APERTURE: the coverage
-                    // multiply required above zeroes the out-of-aperture half and leaves
-                    // the in-aperture half at full strength. Measured outside r/R 1.00-1.04:
-                    // 0.0900 without the multiply, 0.043 with it (antialiasing ramp).
+                    // boundary, while the aperture's one-sided coverage clips every added
+                    // term and is exactly zero outside the circle.
                     "float wallDistance = shadeDistance;",
-                    // The version marker. Without it the fix is unverifiable: the shader
-                    // ships inside a COMPRESSED bundle and Unity strips the shader BODY
-                    // from it, so scanning finds nothing and a stale build cannot be told
-                    // from a working one. Its DECLARATION is required by the check below,
-                    // not just the name: deleting the property while leaving a use of it in
-                    // the body keeps the name in the file and defeats a name-only check.
-                    //
-                    // REVERSED: the marker is no longer a switch the body reads. It is a
-                    // freshness stamp only, which is why no USE of it is required here and
-                    // why the reversal above is enforced by the exact expression instead.
+                    // Legacy lit-wall marker retained for its existing runtime check.
+                    // The one-sided coverage revision has its own distinct serialized
+                    // marker, asserted by SextantOcular_ApertureCoverageIsAntialiasedWithoutUsingRtAlpha.
                 })
                 {
                     if (shader.IndexOf(required, StringComparison.Ordinal) < 0)
@@ -4592,6 +4597,8 @@ namespace RadioNavigation.SourceCheck
                     "public static bool IsShadowed",
                     "public static double RimThickness",
                     "public static SextantLuneOffset ObstructionCentre",
+                    "MaxOffsetUnits",
+                    "AttackSeconds",
                     // The stop lag is a TIMER, so it must live in the state the
                     // runtime keeps, not in a throwaway local.
                     "ReleaseHoldSeconds",
@@ -4926,6 +4933,63 @@ namespace RadioNavigation.SourceCheck
                 $"{problems.Count} sextant beam aim violation(s):\n" + string.Join("\n", problems));
         }
 
+        /// <summary>Inside the boat, world-space beam rotations must be
+        /// converted into the main camera's parent/container frame for the
+        /// direct interior render. Both eyes use the same transform so the
+        /// alidade gap is retained; outside, the original world rotations stay
+        /// untouched. The pure quaternion tests cover non-commuting rotations.</summary>
+        [Fact]
+        public void SextantPip_InteriorBeamsUseTheParentFrame()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var frameMath = FindSourceType(roots, "SextantPipFrameMath");
+            var toParentFrame = frameMath != null
+                ? FindMethod(frameMath, "ToParentFrame")
+                : null;
+            if (toParentFrame == null
+                || !Regex.IsMatch(toParentFrame.ToString(),
+                    @"Quaternion\.Inverse\s*\(\s*parentWorldRotation\s*\)\s*\*\s*worldRotation"))
+                problems.Add("PIP frame conversion must compute inverse(parent-world) * desired-world rotation");
+
+            var pose = FindSourceType(roots, "SextantPipPose");
+            var update = pose != null ? FindMethod(pose, "Update") : null;
+            var build = pose != null ? FindMethod(pose, "BuildPipRotation") : null;
+            if (update == null || build == null)
+            {
+                problems.Add("SextantPipPose.Update or BuildPipRotation not found");
+            }
+            else
+            {
+                string buildText = build.ToString();
+                if (!Regex.IsMatch(buildText,
+                    @"if\s*\(\s*!insideBoat\s*\)\s*return\s+worldRotation"))
+                    problems.Add("outside-boat PIP rotations must remain in the main view's world frame");
+                if (!Regex.IsMatch(buildText,
+                    @"parentWorldRotation\s*=\s*viewTransform\.parent\s*!=\s*null\s*\?\s*viewTransform\.parent\.rotation\s*:\s*Quaternion\.identity"))
+                    problems.Add("interior conversion must use the view camera's parent world rotation, with identity when it has no parent");
+                if (!Regex.IsMatch(buildText,
+                    @"SextantPipFrameMath\.ToParentFrame\s*\(\s*parentWorldRotation\s*,\s*worldRotation\s*\)"))
+                    problems.Add("each interior beam must be converted through its camera parent frame");
+                string updateText = update.ToString();
+                if (!Regex.IsMatch(updateText,
+                    @"BuildPipRotation\s*\(\s*horizon\s*,\s*mt\s*,\s*insideBoat\s*\)")
+                    || !Regex.IsMatch(updateText,
+                        @"BuildPipRotation\s*\(\s*index\s*,\s*mt\s*,\s*insideBoat\s*\)"))
+                    problems.Add("both beam poses must pass through the same mode-aware rotation builder");
+                if (!Regex.IsMatch(updateText,
+                    @"LeftCamera\.transform\.rotation\s*=\s*leftRotation")
+                    || !Regex.IsMatch(updateText,
+                        @"RightCamera\.transform\.rotation\s*=\s*rightRotation"))
+                    problems.Add("both converted beam rotations must reach their matching PIP cameras");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} interior PIP frame violation(s):\n" + string.Join("\n", problems));
+        }
+
         /// <summary>
         /// The Sternspreiz lens must stay an opt-in PIP-only feature: catalog
         /// streaks drawn through the proven IOpaqueImageEffect path, gated by
@@ -5119,6 +5183,31 @@ namespace RadioNavigation.SourceCheck
                 if (field.ToString().IndexOf("AngularWidthMeters", StringComparison.Ordinal) < 0
                     || field.ToString().IndexOf("LineLengthDeg", StringComparison.Ordinal) < 0)
                     problems.Add("Lens field must size streaks by angular length, not by pixels");
+
+                var collect = FindMethod(field, "CollectVisibleStars");
+                string collectText = collect == null ? string.Empty : collect.ToString();
+                if (collect == null
+                    || !InvokesName(collect, "TryProject")
+                    || !InvokesName(collect, "StreakIntersectsFrustum")
+                    || collectText.IndexOf("StreakIntersectsFrustum", StringComparison.Ordinal)
+                        > collectText.IndexOf("buffer[count]", StringComparison.Ordinal))
+                    problems.Add("Lens candidates must pass the PIP streak-frustum test before consuming the star cap");
+
+                var frustum = FindMethod(field, "StreakIntersectsFrustum");
+                if (frustum == null
+                    || frustum.ToString().IndexOf("TanHalfFovX", StringComparison.Ordinal) < 0
+                    || frustum.ToString().IndexOf("TanHalfFovY", StringComparison.Ordinal) < 0
+                    || frustum.ToString().IndexOf("lineLengthDeg", StringComparison.Ordinal) < 0
+                    || frustum.ToString().IndexOf("thicknessDeg", StringComparison.Ordinal) < 0
+                    || frustum.ToString().IndexOf("rollDeg", StringComparison.Ordinal) < 0)
+                    problems.Add("Frustum admission must account for the viewport and the rolled streak's angular footprint");
+
+                var rebuildField = lens == null ? null : FindMethod(lens, "RebuildField");
+                if (rebuildField == null
+                    || !InvokesName(rebuildField, "CollectVisibleStars")
+                    || rebuildField.ToString().IndexOf("BuildCamera()", StringComparison.Ordinal) < 0
+                    || rebuildField.ToString().IndexOf("BaselineThicknessDeg", StringComparison.Ordinal) < 0)
+                    problems.Add("Lens rebuild must filter against its live PIP camera and configured streak dimensions");
             }
 
             if (factory == null)
@@ -5662,10 +5751,14 @@ namespace RadioNavigation.SourceCheck
         /// pose frozen at Close. Rules:
         ///  A) SextantPipPose.ResetFilters exists and clears all three flags;
         ///  B) SextantPipPose.Reset delegates to it;
-        ///  C) AttachAndConfigureCameras calls ResetFilters BEFORE the first
-        ///     UpdatePipPose.
-        /// Mutation checks: remove the call -> FAIL; move it after
-        /// UpdatePipPose -> FAIL; drop lastInsideBoat = false -> FAIL.
+        ///  C) AttachAndConfigureCameras resets the filters and opens the device;
+        ///     the first pose is then applied by LateUpdate, not twice in the
+        ///     opening Update frame;
+        ///  D) LateUpdate applies the PIP pose and eye-shadow rate after the
+        ///     game's view-camera LateUpdate, at order 5000 and before the
+        ///     interior pose helpers at order 10000.
+        /// Mutation checks: remove reset -> FAIL; move pose back to Update ->
+        /// FAIL; remove the late execution order -> FAIL.
         /// </summary>
         [Fact]
         public void SextantPip_OpenResetsStabilizationFilters()
@@ -5751,20 +5844,74 @@ namespace RadioNavigation.SourceCheck
                 else
                 {
                     int resetAt = -1;
-                    int updateAt = -1;
+                    int openAt = -1;
                     foreach (var call in attach.DescendantNodes().OfType<InvocationExpressionSyntax>())
                     {
                         string target = call.Expression.ToString();
                         if (target == "SextantPipPose.ResetFilters")
                             resetAt = call.SpanStart;
-                        else if (target == "UpdatePipPose")
-                            updateAt = call.SpanStart;
                     }
                     if (resetAt < 0)
                         problems.Add("AttachAndConfigureCameras never calls SextantPipPose.ResetFilters — the first pose can glide from the pose frozen at Close");
-                    else if (updateAt >= 0 && resetAt > updateAt)
-                        problems.Add("AttachAndConfigureCameras resets the filters AFTER the first UpdatePipPose");
+                    if (InvokesName(attach, "UpdatePipPose"))
+                        problems.Add("AttachAndConfigureCameras applies the PIP pose in Update as well as LateUpdate — the open frame advances stabilization/probe state twice");
+
+                    foreach (var assignment in attach.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                    {
+                        if (assignment.Left.ToString() == "IsOpen"
+                            && assignment.Right.ToString() == "true")
+                            openAt = assignment.SpanStart;
+                    }
+                    if (resetAt >= 0 && openAt >= 0 && resetAt > openAt)
+                        problems.Add("AttachAndConfigureCameras opens the device before resetting stabilization filters");
                 }
+
+                var lateUpdate = FindMethod(controller, "LateUpdate");
+                if (lateUpdate == null)
+                {
+                    problems.Add("SextantController.LateUpdate not found");
+                }
+                else
+                {
+                    int poseAt = lateUpdate.DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Where(call => call.Expression.ToString() == "UpdatePipPose")
+                        .Select(call => call.SpanStart)
+                        .DefaultIfEmpty(-1)
+                        .Min();
+                    int shadowAt = lateUpdate.DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Where(call => call.Expression.ToString() == "UpdateEyeShadow")
+                        .Select(call => call.SpanStart)
+                        .DefaultIfEmpty(-1)
+                        .Min();
+                    if (poseAt < 0 || shadowAt < 0 || poseAt > shadowAt)
+                        problems.Add("SextantController.LateUpdate must update the PIP pose before feeding its current aim rate to the eye shadow");
+                }
+
+                var update = FindMethod(controller, "Update");
+                if (update != null && (InvokesName(update, "UpdatePipPose")
+                    || InvokesName(update, "UpdateEyeShadow")))
+                    problems.Add("SextantController.Update still updates the PIP pose or eye-shadow rate before the view camera's final LateUpdate pose");
+
+                bool orderIsLate = controller.AttributeLists
+                    .SelectMany(list => list.Attributes)
+                    .Any(attribute => attribute.Name.ToString() == "DefaultExecutionOrder"
+                        && attribute.ArgumentList != null
+                        && attribute.ArgumentList.Arguments.Count == 1
+                        && attribute.ArgumentList.Arguments[0].ToString() == "5000");
+                if (!orderIsLate)
+                    problems.Add("SextantController must run LateUpdate at order 5000, after the game's default-order view camera");
+
+                var interiorPose = FindSourceType(roots, "SextantPipInteriorPose");
+                bool interiorRunsAfter = interiorPose != null
+                    && interiorPose.AttributeLists.SelectMany(list => list.Attributes)
+                        .Any(attribute => attribute.Name.ToString() == "DefaultExecutionOrder"
+                            && attribute.ArgumentList != null
+                            && attribute.ArgumentList.Arguments.Count == 1
+                            && attribute.ArgumentList.Arguments[0].ToString() == "10000");
+                if (!interiorRunsAfter)
+                    problems.Add("SextantPipInteriorPose must retain order 10000 so it positions the interior PIP after the late gaze sync");
             }
 
             Assert.True(problems.Count == 0,
@@ -6222,6 +6369,234 @@ namespace RadioNavigation.SourceCheck
             Assert.True(problems.Count == 0,
                 $"{problems.Count} temporal-reset violation(s):\n"
                 + string.Join("\n", problems));
+        }
+
+        /// <summary>On the open edge, clear both ocular PIP histories before
+        /// their first render, without resetting the main view. This is the
+        /// targeted A/B for the one-frame smear on opening. Mutations: remove
+        /// the open-edge call, pass another factory, or drop either PIP reset
+        /// -> FAIL.</summary>
+        [Fact]
+        public void SextantPip_OpenResetClearsBothPipHistories()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+
+            var controller = FindSourceType(roots, "SextantController");
+            var attach = controller != null
+                ? FindMethod(controller, "AttachAndConfigureCameras")
+                : null;
+            if (attach == null)
+            {
+                problems.Add("SextantController.AttachAndConfigureCameras not found");
+            }
+            else
+            {
+                if (!InvokesOnType(attach, "SextantPipPose", "ResetPipTemporalEffects"))
+                    problems.Add("AttachAndConfigureCameras never invokes SextantPipPose.ResetPipTemporalEffects on the open edge");
+                if (!Regex.IsMatch(attach.ToString(),
+                    @"ResetPipTemporalEffects\s*\(\s*pipFactory\s*\)"))
+                    problems.Add("AttachAndConfigureCameras must pass its live pipFactory to the open-edge reset");
+
+                int resetAt = attach.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Where(call => call.Expression.ToString()
+                        == "SextantPipPose.ResetPipTemporalEffects")
+                    .Select(call => call.SpanStart)
+                    .DefaultIfEmpty(-1)
+                    .Min();
+                int resumedAt = attach.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Where(call => call.Expression.ToString() == "pipFactory.ResumeRendering")
+                    .Select(call => call.SpanStart)
+                    .DefaultIfEmpty(-1)
+                    .Min();
+                int openedAt = -1;
+                foreach (var assignment in attach.DescendantNodes()
+                    .OfType<AssignmentExpressionSyntax>())
+                {
+                    if (assignment.Right.ToString() != "true")
+                        continue;
+                    string target = assignment.Left.ToString();
+                    if (target == "IsOpen")
+                        openedAt = assignment.SpanStart;
+                }
+                // The old gate required both Camera.enabled = true. That
+                // enforced the double-render bug: AttachedCameras ALSO renders
+                // them, leaving a second pass after the first pass's reset.
+                // Require route activation, not a specific enabled flag.
+                if (resumedAt < 0 || resetAt < 0 || openedAt < 0
+                    || resumedAt > resetAt
+                    || resetAt > openedAt)
+                    problems.Add("AttachAndConfigureCameras must resume PIP rendering, reset both histories, and only then mark the sextant open");
+            }
+
+            var pose = FindSourceType(roots, "SextantPipPose");
+            var reset = pose != null
+                ? FindMethod(pose, "ResetPipTemporalEffects")
+                : null;
+            if (reset == null)
+            {
+                problems.Add("SextantPipPose.ResetPipTemporalEffects not found");
+            }
+            else
+            {
+                string body = reset.ToString();
+                if (!Regex.IsMatch(body,
+                    @"ResetTemporalEffects\s*\(\s*factory\s*\.\s*LeftCamera\s*\)"))
+                    problems.Add("open-edge reset must clear the left PIP camera history");
+                if (!Regex.IsMatch(body,
+                    @"ResetTemporalEffects\s*\(\s*factory\s*\.\s*RightCamera\s*\)"))
+                    problems.Add("open-edge reset must clear the right PIP camera history");
+                if (body.IndexOf("viewCamera", StringComparison.Ordinal) >= 0)
+                    problems.Add("open-edge reset must remain PIP-only and leave the main view history untouched");
+            }
+
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} open-edge temporal-reset violation(s):\n"
+                + string.Join("\n", problems));
+        }
+
+        /// <summary>The two ocular cameras must not render both through
+        /// Main Camera's AttachedCameras and Unity's standalone list. Live
+        /// evidence: 4 CollectCameras passes per game frame before, 2 with
+        /// standalone cameras disabled. A missing/inactive root keeps the
+        /// standalone fallback. Pure tests cover the routing truth table.</summary>
+        [Fact]
+        public void SextantPip_RenderUsesOneRoutePerCamera()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var controller = FindSourceType(roots, "SextantController");
+            var attach = controller != null ? FindMethod(controller, "AttachAndConfigureCameras") : null;
+            if (attach == null || !InvokesOnType(attach, "pipFactory", "ResumeRendering"))
+                problems.Add("the open edge must call pipFactory.ResumeRendering");
+            if (attach != null && attach.DescendantNodes().OfType<AssignmentExpressionSyntax>()
+                .Any(a => (a.Left.ToString() == "pipFactory.LeftCamera.enabled"
+                    || a.Left.ToString() == "pipFactory.RightCamera.enabled")
+                    && a.Right.ToString() == "true"))
+                problems.Add("the controller must not override the factory route with Camera.enabled = true");
+
+            var factory = FindSourceType(roots, "SextantPipFactory");
+            var resume = factory != null ? FindMethod(factory, "ResumeRendering") : null;
+            var sync = factory != null ? FindMethod(factory, "SyncRenderRoutes") : null;
+            var route = factory != null ? FindMethod(factory, "SetRenderRoute") : null;
+            var refresh = factory != null ? FindMethod(factory, "RefreshMirroredState") : null;
+            if (resume == null || !InvokesName(resume, "AttachToMain") || !InvokesName(resume, "SyncRenderRoutes"))
+                problems.Add("ResumeRendering must register both PIPs and select their routes");
+            if (refresh == null || !InvokesName(refresh, "SyncRenderRoutes"))
+                problems.Add("per-frame camera sync must refresh routes when Main Camera activation changes");
+            if (sync == null)
+            {
+                problems.Add("SyncRenderRoutes not found");
+            }
+            else
+            {
+                if (!ReadsMemberOn(sync, "registeredRootCamera", "isActiveAndEnabled"))
+                    problems.Add("the attached route needs a live rendering root, not just list membership");
+                if (!Regex.IsMatch(sync.ToString(),
+                    @"GetInt\s*\(\s*SextantPipRenderPolicy\.PrefsKey\s*,\s*1\s*\)"))
+                    problems.Add("single rendering must be the default; the preference is a diagnostic A/B only");
+                foreach (string camera in new[] { "LeftCamera", "RightCamera" })
+                    if (!Regex.IsMatch(sync.ToString(), @"SetRenderRoute\s*\(\s*" + camera
+                        + @"\s*,\s*rootRendering\s*,\s*singleRender\s*\)"))
+                        problems.Add("route selection must reach " + camera + " with the live root and gate");
+            }
+            if (route == null)
+            {
+                problems.Add("SetRenderRoute not found");
+            }
+            else
+            {
+                string body = route.ToString();
+                if (!Regex.IsMatch(body, @"AttachedCameras\.Contains\s*\(\s*camera\s*\)"))
+                    problems.Add("route selection must check this camera's actual attachment");
+                if (!Regex.IsMatch(body,
+                    @"standalone\s*=\s*SextantPipRenderPolicy\.UseStandaloneCamera\s*\(\s*attached\s*,\s*rootRendering\s*,\s*singleRender\s*\)"))
+                    problems.Add("route selection must use the tested policy with the live attachment, root and gate");
+                if (!Regex.IsMatch(body, @"camera\.enabled\s*=\s*standalone\b"))
+                    problems.Add("the routing result must actually drive Camera.enabled");
+            }
+            Assert.True(problems.Count == 0,
+                $"{problems.Count} PIP render-route violation(s):\n" + string.Join("\n", problems));
+        }
+
+        /// <summary>The root PIP writes the interior, not the exterior portal.
+        /// RenderDoc A/B/A (2026-10-04): the inherited portal rect discarded
+        /// the lamp before submission (0/12/0 PIP draws, main unchanged).
+        /// Pin the actual write, its inside-only scope and sync order, while
+        /// retaining the live exterior rect for both cameras on exit. This
+        /// structural gate complements GPU acceptance; it does not simulate
+        /// the pipeline or constrain beam pose/occlusion/optics.</summary>
+        [Fact]
+        public void SextantPip_InteriorWriterUsesFullCullingViewport()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var sync = FindMethod("SextantInteriorMirror", "Sync");
+            Assert.NotNull(sync);
+            var loop = sync.Body.Statements.OfType<ForEachStatementSyntax>()
+                .Single(s => s.Expression.ToString() == "entries");
+            var body = Assert.IsType<BlockSyntax>(loop.Statement);
+            var outside = body.Statements.OfType<IfStatementSyntax>()
+                .Single(s => s.Condition is PrefixUnaryExpressionSyntax negation
+                    && negation.IsKind(SyntaxKind.LogicalNotExpression)
+                    && negation.Operand.ToString() == "inside");
+            Assert.IsType<ContinueStatementSyntax>(outside.Statement);
+
+            var data = body.Statements.OfType<LocalDeclarationStatementSyntax>()
+                .SelectMany(s => s.Declaration.Variables)
+                .Single(v => v.Identifier.Text == "pipData");
+            Assert.Equal("e.PipCamera.GetComponent<AdditionalCameraData>()",
+                data.Initializer.Value.ToString());
+            var writer = body.Statements.OfType<IfStatementSyntax>()
+                .Single(s => s.Condition is BinaryExpressionSyntax guard
+                    && guard.IsKind(SyntaxKind.NotEqualsExpression)
+                    && guard.Left.ToString() == "pipData"
+                    && guard.Right.IsKind(SyntaxKind.NullLiteralExpression));
+            Assert.True(writer.SpanStart > outside.Span.End,
+                "Full culling must apply only after the outside early exit.");
+            var writes = Assert.IsType<BlockSyntax>(writer.Statement).Statements
+                .OfType<ExpressionStatementSyntax>()
+                .Select(s => s.Expression).OfType<AssignmentExpressionSyntax>()
+                .Where(a => a.IsKind(SyntaxKind.SimpleAssignmentExpression)).ToList();
+            Assert.Contains(writes, a => a.Left.ToString() == "pipData.RenderScene"
+                && a.Right.IsKind(SyntaxKind.TrueLiteralExpression));
+            var rectWrite = writes.Single(a => a.Left.ToString() == "pipData.CullingScissorRect");
+            var rect = Assert.IsType<ObjectCreationExpressionSyntax>(rectWrite.Right);
+            Assert.Equal("Rect", rect.Type.ToString());
+            Assert.Equal(new[] { 0d, 0d, 1d, 1d }, rect.ArgumentList.Arguments
+                .Select(a => Convert.ToDouble(
+                    Assert.IsType<LiteralExpressionSyntax>(a.Expression).Token.Value)).ToArray());
+
+            var factory = FindMethod("SextantPipFactory", "SyncRenderScene");
+            Assert.NotNull(factory);
+            var exteriorRect = factory.DescendantNodes().OfType<VariableDeclaratorSyntax>()
+                .Single(v => v.Identifier.Text == "scissor");
+            Assert.Equal("cachedViewData.CullingScissorRect", exteriorRect.Initializer.Value.ToString());
+            var exteriorWrites = factory.DescendantNodes().OfType<AssignmentExpressionSyntax>().ToList();
+            foreach (string camera in new[] { "leftData", "rightData" })
+                Assert.Contains(exteriorWrites, a => a.IsKind(SyntaxKind.SimpleAssignmentExpression)
+                    && a.Left.ToString() == camera + ".CullingScissorRect"
+                    && a.Right.ToString() == "scissor");
+            Assert.DoesNotContain(exteriorWrites,
+                a => a.Left.ToString() == "cachedViewData.CullingScissorRect");
+
+            var refresh = FindMethod("SextantPipFactory", "RefreshMirroredState");
+            Assert.NotNull(refresh);
+            Assert.Contains(refresh.DescendantNodes().OfType<InvocationExpressionSyntax>(),
+                call => call.ToString() == "SyncRenderScene(viewCamera)");
+            var update = FindMethod("SextantPipPose", "Update");
+            Assert.NotNull(update);
+            var calls = update.DescendantNodes().OfType<InvocationExpressionSyntax>().ToList();
+            var mirror = calls.Single(c => c.ToString() == "factory.RefreshMirroredState(viewCamera)");
+            var interior = calls.Single(c => c.ToString() == "factory.InteriorMirror.Sync(insideBoat)");
+            Assert.True(interior.SpanStart > mirror.Span.End,
+                "The interior rect must override this frame's exterior mirror, not be overwritten by it.");
         }
 
         /// <summary>True when the method invokes <paramref name="member"/> on a

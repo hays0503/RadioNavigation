@@ -198,18 +198,17 @@ namespace UBOAT.Mods.RadioNavigation
             // used to be pinned to 0 here — see the class remarks).
             SextantBeamPose horizon = SextantBeamPoseMath.HorizonBeam(pitch, yaw);
             SextantBeamPose index = SextantBeamPoseMath.IndexBeam(pitch, yaw, arcAngle);
+            Quaternion leftRotation = BuildPipRotation(horizon, mt, insideBoat);
+            Quaternion rightRotation = BuildPipRotation(index, mt, insideBoat);
             // Position: bino parity (author decision 2026-11-04) — the game's
             // bridge binocular keeps its camera at the character's head with
             // no damping, and any position filtering/freeze showed as height
             // jumps in the ocular. Raw 1:1, always.
             Vector3 position = mt.position;
             factory.LeftCamera.transform.position = position;
-            factory.LeftCamera.transform.rotation =
-                Quaternion.Euler((float)horizon.PitchDeg, (float)horizon.YawDeg, 0f);
+            factory.LeftCamera.transform.rotation = leftRotation;
             factory.RightCamera.transform.position = position;
-            // Positive Euler X pitches DOWN in Unity; the alidade looks UP.
-            factory.RightCamera.transform.rotation =
-                Quaternion.Euler((float)index.PitchDeg, (float)index.YawDeg, 0f);
+            factory.RightCamera.transform.rotation = rightRotation;
 
             // Inside the boat the hull blocks the sky, so each PIP renders the
             // interior directly: it takes the interior camera's culling mask
@@ -228,15 +227,34 @@ namespace UBOAT.Mods.RadioNavigation
             factory.InteriorMirror.Sync(insideBoat);
             factory.SyncWaterRenderList(insideBoat);
 
-            // Both PIP cameras are enabled (SextantController), so the game's
-            // SRP camera loop renders each exactly once per frame with the pose
-            // set above — after LateUpdate positioned the sun disc and the
-            // interior clone. The old manual Render() here ran in Update (before
-            // those LateUpdates) and was a no-op for the disabled left camera;
-            // GPU-verified 2026-09-17 (RenderDoc capture: left RT <= 0.025 RGB,
-            // right RT <= 0.917, both written 2-3x per frame).
+            // The factory selects a single SRP route per PIP: attached to the
+            // main camera, or standalone if that route is unavailable. There is
+            // no manual Render(); the controller's LateUpdate sets this frame's
+            // pose before either SRP route runs.
             if (SextantVectorLog.Enabled && manualRender != null)
                 manualRender();
+        }
+
+        /// <summary>
+        /// Build a beam's camera rotation. Main-view beams are world-space;
+        /// inside the boat the direct interior render uses the view camera's
+        /// parent/container frame instead. Live evidence: Main Camera world yaw
+        /// was 9.5° while its local yaw and Interior Camera yaw were both ~76.5°.
+        /// The same conversion is applied to each beam, preserving the alidade.
+        /// </summary>
+        private static Quaternion BuildPipRotation(
+            SextantBeamPose beam, Transform viewTransform, bool insideBoat)
+        {
+            Quaternion worldRotation = Quaternion.Euler(
+                (float)beam.PitchDeg, (float)beam.YawDeg, 0f);
+            if (!insideBoat)
+                return worldRotation;
+
+            Quaternion parentWorldRotation = viewTransform.parent != null
+                ? viewTransform.parent.rotation
+                : Quaternion.identity;
+            return SextantPipFrameMath.ToParentFrame(
+                parentWorldRotation, worldRotation);
         }
 
         /// <summary>
@@ -658,6 +676,26 @@ namespace UBOAT.Mods.RadioNavigation
             if (data != null)
                 data.TemporalEffectsResetRequested = true;
         }
+
+        /// <summary>
+        /// Clear the histories owned by the two ocular cameras on opening,
+        /// before their first render after resuming. This is deliberately
+        /// PIP-only; it does not reset the main view camera.
+        /// </summary>
+        internal static void ResetPipTemporalEffects(SextantPipFactory factory)
+        {
+            if (factory == null)
+                return;
+            ResetTemporalEffects(factory.LeftCamera);
+            ResetTemporalEffects(factory.RightCamera);
+            PipOpenResetCount++;
+            LastPipOpenResetFrame = Time.frameCount;
+        }
+
+        /// <summary>Open-edge firing evidence for matched live comparisons.</summary>
+        internal static int PipOpenResetCount { get; private set; }
+
+        internal static int LastPipOpenResetFrame { get; private set; }
 
         /// <summary>Debug aim probe state, for reflection/telemetry.</summary>
         public static SextantAimProbe.State AimProbe

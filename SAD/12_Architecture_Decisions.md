@@ -1,23 +1,29 @@
 # Architecture Decisions — RadioNavigation Mod
 
+> **Сверка 2026-10-04:** статус принятия решения и степень его реализации — разные
+> вещи. Даты и исходные статусы ADR сохранены; дополнения ниже описывают текущий
+> Source. Отдельных файлов ADR-001…007 нет, ADR-008…013 не использовались;
+> `docs/adr/` содержит 21 файл ADR-014…034. Это не новый аудит всего проекта.
+
 > **⚠️ Deep Scan Update (2026-08-02):** Полный аудит выявил критические расхождения между статусами ADR и реальностью. Всего **207 проблем** (F01–F207); статусы каждой — в `refactoring-plan/hypothesis/INDEX.md`.
 > - **F45 (закрыто):** ADR-002/003/004/005/007 — статусы исправлены: «Accepted» → «Deferred»
 > - **F46 (закрыто):** ADR-001 пример кода — заменён на реальное императивное Harmony-патчирование
 > - **F47 (отклонено):** примеры реализации ссылались на несуществующие классы — убраны/аннотированы
 > - **F48 (отклонено):** ADR-003 упоминал 4 станции — реальность 14 (аннотировано)
 >
-> Статусы ADR ниже актуальны; реализация частично закрыта (ADR-005 — Constants.cs в составе F28, ADR-003/004 — остаются в roadmap SAD 08).
+> Этот Deep Scan — снимок 2026-08-02. Его LOC, нереализованные примеры и выводы
+> о roadmap не заменяют текущую сверку реализации в §1.1.
 
 ## 1. Decision Overview
 
 | ID | Decision | Status | Date |
 |----|----------|--------|------|
 | ADR-001 | Use Harmony for runtime patching | Accepted | 2026-07-26 |
-| ADR-002 | Implement double-buffer pattern for audio | Deferred | 2026-07-26 |
-| ADR-003 | Decompose God Classes | Deferred | 2026-07-26 |
+| ADR-002 | Implement double-buffer pattern for audio | Deferred; double-buffer не реализован | 2026-07-26 |
+| ADR-003 | Decompose God Classes | Deferred; частичные выносы реализованы | 2026-07-26 |
 | ADR-004 | Interface-based integration | Deferred | 2026-07-26 |
-| ADR-005 | Centralize constants | Deferred | 2026-07-26 |
-| ADR-006 | JSON configuration files | Proposed | 2026-07-26 |
+| ADR-005 | Centralize constants | Deferred; Constants и локальные контракты реализованы частично | 2026-07-26 |
+| ADR-006 | JSON configuration files | Proposed; перенос радиостанций не выполнен | 2026-07-26 |
 | ADR-007 | Unit testing strategy | Accepted (F22 baseline 182) | 2026-08-19 |
 | ADR-014 | Baseline 182 + farClip tag | Accepted | 2026-08-19 |
 | ADR-015 | Test Shield Gain/Geo | Accepted | 2026-08-19 |
@@ -25,11 +31,11 @@
 | ADR-017 | Lighthouse ResetStatics | Accepted | 2026-08-19 |
 | ADR-018 | CameraResolver (маяк+звезда) | Accepted | 2026-08-19 |
 | ADR-019 | Panel Hardening (PrefabNames+clamp) | Accepted | 2026-08-19 |
-| ADR-020 | StarSky Phase0 log only | Proposed | 2026-08-19 |
-| ADR-021 | StarSky catalog (5046 звёзд) | Accepted | 2026-08-19 |
+| ADR-020 | StarSky Phase0 log only | Proposed; исходный протокол дат не закрыт | 2026-08-19 |
+| ADR-021 | StarSky catalog (5046 строк, эпоха 1926.0) | Accepted; актуальное дополнение в ADR | 2026-08-19 |
 | ADR-022 | Созвездия (215 линий) | Accepted | 2026-08-19 |
 | ADR-023 | Планеты (кеплеровы элементы + renderer) | Accepted | 2026-08-19 |
-| ADR-024 | Луна (low-precision RA/Dec + фаза) | Accepted | 2026-08-19 |
+| ADR-024 | Луна (теперь Meeus + топоцентрический фазовый диск) | Accepted; исходный подход заменён P2 | 2026-08-19 |
 | ADR-025 | STAR_SKY использует GameTime.GmtDateTime | Accepted | 2026-08-19 |
 | ADR-026 | STAR_SKY visibility по Weather.Sky | Accepted | 2026-08-19 |
 | ADR-027 | Собственный маркер маяка на карте (LighthouseMapMarker) | Accepted | 2026-08-22 |
@@ -46,6 +52,25 @@
 > «ADR-023: курсорные зоны и расширенный драг» (2026-08-23; ныне ADR-034).
 > Номер оставлен у более раннего ADR; хронометр переименован в **ADR-034** (свободный
 > номер), ссылки в `SAD/04_Component_Architecture.md` и `AGENTS.md` обновлены.
+
+### 1.1 Реализация и границы решения (2026-10-04)
+
+| ADR | Что есть в Source / что не следует считать выполненным |
+|---|---|
+| 001 | `ModBootstrapper` владеет Harmony owner `UBOAT.Mods.RadioNavigation`, снимает только свои патчи; `HarmonyPatchInstaller` валидирует пять radio/locale-целей и отдельно устанавливает render/sky-патчи. Инъекция решения — **postfix** `ContinueStory`, Locale — prefix. |
+| 002 | Main-thread scheduler/keyer и audio-thread DSP разделены, есть volatile-поля и проверки длины массивов. `StationStateBuffer`/lock-free command ring не реализованы; это не доказательство отсутствия всех cross-thread рисков. |
+| 003 | Уже есть `StoryDecisionGateway`/`RadioLocale`, `ModBootstrapper`/`HarmonyPatchInstaller`/`SceneContentBuilder`/`PrefabValidator`, `SignalDecoder`/`StationManager`/`StationFleet`, UI/chronometer/lighthouse helpers. Исходные LOC и названия слайсов ниже — история; весь план Phase5 не объявляется завершённым. |
+| 004 | Используются конкретные bridge/cache и `IPlayerPositionProvider`; универсальные `IGameServices`/`GameReflectionCache` из примера **не реализованы**. SourceCheck проверяет game API, но не отменяет runtime reflection. |
+| 005 | `Source/Logic/Constants.cs` существует; математика/layout/оптика имеют отдельные семантические контракты. Исторический пример ниже не является буквальным содержимым Constants и не требует перенести туда все локальные числа. |
+| 006 | `BeaconData.Stations` — пять CAP 59 станций в C#; lighthouse/curation/Sonne-данные используют JSON. Это не реализация предложенного `Config/beacons.json`. |
+| 007 / 014 | xunit 2.9 + собственный раннер: **1379 PASS**, анализаторы **68**, SourceCheck **98**; текущий процент покрытия не измерен. Исторические NUnit-примеры и цели coverage не являются результатом. |
+| 020 / 021 / 024 | Исходный Phase0 протокол остаётся Proposed; production-каталог, StarsMesh и топоцентрическая Луна уже реализованы. Дополнения ADR-021/024 отменяют старые epoch/renderer/time описания, но не переписывают дату решения. |
+
+Действующие PIP-контракты и поздние доказательства — `docs/CAMERA_GUIDE.md`,
+`SEXTANT_PLAN.md` §16.23–16.25. Приёмка лампы, cloud stage и компиляции не закрывает
+обычный проход через люк, внешнюю эстетику PSF или остатки radio/live-чеклиста.
+Далее §§2–10 сохраняют контекст исходных решений; примеры с пометкой proposed
+не надо копировать как работающий API.
 
 ## 2. ADR-001: Use Harmony for Runtime Patching
 
@@ -77,15 +102,15 @@ Use Harmony library for runtime method patching.
 ### Implementation
 
 ```csharp
-// Main.cs (OnSceneAwake)
-var harmony = new Harmony("UBOAT.RadioNavigation");
+// Сокращённая иллюстрация; полный preflight/rollback — HarmonyPatchInstaller.
+var harmony = new Harmony("UBOAT.Mods.RadioNavigation");
 harmony.Patch(
     original: AccessTools.Method(typeof(RadioStory), "ContinueStory"),
-    prefix: new HarmonyMethod(typeof(Main), nameof(OnContinueStoryPrefix))
+    postfix: new HarmonyMethod(typeof(RadioStoryIntegration), "InjectT3PLL38Decision")
 );
 harmony.Patch(
     original: AccessTools.Method(typeof(Locale), nameof(Locale.RetrieveString), new[] { typeof(string) }),
-    postfix: new HarmonyMethod(typeof(Main), nameof(OnRetrieveStringPostfix))
+    prefix: new HarmonyMethod(typeof(RadioStoryIntegration), "OverrideLocaleKey")
 );
 ```
 
@@ -125,7 +150,7 @@ Implement double-buffer pattern with lock-free ring buffer for command passing.
 
 ```csharp
 // ⚠ proposed — StationStateBuffer not yet implemented (F47)
-// Actual implementation: StationState[] mutated directly without sync (F01, F29)
+// Историческая схема, не текущий аудио-контракт; см. §1.1 (F01, F29).
 public class StationStateBuffer {
     private StationState[] readBuffer;   // Audio thread reads
     private StationState[] writeBuffer;  // Main thread writes
@@ -181,7 +206,7 @@ Decompose God Classes into focused, single-responsibility classes.
 
 ### Implementation
 
-**SonneController Decomposition** (⚠ proposed — classes not yet implemented, F47):
+**SonneController Decomposition** (исходное предложение, не текущий состав; см. §1.1):
 
 | New Class | Responsibility | Lines | Status |
 |-----------|----------------|-------|--------|
@@ -190,7 +215,7 @@ Decompose God Classes into focused, single-responsibility classes.
 | DiagnosticsCollector | Diagnostics | ~30 | Existing (inline) |
 | SonneController | Orchestration | ~136 | Existing (508 LOC) |
 
-**InformationPanelHandler Decomposition** (⚠ proposed — classes not yet implemented, F47):
+**InformationPanelHandler Decomposition** (исходное предложение; UIElementFactory уже реализован):
 
 | New Class | Responsibility | Lines | Status |
 |-----------|----------------|-------|--------|
@@ -235,7 +260,7 @@ Create interfaces for all game integrations with fallback implementations.
 
 ```csharp
 // ⚠ proposed — GameReflectionCache not yet implemented (F47)
-// Actual implementation: RadioStoryIntegration (381 LOC) uses Type.GetType/FieldInfo directly
+// Исторический контекст 381 LOC; сейчас reflection делегируется StoryDecisionGateway.
 // Interfaces (IGameServices, etc.) not yet created (F04, ADR-004 Deferred)
 
 // Interfaces
@@ -289,8 +314,7 @@ Centralize all constants in `Data/Constants.cs`.
 ### Implementation
 
 ```csharp
-// ⚠ proposed — Data/Constants.cs not yet implemented (F47)
-// Actual: magic numbers scattered across all files (~40 unique values, F05)
+// Исторический illustrative пример, не содержимое существующего Data/Constants.cs.
 public static class Constants {
     // Audio
     public const float BfoBaseFrequency = 1000f;
@@ -375,10 +399,11 @@ Accepted (2026-08-19, baseline ADR-014: 182 PASS)
 
 > **Update 2026-08-19 (ADR-014):** F22 закрыто — `Tests/Runner` 182 PASS `powershell -ExecutionPolicy Bypass -File tests.ps1`, `dotnet build Release/Debug` 0 errors, tag `baseline-182-20260819` на `8b3021fa`. Цель `SAD/11` >80% Data / >70% Logic — частично достигнута (чистая математика покрыта, UI 0% — см. `docs/adr/ADR-014-baseline.md`).
 >
-> **Текущее состояние (2026-08-24):** 263 PASS (история роста — AGENTS.md); числа выше — факт на дату принятия ADR-014, не изменяются.
+> **Историческое состояние (2026-08-24):** 263 PASS. Текущие 1379 / 68 / 98 и
+> отсутствие измеренного coverage — в §1.1 и `SAD/11_Testing_Strategy.md`.
 
-### Context
-No unit tests exist (0% coverage). Bugs are discovered in production.
+### Context (на дату исходного предложения)
+No unit tests existed; bugs were discovered in production. Это не текущее состояние.
 
 ### Decision
 Implement unit tests for all pure C# logic.
@@ -432,13 +457,13 @@ public class SonneBeamTests {
 |------|----------|-----------|
 | 2026-07-26 | ADR-001: Harmony | Industry standard for Unity modding |
 | 2026-07-26 | ADR-002: Double-buffer | Thread safety critical for audio |
-| 2026-07-26 | ADR-003: Decompose | God classes阻碍 development |
+| 2026-07-26 | ADR-003: Decompose | God classes hinder development |
 | 2026-07-26 | ADR-004: Interfaces | Game updates break reflection |
 | 2026-07-26 | ADR-005: Constants | Magic numbers cause bugs |
 | 2026-07-26 | ADR-006: JSON | Configuration flexibility |
 | 2026-07-26 | ADR-007: Testing | No tests = high risk |
 
-## 10. Review Schedule
+## 10. Историческое предложение графика review (не текущие назначения)
 
 | ADR | Review Date | Reviewer | Status |
 |-----|-------------|----------|--------|

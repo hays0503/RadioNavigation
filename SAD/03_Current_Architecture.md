@@ -1,5 +1,25 @@
 # Current Architecture — RadioNavigation Mod
 
+## 0. Действующие цепочки (2026-10-04)
+
+| Цепочка | Ответственность |
+|---|---|
+| Main → ModBootstrapper / SceneContentBuilder | patching, DI, bundle fallback, scene wiring и double-load guards |
+| SonneController → StationManager / SignalDecoder / audio | координаты/выбор станции, морзе, audio-thread без Unity/аллокаций; радиопанель читает фасад |
+| SextantController → PIP factory / pose / interior mirror | input/lifecycle, один attached либо standalone route, root writer внутри, parent-frame оба луча |
+| SextantStarId → worksheet / running fix / card | hold/selection, отсчёт барабана по I, три слота, snapshot-pure расчётная секция |
+| CelestialEphemeris / AstroMath → sky / ID / reduction | эпоха 1926.0 → дата, UT/TT, топоцентрическая Луна, единые направления тел |
+| NavMapMarkerBase → MapMarkerPointBridge / MapSaveSanitizer | родные MapPointUI, includeInactive-реконсиляция, family ownership, save-дедуп и explicit removal |
+
+Полные component contracts — `SAD/04_Component_Architecture.md` §10.12–10.15;
+камера/лампа/open-frame — `docs/CAMERA_GUIDE.md`, доказательства — `SEXTANT_PLAN.md`
+§16.23–16.25. Игра компилирует Source при загрузке; локальная DLL из raw csc
+не используется как runtime-деплой.
+
+**Разделы 1–6 ниже — исторический снимок радиоядра 2026-08**, не полный список
+текущих классов/дефектов. LOC/старые API в нём нельзя использовать как текущий
+контракт; извлечённые фасады и satellites описаны в §0 и главе 04.
+
 ## 1. Layer Architecture
 
 ```
@@ -319,6 +339,7 @@ Sound               Low   High    Low    -
 
 ---
 
-*Document Version: 2.0*  
-*Last Updated: 2026-08-24 (счётчики тела обновлялись 2026-08-22; футер синхронизирован)*  
+*Document Version: 2.1*
+
+*Last Updated: 2026-10-04 (действующие цепочки §0; исходный аудит ниже сохранён)*
 *Corrections: Fixed UBOOT→UBOAT, reflection handler count 8→9, updated footer to 199 problems. See F45-F52, F65-F199.*
