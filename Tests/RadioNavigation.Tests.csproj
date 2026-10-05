@@ -150,6 +150,7 @@
     <Compile Include="RadioPowerBusTests.cs" />
     <Compile Include="GameTypeCacheTests.cs" />
     <Compile Include="CourseSamplerTests.cs" />
+    <Compile Include="SextantSaveTests.cs" />
     <Compile Include="WarnOnceTests.cs" />
     <Compile Include="SceneEventHandlerPurgeTests.cs" />
     <Compile Include="TypeMemberCacheTests.cs" />
@@ -312,6 +313,8 @@
     <Compile Include="..\Source\Data\ConstellationLines.cs" Link="Source\Data\ConstellationLines.cs" />
     <Compile Include="..\Source\Logic\FrameThrottle.cs" Link="Source\Logic\FrameThrottle.cs" />
     <Compile Include="..\Source\Logic\CourseSampler.cs" Link="Source\Logic\CourseSampler.cs" />
+    <Compile Include="..\Source\Logic\SextantSaveSnapshot.cs" Link="Source\Logic\SextantSaveSnapshot.cs" />
+    <Compile Include="..\Source\Logic\SextantSaveCodec.cs" Link="Source\Logic\SextantSaveCodec.cs" />
     <Compile Include="..\Source\Logic\StationGainModel.cs" Link="Source\Logic\StationGainModel.cs" />
     <Compile Include="..\Source\Logic\SignalTranscriber.cs" Link="Source\Logic\SignalTranscriber.cs" />
     <Compile Include="..\Source\Logic\BearingDiagnostics.cs" Link="Source\Logic\BearingDiagnostics.cs" />

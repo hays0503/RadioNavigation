@@ -1,5 +1,15 @@
 # Component Architecture — RadioNavigation Mod
 
+## Дополнение 2026-10-05: астронавигация в сейве
+
+`SextantSavePersistence` связывает worksheet с `LoadingInitialization`,
+`Loaded` и `SavingStarted`. `SextantSaveData : SceneObject` хранит bounded
+`Payload` v1; `SextantSaveSnapshot` / `SextantSaveCodec` проверяют наблюдения,
+frozen карточку/результат, калибровку/track/FIX/LOP/скрытие. Restore идёт через
+хвост очереди без пересчёта; loading guard и source latch у `NavMapMarkerBase`
+сохраняют native drag/ссылки фигур. Контракт и live reload/изоляция —
+`docs/astro-save.md`.
+
 ## 1. Component Hierarchy
 
 ```

@@ -1,5 +1,11 @@
 # System Context — RadioNavigation Mod
 
+> **Сохранение астронавигации (2026-10-05):** активная worksheet-серия и frozen
+> карточка/FIX/LOP/скрытие хранятся в campaign `SceneObject` внутри `.save`;
+> drag-позиции и фигуры — в нативной БД того же сейва. Это не архив старых
+> безымянных точек: отсутствующие наблюдения не выдумываются. Формат v1 и
+> реальная save/reload-приёмка — `docs/astro-save.md`.
+
 ## 1. System Boundary
 
 ```

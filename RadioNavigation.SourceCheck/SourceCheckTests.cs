@@ -7078,6 +7078,127 @@ namespace RadioNavigation.SourceCheck
                 + string.Join("\n", problems));
         }
 
+        /// <summary>Astro state must live in the game's campaign save, not
+        /// merely in saved charting points plus session-static worksheet data.
+        /// Pure codec semantics are owned by SextantSaveTests; this gate pins
+        /// the actual game hook/restore/adoption calls (not symbol presence).</summary>
+        [Fact]
+        public void AstroNavigation_IsSavedPerCampaignAndRestoredWithoutRecalculation()
+        {
+            if (!ModCompiler.HasModSource) return;
+            var roots = ParseAllSources();
+            var problems = new List<string>();
+            var persistence = FindSourceType(roots, "SextantSavePersistence");
+            var carrier = FindSourceType(roots, "SextantSaveData");
+            var worksheet = FindSourceType(roots, "SextantWorksheet");
+            var controller = FindSourceType(roots, "SextantController");
+            var fix = FindSourceType(roots, "FixMapMarker");
+            var markerBase = FindSourceType(roots, "NavMapMarkerBase");
+            if (persistence == null || carrier == null || worksheet == null
+                || controller == null || fix == null || markerBase == null)
+                problems.Add("astro save types missing");
+            else
+            {
+                if (carrier.BaseList == null || !carrier.BaseList.Types.Any(t => t.Type.ToString() == "SceneObject"))
+                    problems.Add("SextantSaveData is not a campaign SceneObject");
+                if (!carrier.Members.OfType<FieldDeclarationSyntax>().Any(f => f.Declaration.Type.ToString() == "string"
+                    && f.Declaration.Variables.Any(v => v.Identifier.Text == "Payload")
+                    && !f.Modifiers.Any(SyntaxKind.StaticKeyword)))
+                    problems.Add("carrier has no instance string Payload");
+                var install = FindMethod(persistence, "TryInstall");
+                foreach (string name in new[] { "LoadingInitialization", "Loaded", "SavingStarted" })
+                {
+                    if (install == null || !install.DescendantNodes().OfType<AssignmentExpressionSyntax>()
+                        .Any(a => a.IsKind(SyntaxKind.AddAssignmentExpression)
+                            && a.Left.ToString().EndsWith("." + name, StringComparison.Ordinal)))
+                        problems.Add("astro save does not subscribe to " + name);
+                }
+                var save = FindMethod(persistence, "OnSavingStarted");
+                if (save == null || !InvokesName(save, "CaptureState")
+                    || !InvokesOnType(save, "SextantSaveCodec", "Encode") || !InvokesName(save, "WritePayload"))
+                    problems.Add("save hook does not capture/encode/write the worksheet");
+                var init = FindMethod(persistence, "OnLoadingInitialization");
+                // RCS1146 rewrites an explicit null guard to ?.RestoreState;
+                // MemberBindingExpression is an invocation too, not a lost reset.
+                if (init == null || !init.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .Any(i => (i.Expression is MemberAccessExpressionSyntax access
+                            && access.Name.Identifier.Text == "RestoreState"
+                            || i.Expression is MemberBindingExpressionSyntax binding
+                            && binding.Name.Identifier.Text == "RestoreState")
+                        && i.ArgumentList.Arguments.Any(a => a.Expression is ObjectCreationExpressionSyntax creation
+                            && creation.Type.ToString() == "SextantSaveSnapshot")))
+                    problems.Add("loading initialization retains the previous save's worksheet");
+                var loaded = FindMethod(persistence, "OnLoaded");
+                if (loaded == null || !InvokesName(loaded, "Enqueue"))
+                    problems.Add("restore is not dispatched via the Loaded main-thread queue");
+                var read = FindMethod(persistence, "RestoreFromSave");
+                if (read == null || !InvokesOnType(read, "SextantSaveCodec", "TryDecode")
+                    || !InvokesName(read, "RestoreState"))
+                    problems.Add("load path does not decode/apply the saved snapshot");
+                var restore = FindMethod(worksheet, "RestoreState");
+                if (restore == null || !InvokesName(restore, "Reset") || !InvokesName(restore, "InvalidateCard")
+                    || !InvokesOnType(restore, "FixMapMarker", "RestoreState"))
+                    problems.Add("worksheet restore does not replace its series/markers/card");
+                if (restore != null && (InvokesName(restore, "RecomputeFixSnapshot")
+                    || InvokesName(restore, "BuildObservation") || InvokesName(restore, "GetUtcNow")))
+                    problems.Add("restoration recalculates the frozen fix using live state");
+                if (restore == null || !InvokesOnType(restore, "SunEphemerisCalibration", "SetDelta"))
+                    problems.Add("an active saved series uses another campaign's Sun/Moon calibration on continuation");
+                var awake = FindMethod(controller, "Awake");
+                if (awake == null || !InvokesOnType(awake, "SextantSavePersistence", "Bind"))
+                    problems.Add("active controller never binds its worksheet to persistence");
+                var destroy = FindMethod(fix, "OnPointDestroyed");
+                if (destroy == null || !destroy.DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                    .Any(m => m.ToString() == "SextantSavePersistence.IsLoading"))
+                    problems.Add("load teardown is recorded as a player erase");
+                var rebuild = FindMethod(markerBase, "RebuildViews");
+                if (rebuild == null || !rebuild.DescendantNodes().OfType<AssignmentExpressionSyntax>()
+                    .Any(a => a.Left.ToString() == "view.HasTruePosition"
+                        && a.Right.ToString() == "PreserveInitialPointPosition"))
+                    problems.Add("first reconcile overwrites restored dragged map positions");
+                var contentGate = fix.Members.OfType<PropertyDeclarationSyntax>()
+                    .FirstOrDefault(p => p.Identifier.Text == "ContentReady");
+                var mapUpdate = FindMethod(markerBase, "Update");
+                if (contentGate == null || contentGate.ExpressionBody == null
+                    || contentGate.ExpressionBody.Expression.ToString() != "!SextantSavePersistence.IsLoading"
+                    || mapUpdate == null || !mapUpdate.DescendantNodes().OfType<IfStatementSyntax>()
+                        .Any(i => i.Condition.ToString().Contains("!ContentReady")
+                            && i.Statement.DescendantNodesAndSelf().OfType<ReturnStatementSyntax>().Any()))
+                    problems.Add("marker reconciliation can erase saved rows before queued worksheet restoration");
+                if (InvokesName(persistence, "DontDestroyOnLoad") || InvokesName(persistence, "SetString")
+                    || InvokesName(persistence, "WriteAllText"))
+                    problems.Add("astro save state uses global/sidecar storage");
+            }
+            Assert.True(problems.Count == 0, string.Join("\n", problems));
+        }
+
+        [Fact]
+        public void AstroMarkers_NewObservationSupersedesDeferredSeriesReset()
+        {
+            if (!ModCompiler.HasModSource) return;
+            var roots = ParseAllSources();
+            var fix = FindSourceType(roots, "FixMapMarker");
+            var worksheet = FindSourceType(roots, "SextantWorksheet");
+            Assert.NotNull(fix);
+            Assert.NotNull(worksheet);
+            var recorded = FindMethod(fix, "OnNewObservation");
+            Assert.NotNull(recorded);
+            foreach (string field in new[] { "clearRequested", "HasTriangle" })
+                Assert.True(recorded.DescendantNodes().OfType<AssignmentExpressionSyntax>()
+                    .Any(a => a.Left.ToString() == field && a.Right.IsKind(SyntaxKind.FalseLiteralExpression)),
+                    "A new observation must cancel pending O cleanup and the previous series' triangle");
+            var capture = worksheet.Members.OfType<MethodDeclarationSyntax>().FirstOrDefault(m =>
+                m.Identifier.Text == "CaptureObservation" && m.ParameterList.Parameters.Count == 5);
+            Assert.NotNull(capture);
+            var unsolved = capture.DescendantNodes().OfType<IfStatementSyntax>()
+                .FirstOrDefault(i => i.Condition.ToString() == "runningFix.CanSolve");
+            Assert.NotNull(unsolved);
+            Assert.NotNull(unsolved.Else);
+            Assert.True(unsolved.Else.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Any(i => i.Expression.ToString() == "FixMapMarker.Clear"),
+                "The first sight of a new series must not save the previous series' marker model");
+        }
+
         [Fact]
         public void MapMarkers_AreNativeMapPoints()
         {

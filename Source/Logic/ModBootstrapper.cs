@@ -85,6 +85,7 @@ namespace UBOAT.Mods.RadioNavigation
             // serialization (SavingStarted). Retried on scene start until the
             // SavesManager singleton resolves.
             MapSaveSanitizer.TryInstall();
+            SextantSavePersistence.TryInstall();
 
             // Dev-console diagnostics (calibration probe: rn_lighthouse_height)
             LighthouseHeightProbe.EnsureRegistered();
@@ -252,6 +253,7 @@ namespace UBOAT.Mods.RadioNavigation
             // Retry the save-sanitizer install until the SavesManager
             // singleton is resolvable (LoadSingleton returns null early).
             MapSaveSanitizer.TryInstall();
+            SextantSavePersistence.TryInstall();
         }
 
         /// Self-recovery for a missing/evicted DI registration of the

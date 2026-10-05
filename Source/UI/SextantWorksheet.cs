@@ -98,6 +98,7 @@ namespace UBOAT.Mods.RadioNavigation
         private float courseSampleTimer;
         private readonly CourseSampler courseSampler = new CourseSampler();
         private string sectionText;
+        private double seriesCalibrationMinutes;
 
         // Published-fix snapshot for the MCP probe (mirrors the card's
         // Versetzung/FIX section, computed at record time only). ErrorNm is
@@ -259,6 +260,8 @@ namespace UBOAT.Mods.RadioNavigation
             obs.HoSampleCount = samples < 1 ? 1 : samples;
             obs.HoRejectedCount = rejected < 0 ? 0 : rejected;
             obs.IndexErrorArcMin = indexErrorArcMin;
+            if (!SeriesActive || runningFix.HasThird)
+                seriesCalibrationMinutes = SunEphemerisCalibration.DeltaMinutes;
             runningFix.Record(obs);
             FixMapMarker.OnNewObservation();
             // v1.13: the fix is a snapshot computed at record time only.
@@ -268,6 +271,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 sectionText = null;
                 FixPublished = false;
+                FixMapMarker.Clear();
             }
             bool isThird = runningFix.Observation3 == obs;
             bool isSecond = runningFix.Observation2 == obs;
@@ -311,6 +315,54 @@ namespace UBOAT.Mods.RadioNavigation
             statusTimer = FixStatusSeconds;
             panelTimer = 0f;
             Debug.Log(LogPrefix + " FIX series reset");
+        }
+
+        internal SextantSaveSnapshot CaptureState()
+        {
+            return new SextantSaveSnapshot
+            {
+                Observation1 = runningFix.Observation1,
+                Observation2 = runningFix.Observation2,
+                Observation3 = runningFix.Observation3,
+                SectionText = sectionText,
+                CalibrationMinutes = seriesCalibrationMinutes,
+                FixPublished = FixPublished,
+                FixLatDeg = FixLatDeg,
+                FixLonDeg = FixLonDeg,
+                FixErrorNm = FixErrorNm,
+                FixCrossingDeg = FixCrossingDeg,
+                FixSameBody = FixSameBody,
+                Course = courseSampler.CaptureState(),
+                Markers = FixMapMarker.CaptureState()
+            };
+        }
+
+        /// <summary>Replace, never merge, the previous save's series. Input
+        /// has been decoded/validated; there are deliberately no live reads or
+        /// calls to RecomputeFixSnapshot/BuildObservation in this path.</summary>
+        internal void RestoreState(SextantSaveSnapshot state)
+        {
+            runningFix.Reset();
+            runningFix.Record(state.Observation1);
+            runningFix.Record(state.Observation2);
+            runningFix.Record(state.Observation3);
+            courseSampler.RestoreState(state.Course);
+            sectionText = state.SectionText;
+            seriesCalibrationMinutes = state.CalibrationMinutes;
+            if (SeriesActive)
+                SunEphemerisCalibration.SetDelta(seriesCalibrationMinutes);
+            FixPublished = state.FixPublished;
+            FixLatDeg = state.FixLatDeg;
+            FixLonDeg = state.FixLonDeg;
+            FixErrorNm = state.FixErrorNm;
+            FixCrossingDeg = state.FixCrossingDeg;
+            FixSameBody = state.FixSameBody;
+            FixMapMarker.RestoreState(state.Markers);
+            statusLine = string.Empty;
+            statusTimer = 0f;
+            courseSampleTimer = 0f;
+            cardCompact = false;
+            InvalidateCard();
         }
 
         /// <summary>
@@ -441,7 +493,7 @@ namespace UBOAT.Mods.RadioNavigation
                 runningFix.Observation2,
                 sectionText,
                 status,
-                SunEphemerisCalibration.DeltaMinutes,
+                SeriesActive ? seriesCalibrationMinutes : SunEphemerisCalibration.DeltaMinutes,
                 compact);
         }
 

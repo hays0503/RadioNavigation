@@ -12,7 +12,8 @@ namespace UBOAT.Mods.RadioNavigation
     /// <see cref="NavMapMarkerBase"/> — so they can be dragged, erased and
     /// snapped by the charting tools (Lines/Circles/Angles/Bearing). The
     /// worksheet publishes the last computed fix through the static state
-    /// below; the base reconciles the points with it every 0.25 s.
+    /// below; the base reconciles the points with it every 1 s. The worksheet
+    /// and marker model are restored from the current save, not session statics.
     ///
     /// Deletion (the map eraser / Delete) removes ONLY the marker: the fix
     /// data, the worksheet card and the probe are untouched — the markers are
@@ -53,6 +54,13 @@ namespace UBOAT.Mods.RadioNavigation
         // reconcile consumes it once (stale cleanup by state is off — the
         // double-load-safe behaviour, see NavMapMarkerBase.ApplyPlan).
         private static bool clearRequested;
+        private static bool restoredFromSave;
+
+        protected override bool PreserveInitialPointPosition => restoredFromSave;
+        // Saved native rows can be created by MapChartingUI earlier in the
+        // Loaded queue than the worksheet restore. Never stale-clean or move
+        // them using the temporary empty model in that window.
+        protected override bool ContentReady => !SextantSavePersistence.IsLoading;
 
         public static void Set(double latDeg, double lonDeg, string label)
         {
@@ -87,6 +95,7 @@ namespace UBOAT.Mods.RadioNavigation
             Suppressed = false;
             suppressedIndices.Clear();
             clearRequested = true;
+            restoredFromSave = false;
         }
 
         /// <summary>New observation recorded (I): a fresh fix may publish again.</summary>
@@ -94,27 +103,59 @@ namespace UBOAT.Mods.RadioNavigation
         {
             Suppressed = false;
             suppressedIndices.Clear();
+            restoredFromSave = false;
+            // O can be pressed while the map is closed. Its deferred cleanup
+            // must not delete a later result on the first map-open (nor turn
+            // that destruction into a player erase). The desired set is now
+            // authoritative; normal stale cleanup removes old LOP keys.
+            clearRequested = false;
+            HasTriangle = false;
         }
 
-        /// <summary>A save/load cycle destroys every map point
-        /// (SavesManagerOnLoadingStarted -> Clear) and that destruction is
-        /// indistinguishable from a player erase at the point level — re-arm
-        /// the markers instead of leaving the fix hidden until the next
-        /// observation (leak forensic 2026-09-25). The fix data itself is
-        /// session state: a reload does not clear it.</summary>
-        public static void ResetSuppressions()
+        internal static FixMarkerSnapshot CaptureState()
         {
+            var state = new FixMarkerSnapshot
+            {
+                HasFix = HasFix,
+                Lat = HasFix ? FixLat : 0,
+                Lon = HasFix ? FixLon : 0,
+                Label = FixLabel,
+                HasTriangle = HasFix && HasTriangle,
+                VertexLat = (double[])VertexLat.Clone(),
+                VertexLon = (double[])VertexLon.Clone(),
+                SuppressedMask = Suppressed ? 15 : 0
+            };
+            foreach (int index in suppressedIndices)
+                state.SuppressedMask |= 1 << index;
+            return state;
+        }
+
+        internal static void RestoreState(FixMarkerSnapshot state)
+        {
+            HasFix = state.HasFix;
+            FixLat = state.Lat;
+            FixLon = state.Lon;
+            FixLabel = state.Label;
+            HasTriangle = state.HasTriangle;
+            System.Array.Copy(state.VertexLat, VertexLat, 3);
+            System.Array.Copy(state.VertexLon, VertexLon, 3);
             Suppressed = false;
             suppressedIndices.Clear();
+            for (int i = 0; i < 4; i++)
+            {
+                if ((state.SuppressedMask & (1 << i)) != 0)
+                    suppressedIndices.Add(i);
+            }
+            // A bootstrap/session reset must not erase freshly restored rows.
+            clearRequested = false;
+            restoredFromSave = true;
         }
 
         /// <summary>Stale cleanup scope: only the fix marker's own keys
         /// (FIX / LOP) may be destroyed by this component's reconcile.</summary>
         protected override bool OwnsKey(string key)
         {
-            return !string.IsNullOrEmpty(key)
-                && (key.StartsWith(MapMarkerPoints.FixKey, System.StringComparison.Ordinal)
-                    || key.StartsWith(MapMarkerPoints.LopKeyPrefix, System.StringComparison.Ordinal));
+            return FixMarkerSnapshot.IndexOfKey(key) >= 0;
         }
 
         // Marker 0 = the fix pin, 1..3 = the cocked-hat vertices (P6).
@@ -137,6 +178,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected override void OnPointDestroyed(int index)
         {
+            // MapChartingUI.Clear destroys ALL points during loading. It is
+            // teardown, not a player erase to carry into the new save.
+            if (SextantSavePersistence.IsLoading)
+                return;
             suppressedIndices.Add(index);
             Debug.Log(LogPrefix + " fix marker erased by the map eraser (index=" + index + ")");
         }

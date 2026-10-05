@@ -3,6 +3,20 @@ using System.Collections.Generic;
 
 namespace UBOAT.Mods.RadioNavigation
 {
+    public struct CourseTrackSample
+    {
+        public DateTime Utc;
+        public double Lat;
+        public double Lon;
+    }
+
+    public sealed class CourseSamplerSnapshot
+    {
+        public float CourseDeg;
+        public float SpeedKn;
+        public CourseTrackSample[] Samples = new CourseTrackSample[0];
+    }
+
     /// <summary>
     /// Course/speed over ground from the recent position track. The cadence is
     /// GAME time, not wall time (CELESTIAL_REALISM_PLAN P7): the caller may
@@ -28,14 +42,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const float SampleWindowSeconds = 10f;
         private const float MinTransferSpeedKn = 0.5f;
 
-        private struct TrackSample
-        {
-            public DateTime Utc;
-            public double Lat;
-            public double Lon;
-        }
-
-        private readonly List<TrackSample> samples = new List<TrackSample>(16);
+        private readonly List<CourseTrackSample> samples = new List<CourseTrackSample>(16);
         private float courseDeg;
         private float speedKn;
         private bool hasLastSample;
@@ -104,15 +111,15 @@ namespace UBOAT.Mods.RadioNavigation
             lastSampleUtc = utc;
             lastLat = latDeg;
             lastLon = lonDeg;
-            samples.Add(new TrackSample { Utc = utc, Lat = latDeg, Lon = lonDeg });
+            samples.Add(new CourseTrackSample { Utc = utc, Lat = latDeg, Lon = lonDeg });
             while (samples.Count > 0 &&
                     (utc - samples[0].Utc).TotalSeconds > SampleWindowSeconds + 2.0)
                 samples.RemoveAt(0);
             if (samples.Count < 2)
                 return;
 
-            TrackSample first = samples[0];
-            TrackSample last = samples[samples.Count - 1];
+            CourseTrackSample first = samples[0];
+            CourseTrackSample last = samples[samples.Count - 1];
             double spanHours = (last.Utc - first.Utc).TotalHours;
             if (spanHours < SampleWindowSeconds / 3600.0 * 0.6)
                 return; // not enough baseline yet right after opening
@@ -135,11 +142,41 @@ namespace UBOAT.Mods.RadioNavigation
         private void Seed(DateTime utc, double latDeg, double lonDeg)
         {
             samples.Clear();
-            samples.Add(new TrackSample { Utc = utc, Lat = latDeg, Lon = lonDeg });
+            samples.Add(new CourseTrackSample { Utc = utc, Lat = latDeg, Lon = lonDeg });
             hasLastSample = true;
             lastSampleUtc = utc;
             lastLat = latDeg;
             lastLon = lonDeg;
+        }
+
+        public CourseSamplerSnapshot CaptureState()
+        {
+            return new CourseSamplerSnapshot
+            {
+                CourseDeg = courseDeg,
+                SpeedKn = speedKn,
+                Samples = samples.ToArray()
+            };
+        }
+
+        /// <summary>Input has been validated by SextantSaveCodec. Restoring
+        /// the game-time track permits a third sight immediately after load;
+        /// the existing gap/teleport guards still restart an obsolete track.</summary>
+        public void RestoreState(CourseSamplerSnapshot state)
+        {
+            Reset();
+            if (state == null)
+                return;
+            courseDeg = state.CourseDeg;
+            speedKn = state.SpeedKn;
+            samples.AddRange(state.Samples);
+            if (samples.Count == 0)
+                return;
+            CourseTrackSample last = samples[samples.Count - 1];
+            hasLastSample = true;
+            lastSampleUtc = last.Utc;
+            lastLat = last.Lat;
+            lastLon = last.Lon;
         }
 
         public void Reset()

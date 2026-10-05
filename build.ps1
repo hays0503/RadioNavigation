@@ -92,30 +92,41 @@ $defineSymbol = if ($Configuration -eq "Debug") { "DEBUG;$gameSymbols" } else { 
 $debugFlag = if ($Configuration -eq "Debug") { "/debug:full" } else { "/debug:pdbonly" }
 $optimizeFlag = if ($Configuration -eq "Debug") { "/optimize-" } else { "/optimize+" }
 
+$allArgs = @("/target:library", "/out:$outPath", $debugFlag, $optimizeFlag, "/define:$defineSymbol")
 if ($cscPath.EndsWith(".dll")) {
     # /langversion:7 mirrors the game's RoslynCSharp mod compiler (C# 7.0):
     # the game rejects newer language features with CS8107 and then loads a
     # broken assembly (BadImageFormatException, in-game 2026-09-03).
-    $allArgs = @("/target:library", "/out:$outPath", $debugFlag, $optimizeFlag, "/define:$defineSymbol", "/langversion:7", "/noconfig")
-    $allArgs += $refArgs
-    $allArgs += $srcFiles
-    & dotnet $cscPath $allArgs
-} else {
-    # Legacy framework csc.exe is C# 5 — already stricter than the game.
-    & $cscPath /target:library `
-        /out:$outPath `
-        $debugFlag `
-        $optimizeFlag `
-        /define:$defineSymbol `
-        $refArgs `
-        $srcFiles
+    $allArgs += "/langversion:7"
+}
+$allArgs += $refArgs
+$allArgs += $srcFiles
+
+# The source list now exceeds Windows' 32K process command-line limit at this
+# checkout path. A response file preserves raw csc/game-language parity and
+# also quotes every path containing spaces. Delete only our own temporary file.
+$responseDir = Join-Path $env:LOCALAPPDATA "Temp\opencode"
+New-Item -ItemType Directory -Force -Path $responseDir | Out-Null
+$responsePath = Join-Path $responseDir ("radionav-csc-" + [Guid]::NewGuid().ToString("N") + ".rsp")
+try {
+    $responseArgs = $allArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
+    [IO.File]::WriteAllLines($responsePath, [string[]]$responseArgs, [Text.UTF8Encoding]::new($false))
+    if ($cscPath.EndsWith(".dll")) {
+        # /noconfig must be a command-line option, not a response-file option.
+        & dotnet $cscPath /noconfig "@$responsePath"
+    } else {
+        & $cscPath "@$responsePath"
+    }
+    $compileCode = $LASTEXITCODE
+} finally {
+    Remove-Item -LiteralPath $responsePath -ErrorAction SilentlyContinue
 }
 
-if ($LASTEXITCODE -eq 0) {
+if ($compileCode -eq 0) {
     Write-Host "[RadioNavigation] Build OK -> $outPath"
 } else {
-    Write-Host "[RadioNavigation] Build FAILED (exit $LASTEXITCODE)"
-    exit $LASTEXITCODE
+    Write-Host "[RadioNavigation] Build FAILED (exit $compileCode)"
+    exit $compileCode
 }
 
 # PVS-Studio static-analysis gate (blocking). Skipped with -SkipPvs for a fast

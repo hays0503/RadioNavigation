@@ -78,4 +78,36 @@ public class RadioNavState : ScriptableObjectSingleton
    `RemoveSaveBlockade(this)` — забытая блокировка навсегда запрещает сейвы.
    Дубликат по тому же объекту не добавляется.
 4. **BackgroundTask'и** переживают сейв только если запущены событием `CampaignStart`
-   (`runningSerializableTasks`); прочие задачи — в `runningUnserializableTasks` и гибнут.
+    (`runningSerializableTasks`); прочие задачи — в `runningUnserializableTasks` и гибнут.
+
+## Дополнение: отдельный save carrier без ассета (2026-10-04)
+
+Проверено по исходникам текущей игры:
+
+- `SceneObject.cs:8–17`: активный компонент регистрируется в
+  `SceneObject.sceneObjects` через наследуемый `OnEnable`, выходит через
+  `OnDisable`. Можно создать отдельный GameObject кампании с наследником
+  `SceneObject`; не требуется parent на корабле или ScriptableObject asset.
+- `SavesManager.cs:878–904`: `SavingStarted` вызывается **до** `isSaving=true`,
+  одного `yield` и сериализации `SaveData.sceneObjects`. Snapshot carrier
+  нужно записать в этом handler, а не после `SavingFinished`.
+- `GameStateSerializer.cs:337–411`: сериализуются компоненты GameObject;
+  `GameStateDeserializer.cs:898–965` восстанавливает компонент через
+  `AddComponent(type)`, затем поля. Carrier не должен читать Unity API из
+  десериализации поля.
+- `ClassDescriptor.cs:121–157`: private/public instance-поля входят в сейв;
+  static/NonSerialized исключены. У save carrier мода только string `Payload`.
+- `SavesManager.cs:459–473`: `LoadingInitialization` предшествует уничтожению
+  старых `SceneObject`; `Loaded` и очередь actions — строки 598–613. Чтобы не
+  зависеть от порядка подписок `Loaded`, handler может поставить action,
+  который добавляет фактическое восстановление в хвост той же очереди.
+- `SavesManager.cs:301`: blacklist namespace содержит regex `\\.UI`.
+  Namespace carrier должен быть не UI (у мода — `UBOAT.Mods.RadioNavigation`).
+- `MapChartingDatabase.RemovePoint` удаляет **только** row точки, не связанные
+  фигуры (`MapChartingDatabase.cs:42–45`). При явной уборке несохранённого
+  FIX/LOP нужно сначала удалить ссылающиеся line/circle/angle/bearing rows.
+
+Реализация: `Source/Logic/SextantSaveData.cs`, `SextantSavePersistence.cs`,
+`SextantSaveCodec.cs`, `SextantMapSave.cs`; контракт/приёмка —
+`docs/astro-save.md`. Статическая проверка этого пути не является доказательством
+завершённой записи и загрузки `.save` в игре.

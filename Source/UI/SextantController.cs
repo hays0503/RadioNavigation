@@ -165,6 +165,9 @@ namespace UBOAT.Mods.RadioNavigation
             sunDriftLogDelegate = LogSunDrift;
             painStarIdResetDelegate = starId.Reset;
             calibrator.Load();
+            // Pending campaign state takes precedence over the device's
+            // global calibration when a saved series is still in progress.
+            SextantSavePersistence.Bind(worksheet);
         }
 
         [Inject] private static ResourceManager resourceManager = null;
@@ -293,6 +296,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
+            SextantSavePersistence.Unbind(worksheet);
             if (Instance == this)
                 Instance = null;
             if (IsOpen && gameInput != null)

@@ -65,10 +65,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             Debug.Log("[RadioNav][Map] save sanitizer: Loaded hook fired (queue=" +
                 (queue != null ? "yes" : "null") + ")");
-            // The game destroys every point on load (SavesManagerOnLoadingStarted
-            // -> Clear), and that destruction was recorded as a player erase by
-            // the fix marker. Re-arm it: the fix data is untouched by a reload.
-            FixMapMarker.ResetSuppressions();
+            // Astro worksheet/dismissal now belongs to the loaded save and is
+            // restored by SextantSavePersistence after charting restoration.
+            // Do not unconditionally re-arm player-erased FIX/LOP markers here.
             // The charting database is re-created/restored by the game's own
             // Loaded handlers (BackgroundTasksManager) and the map restore is
             // enqueued by MapChartingUI — so at handler time the database may
@@ -272,7 +271,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// (verified live: prune reported the restored 215 rows). The DI probe
         /// is kept only as a cheap fast path for a future game change; do not
         /// read it as the primary route.</remarks>
-        private static MapChartingDatabase ResolveDatabase()
+        internal static MapChartingDatabase ResolveDatabase()
         {
             InjectionFramework framework = InjectionFramework.Instance;
             if (framework != null)

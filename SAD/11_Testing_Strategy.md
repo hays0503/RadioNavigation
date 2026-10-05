@@ -1,5 +1,11 @@
 # Testing Strategy — RadioNavigation Mod
 
+> **Save-приёмка 2026-10-05:** codec v1 добавил 32 behavioral cases и два
+> SourceCheck-гейта; пять save-мутаций пойманы ожидаемыми тестами/гейтами.
+> Реальные save/reload/изоляция, продолжение, drag-hidden с линией и возврат
+> кампании проверены (`docs/astro-save.md`). Это не физический drag/ластик;
+> счётчики полного рабочего дерева в receipt не являются процентом покрытия.
+
 > **⚠️ Baseline (2026-08-19, ADR-014) → актуализировано 2026-08-24:** Инфраструктура тестов РЕАЛИЗОВАНА (F22): xunit 2.9 + собственный раннер (`Tests/Runner`), **263 теста PASS** (`powershell -ExecutionPolicy Bypass -File tests.ps1`; история роста: baseline-182 `8b3021fa` → 232 → 253 → 255 → 257 → 260 → 263, детали в AGENTS.md). `dotnet build -c Release -c Debug` 0 errors. ADR-007 «Deferred» (F45) — полный охват интеграционных/производительных тестов целевой (см. `docs/adr/ADR-014-baseline.md`). Секции 3.x — целевые примеры (могут не совпадать с `Tests/`).
 
 ## 1. Testing Overview

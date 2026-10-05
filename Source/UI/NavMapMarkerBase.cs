@@ -145,6 +145,12 @@ namespace UBOAT.Mods.RadioNavigation
         {
         }
 
+        /// <summary>A restored dynamic point already carries its dragged
+        /// position in MapPointData. Seed the source latch without rewriting
+        /// that saved position on the first reconcile.</summary>
+        protected virtual bool PreserveInitialPointPosition => false;
+        protected virtual bool ContentReady => true;
+
         /// <summary>Declutter hooks (ADR-032). Default: off — markers draw
         /// every frame exactly as before. Overriding DeclutterEnabled turns
         /// on greedy min-gap suppression; Priority ranks who survives an
@@ -162,7 +168,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
-            if (!EnsureDependencies())
+            if (!ContentReady || !EnsureDependencies())
                 return;
 
             MapCameraController mapController = mainCamera.MapController;
@@ -389,8 +395,12 @@ namespace UBOAT.Mods.RadioNavigation
                 }
 
                 MarkerView view;
-                if (!previous.TryGetValue(key, out view))
+                if (!previous.TryGetValue(key, out view) || view.Point != point)
+                {
                     view = new MarkerView();
+                    view.HasTruePosition = PreserveInitialPointPosition;
+                    view.LastTruePosition = GetEncounterPosition(index);
+                }
                 view.Index = index;
                 view.Key = key;
                 view.Point = point;
