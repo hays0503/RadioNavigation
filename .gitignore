@@ -42,3 +42,6 @@ Bundles/buildlogtep.json
 .supermemory/
 memory.txt
 documents-readonly/
+
+# Locally generated Unity AssetBundle; keep out of Git.
+/Bundles/testui
