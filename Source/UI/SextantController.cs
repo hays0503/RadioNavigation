@@ -37,6 +37,8 @@ namespace UBOAT.Mods.RadioNavigation
         // Arc input step math + fine-drum repeat live in SextantArcInput
         // (extracted, P5.4 slice 4b); the controller keeps key polling.
         private readonly SextantArcInput arcInput = new SextantArcInput();
+        private readonly HeldKeyEdge zEdge = new HeldKeyEdge();
+        private readonly HeldKeyEdge pEdge = new HeldKeyEdge();
         // Vector telemetry lives in SextantVectorLog (extracted).
         private readonly SextantVectorLog vectorLog = new SextantVectorLog();
         // Ocular zoom steps live in SextantZoom (extracted, P5.4 slice 4a).
@@ -133,7 +135,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         // Cached delegates for the per-frame input poller: method-group
         // conversions would allocate a new delegate each frame.
-        private Action<float> logArcInputDelegate;
+        private Action<float, bool> logArcInputDelegate;
         private Action<int, bool> setFiltersDelegate;
         private Action toggleLensDelegate;
         private Action zoomInDelegate;
@@ -176,6 +178,19 @@ namespace UBOAT.Mods.RadioNavigation
             // Pending campaign state takes precedence over the device's
             // global calibration when a saved series is still in progress.
             SextantSavePersistence.Bind(worksheet);
+        }
+
+        private void OnEnable()
+        {
+            SynchronizeInputEdges();
+        }
+
+        private void SynchronizeInputEdges()
+        {
+            zEdge.Synchronize(Input.GetKey(KeyCode.Z));
+            pEdge.Synchronize(Input.GetKey(KeyCode.P));
+            if (inputPoller != null)
+                inputPoller.SynchronizeEdges();
         }
 
         [Inject] private static ResourceManager resourceManager = null;
@@ -263,17 +278,24 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
+            // Sample before the open/closed branch and before Close() can
+            // return early. Only the action is mode-gated; held state is not.
+            bool zPressed = zEdge.Advance(Input.GetKey(KeyCode.Z));
+            bool pPressed = pEdge.Advance(Input.GetKey(KeyCode.P));
+            bool shiftHeld = ShiftHeld();
+            inputPoller.SampleEdges(IsOpen);
+
             if (IsOpen)
             {
                 // Shift+Z while open does nothing: constellations are gated by
                 // IsOpen, and the device must not close on their combo.
-                if (Input.GetKeyDown(KeyCode.Z) && !ShiftHeld())
+                if (zPressed && !shiftHeld)
                 {
                     Close();
                     return;
                 }
-                inputPoller.PollArc(Time.unscaledDeltaTime, ref arcAngle, ShiftHeld(), logArcInputDelegate);
-                inputPoller.PollYawTrim(Time.unscaledDeltaTime, ShiftHeld());
+                inputPoller.PollArc(Time.unscaledDeltaTime, ref arcAngle, shiftHeld, logArcInputDelegate);
+                inputPoller.PollYawTrim(Time.unscaledDeltaTime, shiftHeld);
                 inputPoller.PollFilters(setFiltersDelegate);
                 inputPoller.PollLens(toggleLensDelegate);
                 inputPoller.PollZoom(zoomInDelegate, zoomOutDelegate, resetArcDelegate);
@@ -287,13 +309,13 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateMoonParity(Time.unscaledDeltaTime);
                 inputPoller.PollFix(arcAngle);
                 inputPoller.PollIndexError(arcAngle);
-                if (Input.GetKeyDown(KeyCode.P))
+                if (pPressed)
                     ToggleHelp();
                 worksheet.UpdateCourseSampler(Time.unscaledDeltaTime);
                 PollUiScale();
                 worksheet.UpdatePanel(Time.unscaledDeltaTime);
             }
-            else if (Input.GetKeyDown(KeyCode.Z) && !ShiftHeld())
+            else if (zPressed && !shiftHeld)
             {
                 TryOpen();
             }
@@ -880,11 +902,10 @@ namespace UBOAT.Mods.RadioNavigation
         // key polling callbacks and host services stay here.
 
         /// <summary>Hold/press vector telemetry on plain (non-Ctrl) input.</summary>
-        private void LogArcInputVector(float dt)
+        private void LogArcInputVector(float dt, bool pressed)
         {
             if (!SextantVectorLog.Enabled)
                 return;
-            bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
             bool holdDue = vectorLog.OnArcInput(dt);
             if (pressed)
                 vectorLog.OnArcPressed();

@@ -141,6 +141,7 @@
     <Compile Include="SextantGlareTests.cs" />
     <Compile Include="SextantZoomTests.cs" />
     <Compile Include="SextantArcInputTests.cs" />
+    <Compile Include="HeldKeyEdgeTests.cs" />
     <Compile Include="SextantReadoutTests.cs" />
     <Compile Include="SextantRunningFixTests.cs" />
     <Compile Include="SunEphemerisCalibrationTests.cs" />
@@ -258,6 +259,7 @@
     <Compile Include="..\..\Source\Logic\RebuildDrift.cs" Link="Source\Logic\RebuildDrift.cs" />
     <Compile Include="..\..\Source\Logic\ConstellationLineMath.cs" Link="Source\Logic\ConstellationLineMath.cs" />
     <Compile Include="..\..\Source\Logic\IndexErrorCorrection.cs" Link="Source\Logic\IndexErrorCorrection.cs" />
+    <Compile Include="..\..\Source\Logic\HeldKeyEdge.cs" Link="Source\Logic\HeldKeyEdge.cs" />
     <Compile Include="..\..\Source\Logic\CelestialForecast.cs" Link="Source\Logic\CelestialForecast.cs" />
     <Compile Include="..\..\Source\Logic\SextantPipSize.cs" Link="Source\Logic\SextantPipSize.cs" />
     <Compile Include="..\..\Source\Logic\SextantOcularSize.cs" Link="Source\Logic\SextantOcularSize.cs" />

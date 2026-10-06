@@ -187,17 +187,21 @@ Runtime-деплой — touch Source + restart (`run-game.ps1`); DLL из raw c
 - `GameInput` (UBOAT.Game.Core.Input): `[Inject] static GameInput gameInput;` —
   паттерн всей игры. `AddBlockade(object)` / `RemoveBlockade(object)` /
   `HasActiveBlockades()` — глушит игровую обработку ввода (зум на стрелках).
-- Прецедент мод-хоткея: `Input.GetKeyDown(KeyCode.F7)` в
-  ChronometerOverlayHandler.cs:92 (хронометр). Наш секстант: **Z**
-  (v1.2; исходный Ctrl+Z убран — игра ставит действие в очередь на Ctrl).
-- Занятые клавиши игры (полная таблица `knowledge/inventory/game-hotkeys.md`):
-  F4 телеграф, F5 глубиномер, F6 аксиометр, F7 хронометр, F8 Quick Save,
-  F9 Quick Load, F10 Capture Screenshot, **F11 bug report dialog** (хардкод,
-  НЕ InputAxis — в дамп осей не попадает!), Space, G, J, 1, M, B, H, U, K, L,
-  Q, E, C, V, R, N, F, W/A/S/D, Tab, Esc, Return, BackQuote, Ctrl, Shift,
-  PageUp/Down, +/=/-, Keypad0, 2..9 (персонажи), Mouse0/1/2, стрелки (Zoom).
+- Ввод `InputAxis` опрашивает как удерживаемое состояние через `Input.GetKey` и
+  вычисляет `JustPressed`/`JustReleased` из предыдущего снимка. Детали и границы
+  этого утверждения: `knowledge/inventory/game-input-semantics.md`.
+- Прежняя ссылка на `Input.GetKeyDown(KeyCode.F7)` в
+  `ChronometerOverlayHandler` была плохим прецедентом и удалена: это код мода,
+  а не доказательство политики игры; сейчас fallback хронометра edge-detect'ится
+  по sampled `Input.GetKey` (`HeldKeyEdge`). Наш секстант: **Z** (v1.2; исходный
+  Ctrl+Z убран — игра ставит действие в очередь на Ctrl).
+- Использовать `knowledge/inventory/game-hotkeys.md` как снимок разрешённых
+  привязок, а не как универсальную карту всех hard-coded обработчиков. F4/F5/F6
+  упомянуты там как неразрешённые оси из экрана настроек; F7 и G не подтверждены
+  effective-binding dump'ом и не перечисляются здесь как занятые клавиши.
 - **Свободно**: Z (мод с v1.2: секстант=Z, созвездия=Shift+Z),
-  F12 (но это скриншот Steam — избегать), буквы I/O/P/T/X/Y.
+  F12 (но это скриншот Steam — избегать). I/O/P/T/X/Y отсутствуют в dump;
+  перед назначением проверять hard-coded обработчики конкретного контекста.
 
 ### 3.2 Камеры и оверлеи
 - Основная камера: `CameraResolver.TryResolve(out cam)` (мод), `cam.fieldOfView`.

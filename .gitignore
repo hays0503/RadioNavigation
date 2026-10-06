@@ -41,3 +41,4 @@ Bundles/buildlogtep.json
 # Local supermemory tool artifacts (contain key material)
 .supermemory/
 memory.txt
+documents-readonly/

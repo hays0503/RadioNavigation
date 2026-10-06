@@ -8,14 +8,26 @@ namespace UBOAT.Mods.RadioNavigation
     /// not device logic). Owns the arc-input state (SextantArcInput) and
     /// the zoom steps (SextantZoom); the controller supplies the arc field,
     /// host services and worksheet/starId collaborators. Moved verbatim
-    /// (key map, fine-drum repeat, filter sides). UnityEngine.Input-bound,
-    /// so no unit tests — covered by live smoke. Needs UnityEngine.
+    /// (key map, fine-drum repeat, filter sides). Hardware polling remains
+    /// UnityEngine.Input-bound; the edge and repeat policies are tested as
+    /// pure logic, and SourceCheck pins this class's wiring. Needs UnityEngine.
     /// </summary>
     public sealed class SextantInputPoller
     {
         private readonly SextantArcInput arcInput;
         private readonly SextantWorksheet worksheet;
         private readonly SextantStarId starId;
+        private readonly HeldKeyEdge alpha4Edge = new HeldKeyEdge();
+        private readonly HeldKeyEdge keypad4Edge = new HeldKeyEdge();
+        private readonly HeldKeyEdge fixEdge = new HeldKeyEdge();
+        private readonly HeldKeyEdge upArrowEdge = new HeldKeyEdge();
+        private readonly HeldKeyEdge downArrowEdge = new HeldKeyEdge();
+        private readonly HeldKeyEdge leftArrowEdge = new HeldKeyEdge();
+        private readonly HeldKeyEdge rightArrowEdge = new HeldKeyEdge();
+        private bool lensPressedThisFrame;
+        private bool fixPressedThisFrame;
+        private bool arcPressedThisFrame;
+        private bool yawPressedThisFrame;
         // The yaw trim's fine-step repeat reuses the arc's hold cycle (the
         // same press-hold rhythm); a separate instance keeps the timers apart.
         private readonly SextantArcInput yawRepeat = new SextantArcInput();
@@ -34,7 +46,55 @@ namespace UBOAT.Mods.RadioNavigation
             this.starId = starId;
         }
 
-        public void PollArc(float dt, ref double arcAngle, bool shiftHeld, Action<float> logVector)
+        /// <summary>
+        /// Synchronizes every edge detector with hardware state on enable.
+        /// This prevents a key held across a Unity enable boundary from being
+        /// delivered as a fresh press.
+        /// </summary>
+        public void SynchronizeEdges()
+        {
+            alpha4Edge.Synchronize(Input.GetKey(KeyCode.Alpha4));
+            keypad4Edge.Synchronize(Input.GetKey(KeyCode.Keypad4));
+            fixEdge.Synchronize(Input.GetKey(KeyCode.I));
+            upArrowEdge.Synchronize(Input.GetKey(KeyCode.UpArrow));
+            downArrowEdge.Synchronize(Input.GetKey(KeyCode.DownArrow));
+            leftArrowEdge.Synchronize(Input.GetKey(KeyCode.LeftArrow));
+            rightArrowEdge.Synchronize(Input.GetKey(KeyCode.RightArrow));
+            ClearSampledEdges();
+        }
+
+        /// <summary>
+        /// Samples edge inputs every controller frame, including while the
+        /// sextant is closed. The action gate drops edge-triggered actions
+        /// from inactive frames while still updating held state. Continuous
+        /// arrow movement remains governed by GetKey in PollArc/PollYawTrim,
+        /// preserving the existing hold behavior while the overlay is open.
+        /// </summary>
+        public void SampleEdges(bool actionsEnabled)
+        {
+            bool alpha4Pressed = alpha4Edge.Advance(Input.GetKey(KeyCode.Alpha4));
+            bool keypad4Pressed = keypad4Edge.Advance(Input.GetKey(KeyCode.Keypad4));
+            bool fixPressed = fixEdge.Advance(Input.GetKey(KeyCode.I));
+            bool upPressed = upArrowEdge.Advance(Input.GetKey(KeyCode.UpArrow));
+            bool downPressed = downArrowEdge.Advance(Input.GetKey(KeyCode.DownArrow));
+            bool leftPressed = leftArrowEdge.Advance(Input.GetKey(KeyCode.LeftArrow));
+            bool rightPressed = rightArrowEdge.Advance(Input.GetKey(KeyCode.RightArrow));
+
+            lensPressedThisFrame = actionsEnabled && (alpha4Pressed || keypad4Pressed);
+            fixPressedThisFrame = actionsEnabled && fixPressed;
+            arcPressedThisFrame = actionsEnabled && (upPressed || downPressed);
+            yawPressedThisFrame = actionsEnabled && (leftPressed || rightPressed);
+        }
+
+        private void ClearSampledEdges()
+        {
+            lensPressedThisFrame = false;
+            fixPressedThisFrame = false;
+            arcPressedThisFrame = false;
+            yawPressedThisFrame = false;
+        }
+
+        public void PollArc(float dt, ref double arcAngle, bool shiftHeld, Action<float, bool> logVector)
         {
             float dir = 0f;
             if (Input.GetKey(KeyCode.UpArrow)) dir += 1f;
@@ -51,14 +111,13 @@ namespace UBOAT.Mods.RadioNavigation
                 // Fine adjustment: one vernier tick (0.1' = 1 quantum) per
                 // press, hold repeats after a short delay - like turning the
                 // drum; one tick equals one displayed digit.
-                bool pressed = Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow);
-                if (arcInput.AdvanceFineHold(dt, pressed))
+                if (arcInput.AdvanceFineHold(dt, arcPressedThisFrame))
                     arcAngle = SextantArcInput.StepFine(arcAngle, dir);
                 return;
             }
 
             if (logVector != null)
-                logVector(dt);
+                logVector(dt, arcPressedThisFrame);
 
             // Leaving the fine mode drops its repeat timer, so the next
             // Ctrl press fires immediately (C4).
@@ -88,9 +147,7 @@ namespace UBOAT.Mods.RadioNavigation
             bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
             if (ctrl)
             {
-                bool pressed = Input.GetKeyDown(KeyCode.LeftArrow)
-                    || Input.GetKeyDown(KeyCode.RightArrow);
-                if (yawRepeat.AdvanceFineHold(dt, pressed))
+                if (yawRepeat.AdvanceFineHold(dt, yawPressedThisFrame))
                     SextantPipPose.AddYawTrim(SextantYawInput.DeltaFine(dir));
                 return;
             }
@@ -116,7 +173,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// already the left-filter modifier.</summary>
         public void PollLens(Action toggleLens)
         {
-            if (Input.GetKeyDown(KeyCode.Alpha4) || Input.GetKeyDown(KeyCode.Keypad4))
+            if (lensPressedThisFrame)
             {
                 if (toggleLens != null)
                     toggleLens();
@@ -196,7 +253,7 @@ namespace UBOAT.Mods.RadioNavigation
             // I records a sight of the SELECTED body (sticky, 2026-11-04: it
             // survives leaving the cone, so the drum can be set first), O
             // starts a new worksheet series and drops the selection.
-            if (Input.GetKeyDown(KeyCode.I))
+            if (fixPressedThisFrame)
             {
                 if (!starId.HasSelection)
                 {

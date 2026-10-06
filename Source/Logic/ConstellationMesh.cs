@@ -46,8 +46,9 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<float> altitudeScratch = new List<float>(64);
         private Vector3 rebuildCamPos;
 
-        /// <summary>Base key of the constellation toggle combo; effective binding is Shift+Z (SEXTANT_PLAN v1.2 — plain Z opens the sextant). Game occupies F4-F10/F11; Z verified free (source grep + 80-axis dump).</summary>
+        /// <summary>Base key of the constellation toggle combo; effective binding is Shift+Z (SEXTANT_PLAN v1.2 — plain Z opens the sextant). Z was absent from the effective game InputAxis dump; this does not describe unrelated hard-coded handlers.</summary>
         private const KeyCode ToggleKey = KeyCode.Z;
+        private readonly HeldKeyEdge toggleEdge = new HeldKeyEdge();
 
         /// <summary>Current layer state, persisted via ConstellationTogglePrefs. Default ON.</summary>
         public static bool Enabled { get; private set; } = ConstellationTogglePrefs.Load();
@@ -64,13 +65,20 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
+            bool togglePressed = toggleEdge.Advance(Input.GetKey(ToggleKey));
+            bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             // SEXTANT_PLAN v1.2: constellations moved to Shift+Z (the game queues
             // an action on bare Ctrl), plain Z belongs to the sextant; while the
             // sextant overlay is open stars must not toggle mid-shot.
-            if (Input.GetKeyDown(ToggleKey)
-                && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+            if (togglePressed
+                && shiftHeld
                 && !SextantController.IsOpen)
                 SetEnabled(!Enabled);
+        }
+
+        private void OnEnable()
+        {
+            toggleEdge.Synchronize(Input.GetKey(ToggleKey));
         }
 
         private void Awake()

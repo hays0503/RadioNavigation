@@ -337,6 +337,90 @@ namespace RadioNavigation.SourceCheck
         }
 
         /// <summary>
+        /// Held toggles and commit-like inputs must be driven by sampled
+        /// rising edges, not raw GetKeyDown calls. The hardware policy is
+        /// unit-tested separately; this pins the production wiring.
+        /// </summary>
+        [Fact]
+        public void ToggleKeys_AreEdgeDetected()
+        {
+            if (!ModCompiler.HasModSource) return;
+
+            var problems = new List<string>();
+            var roots = ParseAllSources();
+            var controller = FindSourceType(roots, "SextantController");
+            var poller = FindSourceType(roots, "SextantInputPoller");
+            var constellations = FindSourceType(roots, "ConstellationMesh");
+            var chronometer = FindSourceType(roots, "ChronometerOverlayHandler");
+
+            var controllerUpdate = FindMethod(controller, "Update");
+            if (!InvokesReceiverMethod(controllerUpdate, "zEdge", "Advance"))
+                problems.Add("SextantController.Update must advance zEdge before mode branching");
+            if (!InvokesReceiverMethod(controllerUpdate, "pEdge", "Advance"))
+                problems.Add("SextantController.Update must advance pEdge before mode branching");
+            if (controllerUpdate == null || !InvokesName(controllerUpdate, "SampleEdges"))
+                problems.Add("SextantController.Update must sample poller edges on both open and closed frames");
+
+            var sampleEdges = FindMethod(poller, "SampleEdges");
+            foreach (string edge in new[]
+            {
+                "alpha4Edge", "keypad4Edge", "fixEdge", "upArrowEdge",
+                "downArrowEdge", "leftArrowEdge", "rightArrowEdge"
+            })
+            {
+                if (!InvokesReceiverMethod(sampleEdges, edge, "Advance"))
+                    problems.Add("SextantInputPoller.SampleEdges must advance " + edge);
+            }
+
+            var pollLens = FindMethod(poller, "PollLens");
+            if (pollLens == null || !ReferencesIdentifier(pollLens, "lensPressedThisFrame"))
+                problems.Add("SextantInputPoller.PollLens must consume lensPressedThisFrame");
+            var pollFix = FindMethod(poller, "PollFix");
+            if (pollFix == null || !ReferencesIdentifier(pollFix, "fixPressedThisFrame"))
+                problems.Add("SextantInputPoller.PollFix must consume fixPressedThisFrame");
+
+            var pollArc = FindMethod(poller, "PollArc");
+            if (pollArc == null || !InvokesWithArgument(pollArc, "AdvanceFineHold", "arcPressedThisFrame"))
+                problems.Add("SextantInputPoller.PollArc must drive fine repeat from arcPressedThisFrame");
+            var pollYaw = FindMethod(poller, "PollYawTrim");
+            if (pollYaw == null || !InvokesWithArgument(pollYaw, "AdvanceFineHold", "yawPressedThisFrame"))
+                problems.Add("SextantInputPoller.PollYawTrim must drive fine repeat from yawPressedThisFrame");
+
+            var constellationUpdate = FindMethod(constellations, "Update");
+            if (!InvokesReceiverMethod(constellationUpdate, "toggleEdge", "Advance"))
+                problems.Add("ConstellationMesh.Update must advance toggleEdge");
+            var chronometerLateUpdate = FindMethod(chronometer, "LateUpdate");
+            if (!InvokesReceiverMethod(chronometerLateUpdate, "f7Edge", "Advance"))
+                problems.Add("ChronometerOverlayHandler.LateUpdate must advance f7Edge before resolving the bridge");
+
+            foreach (var root in roots)
+            {
+                foreach (var invocation in root.Item2.DescendantNodes().OfType<InvocationExpressionSyntax>())
+                {
+                    if (!(invocation.Expression is MemberAccessExpressionSyntax member)
+                        || member.Name.Identifier.Text != "GetKeyDown"
+                        || invocation.ArgumentList.Arguments.Count == 0)
+                        continue;
+
+                    string argument = invocation.ArgumentList.Arguments[0].Expression.ToString();
+                    if (new[]
+                    {
+                        "KeyCode.Z", "KeyCode.P", "KeyCode.Alpha4", "KeyCode.Keypad4",
+                        "KeyCode.I", "KeyCode.UpArrow", "KeyCode.DownArrow",
+                        "KeyCode.LeftArrow", "KeyCode.RightArrow", "KeyCode.F7", "ToggleKey"
+                    }.Contains(argument, StringComparer.Ordinal))
+                    {
+                        problems.Add("raw GetKeyDown remains for edge-managed key " + argument
+                            + " in " + root.Item1);
+                    }
+                }
+            }
+
+            Assert.True(problems.Count == 0,
+                problems.Count + " input-edge wiring violation(s):\n" + string.Join("\n", problems));
+        }
+
+        /// <summary>
         /// Names any method-like body for the complexity report: methods and
         /// constructors by identifier, operators by token, accessors by keyword.
         /// Returns null for non-method-like nodes.
@@ -3572,6 +3656,39 @@ namespace RadioNavigation.SourceCheck
                         && qname.Identifier.Text == name));
         }
 
+        private static bool InvokesReceiverMethod(
+            MethodDeclarationSyntax method, string receiver, string name)
+        {
+            return method != null && method.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(inv => inv.Expression is MemberAccessExpressionSyntax member
+                    && member.Expression.ToString() == receiver
+                    && member.Name.Identifier.Text == name);
+        }
+
+        private static bool ReferencesIdentifier(MethodDeclarationSyntax method, string name)
+        {
+            return method != null && method.DescendantNodes()
+                .OfType<IdentifierNameSyntax>()
+                .Any(identifier => identifier.Identifier.Text == name);
+        }
+
+        private static bool InvokesWithArgument(
+            MethodDeclarationSyntax method, string name, string argument)
+        {
+            return method != null && method.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(inv =>
+                {
+                    bool named = inv.Expression is IdentifierNameSyntax bare
+                        ? bare.Identifier.Text == name
+                        : inv.Expression is MemberAccessExpressionSyntax member
+                            && member.Name.Identifier.Text == name;
+                    return named && inv.ArgumentList.Arguments.Any(a =>
+                        a.Expression.ToString() == argument);
+                });
+        }
+
         /// <summary>First position of an assignment to <paramref name="field"/>
         /// inside an `if (Locked)` branch whose right side mentions
         /// <paramref name="source"/>; -1 when absent. Used by the keyboard-trim
@@ -5271,10 +5388,13 @@ namespace RadioNavigation.SourceCheck
             else
             {
                 var pollLens = FindMethod(poller, "PollLens");
-                if (pollLens == null
-                    || pollLens.ToString().IndexOf("Alpha4", StringComparison.Ordinal) < 0
-                    || pollLens.ToString().IndexOf("Keypad4", StringComparison.Ordinal) < 0)
-                    problems.Add("Key 4 must be polled as Alpha4/Keypad4 in SextantInputPoller.PollLens");
+                var sampleEdges = FindMethod(poller, "SampleEdges");
+                if (pollLens == null || !ReferencesIdentifier(pollLens, "lensPressedThisFrame"))
+                    problems.Add("SextantInputPoller.PollLens must consume the sampled lens edge");
+                if (sampleEdges == null
+                    || !InvokesWithArgument(sampleEdges, "GetKey", "KeyCode.Alpha4")
+                    || !InvokesWithArgument(sampleEdges, "GetKey", "KeyCode.Keypad4"))
+                    problems.Add("Key 4 must sample Alpha4 and Keypad4 when building the lens edge");
             }
 
             var help = FindSourceType(roots, "SextantHelpPanel");

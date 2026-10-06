@@ -40,6 +40,7 @@ namespace UBOAT.Mods.RadioNavigation
         // drag mechanics live in ChronometerDragProtocol (extracted).
         private readonly ChronometerScaleSubsystem scaleSubsystem = new ChronometerScaleSubsystem();
         private ChronometerDragProtocol dragProtocol;
+        private readonly HeldKeyEdge f7Edge = new HeldKeyEdge();
         // Expensive scene-wide fallback (Resources.FindObjectsOfTypeAll)
         // runs at most once per interval while the bridge is unresolved —
         // not every LateUpdate.
@@ -55,8 +56,17 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateDefaultPositionForRadioParent);
         }
 
+        private void OnEnable()
+        {
+            f7Edge.Synchronize(Input.GetKey(KeyCode.F7));
+        }
+
         private void LateUpdate()
         {
+            // Sample even while the native bridge is unresolved; otherwise a
+            // held F7 could look like a fresh fallback press when it resolves.
+            bool f7Pressed = f7Edge.Advance(Input.GetKey(KeyCode.F7));
+
             if (dragProtocol != null && dragProtocol.LocalDragActive)
                 CancelNativeDrag();
 
@@ -71,7 +81,7 @@ namespace UBOAT.Mods.RadioNavigation
             bool isOpen = shipControlUI.IsChronometerOpen;
             ChronometerOpenTracker.Frame frame = ChronometerOpenTracker.Track(
                 hasPreviousOpenState, previousOpenState, isOpen,
-                Input.GetKeyDown(KeyCode.F7), chronometerButton.IsNotNull());
+                f7Pressed, chronometerButton.IsNotNull());
             if (frame.ToggledByFallback)
             {
                 chronometerButton.isOn = !chronometerButton.isOn;

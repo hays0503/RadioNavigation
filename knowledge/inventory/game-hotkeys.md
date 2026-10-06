@@ -2,6 +2,8 @@
 
 Source: InputDumpMod dump of 80/83 game InputAxis assets (effective bindings — user overrides applied). Missing 3 axes = Inputs/F4, Inputs/F5, Inputs/F6 (referenced by InputSettingsPanel but not resolvable — device hotkeys F4/F5/F6 from settings screen: телеграф/глубиномер/аксиометр).
 
+Input state/edge semantics for the active `InputAxis` implementation are recorded separately in [`game-input-semantics.md`](game-input-semantics.md). Binding presence in this dump does not establish the behavior of unrelated hard-coded key handlers.
+
 ## Occupied keys
 
 | Key | Action |
