@@ -75,7 +75,7 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     double x = ((px + 0.5) - half) / half;
                     double r2 = x * x + y * y;
-                    double disc = 1.0 - Smoothstep(1.0 - soft, 1.0, Math.Sqrt(r2));
+                    double disc = CelestialDiscRaster.Coverage(Math.Sqrt(r2), size);
                     if (disc <= 0.0)
                     {
                         field[py * size + px] = 0f;
@@ -83,11 +83,32 @@ namespace UBOAT.Mods.RadioNavigation
                     }
 
                     // Rotate so the bright limb points along +xr.
-                    double xr = x * cosPa + y * sinPa;
-                    double yr = -x * sinPa + y * cosPa;
+                    double xr = (x * cosPa + y * sinPa) / CelestialDiscRaster.LimbRadius;
+                    double yr = (-x * sinPa + y * cosPa) / CelestialDiscRaster.LimbRadius;
                     double terminator = -cosI * Math.Sqrt(Math.Max(0.0, 1.0 - yr * yr));
                     double lit = Smoothstep(-soft, soft, xr - terminator);
                     field[py * size + px] = (float)(disc * lit);
+                }
+            }
+            return field;
+        }
+
+        /// <summary>Opacity is the whole spherical silhouette, independent of
+        /// illumination. A dark hemisphere must not reveal another Moon/stars.</summary>
+        public static float[] BuildCoverageField(int size)
+        {
+            if (size < 4)
+                size = 4;
+            float[] field = new float[size * size];
+            double half = size * 0.5;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    double dx = (x + 0.5 - half) / half;
+                    double dy = (y + 0.5 - half) / half;
+                    field[y * size + x] = (float)CelestialDiscRaster.Coverage(
+                        Math.Sqrt(dx * dx + dy * dy), size);
                 }
             }
             return field;

@@ -134,6 +134,12 @@ namespace UBOAT.Mods.RadioNavigation
             DateTime utc, out double azimuthDeg)
         {
             azimuthDeg = 0.0;
+            if (body.Kind == CelestialBodyKind.Sun)
+            {
+                double altitude;
+                return Sh5SolarNavigation.TryCentre(utc, latDeg, lonDeg, out altitude, out azimuthDeg)
+                    && altitude >= 3;
+            }
             double raRad, decRad;
             double lstDeg;
             if (body.Kind == CelestialBodyKind.Moon)

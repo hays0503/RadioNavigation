@@ -20,6 +20,9 @@ namespace UBOAT.Mods.RadioNavigation
         public float OwnAz;
         public bool GameOk;
         public Vector3 GameDir;
+        public bool TableOk;
+        public Vector3 TableDir;
+        public float TableAlt;
         public int RightFilterCount;
         public Image GlareImage;
         public Image FilterDimLeft;
@@ -59,6 +62,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void Update(float dt, GlareFrame frame)
         {
+            // This coordinator never writes solar geometry. The controller's
+            // late SH5 optics owns it, regardless of filters/glare preference.
             if (frame.Disabled)
             {
                 ApplyGlare(0f, frame.GlareImage, frame.PainText, frame.PainStarIdReset);
@@ -70,20 +75,17 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             float g = 0f;
-            if (frame.RightCamera != null && frame.OwnOk)
+            if (frame.RightCamera != null && frame.TableOk)
             {
-                float angle = Vector3.Angle(frame.RightCamera.transform.forward, frame.OwnDir);
-                g = (float)SextantGlare.Glare(angle, frame.OwnAlt, frame.RightFilterCount, frame.RightCamera.fieldOfView);
-                // Disc must cover the GAME sun sprite (SUNDRIFT sep ~1.6°),
-                // so position it on the game direction when available.
-                SunDiscRenderer.SunDirection = frame.GameOk ? frame.GameDir : frame.OwnDir;
+                float angle = Vector3.Angle(frame.RightCamera.transform.forward, frame.TableDir);
+                g = (float)SextantGlare.Glare(angle, frame.TableAlt, frame.RightFilterCount, frame.RightCamera.fieldOfView);
                 if (!sunDiscSourceLogged && SunDiscRenderer.Active)
                 {
                     sunDiscSourceLogged = true;
                     float sep = frame.GameOk ? Vector3.Angle(frame.GameDir, frame.OwnDir) : -1f;
                     Debug.Log(string.Format(CultureInfo.InvariantCulture,
                         "{0} SUNDISC src={1} sep={2:F3} own(alt={3:F2} az={4:F1}) game={5}",
-                        LogPrefix, frame.GameOk ? "game" : "own", sep, frame.OwnAlt, frame.OwnAz,
+                        LogPrefix, "SH5", sep, frame.OwnAlt, frame.OwnAz,
                         frame.GameOk ? SextantVectorLog.V3(frame.GameDir) : " n/a"));
                 }
             }
@@ -92,23 +94,21 @@ namespace UBOAT.Mods.RadioNavigation
                 frame.SunDriftLog(dt);
         }
 
+        // Compatibility entry point: the sealed controller still supplies the
+        // old dimmer arguments. Intentionally unused; don't invent optical uses
+        // for them or change protected calibration/controller code to remove them.
+#pragma warning disable RCS1163
         public void ApplyDim(Image left, Image right, int leftCount, int rightCount, bool glareEnabled)
         {
-            if (!glareEnabled)
-                return;
-            if (left.IsNotNull())
-            {
-                Color c = left.color;
-                c.a = SextantReadout.FilterDimAlpha(leftCount);
-                left.color = c;
-            }
-            if (right.IsNotNull())
-            {
-                Color c = right.color;
-                c.a = SextantReadout.FilterDimAlpha(rightCount);
-                right.color = c;
-            }
+            // Shade glasses are applied by the PIP's HDR profile. A black UI
+            // quad cannot recover clipped spots/limbs and would attenuate twice.
+            // Glare's preference must not switch the optical glasses off.
+            // Keep the public call signature used by the sealed controller;
+            // filter counts now reach the camera profiles through BloomCut.Update.
+            ZeroDim(left);
+            ZeroDim(right);
         }
+#pragma warning restore RCS1163
 
         private static void ZeroDim(Image image)
         {

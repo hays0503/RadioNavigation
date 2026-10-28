@@ -3853,7 +3853,8 @@ namespace RadioNavigation.SourceCheck
 
         /// <summary>
         /// Factory gate (SRP slice 4a): PIP camera creation flows
-        /// SextantController.TryOpen -&gt; SextantPipFactory.Ensure -&gt;
+        /// SextantController.TryOpen/TryOpenForRenderProbe -&gt; PrepareOpen
+        /// -&gt; SextantPipFactory.Ensure -&gt;
         /// ConfigurePipCamera. A re-inline of creation into the controller
         /// fails here.
         /// </summary>
@@ -3873,8 +3874,14 @@ namespace RadioNavigation.SourceCheck
                 var open = FindMethod(controller, "TryOpen");
                 if (open == null)
                     problems.Add("SextantController.TryOpen not found");
-                else if (!InvokesName(open, "Ensure"))
-                    problems.Add("SextantController.TryOpen never invokes SextantPipFactory.Ensure — creation regressed into the controller");
+                else if (!InvokesName(open, "PrepareOpen"))
+                    problems.Add("SextantController.TryOpen never invokes PrepareOpen — camera creation disconnected");
+                var renderOpen = FindMethod(controller, "TryOpenForRenderProbe");
+                if (renderOpen == null || !InvokesName(renderOpen, "PrepareOpen"))
+                    problems.Add("SextantController.TryOpenForRenderProbe never invokes PrepareOpen");
+                var prepare = FindMethod(controller, "PrepareOpen");
+                if (prepare == null || !InvokesOnType(prepare, "pipFactory", "Ensure"))
+                    problems.Add("SextantController.PrepareOpen never invokes pipFactory.Ensure — creation regressed into the controller");
             }
             if (factory == null)
             {
@@ -5188,10 +5195,13 @@ namespace RadioNavigation.SourceCheck
                     problems.Add("Interior optics asset keys must resolve to the bundled shader and material");
 
                 var interiorProjection = FindMethod(lens, "UpdateInteriorProjection");
+                // This is the accepted lamp compactness, NOT the physical Sun.
+                // CelestialDisc_SolarSizeAndLimbUsePhysicalGeometry pins the
+                // 2.153125-degree value and its actual PixelsForAngle arguments.
                 if (interiorProjection == null
                     || CountOccurrences(interiorProjection.ToString(), "PixelsForAngle") < 3
                     || interiorProjection.ToString().IndexOf("BaselineThicknessDeg", StringComparison.Ordinal) < 0
-                    || interiorProjection.ToString().IndexOf("SunDiscRenderer.AngularDiameterDeg", StringComparison.Ordinal) < 0
+                    || interiorProjection.ToString().IndexOf("interiorCompactDiameterDeg", StringComparison.Ordinal) < 0
                     || interiorProjection.ToString().IndexOf("SternspreizLensTilt.AngleDeg", StringComparison.Ordinal) < 0
                     || interiorProjection.ToString().IndexOf("InteriorStreakHalfLengthId", StringComparison.Ordinal) < 0
                     || interiorProjection.ToString().IndexOf("InteriorCompactnessRadiusId", StringComparison.Ordinal) < 0
@@ -5792,20 +5802,45 @@ namespace RadioNavigation.SourceCheck
             }
             else
             {
-                bool captureFound = worksheet.Members.OfType<MethodDeclarationSyntax>()
-                    .Any(m => m.Identifier.Text == "CaptureObservation");
-                bool validates = worksheet.Members.OfType<MethodDeclarationSyntax>()
-                    .Where(m => m.Identifier.Text == "CaptureObservation")
-                    .Any(m => InvokesName(m, "Compute"));
-                if (!captureFound)
+                var capture = worksheet.Members.OfType<MethodDeclarationSyntax>()
+                    .SingleOrDefault(m => m.Identifier.Text == "CaptureObservation"
+                        && m.ParameterList.Parameters.Count == 6);
+                var frame = FindMethod(worksheet, "TryCaptureFrame");
+                // Capture was split to keep its complexity bounded. Follow the
+                // guarded helper call, not an arbitrary Compute token elsewhere
+                // in the type: both failed calls must return before the builder.
+                var frameGuard = FindFailedCallGuard(capture,
+                    "TryCaptureFrame(body, disc, out utc, out lat, out lon)");
+                var ephemerisGuard = FindFailedCallGuard(frame,
+                    "CelestialEphemeris.Compute(body, utc, out _, out _)");
+                var build = capture?.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                    .FirstOrDefault(i => i.Expression.ToString() == "TryBuildCapture");
+                bool validates = frameGuard != null && ephemerisGuard != null
+                    && build != null && frameGuard.Span.End < build.SpanStart;
+                if (capture == null)
                     problems.Add("SextantWorksheet.CaptureObservation not found");
                 else if (!validates)
-                    problems.Add("SextantWorksheet.CaptureObservation never validates CelestialEphemeris.Compute — unknown bodies silently fall back to the sun");
+                    problems.Add("SextantWorksheet.CaptureObservation does not reject failed TryCaptureFrame/CelestialEphemeris.Compute before building — unknown bodies can fall back to the sun");
             }
 
             Assert.True(problems.Count == 0,
                 $"{problems.Count} no-HIP sentinel violation(s):\n"
                 + string.Join("\n", problems));
+        }
+
+        private static IfStatementSyntax FindFailedCallGuard(MethodDeclarationSyntax method,
+            string invocation)
+        {
+            if (method == null)
+                return null;
+            var expected = SyntaxFactory.ParseExpression(invocation);
+            return method.DescendantNodes().OfType<IfStatementSyntax>()
+                .FirstOrDefault(i => i.Condition.DescendantNodesAndSelf()
+                    .OfType<PrefixUnaryExpressionSyntax>()
+                    .Any(n => n.IsKind(SyntaxKind.LogicalNotExpression)
+                        && SyntaxFactory.AreEquivalent(n.Operand, expected))
+                    && i.Statement.DescendantNodesAndSelf().OfType<ReturnStatementSyntax>()
+                        .Any(r => r.Expression != null && r.Expression.IsKind(SyntaxKind.FalseLiteralExpression)));
         }
 
         /// <summary>
@@ -7682,8 +7717,14 @@ namespace RadioNavigation.SourceCheck
                 Assert.True(recorded.DescendantNodes().OfType<AssignmentExpressionSyntax>()
                     .Any(a => a.Left.ToString() == field && a.Right.IsKind(SyntaxKind.FalseLiteralExpression)),
                     "A new observation must cancel pending O cleanup and the previous series' triangle");
-            var capture = worksheet.Members.OfType<MethodDeclarationSyntax>().FirstOrDefault(m =>
-                m.Identifier.Text == "CaptureObservation" && m.ParameterList.Parameters.Count == 5);
+            // The overload that IMPLEMENTS the record, not a fixed arity: the
+            // arity-pinned lookup broke when the solar-disc snapshot added a
+            // parameter and the old 5-arg overload became a thin delegate.
+            // The widest overload is the one carrying the body.
+            var capture = worksheet.Members.OfType<MethodDeclarationSyntax>()
+                .Where(m => m.Identifier.Text == "CaptureObservation")
+                .OrderByDescending(m => m.ParameterList.Parameters.Count)
+                .FirstOrDefault();
             Assert.NotNull(capture);
             var unsolved = capture.DescendantNodes().OfType<IfStatementSyntax>()
                 .FirstOrDefault(i => i.Condition.ToString() == "runningFix.CanSolve");

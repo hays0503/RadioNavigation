@@ -9,7 +9,9 @@ namespace UBOAT.Mods.RadioNavigation
     /// PPv2 bloom-cut volumes for the sextant PIP cameras: one volume per
     /// camera on a dedicated layer present ONLY in that camera's
     /// volumeLayer mask (the main camera never consumes those layers, so
-    /// the eyes' bloom is untouched).
+    /// the eyes' bloom is untouched). The same camera-private profiles now
+    /// carry the amber shade glasses: HDR attenuation before tone mapping,
+    /// with eye adaptation disabled only while that half is filtered.
     ///
     /// Always active while the sextant is open: the PIP renders 512x512,
     /// so the game's bloom (tuned for 1080p) produces halos ~2x larger in
@@ -32,6 +34,10 @@ namespace UBOAT.Mods.RadioNavigation
         // GameObject — it must be destroyed explicitly or it leaks per open.
         private PostProcessProfile leftProfile;
         private PostProcessProfile rightProfile;
+        private ColorGrading leftShade;
+        private ColorGrading rightShade;
+        private AutoExposure leftExposure;
+        private AutoExposure rightExposure;
         private bool logged;
         // Edge-only logging: Update runs per frame, the active flag rarely
         // changes (CS0169-style noise otherwise).
@@ -46,12 +52,27 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 PostProcessLayer pipLayer = pipGo.GetComponent<PostProcessLayer>();
                 if (pipLayer == null)
+                {
+                    if (WarnOnce.ShouldLog("SextantBloomCut.NoPostLayer"))
+                        Debug.LogWarning(LogPrefix + " shade glasses unavailable: PIP has no PostProcessLayer");
                     return;
+                }
 
                 GameObject volumeGo = rightSide ? rightGo : leftGo;
                 if (volumeGo == null)
                 {
                     int layer = rightSide ? LayerCandidateRight : LayerCandidateLeft;
+                    // The layer mask was just copied from the view camera. If
+                    // either reserved layer is already in it, global volumes
+                    // would leak into the eyes or the opposite PIP. Fail closed;
+                    // never 'fix' this by changing a native camera's mask.
+                    int reserved = (1 << LayerCandidateLeft) | (1 << LayerCandidateRight);
+                    if ((pipLayer.volumeLayer.value & reserved) != 0)
+                    {
+                        if (WarnOnce.ShouldLog("SextantBloomCut.LayerCollision"))
+                            Debug.LogWarning(LogPrefix + " shade/bloom volumes unavailable: private layer collision");
+                        return;
+                    }
                     volumeGo = new GameObject(rightSide ? "RadioNavSextantBloomCutRight" : "RadioNavSextantBloomCutLeft");
                     volumeGo.layer = layer;
                     PostProcessVolume volume = volumeGo.AddComponent<PostProcessVolume>();
@@ -61,17 +82,26 @@ namespace UBOAT.Mods.RadioNavigation
                     profile.name = "RadioNavSextantBloomCut";
                     Bloom bloom = profile.AddSettings<Bloom>();
                     bloom.enabled.value = false;
+                    ColorGrading shade = CreateShade(profile);
+                    AutoExposure exposure = profile.AddSettings<AutoExposure>();
+                    exposure.SetAllOverridesTo(false);
+                    exposure.enabled.Override(false);
+                    exposure.active = false;
                     volume.sharedProfile = profile;
                     volumeGo.SetActive(false); // active while the sextant is open
                     if (rightSide)
                     {
                         rightGo = volumeGo;
                         rightProfile = profile;
+                        rightShade = shade;
+                        rightExposure = exposure;
                     }
                     else
                     {
                         leftGo = volumeGo;
                         leftProfile = profile;
+                        leftShade = shade;
+                        leftExposure = exposure;
                     }
                     Debug.Log(LogPrefix + " BLOOMCUT volume " + (rightSide ? "right" : "left")
                         + " on layer " + layer + " created (hidden)");
@@ -87,11 +117,42 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        private static ColorGrading CreateShade(PostProcessProfile profile)
+        {
+            ColorGrading shade = profile.AddSettings<ColorGrading>();
+            // AddSettings enables ALL overrides. Keep the game's white balance,
+            // contrast, tonemapper, LUT etc.; only these optical controls belong
+            // to us, and none is blended at zero glasses.
+            shade.SetAllOverridesTo(false);
+            shade.enabled.Override(true);
+            shade.gradingMode.Override(GradingMode.HighDefinitionRange);
+            shade.postExposure.Override(0f);
+            shade.colorFilter.Override(Color.white);
+            shade.active = false;
+            return shade;
+        }
+
+        internal static void ApplyShade(ColorGrading shade, AutoExposure exposure,
+            bool open, int count)
+        {
+            if (shade == null || exposure == null)
+                return;
+            int glasses = SextantShadeFilter.ClampCount(count);
+            bool on = open && glasses > 0;
+            shade.active = on;
+            exposure.active = on;
+            shade.postExposure.value = (float)SextantShadeFilter.ExposureEv(glasses);
+            shade.colorFilter.value = new Color(1f,
+                (float)SextantShadeFilter.Green(glasses), (float)SextantShadeFilter.Blue(glasses), 1f);
+        }
+
         /// <summary>Bloom-cut while open: both halves lose bloom for the whole
-        /// open period (halos + NaN black blocks at 512x512). Filter counts
-        /// are kept for the diagnostic log only.</summary>
+        /// open period (halos + NaN black blocks at 512x512). Each filter count
+        /// controls only its half's HDR shade/eye-adaptation overrides.</summary>
         public void Update(bool open, int leftFilters, int rightFilters)
         {
+            ApplyShade(leftShade, leftExposure, open, leftFilters);
+            ApplyShade(rightShade, rightExposure, open, rightFilters);
             if (rightGo != null)
             {
                 bool rightOn = open;
@@ -151,6 +212,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// edge logs for the next open.</summary>
         public void Hide()
         {
+            ApplyShade(leftShade, leftExposure, false, 0);
+            ApplyShade(rightShade, rightExposure, false, 0);
             if (leftGo != null)
                 leftGo.SetActive(false);
             if (rightGo != null)
@@ -167,13 +230,31 @@ namespace UBOAT.Mods.RadioNavigation
             if (rightGo != null)
                 UnityEngine.Object.Destroy(rightGo);
             if (leftProfile != null)
+            {
+                DestroySettings(leftProfile);
                 UnityEngine.Object.Destroy(leftProfile);
+            }
             if (rightProfile != null)
+            {
+                DestroySettings(rightProfile);
                 UnityEngine.Object.Destroy(rightProfile);
+            }
             leftGo = null;
             rightGo = null;
             leftProfile = null;
             rightProfile = null;
+            leftShade = null;
+            rightShade = null;
+            leftExposure = null;
+            rightExposure = null;
+        }
+
+        private static void DestroySettings(PostProcessProfile profile)
+        {
+            // These settings were created by this profile, not borrowed from a
+            // game asset. Destroying a ScriptableObject is not recursive.
+            foreach (PostProcessEffectSettings settings in profile.settings)
+                UnityEngine.Object.Destroy(settings);
         }
     }
 }

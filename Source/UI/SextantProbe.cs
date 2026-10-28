@@ -29,6 +29,8 @@ namespace UBOAT.Mods.RadioNavigation
                 StringBuilder sb = new StringBuilder(1024);
                 sb.Append("{\"ok\":true,\"loaded\":true");
                 sb.Append(",\"open\":").Append(SextantController.IsOpen ? "true" : "false");
+                sb.Append(",\"renderOnly\":").Append(controller.RenderOnlyForProbe ? "true" : "false");
+                sb.Append(",\"sightOnly\":").Append(controller.SightOnlyForProbe ? "true" : "false");
                 sb.Append(",\"arcDeg\":").Append(Num(controller.ArcAngle));
                 sb.Append(",\"filters\":{\"left\":").Append(controller.LeftFilterCount)
                   .Append(",\"right\":").Append(controller.RightFilterCount).Append('}');
@@ -41,6 +43,7 @@ namespace UBOAT.Mods.RadioNavigation
                 sb.Append(",\"yawTrimDeg\":").Append(Num(SextantPipPose.YawTrimDeg));
                 AppendIdentified(sb, controller.StarIdForProbe);
                 AppendOwnBodies(sb, controller);
+                AppendSolarAudit(sb, controller);
                 AppendSight(sb, "sight1", worksheet.Calculator.Observation1);
                 AppendSight(sb, "sight2", worksheet.Calculator.Observation2);
                 sb.Append(",\"fix\":");
@@ -148,6 +151,47 @@ namespace UBOAT.Mods.RadioNavigation
             return BuildSetResult(controller, MoonDiagEnabled());
         }
 
+        /// <summary>Explicit render-only opening. Unlike Set(open=true), never
+        /// runs automatic Sun calibration. I/O, C, Record and Reset are blocked
+        /// until close; arc, aim, filters and read-only snapshots still work.
+        /// Does not change preferences or insert a fake worksheet sight.</summary>
+        public static string OpenForRender()
+        {
+            SextantController controller = ResolveController();
+            if (controller == null)
+                return "{\"ok\":false,\"error\":\"no-live-probe\"}";
+            try
+            {
+                if (!controller.TryOpenForRenderProbe())
+                    return "{\"ok\":false,\"error\":\"cannot-open-render-only\"}";
+                return BuildSetResult(controller, MoonDiagEnabled());
+            }
+            catch (Exception ex)
+            {
+                return "{\"ok\":false,\"error\":\"" + RadioNavProbeJson.Escape(ex.GetType().Name) + "\"}";
+            }
+        }
+
+        /// <summary>Real observations with the existing calibration. Never
+        /// solves calibration, clears a retained series or changes an open
+        /// session's mode. Record/I may fill three slots; O/C stay blocked.</summary>
+        public static string OpenForSights()
+        {
+            SextantController controller = ResolveController();
+            if (controller == null)
+                return "{\"ok\":false,\"error\":\"no-live-probe\"}";
+            try
+            {
+                if (!controller.TryOpenForSightsProbe())
+                    return "{\"ok\":false,\"error\":\"cannot-open-sight-only\"}";
+                return BuildSetResult(controller, MoonDiagEnabled());
+            }
+            catch (Exception ex)
+            {
+                return "{\"ok\":false,\"error\":\"" + RadioNavProbeJson.Escape(ex.GetType().Name) + "\"}";
+            }
+        }
+
         private static bool TryArc(string text, out double arc)
         {
             return TryDouble(text, out arc) && InRange(arc, 0.0, SextantArc.MaxDeg);
@@ -232,8 +276,12 @@ namespace UBOAT.Mods.RadioNavigation
             SextantController controller = ResolveController();
             if (controller == null)
                 return "{\"ok\":false,\"error\":\"no-live-probe\"}";
+            if (controller.RenderOnlyForProbe)
+                return "{\"ok\":false,\"error\":\"render-only\"}";
             if (!SextantController.IsOpen)
                 return "{\"ok\":false,\"error\":\"not-open\"}";
+            if (controller.SightOnlyForProbe && controller.WorksheetForProbe.Calculator.HasThird)
+                return "{\"ok\":false,\"error\":\"sight-limit\"}";
             CelestialBody body = controller.StarIdForProbe.IdentifiedBody;
             if (body.IsNone)
                 return "{\"ok\":false,\"error\":\"no-body\"}";
@@ -241,7 +289,10 @@ namespace UBOAT.Mods.RadioNavigation
             if (!controller.TryGetPositionForProbe(out lat, out lon))
                 return "{\"ok\":false,\"error\":\"no-position\"}";
             SextantWorksheet worksheet = controller.WorksheetForProbe;
-            if (!worksheet.CaptureObservation(body, controller.ArcAngle))
+            // Same snapshot the I-key takes: the disc as drawn at this instant,
+            // never re-read afterwards.
+            if (!worksheet.CaptureObservation(body, controller.ArcAngle, 0.0, 1, 0,
+                    controller.CaptureSunDiscSighting(body)))
                 return "{\"ok\":false,\"error\":\"no-body\"}";
             // The third slot was reported as "2" (swarm review 2026-11-04):
             // the cocked-hat validation reads this body, so it must name the
@@ -281,6 +332,10 @@ namespace UBOAT.Mods.RadioNavigation
             SextantController controller = ResolveController();
             if (controller == null)
                 return "{\"ok\":false,\"error\":\"no-live-probe\"}";
+            if (controller.RenderOnlyForProbe)
+                return "{\"ok\":false,\"error\":\"render-only\"}";
+            if (controller.SightOnlyForProbe)
+                return "{\"ok\":false,\"error\":\"sight-only\"}";
             controller.WorksheetForProbe.ResetSeries();
             controller.StarIdForProbe.ClearSelection();
             return "{\"ok\":true,\"cleared\":true}";
@@ -314,6 +369,21 @@ namespace UBOAT.Mods.RadioNavigation
 
         // ---- helpers -------------------------------------------------------
 
+        private static void AppendSolarAudit(StringBuilder sb, SextantController controller)
+        {
+            // A diagnostic failure must not break the pre-existing snapshot.
+            string audit;
+            try
+            {
+                audit = controller.SolarAuditSnapshotForProbe();
+            }
+            catch (Exception e)
+            {
+                audit = "{\"ok\":false,\"error\":\"" + RadioNavProbeJson.Escape(e.GetType().Name) + "\"}";
+            }
+            sb.Append(",\"solarAudit\":").Append(audit);
+        }
+
         private static SextantController ResolveController()
         {
             SextantController controller = SextantController.Instance;
@@ -346,6 +416,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             StringBuilder sb = new StringBuilder(160);
             sb.Append("{\"ok\":true,\"open\":").Append(SextantController.IsOpen ? "true" : "false");
+            sb.Append(",\"renderOnly\":").Append(controller.RenderOnlyForProbe ? "true" : "false");
+            sb.Append(",\"sightOnly\":").Append(controller.SightOnlyForProbe ? "true" : "false");
             sb.Append(",\"arcDeg\":").Append(Num(controller.ArcAngle));
             sb.Append(",\"filters\":{\"left\":").Append(controller.LeftFilterCount)
               .Append(",\"right\":").Append(controller.RightFilterCount).Append('}');
@@ -422,6 +494,11 @@ namespace UBOAT.Mods.RadioNavigation
               .Append(obs.Utc.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture))
               .Append('"');
             sb.Append(",\"hoDeg\":").Append(Num(obs.HoDeg));
+            // What the player actually saw, and what it was corrected by — the
+            // evidence that a recorded sight is reproducible after the fact.
+            sb.Append(",\"sunDiscDeg\":").Append(Num(obs.ObservedSunAngularDiameterDeg));
+            sb.Append(",\"sunDiscCompArcMin\":").Append(Num(obs.SunDiscCompensationArcMin));
+            sb.Append(",\"sunLimb\":\"").Append(obs.SunLimb.ToString()).Append('"');
             sb.Append(",\"hcDeg\":").Append(Num(obs.HcDeg));
             sb.Append(",\"azDeg\":").Append(Num(obs.AzDeg));
             sb.Append(",\"interceptNm\":").Append(Num(obs.InterceptNm));

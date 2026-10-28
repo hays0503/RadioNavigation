@@ -6,8 +6,8 @@ namespace UBOAT.Mods.RadioNavigation
     /// <summary>
     /// On-screen F-Tafel legend (SEXTANT_PLAN v2.2), toggled by the P key
     /// while the sextant is open. Explains the worksheet fields, the sight
-    /// workflow, the game assumptions (refraction / lunar parallax / horizon
-    /// dip are not modelled) and — since 2026-11-04 — the full key list (the
+    /// workflow, the SH5 lower-limb chain and the other bodies' assumptions,
+    /// plus — since 2026-11-04 — the full key list (the
     /// old bottom hint line was overlapped by the game's own bottom UI).
     /// Built once with the overlay and hidden until asked for. Legacy UI.Text
     /// + OS Arial for Cyrillic glyphs.
@@ -39,9 +39,11 @@ namespace UBOAT.Mods.RadioNavigation
             "\u0413\u0435\u043E\u043C\u0435\u0442\u0440\u0438\u044F \u2014 \u0443\u0433\u043E\u043B \u043F\u0435\u0440\u0435\u0441\u0435\u0447\u0435\u043D\u0438\u044F \u043B\u0438\u043D\u0438\u0439: >30\u00B0 \u0445\u043E\u0440\u043E\u0448\u043E, 15\u201330\u00B0 \u043F\u043E\u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0435\u043D\u043D\u043E, <15\u00B0 \u0441\u043B\u0430\u0431\u043E.\n" +
             "\n" +
             "\u0414\u041E\u041F\u0423\u0429\u0415\u041D\u0418\u042F \u0418\u0413\u0420\u042B\n" +
-            "\u0418\u0433\u0440\u0430 \u043D\u0435 \u043C\u043E\u0434\u0435\u043B\u0438\u0440\u0443\u0435\u0442 \u0440\u0435\u0444\u0440\u0430\u043A\u0446\u0438\u044E \u0438 \u043D\u0430\u043A\u043B\u043E\u043D \u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442\u0430 (dip).\n" +
+            "Солнце SH5: нижний край к морскому горизонту; Глаз 0–14 м, h 3–90°.\n" +
+            "Hs → ИП → h → F VIII → Ho центра. SD/dip/рефракция уже в F VIII: не добавлять повторно.\n" +
             "\u042D\u0444\u0435\u043C\u0435\u0440\u0438\u0434\u0430 \u041B\u0443\u043D\u044B: \u00B10.1\u00B0, \u043F\u0430\u0440\u0430\u043B\u043B\u0430\u043A\u0441 \u0443\u0447\u0442\u0451\u043D.\n" +
-            "\u041B\u0443\u043D\u0430 \u0438 \u0421\u043E\u043B\u043D\u0446\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044E\u0442 \u043E\u0431\u0449\u0443\u044E \u043F\u043E\u043F\u0440\u0430\u0432\u043A\u0443 \u0432\u0440\u0435\u043C\u0435\u043D\u0438 (\u0394t).\n" +
+            "SH5 GHA/δ: GMT без Δt/SUNDRIFT; Луна и старые записи сохраняют прежнюю модель.\n" +
+            "Прочие светила: без рефракции/dip. Старая солнечная серия — новая серия через O.\n" +
             "\u0417\u0432\u0451\u0437\u0434\u044B \u2014 \u043A\u0430\u0442\u0430\u043B\u043E\u0433 J1942 + \u043F\u0440\u0435\u0446\u0435\u0441\u0441\u0438\u044F \u043A \u0434\u0430\u0442\u0435; \u0437\u0430\u043C\u0435\u0440 \u0433\u0435\u043E\u0446\u0435\u043D\u0442\u0440\u0438\u0447\u0435\u0441\u043A\u0438\u0439.\n" +
             "\u041F\u043B\u0430\u043D\u0435\u0442\u044B (\u0412\u0435\u043D\u0435\u0440\u0430, \u042E\u043F\u0438\u0442\u0435\u0440, \u0421\u0430\u0442\u0443\u0440\u043D, \u041C\u0430\u0440\u0441) \u0432\u0438\u0434\u043D\u044B, \u043D\u043E \u0432 \u0441\u0447\u0438\u0441\u043B\u0435\u043D\u0438\u0438 \u043D\u0435 \u0443\u0447\u0430\u0441\u0442\u0432\u0443\u044E\u0442.\n" +
             "\n" +

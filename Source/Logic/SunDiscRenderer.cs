@@ -5,34 +5,47 @@ using UnityEngine.Rendering;
 namespace UBOAT.Mods.RadioNavigation
 {
     /// <summary>
-    /// Real-size solar disc for the sextant's filtered view: 0.53° angular
+    /// Physical-size solar disc for the sextant: date-dependent angular
     /// diameter, orange body with limb darkening and 3-5 random sunspots.
     /// Rendered only into the PIP cameras (layer 7, OR-ed into their culling
     /// masks; the bit is absent from every stock camera mask) so the main
-    /// view never sees it. Positioned along the game sun direction at
-    /// CameraResolver.SafeRadius so it covers the game's own sun sprite;
-    /// the mirrored post stack blooms the bright disc into a halo.
+    /// view never sees it. Positioned along the SH5 apparent direction at
+    /// CameraResolver.SafeRadius. The native Sun is isolated per PIP render;
+    /// drawing a smaller disc on top of its halo would not fix a measured limb.
     /// </summary>
+    [DefaultExecutionOrder(6000)]
     public sealed class SunDiscRenderer : MonoBehaviour
     {
         public const int SunDiscLayer = 7;
         public const int SunDiscLayerMask = 1 << SunDiscLayer;
+        internal static double ConfiguredTableDiameterDeg { get; set; }
 
         /// <summary>
-        /// Readable solar disc: the real 0.53° scaled by the player-measured
-        /// 4.0625× (GIMP overlay 48px→195px) so the filtered view shows the
-        /// disc big enough to read sunspots. Angular size - scales with zoom.
+        /// Last configured physical diameter. A sight snapshots THIS size,
+        /// not the nominal fallback and not a live value read after recording.
         /// </summary>
-        internal const float AngularDiameterDeg = 0.53f * 4.0625f;
-        private const float AngularRadiusRad = AngularDiameterDeg * 0.5f * Mathf.Deg2Rad;
+        internal static double AngularDiameterDeg { get; private set; } = SunDiscScale.TrueAngularDiameterDeg;
         private const int TextureSize = 256;
         private const string LogPrefix = "[RadioNav][SunDisc]";
 
-        /// <summary>Visibility gate set by SextantController (open &amp;&amp; filters &gt; 0).</summary>
+        /// <summary>Visibility gate set by SextantController (open). Filters
+        /// change glare/dimming, not the source or diameter of a measured body.</summary>
         public static bool Active { get; set; }
 
+        internal static Renderer MeasuringRenderer
+        {
+            get { return instance != null ? instance.meshRenderer : null; }
+        }
+
+        internal static bool MeasuringDiscReady
+        {
+            get { return instance != null && instance.bundledShaderResolved
+                && instance.meshRenderer != null && instance.meshRenderer.enabled
+                && instance.gameObject.activeInHierarchy; }
+        }
+
         /// <summary>
-        /// Game sun direction (fallback: Meeus), refreshed every frame by
+        /// SH5 apparent solar centre, refreshed every late frame by
         /// SextantController. Non-normalized is fine - normalized in use.
         /// </summary>
         public static Vector3 SunDirection { get; set; }
@@ -43,6 +56,8 @@ namespace UBOAT.Mods.RadioNavigation
         private MeshFilter meshFilter;
         private Material material;
         private Texture2D discTexture;
+        private Color probeHomeColor;
+        private bool probeRadianceChanged;
         private readonly System.Random rng = new System.Random();
 
         private struct SpotData
@@ -63,6 +78,7 @@ namespace UBOAT.Mods.RadioNavigation
         public static void ResetDirection()
         {
             SunDirection = Vector3.zero;
+            ConfiguredTableDiameterDeg = 0;
         }
 
         private void Awake()
@@ -87,6 +103,8 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 material = new Material(shader);
                 material.mainTexture = discTexture;
+                float radiance = (float)SextantShadeFilter.SolarSceneRadiance;
+                material.SetColor("_Color", new Color(radiance, radiance, radiance, 1f));
                 material.SetFloat("_SrcBlend", (float)BlendMode.One);
                 material.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
                 material.SetInt("_ZWrite", 0);
@@ -104,6 +122,49 @@ namespace UBOAT.Mods.RadioNavigation
 
         private bool bundledShaderResolved;
         private int shaderUpgradeCountdown = 30;
+
+        /// <summary>Bounded colour-path diagnosis, only in an explicit render
+        /// session. No preferences, geometry, direction or calibration writes.
+        /// Capture the original colour once and restore it on close/disable.</summary>
+        public bool SetRadianceForProbe(float radiance)
+        {
+            if (!ProbeContextActive() || material == null
+                || !SextantShadeFilter.IsProbeRadiance(radiance))
+                return false;
+            if (!probeRadianceChanged)
+            {
+                probeHomeColor = material.color;
+                probeRadianceChanged = true;
+            }
+            material.SetColor("_Color", new Color(radiance, radiance, radiance, 1f));
+            return true;
+        }
+
+        private bool ProbeContextActive()
+        {
+            SextantController controller = SextantController.Instance;
+            return instance == this && Active && controller != null && controller.RenderOnlyForProbe;
+        }
+
+        private void ReconcileRadianceProbe()
+        {
+            if (probeRadianceChanged && !ProbeContextActive())
+                RestoreProbeRadiance();
+        }
+
+        private void RestoreProbeRadiance()
+        {
+            if (!probeRadianceChanged)
+                return;
+            if (material != null)
+                material.SetColor("_Color", probeHomeColor);
+            probeRadianceChanged = false;
+        }
+
+        private void OnDisable()
+        {
+            RestoreProbeRadiance();
+        }
 
         /// <summary>
         /// The mod bundle may not be loaded when the sky roots are created, so
@@ -130,6 +191,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
+            RestoreProbeRadiance();
             if (instance == this)
                 instance = null;
             if (discTexture != null)
@@ -173,6 +235,8 @@ namespace UBOAT.Mods.RadioNavigation
             discTexture = new Texture2D(TextureSize, TextureSize, TextureFormat.RGBA32, false);
             discTexture.name = "RadioNavSunDisc";
             discTexture.hideFlags = HideFlags.DontSave;
+            discTexture.wrapMode = TextureWrapMode.Clamp;
+            discTexture.filterMode = FilterMode.Bilinear;
 
             int spotCount = rng.Next(3, 6);
             SpotData[] spots = new SpotData[spotCount];
@@ -186,7 +250,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             float half = TextureSize * 0.5f;
-            const float discR = 0.93f;
+            const float discR = (float)CelestialDiscRaster.LimbRadius;
             Color center = new Color(1f, 0.72f, 0.22f, 1f);
             Color limb = new Color(0.62f, 0.28f, 0.04f, 1f);
             Color spotColor = new Color(0.28f, 0.13f, 0.02f, 1f);
@@ -199,10 +263,7 @@ namespace UBOAT.Mods.RadioNavigation
                     float dy = (y + 0.5f - half) / half;
                     float r = (float)Math.Sqrt(dx * dx + dy * dy);
 
-                    float alpha;
-                    if (r <= discR) alpha = 1f;
-                    else if (r >= 1f) alpha = 0f;
-                    else alpha = 1f - (r - discR) / (1f - discR);
+                    float alpha = (float)CelestialDiscRaster.Coverage(r, TextureSize);
 
                     if (alpha <= 0f)
                     {
@@ -247,6 +308,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void LateUpdate()
         {
+            ReconcileRadianceProbe();
             TryUpgradeToBundledShader();
 
             if (!Active || material == null)
@@ -278,7 +340,13 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             float radius = CameraResolver.SafeRadius(cam);
-            float size = 2f * radius * (float)Math.Tan(AngularRadiusRad);
+            AngularDiameterDeg = ConfiguredTableDiameterDeg;
+            if (AngularDiameterDeg < 0.5 || AngularDiameterDeg > 0.56)
+            {
+                meshRenderer.enabled = false;
+                return;
+            }
+            float size = (float)CelestialDiscRaster.QuadSide(radius, AngularDiameterDeg);
 
             transform.position = cam.transform.position + dir * radius;
             transform.rotation = Quaternion.LookRotation(cam.transform.position - transform.position, Vector3.up);

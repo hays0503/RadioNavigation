@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "source": "documents-readonly/celestian-navigation-sh5/[1] Nautical Almanac SH5 1939-1945.pdf",
+  "source_sha256": "0faa33d1afc3835a4cca72c8c7b21750e611ad5e11a339adffe14c6f50068f48",
+  "pdf_pages": [27, 72],
+  "increments_pdf_page": 73,
+  "gmt_range": ["1939-01-01T00:00:00Z", "1946-01-01T00:00:00Z"],
+  "end_exclusive": true,
+  "records": 15342,
+  "bytes": 122776,
+  "sha256": "8e1fc1da5b092dad0d08a3fc7a74f58ba008b0dd18904475ae9c988ff999e1b0",
+  "format": "RNS1 + little-endian int32 count + 32-byte source hash; each 4h row: int32 GHA tenths of arcmin, int16 signed declination tenths of arcmin, int16 signed four-hour d tenths of arcmin",
+  "interpolation": "Printed p.73: Sun GHA adds exactly 15 deg/hour. Declination adds signed d * elapsed-hours/4. No SUNDRIFT or port GMT-1 subtraction. Physical SD comes from date at plain UTC+TT-UT, not from F VIII a second time.",
+  "generator": "python Tools/solar-sight/build_campaign.py (writes artifacts only; compare before copying the resulting pack into Source/Data)",
+  "scope": "SH5-specific table coordinates; not a replacement for the real-world astronomical ephemeris or native main-view lighting"
+}

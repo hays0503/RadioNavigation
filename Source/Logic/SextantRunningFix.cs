@@ -8,14 +8,21 @@ namespace UBOAT.Mods.RadioNavigation
     /// position the navigator believed he was at, plus the full ephemeris
     /// chain of the German worksheet: gamma (GHA Aries), SHA, GHA, lambda_g,
     /// LHA, delta, h_b (measured), h1 (computed Hc), Az and the intercept
-    /// a = Ho - Hc. Ephemeris fields come from AstroMath (Meeus) through
-    /// CelestialEphemeris, which routes the Sun (calibrated) and the
-    /// Moon/stars (plain UTC) to the right source.
+    /// a = Ho - Hc. New Sun sights use the printed SH5 centre GHA/declination;
+    /// other bodies and frozen legacy Sun sights keep CelestialEphemeris.
     /// </summary>
     public sealed class SextantObservation
     {
         public DateTime Utc;
         public double HoDeg;
+
+        // v3: 0 = frozen legacy/unknown reduction, 1 = SH5 lower-limb F VIII.
+        public int SolarReductionVersion;
+        public double RawHsDeg;
+        public double IndexCorrectedHDeg;
+        public double SolarEyeHeightM;
+        public double SolarFviiiArcMin;
+        public double SolarHorizonAltitudeDeg;
 
         public double DrLatDeg;
         public double DrLonDeg;
@@ -52,6 +59,29 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>Instrument index error applied to this sight (arcmin, P6).</summary>
         public double IndexErrorArcMin;
+
+        /// <summary>
+        /// Angular diameter of the solar disc AS DRAWN AT THE MOMENT OF THIS
+        /// SIGHT (date-dependent physical size in new sights; v2 legacy sights
+        /// may retain an enlarged diameter). Frozen here, not re-read from
+        /// the renderer later: the player can sight with a filter, drop the
+        /// filter and then open the worksheet, and the record must not change
+        /// under them. Zero means "no solar disc was involved" (Moon/star).
+        /// </summary>
+        public double ObservedSunAngularDiameterDeg;
+
+        /// <summary>
+        /// Which limb of the solar disc the sight was taken on. New SH5 captures
+        /// accept only the lower limb; legacy records retain their original limb.
+        /// </summary>
+        public SunSightLimb SunLimb = SunSightLimb.LowerLimb;
+
+        /// <summary>
+        /// Rendered-disc compensation actually folded into <see cref="HoDeg"/>
+        /// for this sight (arcmin; signed). Kept so the card and any later audit
+        /// can show the correction rather than a silently-adjusted altitude.
+        /// </summary>
+        public double SunDiscCompensationArcMin;
 
         /// <summary>F-Tafel gleichnam.t rule: LHA I,II -> West; III,IV -> Ost.</summary>
         public bool QuadrantWest;
@@ -734,6 +764,12 @@ namespace UBOAT.Mods.RadioNavigation
         public static void RecomputeHcAz(SextantObservation observation,
             double latDeg, double lonDeg, out double hcDeg, out double azDeg)
         {
+            if (observation.SolarReductionVersion == 1)
+            {
+                Sh5SolarNavigation.Place(observation.GhaBodyDeg, observation.DecDeg,
+                    latDeg, lonDeg, out hcDeg, out azDeg);
+                return;
+            }
             double jd = CelestialEphemeris.JdForKind(observation.BodyKind, observation.Utc);
             double lstDeg = AstroMath.LstDeg(jd, lonDeg);
             double raRad = observation.BodyRaDeg * Deg2Rad;

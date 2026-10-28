@@ -173,6 +173,18 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public static bool MoonRaDec(double jd, out double raRad, out double decRad)
         {
+            return MoonRaDec(jd, false, out raRad, out decRad);
+        }
+
+        /// <summary>Complete Meeus 47 series for the isolated world kernel.
+        /// Existing callers deliberately retain the legacy truncation.</summary>
+        internal static bool MoonRaDecComplete(double jdTt, out double raRad, out double decRad)
+        {
+            return MoonRaDec(jdTt, true, out raRad, out decRad);
+        }
+
+        private static bool MoonRaDec(double jd, bool completeSeries, out double raRad, out double decRad)
+        {
             raRad = 0;
             decRad = 0;
             if (double.IsNaN(jd) || double.IsInfinity(jd)) return false;
@@ -182,8 +194,15 @@ namespace UBOAT.Mods.RadioNavigation
             MoonFundamentals(t, out lp, out d, out m, out mp, out f);
             double e = 1.0 - 0.002516 * t - 0.0000074 * t * t;
 
-            double lambda = lp + MoonLongitudeSum(d, m, mp, f, e) / 1000000.0;
-            double beta = MoonLatitudeSum(d, m, mp, f, e) / 1000000.0;
+            double longitudeSum = MoonLongitudeSum(d, m, mp, f, e);
+            double latitudeSum = MoonLatitudeSum(d, m, mp, f, e);
+            if (completeSeries)
+            {
+                longitudeSum += MoonSeriesSum(MoonExtraLTerms, d, m, mp, f, e, false);
+                latitudeSum += MoonSeriesSum(MoonExtraBTerms, d, m, mp, f, e, false);
+            }
+            double lambda = lp + longitudeSum / 1000000.0;
+            double beta = latitudeSum / 1000000.0;
 
             // Meeus 47 additive terms (planetary + figure effects), degrees.
             double a1 = 119.75 + 131.849 * t;
@@ -335,6 +354,118 @@ namespace UBOAT.Mods.RadioNavigation
             new MoonTerm(2, 0, 1, -2, 4130),
         };
 
+        // Standard Meeus 47.A/B numerical facts: ONLY terms absent from legacy.
+        // Provenance: sky-contract-phase1-20261015/source-provenance.json.
+        private static readonly MoonTerm[] MoonExtraLTerms =
+        {
+            new MoonTerm(2, 1, 0, 0, -6766),
+            new MoonTerm(1, 0, -1, 0, -5163),
+            new MoonTerm(1, 1, 0, 0, 4987),
+            new MoonTerm(2, -1, 1, 0, 4036),
+            new MoonTerm(2, 0, 2, 0, 3994),
+            new MoonTerm(4, 0, 0, 0, 3861),
+            new MoonTerm(2, 0, -3, 0, 3665),
+            new MoonTerm(0, 1, -2, 0, -2689),
+            new MoonTerm(2, 0, -1, 2, -2602),
+            new MoonTerm(2, -1, -2, 0, 2390),
+            new MoonTerm(1, 0, 1, 0, -2348),
+            new MoonTerm(2, -2, 0, 0, 2236),
+            new MoonTerm(0, 1, 2, 0, -2120),
+            new MoonTerm(0, 2, 0, 0, -2069),
+            new MoonTerm(2, -2, -1, 0, 2048),
+            new MoonTerm(2, 0, 1, -2, -1773),
+            new MoonTerm(2, 0, 0, 2, -1595),
+            new MoonTerm(4, -1, -1, 0, 1215),
+            new MoonTerm(0, 0, 2, 2, -1110),
+            new MoonTerm(3, 0, -1, 0, -892),
+            new MoonTerm(2, 1, 1, 0, -810),
+            new MoonTerm(4, -1, -2, 0, 759),
+            new MoonTerm(0, 2, -1, 0, -713),
+            new MoonTerm(2, 2, -1, 0, -700),
+            new MoonTerm(2, 1, -2, 0, 691),
+            new MoonTerm(2, -1, 0, -2, 596),
+            new MoonTerm(4, 0, 1, 0, 549),
+            new MoonTerm(0, 0, 4, 0, 537),
+            new MoonTerm(4, -1, 0, 0, 520),
+            new MoonTerm(1, 0, -2, 0, -487),
+            new MoonTerm(2, 1, 0, -2, -399),
+            new MoonTerm(0, 0, 2, -2, -381),
+            new MoonTerm(1, 1, 1, 0, 351),
+            new MoonTerm(3, 0, -2, 0, -340),
+            new MoonTerm(4, 0, -3, 0, 330),
+            new MoonTerm(2, -1, 2, 0, 327),
+            new MoonTerm(0, 2, 1, 0, -323),
+            new MoonTerm(1, 1, -1, 0, 299),
+            new MoonTerm(2, 0, 3, 0, 294),
+        };
+
+        private static readonly MoonTerm[] MoonExtraBTerms =
+        {
+            new MoonTerm(2, -1, -1, 1, 2463),
+            new MoonTerm(2, -1, 0, 1, 2211),
+            new MoonTerm(2, -1, -1, -1, 2065),
+            new MoonTerm(0, 1, -1, -1, -1870),
+            new MoonTerm(4, 0, -1, -1, 1828),
+            new MoonTerm(0, 1, 0, 1, -1794),
+            new MoonTerm(0, 0, 0, 3, -1749),
+            new MoonTerm(0, 1, -1, 1, -1565),
+            new MoonTerm(1, 0, 0, 1, -1491),
+            new MoonTerm(0, 1, 1, 1, -1475),
+            new MoonTerm(0, 1, 1, -1, -1410),
+            new MoonTerm(0, 1, 0, -1, -1344),
+            new MoonTerm(1, 0, 0, -1, -1335),
+            new MoonTerm(0, 0, 3, 1, 1107),
+            new MoonTerm(4, 0, 0, -1, 1021),
+            new MoonTerm(4, 0, -1, 1, 833),
+            new MoonTerm(0, 0, 1, -3, 777),
+            new MoonTerm(4, 0, -2, 1, 671),
+            new MoonTerm(2, 0, 0, -3, 607),
+            new MoonTerm(2, 0, 2, -1, 596),
+            new MoonTerm(2, -1, 1, -1, 491),
+            new MoonTerm(2, 0, -2, 1, -451),
+            new MoonTerm(0, 0, 3, -1, 439),
+            new MoonTerm(2, 0, 2, 1, 422),
+            new MoonTerm(2, 0, -3, -1, 421),
+            new MoonTerm(2, 1, -1, 1, -366),
+            new MoonTerm(2, 1, 0, 1, -351),
+            new MoonTerm(4, 0, 0, 1, 331),
+            new MoonTerm(2, -1, 1, 1, 315),
+            new MoonTerm(2, -2, 0, -1, 302),
+            new MoonTerm(0, 0, 1, 3, -283),
+            new MoonTerm(2, 1, 1, -1, -229),
+            new MoonTerm(1, 1, 0, -1, 223),
+            new MoonTerm(1, 1, 0, 1, 223),
+            new MoonTerm(0, 1, -2, -1, -220),
+            new MoonTerm(2, 1, -1, -1, -220),
+            new MoonTerm(1, 0, 1, 1, -185),
+            new MoonTerm(2, -1, -2, -1, 181),
+            new MoonTerm(0, 1, 2, 1, -177),
+            new MoonTerm(4, 0, -2, -1, 176),
+            new MoonTerm(4, -1, -1, -1, 166),
+            new MoonTerm(1, 0, 1, -1, -164),
+            new MoonTerm(4, 0, 1, -1, 132),
+            new MoonTerm(1, 0, -1, -1, -119),
+            new MoonTerm(4, -1, 0, -1, 115),
+            new MoonTerm(2, -2, 0, 1, 107),
+        };
+
+        private static readonly MoonTerm[] MoonExtraRTerms =
+        {
+            new MoonTerm(4, -1, -1, 0, -3958),
+            new MoonTerm(3, 0, -1, 0, 3258),
+            new MoonTerm(2, 1, 1, 0, 2616),
+            new MoonTerm(4, -1, -2, 0, -1897),
+            new MoonTerm(0, 2, -1, 0, -2117),
+            new MoonTerm(2, 2, -1, 0, 2354),
+            new MoonTerm(4, 0, 1, 0, -1423),
+            new MoonTerm(0, 0, 4, 0, -1117),
+            new MoonTerm(4, -1, 0, 0, -1571),
+            new MoonTerm(1, 0, -2, 0, -1739),
+            new MoonTerm(0, 0, 2, -2, -4421),
+            new MoonTerm(0, 2, 1, 0, 1165),
+            new MoonTerm(2, 0, -1, -2, 8752),
+        };
+
         private static double MoonSeriesSum(MoonTerm[] terms, double d, double m,
             double mp, double f, double e, bool useCosine)
         {
@@ -369,11 +500,24 @@ namespace UBOAT.Mods.RadioNavigation
         /// that way) — using sine puts the distance ~19 000 km off.</summary>
         public static double MoonDistanceKm(double jd)
         {
+            return MoonDistanceKm(jd, false);
+        }
+
+        internal static double MoonDistanceKmComplete(double jdTt)
+        {
+            return MoonDistanceKm(jdTt, true);
+        }
+
+        private static double MoonDistanceKm(double jd, bool completeSeries)
+        {
             double t = (jd - 2451545.0) / 36525.0;
             double lp, d, m, mp, f;
             MoonFundamentals(t, out lp, out d, out m, out mp, out f);
             double e = 1.0 - 0.002516 * t - 0.0000074 * t * t;
-            return 385000.56 + MoonSeriesSum(MoonRTerms, d, m, mp, f, e, true) / 1000.0;
+            double sum = MoonSeriesSum(MoonRTerms, d, m, mp, f, e, true);
+            if (completeSeries)
+                sum += MoonSeriesSum(MoonExtraRTerms, d, m, mp, f, e, true);
+            return 385000.56 + sum / 1000.0;
         }
 
         /// <summary>Horizontal parallax of the Moon (degrees), from the

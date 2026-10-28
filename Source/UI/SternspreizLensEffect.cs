@@ -458,10 +458,11 @@ namespace UBOAT.Mods.RadioNavigation
                 BaselineThicknessDeg, pipCamera.fieldOfView, targetWidth);
             // Guard radius for "is this a point source?". A lamp is a few
             // pixels across, an instrument glass or a lit panel is wider than
-            // the extended solar disc, so the guard is sized from that disc
-            // and stays angularly correct at every zoom.
+            // the accepted compactness gate. Keep the 2026-09-30 lamp setting
+            // independently: fixing solar geometry must not retune the lens.
+            const double interiorCompactDiameterDeg = 2.153125;
             double extendedDiscPixels = SternspreizLineProfile.PixelsForAngle(
-                SunDiscRenderer.AngularDiameterDeg, pipCamera.fieldOfView, targetWidth);
+                interiorCompactDiameterDeg, pipCamera.fieldOfView, targetWidth);
             float halfResolutionScale = glowWidth / (float)targetWidth * 0.5f;
             float halfLengthTexels = Mathf.Max(
                 0.5f, (float)linePixels * InteriorStreakLengthScale * halfResolutionScale);

@@ -10,7 +10,13 @@ namespace UBOAT.Mods.RadioNavigation
     public static class SextantSaveCodec
     {
         private const int Magic = 0x524E4153;
-        public const int Version = 1;
+        /// <summary>
+        /// v3 adds frozen SH5 lower-limb reduction provenance. v2 adds the drawn-solar-disc snapshot to each sight
+        /// (observed diameter, limb, applied compensation). v1 is decoded in
+        /// its own layout with unknown disc provenance (zero), without changing
+        /// any frozen Ho/Hc/intercept, card, calibration or marker data.
+        /// </summary>
+        public const int Version = 3;
         public const int MaxBytes = 32768;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
 
@@ -53,8 +59,9 @@ namespace UBOAT.Mods.RadioNavigation
                 using (var reader = new BinaryReader(stream, Utf8))
                 {
                     Require(reader.ReadInt32() == Magic, "wrong magic");
-                    Require(reader.ReadInt32() == Version, "unsupported version");
-                    SextantSaveSnapshot decoded = ReadSnapshot(reader);
+                    int version = reader.ReadInt32();
+                    Require(version >= 1 && version <= Version, "unsupported version");
+                    SextantSaveSnapshot decoded = ReadSnapshot(reader, version);
                     Require(stream.Position == stream.Length, "trailing data");
                     ValidateSnapshot(decoded);
                     state = decoded;
@@ -68,13 +75,13 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private static SextantSaveSnapshot ReadSnapshot(BinaryReader reader)
+        private static SextantSaveSnapshot ReadSnapshot(BinaryReader reader, int version)
         {
             var state = new SextantSaveSnapshot
             {
-                Observation1 = ReadObservation(reader),
-                Observation2 = ReadObservation(reader),
-                Observation3 = ReadObservation(reader),
+                Observation1 = ReadObservation(reader, version),
+                Observation2 = ReadObservation(reader, version),
+                Observation3 = ReadObservation(reader, version),
                 SectionText = ReadText(reader, 8192),
                 CalibrationMinutes = ReadFinite(reader),
                 FixPublished = reader.ReadBoolean(),
@@ -117,9 +124,19 @@ namespace UBOAT.Mods.RadioNavigation
             w.Write(o.Quadrant); w.Write(o.QuadrantWest);
             w.Write(o.HoSigmaArcMin); w.Write(o.HoSampleCount); w.Write(o.HoRejectedCount);
             w.Write(o.IndexErrorArcMin);
+            // v2: the drawn solar disc the sight was taken on, the limb, and the
+            // compensation folded into HoDeg. Persisted so a reloaded record
+            // still explains itself instead of depending on live renderer state.
+            w.Write(o.ObservedSunAngularDiameterDeg);
+            w.Write((int)o.SunLimb);
+            w.Write(o.SunDiscCompensationArcMin);
+            w.Write(o.SolarReductionVersion);
+            w.Write(o.RawHsDeg); w.Write(o.IndexCorrectedHDeg);
+            w.Write(o.SolarEyeHeightM); w.Write(o.SolarFviiiArcMin);
+            w.Write(o.SolarHorizonAltitudeDeg);
         }
 
-        private static SextantObservation ReadObservation(BinaryReader r)
+        private static SextantObservation ReadObservation(BinaryReader r, int version)
         {
             if (!r.ReadBoolean())
                 return null;
@@ -138,6 +155,19 @@ namespace UBOAT.Mods.RadioNavigation
                 HoSigmaArcMin = ReadFinite(r), HoSampleCount = r.ReadInt32(), HoRejectedCount = r.ReadInt32(),
                 IndexErrorArcMin = ReadFinite(r)
             };
+            if (version >= 2)
+            {
+                o.ObservedSunAngularDiameterDeg = ReadFinite(r);
+                o.SunLimb = (SunSightLimb)r.ReadInt32();
+                o.SunDiscCompensationArcMin = ReadFinite(r);
+            }
+            if (version >= 3)
+            {
+                o.SolarReductionVersion = r.ReadInt32();
+                o.RawHsDeg = ReadFinite(r); o.IndexCorrectedHDeg = ReadFinite(r);
+                o.SolarEyeHeightM = ReadFinite(r); o.SolarFviiiArcMin = ReadFinite(r);
+                o.SolarHorizonAltitudeDeg = ReadFinite(r);
+            }
             ValidateObservation(o);
             return o;
         }
@@ -153,6 +183,45 @@ namespace UBOAT.Mods.RadioNavigation
             Require(o.Quadrant >= 1 && o.Quadrant <= 4, "invalid quadrant");
             Require(o.HoSigmaArcMin >= 0 && o.HoSampleCount > 0 && o.HoRejectedCount >= 0,
                 "invalid sight quality");
+            // The limb enum must be one of the two the contract defines, and a
+            // non-Sun sight must carry no solar disc at all.
+            Require(o.SunLimb == SunSightLimb.LowerLimb || o.SunLimb == SunSightLimb.UpperLimb,
+                "invalid sun limb");
+            Require(o.BodyKind == CelestialBodyKind.Sun || o.ObservedSunAngularDiameterDeg == 0.0,
+                "solar disc on a non-solar sight");
+            ValidateSolarReduction(o);
+        }
+
+        private static void ValidateSolarReduction(SextantObservation o)
+        {
+            Require(o.SolarReductionVersion == 0 || o.SolarReductionVersion == 1, "unknown solar reduction");
+            if (o.SolarReductionVersion == 0)
+            {
+                Require(o.RawHsDeg == 0 && o.IndexCorrectedHDeg == 0 && o.SolarEyeHeightM == 0
+                    && o.SolarFviiiArcMin == 0 && o.SolarHorizonAltitudeDeg == 0,
+                    "SH5 fields on legacy reduction");
+                return; // never reinterpret frozen legacy Ho
+            }
+            Require(o.BodyKind == CelestialBodyKind.Sun && o.SunLimb == SunSightLimb.LowerLimb,
+                "SH5 reduction on wrong body/limb");
+            Require(o.Utc.Year >= 1939 && o.Utc.Year <= 1945 && o.SolarEyeHeightM >= 0 && o.SolarEyeHeightM <= 14,
+                "SH5 time/eye out of bounds");
+            ValidateSolarChain(o);
+            Require(o.SunDiscCompensationArcMin == 0 && o.SolarHorizonAltitudeDeg >= -1
+                && o.SolarHorizonAltitudeDeg <= 0 && o.ObservedSunAngularDiameterDeg >= 0.5
+                && o.ObservedSunAngularDiameterDeg <= 0.56, "invalid SH5 optics provenance");
+        }
+
+        private static void ValidateSolarChain(SextantObservation o)
+        {
+            Require(o.IndexCorrectedHDeg >= 3 && o.IndexCorrectedHDeg <= 90
+                && Math.Abs(o.IndexErrorArcMin) <= 5
+                && Math.Abs(o.IndexCorrectedHDeg - o.RawHsDeg - o.IndexErrorArcMin / 60) < 1e-8
+                && Math.Abs(o.HoDeg - o.IndexCorrectedHDeg - o.SolarFviiiArcMin / 60) < 1e-8,
+                "broken frozen SH5 reduction chain");
+            // Validate bounds and arithmetic, never re-evaluate tables or optics
+            // on load: future table revisions must not rewrite a frozen sight.
+            Require(Math.Abs(o.SolarFviiiArcMin) <= 17, "invalid frozen F VIII");
         }
 
         private static void WriteCourse(BinaryWriter w, CourseSamplerSnapshot state)

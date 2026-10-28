@@ -35,7 +35,9 @@ namespace UBOAT.Mods.RadioNavigation
         private static readonly FieldInfo DatabaseField = typeof(MapChartingUI).GetField(
             "mapChartingDatabase", BindingFlags.NonPublic | BindingFlags.Static);
 
+#pragma warning disable IDE0052 // Keep the installed event publisher rooted; equivalent lifetime after singleton replacement/unload is not proven.
         private static SavesManager savesManager;
+#pragma warning restore IDE0052
         private static bool installed;
         private static bool loggedSaveRun;
         private static int lastRemoved = -1;

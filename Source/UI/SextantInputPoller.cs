@@ -47,6 +47,29 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
+        /// Supplies the solar disc as drawn AT THE KEY PRESS. A delegate
+        /// rather than a stored value on purpose: the poller has no business
+        /// knowing about filters or the renderer, and the snapshot has to be
+        /// taken when I is pressed — not when the worksheet is composed, or a
+        /// later filter change would silently rewrite an already-recorded sight.
+        /// </summary>
+        internal Func<CelestialBody, SunDiscSighting> SunDiscSightingProvider
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// The disc snapshot for a sight taken right now. A missing provider
+        /// yields <see cref="SunDiscSighting.None"/>: no solar disc means no
+        /// extra offset. Only the sighted body can own the solar provenance.
+        /// </summary>
+        private SunDiscSighting CaptureSunDiscSighting(CelestialBody body)
+        {
+            Func<CelestialBody, SunDiscSighting> provider = SunDiscSightingProvider;
+            return provider != null ? provider(body).ForBody(body) : SunDiscSighting.None;
+        }
+
+        /// <summary>
         /// Synchronizes every edge detector with hardware state on enable.
         /// This prevents a key held across a Unity enable boundary from being
         /// delivered as a fresh press.
@@ -223,13 +246,19 @@ namespace UBOAT.Mods.RadioNavigation
             // A NaN altitude (unknown) must never reach Save: the clamp
             // turns it into 0 and would silently wipe the correction.
             float alt = starId.IdentifiedAltDeg;
+            SunDiscSighting sun = CaptureSunDiscSighting(starId.IdentifiedBody);
+            if (sun.TableRequested)
+            {
+                if (!sun.TableCompatible) return;
+                alt = (float)sun.ExpectedHsDeg;
+            }
             if (float.IsNaN(alt))
                 return;
             IndexErrorCorrection.Save(IndexErrorCorrection.SolveFromKnownAltitude(
                 arcAngle, alt));
         }
 
-        public void PollFix(double arcAngle)
+        public void PollFix(double arcAngle, bool preserveSeries = false)
         {
             // P6: tap the arc while a body is held; the tap spacing keeps the
             // burst from filling up in a couple of frames. Tap (not Add)
@@ -253,7 +282,7 @@ namespace UBOAT.Mods.RadioNavigation
             // I records a sight of the SELECTED body (sticky, 2026-11-04: it
             // survives leaving the cone, so the drum can be set first), O
             // starts a new worksheet series and drops the selection.
-            if (fixPressedThisFrame)
+            if (fixPressedThisFrame && (!preserveSeries || !worksheet.Calculator.HasThird))
             {
                 if (!starId.HasSelection)
                 {
@@ -275,12 +304,15 @@ namespace UBOAT.Mods.RadioNavigation
                 int rejected = 0;
                 if (burst.TryCommit(out _, out sigmaArcMin, out rejected))
                     samples = burst.Count - rejected;
+                // Snapshot the drawn solar disc NOW, at the key press. Reading it
+                // later (when the card is composed) would let a filter change
+                // rewrite an already-recorded sight.
                 worksheet.CaptureObservation(starId.IdentifiedBody, ho,
-                    sigmaArcMin, samples, rejected);
+                    sigmaArcMin, samples, rejected, CaptureSunDiscSighting(starId.IdentifiedBody));
                 burst.Clear();
                 burstTimer = 0f;
             }
-            if (Input.GetKeyDown(KeyCode.O))
+            if (!preserveSeries && Input.GetKeyDown(KeyCode.O))
             {
                 worksheet.ResetSeries();
                 starId.ClearSelection();

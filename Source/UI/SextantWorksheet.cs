@@ -195,9 +195,28 @@ namespace UBOAT.Mods.RadioNavigation
         /// value (the mean of the burst when the caller sampled one),
         /// <paramref name="sigmaArcMin"/> its spread and the sample/rejected
         /// counts are carried into the card.
+        ///
+        /// Non-solar compatibility path. A new Sun sight requires the configured
+        /// SH5 snapshot; only the save decoder may restore unknown provenance.
         /// </summary>
         public bool CaptureObservation(CelestialBody body, double hoDeg,
             double sigmaArcMin, int samples, int rejected)
+        {
+            return CaptureObservation(body, hoDeg, sigmaArcMin, samples, rejected,
+                new SunDiscSighting());
+        }
+
+        /// <summary>
+        /// Burst-aware overload carrying the physical solar disc and limb.
+        /// New Sun sights use the TOTAL F VIII lower-limb correction, once.
+        /// Other bodies keep the existing instrument-only convention.
+        ///
+        /// <paramref name="disc"/> is a SNAPSHOT taken at the key press — never
+        /// re-read from the renderer when the worksheet is composed, or the
+        /// record would change when the player drops the filter afterwards.
+        /// </summary>
+        public bool CaptureObservation(CelestialBody body, double hoDeg,
+            double sigmaArcMin, int samples, int rejected, SunDiscSighting disc)
         {
             if (body.IsNone)
             {
@@ -208,40 +227,26 @@ namespace UBOAT.Mods.RadioNavigation
                 return false;
             }
 
-            // N1: never record a body whose ephemeris cannot be resolved — the
-            // builder would silently fall back to the sun and produce a wrong
-            // fix. The ID already filters Hip<=0, so this is belt-and-suspenders
-            // with a first-failure warning for regressions.
-            DateTime utc = GameTimeResolver.GetUtcNow();
-            if (!CelestialEphemeris.Compute(body, utc, out _, out _))
-            {
-                statusLine = FixCardNoSight;
-                statusTimer = FixStatusSeconds;
-                panelTimer = 0f;
-                if (WarnOnce.ShouldLog("CaptureObservation.unknownBody"))
-                    Debug.LogWarning(string.Format(CultureInfo.InvariantCulture,
-                        "{0} FIXKEY I rejected - no ephemeris for kind={1} hip={2}",
-                        LogPrefix, body.Kind, body.Hip));
+            disc = disc.ForBody(body);
+            DateTime utc;
+            double lat, lon;
+            if (!TryCaptureFrame(body, disc, out utc, out lat, out lon))
                 return false;
-            }
 
-            float latF, lonF;
-            if (!positionProvider.TryGetPosition(out latF, out lonF))
-            {
-                statusLine = FixCardNoPosition;
-                statusTimer = FixStatusSeconds;
-                panelTimer = 0f;
-                Debug.Log(LogPrefix + " FIXKEY I ignored - no sandbox position");
-                return false;
-            }
-
-            // Instrument index error (P6): a real sextant reads a constant
-            // offset; it is applied to the RAW arc before quantisation so the
-            // committed Ho stays on the 1/600° grid.
+            // Non-solar sights keep the legacy index-only quantum. Solar Hs is
+            // the raw drum value; index and F VIII are applied once by SH5,
+            // without re-quantizing the reduced centre Ho or a render offset.
             double indexErrorArcMin = IndexErrorCorrection.Load();
-            double ho = SextantArc.Quantize(IndexErrorCorrection.Apply(hoDeg, indexErrorArcMin));
-            SextantObservation obs = RunningFixCalculator.BuildObservation(
-                utc, ho, latF, lonF, body);
+            double ho = SextantArc.Quantize(SunDiscSighting.ApplyMeasuredChain(
+                hoDeg, indexErrorArcMin));
+            SextantObservation obs;
+            if (!TryBuildCapture(body, utc, hoDeg, ho, lat, lon, indexErrorArcMin, disc, out obs))
+            {
+                statusLine = "SH5: нужен нижний край, Глаз 0–14 м, h 3–90° и рабочий источник; старую серию начните заново (O)";
+                statusTimer = FixStatusSeconds;
+                panelTimer = 0f;
+                return false;
+            }
             // Sticky selection (2026-11-04): the body may have been selected
             // long ago, so a physically impossible sight is rejected here —
             // below -1° neither refraction (<= 0.57°) nor dip lifts the body
@@ -260,6 +265,11 @@ namespace UBOAT.Mods.RadioNavigation
             obs.HoSampleCount = samples < 1 ? 1 : samples;
             obs.HoRejectedCount = rejected < 0 ? 0 : rejected;
             obs.IndexErrorArcMin = indexErrorArcMin;
+            // Freeze what the player actually saw, so the record stays
+            // reproducible and auditable even after the filter is dropped.
+            obs.ObservedSunAngularDiameterDeg = disc.ObservedDiameterDeg;
+            obs.SunLimb = disc.Limb;
+            obs.SunDiscCompensationArcMin = 0.0;
             if (!SeriesActive || runningFix.HasThird)
                 seriesCalibrationMinutes = SunEphemerisCalibration.DeltaMinutes;
             runningFix.Record(obs);
@@ -280,11 +290,68 @@ namespace UBOAT.Mods.RadioNavigation
             statusTimer = FixStatusSeconds;
             panelTimer = 0f;
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                "{0} OBS slot={1} body={2} ho={3:F2} sigma={4:F2}' n={5} rej={6} dr=({7:F4},{8:F4}) hc={9:F2} az={10:F2} a={11:F1}NM",
-                LogPrefix, isThird ? 3 : (isSecond ? 2 : 1), obs.BodyName, ho,
+                "{0} OBS slot={1} body={2} ho={3:F2} sigma={4:F2}' n={5} rej={6} dr=({7:F4},{8:F4}) hc={9:F2} az={10:F2} a={11:F1}NM disc={12:F3}deg comp={13:F2}'",
+                LogPrefix, isThird ? 3 : (isSecond ? 2 : 1), obs.BodyName, obs.HoDeg,
                 obs.HoSigmaArcMin, obs.HoSampleCount, obs.HoRejectedCount,
-                latF, lonF, obs.HcDeg, obs.AzDeg, obs.InterceptNm));
+                lat, lon, obs.HcDeg, obs.AzDeg, obs.InterceptNm,
+                obs.ObservedSunAngularDiameterDeg, obs.SunDiscCompensationArcMin));
             return true;
+        }
+
+        private bool TryCaptureFrame(CelestialBody body, SunDiscSighting disc,
+            out DateTime utc, out double lat, out double lon)
+        {
+            lat = 0;
+            lon = 0;
+            utc = GameTimeResolver.GetUtcNow();
+            if (disc.TableRequested)
+                utc = disc.ConfiguredUtc; // the configuration the previous PIP frame used
+            // Do not let the legacy builder silently substitute the Sun for
+            // an unresolved Moon/star. SH5 validates its own solar table below.
+            if (body.Kind != CelestialBodyKind.Sun
+                && !CelestialEphemeris.Compute(body, utc, out _, out _))
+            {
+                statusLine = FixCardNoSight;
+                statusTimer = FixStatusSeconds;
+                panelTimer = 0f;
+                if (WarnOnce.ShouldLog("CaptureObservation.unknownBody"))
+                    Debug.LogWarning(string.Format(CultureInfo.InvariantCulture,
+                        "{0} FIXKEY I rejected - no ephemeris for kind={1} hip={2}",
+                        LogPrefix, body.Kind, body.Hip));
+                return false;
+            }
+            float latF, lonF;
+            if (!positionProvider.TryGetPosition(out latF, out lonF))
+            {
+                statusLine = FixCardNoPosition;
+                statusTimer = FixStatusSeconds;
+                panelTimer = 0f;
+                Debug.Log(LogPrefix + " FIXKEY I ignored - no sandbox position");
+                return false;
+            }
+            lat = disc.TableRequested ? disc.ObserverLatDeg : latF;
+            lon = disc.TableRequested ? disc.ObserverLonDeg : lonF;
+            return true;
+        }
+
+        private bool TryBuildCapture(CelestialBody body, DateTime utc, double rawHs,
+            double legacyHo, double lat, double lon, double index, SunDiscSighting disc,
+            out SextantObservation obs)
+        {
+            obs = null;
+            if (body.Kind == CelestialBodyKind.Sun)
+            {
+                if (HasLegacySun(runningFix.Observation1) || HasLegacySun(runningFix.Observation2))
+                    return false;
+                return Sh5SolarNavigation.TryObservation(utc, rawHs, index, lat, lon, disc, out obs);
+            }
+            obs = RunningFixCalculator.BuildObservation(utc, legacyHo, lat, lon, body);
+            return true;
+        }
+
+        private static bool HasLegacySun(SextantObservation obs)
+        {
+            return obs != null && obs.BodyKind == CelestialBodyKind.Sun && obs.SolarReductionVersion == 0;
         }
 
         /// <summary>

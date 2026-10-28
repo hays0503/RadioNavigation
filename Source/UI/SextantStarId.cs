@@ -169,7 +169,7 @@ namespace UBOAT.Mods.RadioNavigation
             bool ownSunOk, Vector3 ownSunDir, float ownSunAlt,
             bool gameSunOk, Vector3 gameSunDir, float gameSunAlt,
             bool positionOk, float lat, float lon,
-            UnityEngine.UI.Text nameText, double arcAngle)
+            UnityEngine.UI.Text nameText, double arcAngle, float daylightSunAlt)
         {
             tickTimer -= dt;
             bool tick = tickTimer <= 0f;
@@ -196,7 +196,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (tick)
             {
                 TickIdentification(pipFwd, ownSunOk, ownSunDir, ownSunAlt,
-                    gameSunOk, gameSunDir, gameSunAlt, positionOk, lat, lon, arcAngle);
+                    gameSunOk, gameSunDir, gameSunAlt, positionOk, lat, lon, arcAngle, daylightSunAlt);
             }
 
             if (nameText != null)
@@ -242,7 +242,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void TickIdentification(Vector3 pipFwd,
             bool ownSunOk, Vector3 ownSunDir, float ownSunAlt,
             bool gameSunOk, Vector3 gameSunDir, float gameSunAlt,
-            bool positionOk, float lat, float lon, double arcAngle)
+            bool positionOk, float lat, float lon, double arcAngle, float daylightSunAlt)
         {
             double coneDeg = SightabilityGate.EffectiveConeDeg();
             float bodyAlt;
@@ -260,7 +260,7 @@ namespace UBOAT.Mods.RadioNavigation
                         CelestialBody.Moon(), GameTimeResolver.GetUtcNow()))
                     : 0.0;
                 block = SightabilityGate.Evaluate(lastFoundBody.Kind, bodyAlt,
-                    ownSunAlt, illumination);
+                    daylightSunAlt, illumination);
                 if (block == SightBlock.None)
                     key = BodyKey(lastFoundBody);
             }
@@ -323,8 +323,8 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>Current direction/altitude of a body by its identity
-        /// (sticky-selection support): the Sun uses the GAME direction (the
-        /// disc the player actually sees), the Moon and the stars the mod's
+        /// (sticky-selection support): the Sun uses the supplied measuring
+        /// direction (SH5 in production), the Moon and the stars the mod's
         /// own ephemeris at the given position.</summary>
         private static bool TryBodyDirection(CelestialBody body, float lat, float lon,
             bool ownSunOk, Vector3 ownSunDir, float ownSunAlt,
@@ -417,7 +417,18 @@ namespace UBOAT.Mods.RadioNavigation
             aimTotalArcMin = AimOffsetFormat.ToArcMin(AimOffsetFormat.TotalDeg(
                 aimFwd.x, aimFwd.y, aimFwd.z, bodyDir.x, bodyDir.y, bodyDir.z));
             aimVerticalArcMin = AimOffsetFormat.ToArcMin(
-                bodyAlt - (arcAngle + IndexErrorCorrection.Load()));
+                bodyAlt - SunDiscSighting.ApplyMeasuredChain(arcAngle, IndexErrorCorrection.Load()));
+            if (selection.HasSelection && selection.Selected.Kind == CelestialBodyKind.Sun)
+            {
+                SextantController controller = SextantController.Instance;
+                SunDiscSighting sun = controller != null
+                    ? controller.CaptureSunDiscSighting(selection.Selected) : SunDiscSighting.None;
+                if (sun.TableCompatible)
+                    aimVerticalArcMin = AimOffsetFormat.ToArcMin(
+                        sun.ExpectedHsDeg - SunDiscSighting.ApplyMeasuredChain(arcAngle, IndexErrorCorrection.Load()));
+                else
+                    aimVerticalArcMin = double.NaN;
+            }
             aimHorizontalArcMin = AimOffsetFormat.ToArcMin(AimOffsetFormat.HorizontalDeg(
                 aimFwd.x, aimFwd.y, aimFwd.z, bodyDir.x, bodyDir.y, bodyDir.z));
         }
@@ -439,7 +450,7 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Nearest sightable body in the cone: Sun (game direction), then the
+        /// Nearest sightable body in the cone: measuring Sun, then the
         /// Moon and the catalog stars by own ephemeris, closest wins.
         /// </summary>
         private CelestialBody FindNearestBody(out float bodyAltDeg, out Vector3 bodyDir,
@@ -448,10 +459,9 @@ namespace UBOAT.Mods.RadioNavigation
             bool gameSunOk, Vector3 gameSunDir, float gameSunAlt,
             bool positionOk, float lat, float lon)
         {
-            // Sun ID aims at the direction the player actually sees: the disc
-            // is drawn on the GAME sun (SUNDRIFT sep ~1.6° would never fit
-            // the 1.0° cone against our own ephemeris). Own ephemeris stays
-            // the fallback when the game sun is unavailable via reflection.
+            // Controller supplies the SH5 measuring direction and disables
+            // the native fallback. Daylight gating remains a separate input so
+            // hiding a low/nighttime measuring Sun cannot block catalog stars.
             bodyAltDeg = -1f;
             bodyDir = Vector3.zero;
             if (pipFwd.sqrMagnitude < 0.01f)

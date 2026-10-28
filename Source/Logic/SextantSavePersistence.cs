@@ -53,7 +53,7 @@ namespace UBOAT.Mods.RadioNavigation
             resolved.Loaded += OnLoaded;
             resolved.SavingStarted += OnSavingStarted;
             manager = resolved;
-            Debug.Log(LogPrefix + "installed (save-local SceneObject, payload v1)");
+            Debug.Log(LogPrefix + "installed (save-local SceneObject, payload v" + SextantSaveCodec.Version + ")");
         }
 
         private static void PurgeHandler(SavesManager target, string eventName, string method)

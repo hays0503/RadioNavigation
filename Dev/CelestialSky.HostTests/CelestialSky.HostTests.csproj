@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>
+    <LangVersion>7</LangVersion><Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings><EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="FakeGameApi.cs" /><Compile Include="Program.cs" />
+    <Compile Include="..\..\Source\Logic\AstroMath.cs" />
+    <Compile Include="..\..\Source\Logic\SunDiscScale.cs" />
+    <Compile Include="..\..\Source\Data\StarCatalog.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialSkyState.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialSkyMath.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialWorldOwner.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialWorldHost.cs" />
+  </ItemGroup>
+</Project>

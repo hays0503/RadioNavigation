@@ -34,6 +34,43 @@ namespace UBOAT.Mods.RadioNavigation
         private MemberInfo moonAzMember;
         private bool moonMembersResolved;
         private float moonDiagTimer;
+        private Renderer nativeSunRenderer;
+        private Renderer nativeMoonRenderer;
+
+        /// <summary>Exact TOD component references, never a scene-name search.
+        /// Cached while alive; retry after scene destruction/reflection failure.</summary>
+        public bool TryGetNativeDiscs(out Renderer sun, out Renderer moon)
+        {
+            sun = nativeSunRenderer;
+            moon = nativeMoonRenderer;
+            if (sun != null && moon != null)
+                return true;
+            Vector3 unusedDir;
+            float unusedAlt;
+            if (!TryGetSun(out unusedDir, out unusedAlt))
+                return false;
+            try
+            {
+                object sky = skyProperty.GetValue(weather, null);
+                MemberInfo member = FindMember(sky.GetType(), "Components");
+                object components = member != null ? ReadMember(sky, member) : null;
+                if (components == null)
+                    return false;
+                MemberInfo sunMember = FindMember(components.GetType(), "SunRenderer");
+                MemberInfo moonMember = FindMember(components.GetType(), "MoonRenderer");
+                if (sunMember == null || moonMember == null)
+                    return false;
+                nativeSunRenderer = sun = ReadMember(components, sunMember) as Renderer;
+                nativeMoonRenderer = moon = ReadMember(components, moonMember) as Renderer;
+                return sun != null && moon != null;
+            }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("SextantGameSun.nativeDiscs"))
+                    Debug.LogWarning(LogPrefix + " native disc access failed: " + e.Message);
+                return false;
+            }
+        }
 
         /// <summary>
         /// Reads the game's TOD_Sky sun direction/altitude via cached
@@ -182,9 +219,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         /// <summary>
         /// PlayerPrefs-gated Moon parity telemetry (SEXTANT_PLAN v2.2, V1):
-        /// compares the game TOD_Sky moon with the mod's own MoonRaDec moon so
-        /// the "two moons" question is answered from a log, not by eye.
-        /// sep &lt; 0.3° -> the discs coincide; sep &gt; 0.5° -> two moons.
+        /// compares the game TOD_Sky moon with the mod's topocentric render/ID
+        /// centre. Separation alone does NOT establish two visible discs: use
+        /// a scoped source A/B or actual GPU draws/pixels for that acceptance.
         /// Throttled to 10 s; enable with PlayerPrefs RadioNav.MoonDiag=1.
         /// </summary>
         public void LogMoonParity(float dt, bool ownOk, float ownAlt, float ownAz)

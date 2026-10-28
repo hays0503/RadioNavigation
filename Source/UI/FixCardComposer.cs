@@ -35,13 +35,13 @@ namespace UBOAT.Mods.RadioNavigation
             "\u043D\u0438\u0437\u043A\u043E \u2014 \u0433\u0440\u0443\u0431\u043E";
         private const string FixCardMoonAccuracy =
             "\u041B\u0443\u043D\u0430 \u00B10.1\u00B0";
-        // Game assumptions footer (author request): the game does not model
-        // refraction / horizon dip, so the worksheet cannot either. The lunar
+        // SH5 Sun uses the total F VIII lower-limb reduction. Other bodies keep
+        // their established instrument-only convention. The lunar
         // parallax IS modelled (P2/R5: topocentric reduction), and the Moon's
         // ephemeris is now the Meeus-47 series (±0.1° instead of ±0.3°).
         // "P: справка" opens the on-screen F-Tafel legend.
         private const string FixCardAssumptions =
-            "\u0411\u0435\u0437 \u0440\u0435\u0444\u0440\u0430\u043A\u0446\u0438\u0438/dip \u00B7 " +
+            "SH5 LL: F VIII; \u043F\u0440\u043E\u0447\u0438\u0435 \u0431\u0435\u0437 \u0440\u0435\u0444\u0440\u0430\u043A\u0446\u0438\u0438/dip \u00B7 " +
             "\u041B\u0443\u043D\u0430 \u00B10.1\u00B0 " +
             "(\u043F\u0430\u0440\u0430\u043B\u043B\u0430\u043A\u0441 \u0443\u0447\u0442\u0451\u043D) \u00B7 " +
             "P: \u0441\u043F\u0440\u0430\u0432\u043A\u0430";
@@ -171,6 +171,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (includeUt)
                 sb.Append(" UT ").Append(obs.Utc.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
             sb.Append(" hb ").Append(SextantDmFormat.FormatDm(obs.HoDeg));
+            if (obs.SolarReductionVersion == 1)
+                sb.Append(" SH5/FVIII");
             sb.Append(" h1 ").Append(SextantDmFormat.FormatDm(obs.HcDeg));
             sb.Append(" Az ").Append(Format1(obs.AzDeg));
             sb.Append(" a ").Append(obs.InterceptNm >= 0 ? "+" : "\u2212")
@@ -239,6 +241,8 @@ namespace UBOAT.Mods.RadioNavigation
                   .Append(calMinutes >= 0 ? "+" : "\u2212")
                   .Append(System.Math.Abs(calMinutes).ToString("F1", CultureInfo.InvariantCulture))
                   .Append(' ').Append(FixCardMinutes).Append('\n');
+                if (IsTableSun(obs1) || IsTableSun(obs2))
+                    sb.Append("\u0394t: \u043D\u0435 \u043F\u0440\u0438\u043C\u0435\u043D\u044F\u0435\u0442\u0441\u044F \u043A SH5\n");
             }
 
             if (obs1 == null)
@@ -289,6 +293,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (!string.IsNullOrEmpty(obs.BodyName))
                 sb.Append(" \u2014 ").Append(obs.BodyName);
             sb.Append('\n');
+            AppendSolarReduction(sb, obs);
             sb.Append("UT ").Append(obs.Utc.ToString("HH:mm:ss", CultureInfo.InvariantCulture)).Append('\n');
             sb.Append("\u03B3 ").Append(SextantDmFormat.FormatDm(obs.GhaAriesDeg));
             // Same D°M.m′ format as gamma/GHA: a 0.1° decimal SHA read as
@@ -318,6 +323,23 @@ namespace UBOAT.Mods.RadioNavigation
               .Append(" NM");
             if (obs.HoDeg < BodyRecommendation.MinAltitudeDeg)
                 sb.Append('\n').Append(FixCardLowAltitude);
+        }
+
+        private static bool IsTableSun(SextantObservation observation)
+        {
+            return observation?.SolarReductionVersion == 1;
+        }
+
+        private static void AppendSolarReduction(StringBuilder sb, SextantObservation obs)
+        {
+            if (!IsTableSun(obs))
+                return;
+            sb.Append("SH5 LL Hs ").Append(SextantDmFormat.FormatDm(obs.RawHsDeg));
+            sb.Append(" \u0413\u043B\u0430\u0437 ").Append(Format1(obs.SolarEyeHeightM)).Append(" \u043C\n");
+            sb.Append(ComposeIndexError(obs.IndexErrorArcMin));
+            sb.Append(" h ").Append(SextantDmFormat.FormatDm(obs.IndexCorrectedHDeg)).Append('\n');
+            sb.Append("F VIII ").Append(obs.SolarFviiiArcMin >= 0 ? "+" : "\u2212")
+                .Append(Format1(System.Math.Abs(obs.SolarFviiiArcMin))).Append("\u2032 \u2192 Ho\n");
         }
     }
 }

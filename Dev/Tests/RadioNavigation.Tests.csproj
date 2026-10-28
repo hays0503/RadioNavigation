@@ -30,6 +30,9 @@
     <Compile Include="Stubs\UnityEngineMaterial.cs" />
     <Compile Include="Stubs\UnityEngineColor.cs" />
     <Compile Include="Stubs\UnityEngineGameObject.cs" />
+    <Compile Include="Stubs\UnityEngineRenderer.cs" />
+    <Compile Include="Stubs\CelestialCaptureAdapters.cs" />
+    <Compile Include="Stubs\SolarOpticsAdapters.cs" />
     <Compile Include="Stubs\UnityEngineTime.cs" />
     <Compile Include="Stubs\GameStubs.cs" />
     <Compile Include="Stubs\SceneStubs.cs" />
@@ -71,6 +74,8 @@
     <Compile Include="DspPipelineTests.cs" />
     <Compile Include="ShieldTests.cs" />
     <Compile Include="AstroMathTests.cs" />
+    <Compile Include="CelestialSkyStage1Tests.cs" />
+    <Compile Include="Stubs\CelestialWorldHost.cs" />
     <Compile Include="SunAccuracyTests.cs" />
     <Compile Include="StarPrecessionTests.cs" />
     <Compile Include="StarBrightnessTests.cs" />
@@ -139,12 +144,20 @@
     <Compile Include="ConstellationTogglePrefsTests.cs" />
     <Compile Include="SextantArcTests.cs" />
     <Compile Include="SextantGlareTests.cs" />
+    <Compile Include="SextantShadeFilterTests.cs" />
     <Compile Include="SextantZoomTests.cs" />
     <Compile Include="SextantArcInputTests.cs" />
     <Compile Include="HeldKeyEdgeTests.cs" />
     <Compile Include="SextantReadoutTests.cs" />
     <Compile Include="SextantRunningFixTests.cs" />
     <Compile Include="SunEphemerisCalibrationTests.cs" />
+    <Compile Include="CelestialDiscSizeTests.cs" />
+    <Compile Include="CelestialCaptureTests.cs" />
+    <Compile Include="SolarFlareRenderStateTests.cs" />
+    <Compile Include="SolarSightAuditTests.cs" />
+    <Compile Include="Sh5SolarNavigationTests.cs" />
+    <Compile Include="Sh5EndToEndSightTests.cs" />
+    <Compile Include="SolarSeaHorizonTests.cs" />
     <Compile Include="SunEphemerisTests.cs" />
     <Compile Include="PrefabValidatorTests.cs" />
     <Compile Include="RadioLocaleTests.cs" />
@@ -188,6 +201,7 @@
     <Compile Include="LighthouseAlignmentTests.cs" />
     <Compile Include="LighthouseLandGateTests.cs" />
     <Compile Include="CoastQuadTreePortTests.cs" />
+    <Compile Include="ClockSecondsTextTests.cs" />
     <Compile Include="LighthouseStaleGroupPolicyTests.cs" />
     <Compile Include="MarkerDeclutterTests.cs" />
     <Compile Include="Helpers\CoastQuadTreePort.cs" />
@@ -195,6 +209,10 @@
 
   <ItemGroup>
     <Compile Include="..\..\Source\Data\BeaconData.cs" Link="Source\Data\BeaconData.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialSkyState.cs" Link="Source\Logic\CelestialSkyState.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialSkyMath.cs" Link="Source\Logic\CelestialSkyMath.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialWorldOwner.cs" Link="Source\Logic\CelestialWorldOwner.cs" />
+    <EmbeddedResource Include="Fixtures\CelestialSkyDe421.tsv" LogicalName="RadioNavigation.Tests.CelestialSkyDe421.tsv" />
     <Compile Include="..\..\Source\Data\ConsolCycleConfig.cs" Link="Source\Data\ConsolCycleConfig.cs" />
     <Compile Include="..\..\Source\Data\DialConfig.cs" Link="Source\Data\DialConfig.cs" />
     <Compile Include="..\..\Source\Data\SignalTypes.cs" Link="Source\Data\SignalTypes.cs" />
@@ -279,6 +297,7 @@
     <Compile Include="..\..\Source\Logic\AimOffsetFormat.cs" Link="Source\Logic\AimOffsetFormat.cs" />
     <Compile Include="..\..\Source\Logic\FixCardLayout.cs" Link="Source\Logic\FixCardLayout.cs" />
     <Compile Include="..\..\Source\Logic\ConstellationWidthPolicy.cs" Link="Source\Logic\ConstellationWidthPolicy.cs" />
+    <Compile Include="..\..\Source\Logic\ClockSecondsText.cs" Link="Source\Logic\ClockSecondsText.cs" />
     <Compile Include="..\..\Source\Logic\ForecastLineText.cs" Link="Source\Logic\ForecastLineText.cs" />
     <Compile Include="..\..\Source\Logic\SextantSightLineColor.cs" Link="Source\Logic\SextantSightLineColor.cs" />
     <Compile Include="..\..\Source\Logic\MoonPhaseDisc.cs" Link="Source\Logic\MoonPhaseDisc.cs" />
@@ -300,12 +319,25 @@
     <Compile Include="..\..\Source\Logic\ConstellationTogglePrefs.cs" Link="Source\Logic\ConstellationTogglePrefs.cs" />
     <Compile Include="..\..\Source\Logic\SextantArc.cs" Link="Source\Logic\SextantArc.cs" />
     <Compile Include="..\..\Source\Logic\SextantGlare.cs" Link="Source\Logic\SextantGlare.cs" />
+    <Compile Include="..\..\Source\Logic\SextantShadeFilter.cs" Link="Source\Logic\SextantShadeFilter.cs" />
     <Compile Include="..\..\Source\Logic\SextantRunningFix.cs" Link="Source\Logic\SextantRunningFix.cs" />
     <Compile Include="..\..\Source\Logic\CelestialBody.cs" Link="Source\Logic\CelestialBody.cs" />
     <Compile Include="..\..\Source\Logic\CelestialEphemeris.cs" Link="Source\Logic\CelestialEphemeris.cs" />
     <Compile Include="..\..\Source\Logic\BodyRecommendation.cs" Link="Source\Logic\BodyRecommendation.cs" />
     <Compile Include="..\..\Source\Logic\SunEphemerisCalibration.cs" Link="Source\Logic\SunEphemerisCalibration.cs" />
     <Compile Include="..\..\Source\Logic\SunEphemeris.cs" Link="Source\Logic\SunEphemeris.cs" />
+    <Compile Include="..\..\Source\Logic\SunDiscScale.cs" Link="Source\Logic\SunDiscScale.cs" />
+    <Compile Include="..\..\Source\Logic\MoonDiscScale.cs" Link="Source\Logic\MoonDiscScale.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialDiscRaster.cs" Link="Source\Logic\CelestialDiscRaster.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialRenderState.cs" Link="Source\Logic\CelestialRenderState.cs" />
+    <Compile Include="..\..\Source\UI\SextantWorksheet.cs" Link="Source\UI\SextantWorksheet.cs" />
+    <Compile Include="..\..\Source\UI\SextantSolarOptics.cs" Link="Source\UI\SextantSolarOptics.cs" />
+    <Compile Include="..\..\Source\Logic\SunDiscSighting.cs" Link="Source\Logic\SunDiscSighting.cs" />
+    <Compile Include="..\..\Source\Logic\SolarSightAudit.cs" Link="Source\Logic\SolarSightAudit.cs" />
+    <Compile Include="..\..\Source\Data\Sh5SunAlmanac.cs" Link="Source\Data\Sh5SunAlmanac.cs" />
+    <Compile Include="..\..\Source\Logic\Sh5SolarNavigation.cs" Link="Source\Logic\Sh5SolarNavigation.cs" />
+    <Compile Include="..\..\Source\Logic\SolarHeightReduction.cs" Link="Source\Logic\SolarHeightReduction.cs" />
+    <Compile Include="..\..\Source\Logic\SolarSeaHorizon.cs" Link="Source\Logic\SolarSeaHorizon.cs" />
     <Compile Include="..\..\Source\UI\PrefabNames.cs" Link="Source\UI\PrefabNames.cs" />
     <Compile Include="..\..\Source\Logic\PrefabValidator.cs" Link="Source\Logic\PrefabValidator.cs" />
     <Compile Include="..\..\Source\Logic\RadioLocale.cs" Link="Source\Logic\RadioLocale.cs" />

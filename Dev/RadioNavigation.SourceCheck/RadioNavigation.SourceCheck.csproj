@@ -34,6 +34,9 @@
     <Compile Include="ModCompiler.cs" />
     <Compile Include="CleanReferenceCache.cs" />
     <Compile Include="SourceCheckTests.cs" />
+    <Compile Include="CelestialDiscSourceTests.cs" />
+    <Compile Include="SextantRenderProbeTests.cs" />
+    <Compile Include="SextantShadeSourceTests.cs" />
     <Compile Include="DocumentationTests.cs" />
     <Compile Include="TempProbeTests.cs" />
   </ItemGroup>

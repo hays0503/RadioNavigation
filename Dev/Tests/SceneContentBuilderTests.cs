@@ -18,7 +18,18 @@ namespace UBOAT.Mods.RadioNavigation
     public sealed class StationMapOverlay { }
     public sealed class LighthouseMapMarker { }
     public sealed class StationMapMarker { }
-    public sealed class FixMapMarker { }
+    public sealed class FixMapMarker
+    {
+        // World/map endpoints only. CelestialCaptureTests executes the actual
+        // linked worksheet, not a duplicate of its measurement/save arithmetic.
+        private static FixMarkerSnapshot snapshot = new FixMarkerSnapshot();
+        public static void Clear() { snapshot = new FixMarkerSnapshot(); }
+        public static void OnNewObservation() { }
+        public static void Set(double lat, double lon, string label) { }
+        public static void SetTriangle(double a, double b, double c, double d, double e, double f) { }
+        public static FixMarkerSnapshot CaptureState() { return snapshot; }
+        public static void RestoreState(FixMarkerSnapshot state) { snapshot = state; }
+    }
     public sealed class SextantController { }
     public sealed class MapShapeEraser { }
     public sealed class LighthousePlacer { public static void EnsureRunning() { } }

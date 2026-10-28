@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Offline instrument, not the mod build/deployment. Links actual C#;
+       no Unity, game DLL, package or live process is required. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>7.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\..\Source\Logic\AstroMath.cs" Link="AstroMath.cs" />
+    <Compile Include="..\..\Source\Logic\SunDiscScale.cs" Link="SunDiscScale.cs" />
+    <Compile Include="..\..\Source\Logic\SunEphemerisCalibration.cs" Link="SunEphemerisCalibration.cs" />
+    <Compile Include="..\..\Source\Logic\SolarSightAudit.cs" Link="SolarSightAudit.cs" />
+  </ItemGroup>
+</Project>

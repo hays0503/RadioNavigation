@@ -299,6 +299,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void Destroy()
         {
+            SextantCelestialRenderScopePatch.Unregister(LeftCamera);
+            SextantCelestialRenderScopePatch.Unregister(RightCamera);
             Detach();
             DestroySternspreizPhase0();
             DestroyLens();

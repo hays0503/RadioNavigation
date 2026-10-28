@@ -103,11 +103,5 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Contains(SextantReadout.FormatLens(true, 0.35f), text);
         }
 
-        [Fact]
-        public void FilterDimAlpha_ScalesWithCount()
-        {
-            Assert.Equal(0f, SextantReadout.FilterDimAlpha(0));
-            Assert.Equal(0.6f, SextantReadout.FilterDimAlpha(2), 5);
-        }
     }
 }

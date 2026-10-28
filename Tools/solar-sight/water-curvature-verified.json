@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "source": "Installed uboat.core D3D11 water shaders, raw DXBC immediate constant buffer, 2026-10-09",
+  "bundle_sha256": "ce26da620ea3f4a377bb47538192640743ab79d32be2ffc7b5c198620c8ccc9c",
+  "bundle_length": 550073136,
+  "table_hash": "121655da0afa2d37dcb185ba99492c1935f22ab83f0093d05db69f20594fe23c",
+  "table_hash_encoding": "SHA256(concatenated big-endian signed-x float32 bits)",
+  "step_m": 250,
+  "max_index": 79,
+  "curvature_variants": 484,
+  "distinct_bytecodes": 172,
+  "representative_shader": "PlayWay Water/Standard",
+  "signed_x_bits": [
+    "00000000", "bba0ba73", "bca0ba72", "bd34d1c0", "bda0ba72", "bdfb2352", "be34d1c0", "be761d7e",
+    "bea0ba72", "becb6bf8", "befb2352", "bf17f03f", "bf34d1c0", "bf54362a", "bf761d7e", "bf8d43de",
+    "bfa0ba72", "bfb5727a", "bfcb6bf8", "bfe2a6ea", "bffb2351", "c00a7097", "c017f03f", "c02610a2",
+    "c034d1bf", "c0443397", "c0543629", "c064d976", "c0761d7d", "c084011f", "c08d43dd", "c096d6f8",
+    "c0a0ba70", "c0aaee46", "c0b57279", "c0c04709", "c0cb6bf6", "c0d6e140", "c0e2a6e8", "c0eebced",
+    "c0fb234f", "c103ed07", "c10a7095", "c1111c52", "c117f03d", "c11eec57", "c12610a0", "c12d5d17",
+    "c134d1bd", "c13c6e91", "c1443394", "c14c20c5", "c1543626", "c15c73b4", "c164d972", "c16d675d",
+    "c1761d78", "c17efbc1", "c184011c", "c188986f", "c18d43da", "c192035c", "c196d6f4", "c19bbea5",
+    "c1a0ba6c", "c1a5ca4b", "c1aaee41", "c1b0264f", "c1b57273", "c1bad2b0", "c1c04703", "c1c5cf6d",
+    "c1cb6bef", "c1d11c88", "c1d6e139", "c1dcba01", "c1e2a6e0", "c1e8a7d6", "c1eebce3", "c1f4e608",
+    "c1fb2344"
+  ],
+  "gpu_submission_verified": false,
+  "limits": "Shader constants/code only. Active mesh, waves/fog, presented lower-limb contact and real navigation remain unaccepted."
+}

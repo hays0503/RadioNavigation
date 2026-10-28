@@ -36,7 +36,9 @@ namespace UBOAT.Mods.RadioNavigation
         private static readonly int RimLightId = Shader.PropertyToID("_LuneRimLight");
         private Material material;
         private SextantLuneState state = SextantLuneState.Rest;
+#pragma warning disable IDE0052 // Preserve the private field and writes for potential previous ClassDescriptor/save-schema compatibility.
         private SextantAimRateSample rate;
+#pragma warning restore IDE0052
         private float strength = (float)SextantLuneMath.DefaultStrength;
         private double maxUnits = SextantLuneMath.MaxOffsetUnits;
         private double rateFull = SextantLuneMath.RateFullDegPerSec;

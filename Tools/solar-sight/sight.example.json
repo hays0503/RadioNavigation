@@ -1,0 +1,12 @@
+{
+  "id": "illustration-not-a-reconstruction-of-the-original-sight",
+  "gmt": "1939-09-02T10:03:07Z",
+  "raw_hs_deg": 37.99666666666667,
+  "index_correction_arcmin": 0.0,
+  "index_correction_source": "Illustrative zero only; the original sight's index correction is unknown",
+  "limb": "lower",
+  "eye_height_m": 5.5,
+  "horizon_reference": "sea horizon; optical/refraction compatibility unverified",
+  "assumed_lat_deg": 55.0,
+  "assumed_lon_deg": 5.75
+}

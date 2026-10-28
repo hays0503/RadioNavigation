@@ -54,6 +54,7 @@ namespace UBOAT.Mods.RadioNavigation
             // disposable Sternspreiz source renderer around its DeepPipeline
             // camera render, with a finalizer restoring it on every exit.
             SternspreizPipRenderScopePatch.Apply(harmony);
+            SextantCelestialRenderScopePatch.Apply(harmony);
 
             // Separate target assembly (com.uboat.dependencies): hides the
             // game's decorative star sphere while the mod's catalog sky is the

@@ -8,6 +8,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
     /// and the three-star series objective.</summary>
     public sealed class CelestialForecastTests
     {
+        public CelestialForecastTests()
+        {
+            Assert.True(Sh5SunAlmanac.Initialize(System.IO.Path.Combine(
+                System.IO.Directory.GetCurrentDirectory(), "Source", "Data")), Sh5SunAlmanac.LastError);
+        }
+
         private static BodyRecommendation.Candidate Star(string name, double azDeg)
         {
             return new BodyRecommendation.Candidate

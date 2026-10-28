@@ -55,6 +55,11 @@ namespace UBOAT.Mods.RadioNavigation
         internal static SextantController Instance { get; private set; }
 
         private bool openPoseLogPending;
+        // Explicit probe session, never inferred from an empty/non-empty series.
+        // It keeps ordinary Z/open calibration intact while render checks cannot
+        // record/reset sights, calibrate the instrument or extend its course track.
+        private bool renderOnlyProbe;
+        private bool sightOnlyProbe;
 
         /// <summary>
         /// True when the camera is one of the two sextant PIP halves. Used by
@@ -158,6 +163,7 @@ namespace UBOAT.Mods.RadioNavigation
         // (extracted, P5.4 slice 4c): solved on open, persisted, applied
         // to all worksheet ephemeris.
         private readonly SunCalibrator calibrator = new SunCalibrator();
+        private readonly SextantSolarOptics solarOptics = new SextantSolarOptics();
 
         private void Awake()
         {
@@ -165,6 +171,8 @@ namespace UBOAT.Mods.RadioNavigation
             worksheet = new SextantWorksheet(positionProvider);
             bodiesReadout = new SextantBodiesReadout(positionProvider);
             inputPoller = new SextantInputPoller(arcInput, worksheet, starId);
+            // The poller asks at the key press what the disc looked like then.
+            inputPoller.SunDiscSightingProvider = CaptureSunDiscSighting;
             logArcInputDelegate = LogArcInputVector;
             setFiltersDelegate = SetFilters;
             toggleLensDelegate = ToggleLens;
@@ -307,11 +315,16 @@ namespace UBOAT.Mods.RadioNavigation
                 UpdateReadout(false);
                 UpdateBodiesReadout(Time.unscaledDeltaTime);
                 UpdateMoonParity(Time.unscaledDeltaTime);
-                inputPoller.PollFix(arcAngle);
-                inputPoller.PollIndexError(arcAngle);
+                if (!renderOnlyProbe)
+                {
+                    inputPoller.PollFix(arcAngle, sightOnlyProbe);
+                    if (!sightOnlyProbe)
+                        inputPoller.PollIndexError(arcAngle);
+                }
                 if (pPressed)
                     ToggleHelp();
-                worksheet.UpdateCourseSampler(Time.unscaledDeltaTime);
+                if (!renderOnlyProbe)
+                    worksheet.UpdateCourseSampler(Time.unscaledDeltaTime);
                 PollUiScale();
                 worksheet.UpdatePanel(Time.unscaledDeltaTime);
             }
@@ -332,6 +345,7 @@ namespace UBOAT.Mods.RadioNavigation
             // controller's order (5000) keeps the PIP pose late, while the
             // interior helpers (10000) apply their corrections afterwards.
             UpdatePipPose();
+            UpdateTableSun();
             UpdateEyeShadow(Time.unscaledDeltaTime);
 
             if (openPoseLogPending)
@@ -381,14 +395,30 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void TryOpen()
         {
-            if (!CanOpen())
+            if (!PrepareOpen())
                 return;
 
+            calibrator.Solve(positionProvider, gameSun, worksheet);
+            renderOnlyProbe = false;
+            sightOnlyProbe = false;
+            FinishOpen();
+        }
+
+        // Shared rendering preparation has NO calibration or sight/course writes.
+        // Keep Solve only in the ordinary opening, not behind a caller flag in
+        // this helper: a render probe must never enter it, even on an empty save.
+        private bool PrepareOpen()
+        {
+            if (!CanOpen())
+                return false;
             EnsureOverlay();
             pipFactory.Ensure(viewCamera, zoom.FovDivisor, leftViewImage, rightViewImage,
                 effectMirror, bloomCut, this, UiScale());
-            calibrator.Solve(positionProvider, gameSun, worksheet);
+            return true;
+        }
 
+        private void FinishOpen()
+        {
             ResetReadingState();
 
             AttachAndConfigureCameras();
@@ -398,7 +428,9 @@ namespace UBOAT.Mods.RadioNavigation
             if (painText != null) painText.enabled = false;
             UpdateReadout(true);
             UpdateZoomLabel();
-            Debug.Log(LogPrefix + " opened (two-camera split ocular)");
+            Debug.Log(LogPrefix + " opened (two-camera split ocular)"
+                + (renderOnlyProbe ? " render-only probe; calibration and worksheet actions blocked" : "")
+                + (sightOnlyProbe ? " sight-only probe; calibration and series reset blocked" : ""));
         }
 
         private bool CanOpen()
@@ -476,6 +508,8 @@ namespace UBOAT.Mods.RadioNavigation
             SextantPipPose.ResetFilters();
             openPoseLogPending = true;
             IsOpen = true;
+            SunDiscRenderer.Active = true;
+            UpdateGlare(0f);
             // Freeze the sky-shell radius (P7): the PIP mirrors its far clip
             // every frame, so a live radius would make the stars jump mid-sight.
             CameraResolver.FreezeRadius(viewCamera);
@@ -505,6 +539,8 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             IsOpen = false;
+            renderOnlyProbe = false;
+            sightOnlyProbe = false;
             openPoseLogPending = false;
             SextantPipPose.ClearTestAim();
             // A closed sextant must never show a stale crescent.
@@ -553,6 +589,101 @@ namespace UBOAT.Mods.RadioNavigation
                 : "null";
         }
 
+        /// <summary>One main-thread read, no I/O key, calibration, camera or
+        /// preference writes. GMT and position are read ONCE for both models.
+        /// Live source state may predate the last LateUpdate/render: this is
+        /// not a same-presented-frame pixel receipt or historical Ho.</summary>
+        internal string SolarAuditSnapshotForProbe()
+        {
+            DateTime utc = GameTimeResolver.GetUtcNow();
+            float lat, lon;
+            bool positionOk = TryGetPositionForProbe(out lat, out lon);
+            double delta = SunEphemerisCalibration.DeltaMinutes;
+            double index = IndexErrorCorrection.Load();
+            StringBuilder sb = new StringBuilder(2048);
+            sb.Append("{\"ok\":true,\"schema\":1,\"frame\":").Append(Time.frameCount);
+            sb.Append(",\"utc\":\"").Append(utc.ToString("O", CultureInfo.InvariantCulture)).Append('"');
+            sb.Append(",\"campaignUtc\":").Append(utc.Year >= 1939 && utc.Year <= 1945 ? "true" : "false");
+            sb.Append(",\"rawHsDeg\":").Append(SolarSightAudit.Number(arcAngle));
+            sb.Append(",\"indexCorrectionArcMin\":").Append(SolarSightAudit.Number(index));
+            sb.Append(",\"indexCorrectedHDeg\":").Append(SolarSightAudit.Number(arcAngle + index / 60.0));
+            sb.Append(",\"worksheetInputDeg\":").Append(SolarSightAudit.Number(
+                SextantArc.Quantize(SunDiscSighting.ApplyMeasuredChain(arcAngle, index))));
+            sb.Append(",\"worksheetInputConvention\":\"legacy-index-only; SH5 consumes rawHsDeg\"");
+            sb.Append(",\"calibrationMinutes\":").Append(SolarSightAudit.Number(delta));
+            sb.Append(",\"limbAssumption\":\"LowerLimb\",\"observedLimb\":null");
+            sb.Append(",\"horizonModel\":\"unverified\",\"eyeHeightAboveSeaM\":null");
+            sb.Append(",\"position\":");
+            if (positionOk)
+            {
+                sb.Append("{\"latDeg\":").Append(SolarSightAudit.Number(lat));
+                sb.Append(",\"lonDeg\":").Append(SolarSightAudit.Number(lon)).Append('}');
+                sb.Append(",\"uncalibrated\":");
+                SolarSightAudit.AppendModel(sb, SolarSightAudit.Compute(utc, lat, lon, 0.0));
+                sb.Append(",\"calibrated\":");
+                SolarSightAudit.AppendModel(sb, SolarSightAudit.Compute(utc, lat, lon, delta));
+            }
+            else
+                sb.Append("null,\"uncalibrated\":null,\"calibrated\":null");
+            AppendSolarSourceAudit(sb);
+            return sb.Append('}').ToString();
+        }
+
+        private void AppendSolarSourceAudit(StringBuilder sb)
+        {
+            Vector3 nativeDir;
+            float nativeAlt;
+            bool nativeOk = TryGetGameSun(out nativeDir, out nativeAlt);
+            sb.Append(",\"nativeSun\":");
+            if (nativeOk)
+                SolarSightAudit.AppendDirection(sb, nativeDir.x, nativeDir.y, nativeDir.z);
+            else
+                sb.Append("null");
+            sb.Append(",\"nativeAltitudeFieldDeg\":").Append(nativeOk ? SolarSightAudit.Number(nativeAlt) : "null");
+            sb.Append(",\"measuringSun\":{\"active\":").Append(SunDiscRenderer.Active ? "true" : "false");
+            sb.Append(",\"ready\":").Append(SunDiscRenderer.MeasuringDiscReady ? "true" : "false");
+            sb.Append(",\"configuredDiameterDeg\":").Append(SolarSightAudit.Number(SunDiscRenderer.AngularDiameterDeg));
+            sb.Append(",\"configuredDirection\":");
+            Vector3 dir = SunDiscRenderer.SunDirection;
+            SolarSightAudit.AppendDirection(sb, dir.x, dir.y, dir.z);
+            sb.Append(",\"scopeHooksAvailable\":").Append(SextantCelestialRenderScopePatch.IsAvailable ? "true" : "false");
+            sb.Append(",\"leftScopeRecent\":").Append(SextantCelestialRenderScopePatch.IsRegistered(pipFactory.LeftCamera) ? "true" : "false");
+            sb.Append(",\"rightScopeRecent\":").Append(SextantCelestialRenderScopePatch.IsRegistered(pipFactory.RightCamera) ? "true" : "false");
+            sb.Append(",\"evidence\":\"configuration-not-pixels\"}");
+            sb.Append(",\"glareEnabled\":").Append(SextantGlareCoordinator.GlareEnabled ? "true" : "false");
+            sb.Append(",\"pained\":").Append(glare.IsPained ? "true" : "false");
+            sb.Append(",\"cameraMode\":\"").Append(RadioNavProbeJson.Escape(CurrentModeName())).Append('"');
+            string insideBoat = "null";
+            if (gameMainCamera != null)
+                insideBoat = gameMainCamera.IsInsideBoat ? "true" : "false";
+            sb.Append(",\"insideBoat\":").Append(insideBoat);
+            sb.Append(",\"viewCamera\":");
+            AppendSolarCameraAudit(sb, viewCamera);
+            sb.Append(",\"leftCamera\":");
+            AppendSolarCameraAudit(sb, pipFactory.LeftCamera);
+            sb.Append(",\"rightCamera\":");
+            AppendSolarCameraAudit(sb, pipFactory.RightCamera);
+        }
+
+        private static void AppendSolarCameraAudit(StringBuilder sb, Camera camera)
+        {
+            if (camera == null)
+            {
+                sb.Append("null");
+                return;
+            }
+            sb.Append("{\"id\":").Append(camera.GetInstanceID());
+            sb.Append(",\"standaloneEnabled\":").Append(camera.enabled ? "true" : "false");
+            sb.Append(",\"cullingMask\":").Append(camera.cullingMask);
+            sb.Append(",\"fovDeg\":").Append(SolarSightAudit.Number(camera.fieldOfView));
+            sb.Append(",\"worldY\":").Append(SolarSightAudit.Number(camera.transform.position.y));
+            sb.Append(",\"targetHeightPx\":").Append(camera.targetTexture != null ? camera.targetTexture.height : 0);
+            sb.Append(",\"forward\":");
+            Vector3 dir = camera.transform.forward;
+            SolarSightAudit.AppendDirection(sb, dir.x, dir.y, dir.z);
+            sb.Append('}');
+        }
+
         internal SextantStarId StarIdForProbe
         {
             get { return starId; }
@@ -568,6 +699,24 @@ namespace UBOAT.Mods.RadioNavigation
             get { return rightFilterCount; }
         }
 
+        /// <summary>
+        /// Snapshots the physical measuring Sun configured at the key press.
+        /// Readiness is a source/configuration contract, not GPU/pixel acceptance.
+        /// Missing source isolation does not invent a nominal native diameter.
+        ///
+        /// Deliberately a snapshot rather than a live query the worksheet
+        /// re-reads later — see SunDiscSighting.
+        /// </summary>
+        internal SunDiscSighting CaptureSunDiscSighting(CelestialBody body)
+        {
+            if (body.Kind != CelestialBodyKind.Sun)
+                return SunDiscSighting.None;
+            bool ready = IsOpen && Time.frameCount - solarOptics.ConfiguredFrame <= 1
+                && SunDiscRenderer.MeasuringDiscReady
+                && SextantCelestialRenderScopePatch.IsRegistered(pipFactory.RightCamera);
+            return solarOptics.Sighting(ready);
+        }
+
         internal double ArcAngle
         {
             get { return arcAngle; }
@@ -581,6 +730,46 @@ namespace UBOAT.Mods.RadioNavigation
                 return true;
             TryOpen();
             return IsOpen;
+        }
+
+        /// <summary>Calibration-free render session. An already ordinary-open
+        /// device is rejected: its previous Solve cannot be undone or certified
+        /// as never having happened. Close first, then use this explicit entry.</summary>
+        internal bool TryOpenForRenderProbe()
+        {
+            if (IsOpen)
+                return renderOnlyProbe;
+            if (!PrepareOpen())
+                return false;
+            renderOnlyProbe = true; // gate writes BEFORE making the overlay live
+            sightOnlyProbe = false;
+            FinishOpen();
+            return IsOpen && renderOnlyProbe;
+        }
+
+        /// <summary>Explicit calibration-preserving real-sight entry. A retained
+        /// series is never cleared or adopted, and an already open device cannot
+        /// change modes. I and course sampling work; O/C and a fourth I do not.</summary>
+        internal bool TryOpenForSightsProbe()
+        {
+            if (IsOpen)
+                return sightOnlyProbe;
+            if (worksheet.SeriesActive || !PrepareOpen())
+                return false;
+            renderOnlyProbe = false;
+            sightOnlyProbe = true; // restrict actions BEFORE the first live frame
+            FinishOpen();
+            return IsOpen && sightOnlyProbe;
+        }
+
+        internal bool RenderOnlyForProbe
+        {
+            get { return renderOnlyProbe; }
+        }
+
+        internal bool SightOnlyForProbe
+        {
+            get { return sightOnlyProbe; }
         }
 
         internal void CloseForProbe()
@@ -600,7 +789,7 @@ namespace UBOAT.Mods.RadioNavigation
             rightFilterCount = right;
             UpdateFilterLabel();
             UpdateFilterDim();
-            SunDiscRenderer.Active = IsOpen && rightFilterCount > 0;
+            SunDiscRenderer.Active = IsOpen;
             bloomCut.Update(IsOpen, leftFilterCount, rightFilterCount);
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} FILTERSIDE side=PROBE left={1} right={2}",
@@ -985,9 +1174,9 @@ namespace UBOAT.Mods.RadioNavigation
                 filterDimLeftImage != null ? filterDimLeftImage.color.a : -1f,
                 filterDimRightImage != null ? filterDimRightImage.color.a : -1f));
 
-            // The sun disc lives in the right (sun) half: gated by the right
-            // filter only. The left filter dims the horizon view.
-            SunDiscRenderer.Active = IsOpen && rightFilterCount > 0;
+            // Filters dim their views; they never change the physical Sun's
+            // source or angular diameter while the sextant is open.
+            SunDiscRenderer.Active = IsOpen;
 
             // Shade filters preserve the eye's dark adaptation (P4).
             StarsMesh.Shielded = leftFilterCount + rightFilterCount > 0;
@@ -1007,8 +1196,20 @@ namespace UBOAT.Mods.RadioNavigation
         // binocular-like stabilization low-pass (2026-11-04).
         private void UpdatePipPose()
         {
+            UpdateCelestialSources();
             SextantPipPose.Update(pipFactory, arcAngle, zoom.FovDivisor,
                 ref viewCamera, manualRenderDelegate, Time.unscaledDeltaTime);
+        }
+
+        private void UpdateCelestialSources()
+        {
+            Renderer nativeSun, nativeMoon;
+            if (!gameSun.TryGetNativeDiscs(out nativeSun, out nativeMoon))
+                return;
+            SextantCelestialRenderScopePatch.Register(pipFactory.LeftCamera, nativeSun, nativeMoon,
+                SunDiscRenderer.MeasuringRenderer, MoonDiscRenderer.MeasuringRenderer);
+            SextantCelestialRenderScopePatch.Register(pipFactory.RightCamera, nativeSun, nativeMoon,
+                SunDiscRenderer.MeasuringRenderer, MoonDiscRenderer.MeasuringRenderer);
         }
 
         // ---- glare application lives in SextantGlareCoordinator
@@ -1050,6 +1251,9 @@ namespace UBOAT.Mods.RadioNavigation
             frame.OwnAz = sunAz;
             frame.GameOk = gameOk;
             frame.GameDir = gameDir;
+            frame.TableOk = solarOptics.Ready;
+            frame.TableDir = solarOptics.Direction;
+            frame.TableAlt = solarOptics.Ready ? (float)(Math.Asin(solarOptics.Direction.y) * 180 / Math.PI) : 0;
             frame.RightFilterCount = rightFilterCount;
             frame.GlareImage = glareImage;
             frame.FilterDimLeft = filterDimLeftImage;
@@ -1058,6 +1262,24 @@ namespace UBOAT.Mods.RadioNavigation
             frame.SunDriftLog = sunDriftLogDelegate;
             frame.PainStarIdReset = painStarIdResetDelegate;
             glare.Update(dt, frame);
+        }
+
+        private void UpdateTableSun()
+        {
+            float lat, lon;
+            bool positionOk = positionProvider.TryGetPosition(out lat, out lon);
+            bool outside = gameMainCamera != null && !gameMainCamera.IsInsideBoat;
+            solarOptics.Refresh(viewCamera, positionOk && outside,
+                GameTimeResolver.GetUtcNow(), lat, lon);
+            SunDiscRenderer.SunDirection = solarOptics.Direction;
+            SunDiscRenderer.ConfiguredTableDiameterDeg = solarOptics.Ready ? solarOptics.DiameterDeg : 0;
+        }
+
+        internal bool TryGetMeasuringSun(out Vector3 direction, out float altitude)
+        {
+            direction = solarOptics.Direction;
+            altitude = solarOptics.Ready ? (float)(Math.Asin(direction.y) * 180 / Math.PI) : 0;
+            return solarOptics.Ready;
         }
 
         /// <summary>
@@ -1107,13 +1329,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void UpdateBodiesReadout(float dt)
         {
-            float eyeHeightM = viewCamera != null
-                ? viewCamera.transform.position.y : 0f;
-            // The camera's world Y is not a height above the sea: on the map the
-            // map camera sits at ~1.25e6 m (live 2026-09-22 the card showed
-            // "Глаз 1250000.0 м"). Validate before showing it or feeding a dip.
-            if (eyeHeightM < 0.5f || eyeHeightM > 60f)
-                eyeHeightM = float.NaN;
+            float eyeHeightM = solarOptics.Ready ? (float)solarOptics.EyeHeightM : float.NaN;
             // Outside the boat AND not on the map: the same gate the star sky
             // uses, so the map camera cannot leak into the readout.
             bool canSight = SkyVisibilityResolver.IsPlayerOutside();
@@ -1125,7 +1341,7 @@ namespace UBOAT.Mods.RadioNavigation
             bodiesReadout.UpdateBodies(dt, eyeHeightM,
                 worksheet.Observation1AzDeg, worksheet.Observation1Name,
                 SextantPipPose.Forward(pipFactory, viewCamera, gameMainCamera, arcAngle),
-                canSight, bodiesRoom);
+                canSight, bodiesRoom, CaptureSunDiscSighting(CelestialBody.Sun()));
         }
 
         /// <summary>
@@ -1178,9 +1394,10 @@ namespace UBOAT.Mods.RadioNavigation
             // The Moon shares the game sky time shift (ADR-033 v2.4): compare
             // (and render) the same calibrated moon the fix uses.
             double jd = CelestialEphemeris.JdFor(CelestialBody.Moon(), utc);
-            if (!AstroMath.MoonRaDec(jd, out double raRad, out double decRad))
+            double lstDeg = AstroMath.LstDeg(jd, lon);
+            if (!AstroMath.MoonTopocentricRaDec(jd, lat, lstDeg, out double raRad, out double decRad))
                 return false;
-            AstroMath.RaDecToEnu(raRad, decRad, AstroMath.LstDeg(jd, lon), lat,
+            AstroMath.RaDecToEnu(raRad, decRad, lstDeg, lat,
                 out double altRad, out double azRad, out _, out _, out _);
             altDeg = (float)(altRad * Mathf.Rad2Deg);
             azDeg = (float)(azRad * Mathf.Rad2Deg);
@@ -1208,10 +1425,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void UpdateStarId(float dt)
         {
-            Vector3 ownDir, gameDir;
-            float ownAlt, ownAz, gameAlt;
-            bool ownOk = TryGetOwnSun(out ownDir, out ownAlt, out ownAz);
-            bool gameOk = TryGetGameSun(out gameDir, out gameAlt);
+            Vector3 ownDir;
+            float ownAlt;
+            bool ownOk = TryGetMeasuringSun(out ownDir, out ownAlt);
+            Vector3 daylightDir;
+            float daylightAlt, daylightAz;
+            TryGetOwnSun(out daylightDir, out daylightAlt, out daylightAz);
             float lat, lon;
             bool posOk = positionProvider.TryGetPosition(out lat, out lon);
             // Hull gate (R5): inside the boat the hull blocks the sky, so no
@@ -1219,8 +1438,8 @@ namespace UBOAT.Mods.RadioNavigation
             MainCamera main = MainCamera.Instance;
             bool canSight = main == null || !main.IsInsideBoat;
             starId.Update(dt, glare.IsPained, canSight, SextantPipPose.Forward(pipFactory, viewCamera, gameMainCamera, arcAngle),
-                ownOk, ownDir, ownAlt, gameOk, gameDir, gameAlt, posOk, lat, lon,
-                nameText, arcAngle);
+                ownOk, ownDir, ownAlt, false, Vector3.zero, 0f, posOk, lat, lon,
+                nameText, arcAngle, daylightAlt);
             UpdateDebugAimText();
         }
 

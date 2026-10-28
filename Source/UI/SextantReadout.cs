@@ -6,7 +6,7 @@ namespace UBOAT.Mods.RadioNavigation
     /// <summary>
     /// Reading-column text behind SextantController (P5.4 slice 4d, SRP):
     /// arc readout with an emit-only-on-change latch, shade-filter label
-    /// assembly and filter-dim alpha. The controller applies Text/color;
+    /// assembly. Optical transmission belongs to SextantShadeFilter;
     /// the decisions live here and run offline in SextantReadoutTests.
     /// Pure C#. Cyrillic is u-escaped like the rest of the mod (game
     /// compiler encoding safety).
@@ -65,9 +65,5 @@ namespace UBOAT.Mods.RadioNavigation
             return lens.Length == 0 ? filters : filters + " \u00B7 " + lens;
         }
 
-        public static float FilterDimAlpha(int count)
-        {
-            return 0.30f * count;
-        }
     }
 }

@@ -9,6 +9,7 @@ namespace UnityEngine
     public class Transform
     {
         public string name;
+        public Vector3 position;
         public readonly List<Transform> children = new List<Transform>();
 
         public Transform(string name)

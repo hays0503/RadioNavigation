@@ -125,6 +125,54 @@ if ($IdeAudit) {
         'OnPreRender','OnPostRender','OnAudioFilterRead','OnTriggerEnter',
         'OnTriggerExit','OnCollisionEnter','OnPointerClick','OnPointerEnter',
         'OnPointerExit','OnDrag','OnBeginDrag','OnEndDrag','OnScroll')
+    # Only the reviewed StarsMesh message may use this extra exception. Source
+    # guards bind the warning to its sole declared type; metadata verifies the
+    # qualified type, real inheritance and exact signature without running code.
+    # Unknown layouts or unavailable metadata remain genuine (fail closed).
+    function Test-StarsRenderMessage([string]$diagnostic) {
+        $loc = [regex]::Match($diagnostic, '^(.+)\((\d+),\d+\): warning IDE0051:.*"StarsMesh\.OnWillRenderObject"')
+        $source = Join-Path $root 'Source\Logic\StarsMesh.cs'
+        if (-not $loc.Success -or $loc.Groups[1].Value -ine $source) { return $false }
+        $text = [IO.File]::ReadAllText($source)
+        $types = [regex]::Matches($text, '(?m)^\s*(?:(?:public|internal|private|protected|static|sealed|abstract|partial)\s+)*(?:class|struct|interface|enum)\s+\w+')
+        if ($types.Count -ne 1 -or [regex]::Matches($text, '(?m)^\s*namespace\s+').Count -ne 1 -or
+            -not [regex]::IsMatch($text, '(?m)^\s*namespace\s+UBOAT\.Mods\.RadioNavigation\s*$')) { return $false }
+        $lines = $text -split "`r?`n"
+        $line = [int]$loc.Groups[2].Value - 1
+        if ($line -lt 0 -or $line -ge $lines.Count -or
+            -not [regex]::IsMatch($lines[$line], '^\s*private\s+void\s+OnWillRenderObject\s*\(\s*\)\s*\{?\s*$')) { return $false }
+        $assemblies = @(Get-ChildItem -LiteralPath (Join-Path (Split-Path $csproj) 'bin') -Recurse -Filter 'RadioNavigation.Analysis.dll' |
+            Where-Object { $_.DirectoryName -match '[\\/]Release[\\/]net48$' })
+        if ($assemblies.Count -ne 1) { return $false }
+        $directories = @($assemblies[0].DirectoryName,
+            'C:\Program Files (x86)\Steam\steamapps\common\UBOAT\UBOAT_Data\Managed')
+        $resolveBody = {
+            param($sender, $request)
+            $name = New-Object Reflection.AssemblyName($request.Name)
+            foreach ($directory in $directories) {
+                $path = Join-Path $directory ($name.Name + '.dll')
+                if (Test-Path -LiteralPath $path) { return [Reflection.Assembly]::ReflectionOnlyLoadFrom($path) }
+            }
+            return [Reflection.Assembly]::ReflectionOnlyLoad($request.Name)
+        }.GetNewClosure()
+        $resolve = [ResolveEventHandler]$resolveBody
+        [AppDomain]::CurrentDomain.add_ReflectionOnlyAssemblyResolve($resolve)
+        try {
+            $assembly = [Reflection.Assembly]::ReflectionOnlyLoadFrom($assemblies[0].FullName)
+            $type = $assembly.GetType('UBOAT.Mods.RadioNavigation.StarsMesh', $false)
+            if ($null -eq $type) { return $false }
+            $base = $type.BaseType
+            while ($null -ne $base -and $base.FullName -cne 'UnityEngine.MonoBehaviour') { $base = $base.BaseType }
+            if ($null -eq $base) { return $false }
+            $flags = [Reflection.BindingFlags]'DeclaredOnly,Public,NonPublic,Instance,Static'
+            $methods = @($type.GetMethods($flags) | Where-Object { $_.Name -ceq 'OnWillRenderObject' })
+            return $methods.Count -eq 1 -and $methods[0].IsPrivate -and -not $methods[0].IsStatic -and
+                -not $methods[0].IsGenericMethod -and $methods[0].ReturnType.FullName -ceq 'System.Void' -and
+                $methods[0].GetParameters().Length -eq 0
+        }
+        catch { Write-Host "[RadioNavigation] Unity-message metadata unavailable; warning remains blocking: $_"; return $false }
+        finally { [AppDomain]::CurrentDomain.remove_ReflectionOnlyAssemblyResolve($resolve) }
+    }
     # NOTE: semicolons in -p: values MUST be %3B-escaped — MSBuild splits a
     # bare -p:NoWarn="a;b" into junk properties (MSB1006) after PowerShell
     # strips the quotes, and the audit would report a vacuous clean.
@@ -156,7 +204,7 @@ if ($IdeAudit) {
             $dot = $dotted.LastIndexOf('.')
             if ($dot -ge 0) { $memberName = $dotted.Substring($dot + 1) }
         }
-        if ($memberName -ne "" -and $unityNoise -contains $memberName) { $noise += $h }
+        if (($memberName -ne "" -and $unityNoise -contains $memberName) -or (Test-StarsRenderMessage $h)) { $noise += $h }
         else { $genuine += $h }
     }
     Write-Host "[RadioNavigation] IdeAudit: $($hits.Count) hit(s) ($($genuine.Count) genuine, $($noise.Count) Unity-noise)"

@@ -14,7 +14,7 @@ namespace UBOAT.Mods.RadioNavigation
         public const double SigmaDivisor = 4.0;
 
         /// <summary>Light transmission of one shade filter (SEXTANT_PLAN §2.8).</summary>
-        public const double FilterTransmission = 0.35;
+        public const double FilterTransmission = SextantShadeFilter.GlassTransmission;
 
         /// <summary>
         /// Glare in 0..1. Night (sunAltitudeDeg &lt;= 0) → 0. filters = 0..3.
@@ -33,8 +33,7 @@ namespace UBOAT.Mods.RadioNavigation
             double x = angleToSunDeg / sigma;
             double peak = sunIntensity * Math.Exp(-x * x);
 
-            int f = filters < 0 ? 0 : filters;
-            double glare = peak * Math.Pow(FilterTransmission, f);
+            double glare = peak * SextantShadeFilter.Transmission(filters);
 
             if (glare < 0.0) return 0.0;
             if (glare > 1.0) return 1.0;

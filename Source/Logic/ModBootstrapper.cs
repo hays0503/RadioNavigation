@@ -63,6 +63,8 @@ namespace UBOAT.Mods.RadioNavigation
             LighthousePlacer.Reset();
             LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
             GameTimeResolver.Reset();
+            ClockSecondsDriver.EnsureRunning();
+            SceneContentBuilder.EnsureWorldSource();
             // Lifecycle sweep (risk register iter2): stale cross-scene
             // state that the four resets above do not cover — camera hook
             // + cached cameras, radio power latch, type/member caches
@@ -112,6 +114,8 @@ namespace UBOAT.Mods.RadioNavigation
                 "RadioNavigation",
                 "Source",
                 "Data");
+            if (!Sh5SunAlmanac.Initialize(lighthouseDataDirectory))
+                Debug.LogError("[RadioNav][Sun] SH5 almanac unavailable: " + Sh5SunAlmanac.LastError);
             if (!LeuchtfeuerRegistry.Initialize(lighthouseDataDirectory, enabledCurated))
             {
                 Debug.LogError("[RadioNav][Lighthouse] Leuchtfeuer registry failed: " +
@@ -233,6 +237,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void SceneEventsListener_OnSceneAwake(Scene scene)
         {
+            SceneContentBuilder.EnsureWorldSource();
             if (InjectionFramework.Instance.IsNull())
             {
                 Debug.LogError("[RadioNav][Main] InjectionFramework.Instance is null \u2014 DI not initialized. Ensure 'Injection' or 'Reflection' permission in Manifest.json");

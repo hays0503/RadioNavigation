@@ -65,6 +65,13 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        /// <summary>Isolated world computation is independent of radio UI creation.
+        /// This does NOT move or replace the existing visual sky roots.</summary>
+        public static void EnsureWorldSource()
+        {
+            CelestialWorldHost.EnsureRunning();
+        }
+
         public static void EnsureMapComponents(Func<Type, bool> has, Action<Type> add)
         {
             if (has.IsNull() || add.IsNull())

@@ -18,9 +18,12 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Texture resolution of the baked phase disc.</summary>
         private const int TextureSize = 128;
 
-        /// <summary>Real angular diameter is ~0.52°; ×2 keeps the disc
-        /// readable on screen without turning it into a cartoon.</summary>
-        private const float DiameterDeg = 0.52f * 2f;
+        private static MoonDiscRenderer instance;
+
+        internal static Renderer MeasuringRenderer
+        {
+            get { return instance != null ? instance.meshRenderer : null; }
+        }
 
         /// <summary>Phase change (radians) that triggers a texture rebake.</summary>
         private const double RebakePhaseDelta = 0.035; // ~2°
@@ -36,6 +39,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Awake()
         {
+            instance = this;
             meshFilter = GetComponent<MeshFilter>();
             meshRenderer = GetComponent<MeshRenderer>();
             positionProvider = new GamePlayerPositionProvider();
@@ -98,6 +102,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
+            if (instance == this)
+                instance = null;
             if (discTexture != null)
                 Destroy(discTexture);
             if (material != null)
@@ -135,14 +141,15 @@ namespace UBOAT.Mods.RadioNavigation
             if (discTexture != null)
                 Destroy(discTexture);
             float[] alpha = MoonPhaseDisc.BuildAlphaField(TextureSize, phaseAngle, limbAngle);
+            float[] coverage = MoonPhaseDisc.BuildCoverageField(TextureSize);
             Color32[] pixels = new Color32[alpha.Length];
             for (int i = 0; i < alpha.Length; i++)
             {
                 float a = alpha[i];
                 // The lit side is bright grey; the unlit side stays a very dark
                 // disc (premultiplied, so it reads as a body, not a hole).
-                byte level = (byte)((0.06f + 0.88f * a) * a * 255f + 0.5f);
-                byte alphaByte = (byte)(a * 255f + 0.5f);
+                byte level = (byte)((0.06f * coverage[i] + 0.88f * a) * 255f + 0.5f);
+                byte alphaByte = (byte)(coverage[i] * 255f + 0.5f);
                 pixels[i] = new Color32(level, level, level, alphaByte);
             }
             discTexture = new Texture2D(TextureSize, TextureSize, TextureFormat.RGBA32, false);
@@ -208,7 +215,10 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (material != null)
             {
-                material.color = new Color(1f, 1f, 1f, SkyVisibilityResolver.GetVisibility());
+                // Fade light, not the body's silhouette: otherwise the dark
+                // half becomes transparent in daylight and stars leak through.
+                float visibility = SkyVisibilityResolver.GetVisibility();
+                material.color = new Color(visibility, visibility, visibility, 1f);
                 // Live sky render-queue override (clouds must blend over us).
                 SkyRenderQueuePolicy.TryApply(material, SkyRenderQueueSwitch.QueueOverride);
                 // Live cloud occlusion (UniStorm writes no depth).
@@ -216,8 +226,8 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             float radius = CameraResolver.SafeRadius(cam);
-            float size = 2f * radius
-                * (float)Math.Tan(DiameterDeg * 0.5f * Mathf.Deg2Rad);
+            double diameter = MoonDiscScale.AngularDiameterDeg(jd, altRad);
+            float size = (float)CelestialDiscRaster.QuadSide(radius, diameter);
             Vector3 direction = new Vector3((float)e, (float)u, (float)n).normalized;
             transform.position = cam.transform.position + direction * radius;
             transform.rotation = Quaternion.LookRotation(

@@ -90,7 +90,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public void UpdateBodies(float dt, float eyeHeightM,
             double firstSightAzDeg, string firstSightName,
-            Vector3 pipFwd, bool canSight, float availableUnits)
+            Vector3 pipFwd, bool canSight, float availableUnits, SunDiscSighting sun)
         {
             if (bodiesText == null)
                 return;
@@ -127,7 +127,7 @@ namespace UBOAT.Mods.RadioNavigation
                 ? "\u2014"
                 : eyeHeightM.ToString("F1", CultureInfo.InvariantCulture) + " \u043C"));
 
-            AppendSun(rows, status, candidates, utc, lon, lat, pipAzDeg, pipAltDeg, canSight);
+            AppendSun(rows, status, candidates, utc, lon, lat, pipAzDeg, pipAltDeg, canSight, sun);
             AppendMoon(rows, status, candidates, moonJd, moonLst, lat, pipAzDeg, pipAltDeg, canSight);
             AppendStars(rows, candidates, jd, lstDeg, lat, pipAzDeg, pipAltDeg, canSight);
             AppendForecast(status, utc, lat, lon);
@@ -372,17 +372,27 @@ namespace UBOAT.Mods.RadioNavigation
         private static void AppendSun(List<KeyValuePair<string, string>> rows, StringBuilder status,
             List<BodyRecommendation.Candidate> candidates,
             DateTime utc, float lonDeg, float lat,
-            double pipAzDeg, double pipAltDeg, bool withArrows)
+            double pipAzDeg, double pipAltDeg, bool withArrows, SunDiscSighting sun)
         {
-            float alt, az;
-            if (!TrySunAltAz(utc, lonDeg, lat, out alt, out az))
+            double centre, bearing;
+            if (!Sh5SolarNavigation.TryCentre(utc, lat, lonDeg, out centre, out bearing))
+            {
+                status.Append("\nСолнце SH5: таблица недоступна");
                 return;
+            }
 
-            if (alt <= 0f)
+            if (centre <= 0)
             {
                 status.Append('\n').Append(SunBelow);
                 return;
             }
+            float alt, az;
+            if (!TrySunAltAz(sun, out alt, out az))
+            {
+                status.Append("\nСолнце SH5: источник/горизонт недоступен");
+                return;
+            }
+            status.Append("\nSH5 LL: нижний край");
 
             string name = CelestialBody.Sun().Name;
             rows.Add(new KeyValuePair<string, string>(name,
@@ -398,25 +408,20 @@ namespace UBOAT.Mods.RadioNavigation
             });
         }
 
-        /// <summary>Sun altitude/azimuth from the calibrated ephemeris. Its LST
-        /// must come from the CALIBRATED jd: the caller's plain-jd lstDeg
-        /// differs by the SUNDRIFT shift (~1.65°), which would skew the row's
-        /// azimuth (live the calibrated value matches the game sky within
-        /// ~0.001°).</summary>
-        private static bool TrySunAltAz(DateTime utc, float lonDeg, float lat,
+        /// <summary>The Sun row/arrows follow the configured SH5 apparent disc.
+        /// No calibrated TOD fallback when its measuring source is unavailable.</summary>
+        private static bool TrySunAltAz(SunDiscSighting sun,
             out float alt, out float az)
         {
             alt = 0f;
             az = 0f;
-            if (!CelestialEphemeris.Compute(CelestialBody.Sun(), utc,
-                    out double raRad, out double decRad))
+            double altitude, azimuth;
+            if (!sun.TableCompatible || !Sh5SolarNavigation.TryApparentCentre(sun.ConfiguredUtc,
+                sun.ObserverLatDeg, sun.ObserverLonDeg, sun.EyeHeightM, sun.HorizonAltitudeDeg,
+                sun.ObservedDiameterDeg, out altitude, out azimuth))
                 return false;
-            double sunLstDeg = AstroMath.LstDeg(
-                CelestialEphemeris.JdFor(CelestialBody.Sun(), utc), lonDeg);
-            AstroMath.RaDecToEnu(raRad, decRad, sunLstDeg, lat,
-                out double altRad, out double azRad, out _, out _, out _);
-            alt = (float)(altRad * Mathf.Rad2Deg);
-            az = (float)(azRad * Mathf.Rad2Deg);
+            alt = (float)altitude;
+            az = (float)azimuth;
             return true;
         }
 
