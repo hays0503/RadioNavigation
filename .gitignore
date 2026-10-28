@@ -35,6 +35,15 @@ Desktop.ini
 # pause_check audio artifacts (regenerable)
 Tools/pause_check/*.wav
 
+# Offline solar bench bytecode (regenerable)
+/Tools/solar-sight/**/__pycache__/
+
+# Local solar-navigation manual outputs (large PDFs; source tables live in documents-readonly)
+/docs/manual-solar-navigation/
+
+# Local OpenChamber screenshots and evidence
+/.openchamber/
+
 # SBP AssetBundle build log (regenerable)
 Bundles/buildlogtep.json
 
