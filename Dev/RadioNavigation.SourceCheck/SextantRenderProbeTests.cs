@@ -177,7 +177,7 @@ namespace RadioNavigation.SourceCheck
             var update = Method(controller, "Update");
             Assert.Contains(update.DescendantNodes().OfType<InvocationExpressionSyntax>(),
                 c => c.Expression.ToString() == "inputPoller.SampleEdges"
-                    && c.ArgumentList.ToString() == "(IsOpen)");
+                    && c.ArgumentList.ToString() == "(IsOpen || heldModel.IsHeld)");
             var probe = Source("SextantProbe.cs");
             foreach (string name in new[] { "Snapshot", "BuildSetResult" })
             {
@@ -443,7 +443,7 @@ public static class ProbeState {
     }
 }
 namespace UnityEngine {
-    public enum KeyCode { Z, P, O }
+    public enum KeyCode { Z, P, O, LeftAlt, RightAlt }
     public static class Input {
         public static bool GetKey(KeyCode key) { return false; }
         public static bool GetKeyDown(KeyCode key) { return key == KeyCode.O && ProbeState.PressO; }
@@ -452,6 +452,7 @@ namespace UnityEngine {
     public static class Debug { public static void Log(string text) {} }
 }
 public sealed class FakeEdge { public bool Advance(bool held) { return false; } }
+public sealed class FakeHeldProp { public bool IsHeld; }
 public sealed class FakeObject { public bool enabled; public void SetActive(bool on) {} }
 public sealed class FakeMirror { public void SetEnabled(bool on) {} }
 public sealed class FakePip {
@@ -534,6 +535,11 @@ public static class RadioNavProbeJson { public static string Escape(string value
 public sealed class SextantController {
     private const string LogPrefix = ""[Sextant]"";
     private readonly FakeEdge zEdge = new FakeEdge(), pEdge = new FakeEdge();
+    private readonly FakeHeldProp heldModel = new FakeHeldProp();
+    // This fixture tests probe write barriers, not the separate handheld input
+    // collaborator. Its actual production methods are executed by CPlathInputSourceTests.
+    private bool PollHandheldInput(bool take) { return false; }
+    private void PollDeviceFilters() { inputPoller.PollFilters(setFiltersDelegate); }
     private readonly FakePip pipFactory = new FakePip();
     private readonly FakeCalibrator calibrator = new FakeCalibrator();
     private readonly FakeZoom zoom = new FakeZoom();

@@ -81,6 +81,11 @@
     <Compile Include="StarBrightnessTests.cs" />
     <Compile Include="StarSpriteMathTests.cs" />
     <Compile Include="SextantRimProfileTests.cs" />
+    <Compile Include="CPlathKinematicsTests.cs" />
+    <Compile Include="CelestialWorldReadbackTests.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialWorldReadback.cs" Link="Source\CelestialWorldReadback.cs" />
+    <Compile Include="..\..\Source\Logic\CPlathKinematics.cs" Link="Source\CPlathKinematics.cs" />
+    <Compile Include="..\..\Source\UI\CPlathPointerLease.cs" Link="Source\UI\CPlathPointerLease.cs" />
     <Compile Include="SextantOpticsProfileTests.cs" />
     <Compile Include="SternspreizPsfMathTests.cs" />
     <Compile Include="SternspreizLineProfileTests.cs" />

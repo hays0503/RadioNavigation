@@ -13,5 +13,7 @@
     <Compile Include="..\..\Source\Logic\CelestialSkyMath.cs" />
     <Compile Include="..\..\Source\Logic\CelestialWorldOwner.cs" />
     <Compile Include="..\..\Source\Logic\CelestialWorldHost.cs" />
+    <Compile Include="..\..\Source\Logic\CelestialWorldReadback.cs" />
+    <Compile Include="..\..\Source\Logic\TypeMemberCache.cs" />
   </ItemGroup>
 </Project>

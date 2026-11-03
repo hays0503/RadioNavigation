@@ -30,7 +30,7 @@ namespace UBOAT.Mods.RadioNavigation
     // Run after them so the ocular PIPs use this frame's gaze, but before the
     // interior pose followers at order 10000.
     [DefaultExecutionOrder(5000)]
-    public sealed class SextantController : MonoBehaviour
+    public sealed partial class SextantController : MonoBehaviour
     {
         private const string LogPrefix = "[RadioNav][Sextant]";
 
@@ -168,6 +168,8 @@ namespace UBOAT.Mods.RadioNavigation
         private void Awake()
         {
             Instance = this;
+            if (Application.isPlaying && GetComponent<CPlathExistingCharacterPrototype>() == null)
+                gameObject.AddComponent<CPlathExistingCharacterPrototype>();
             worksheet = new SextantWorksheet(positionProvider);
             bodiesReadout = new SextantBodiesReadout(positionProvider);
             inputPoller = new SextantInputPoller(arcInput, worksheet, starId);
@@ -291,7 +293,9 @@ namespace UBOAT.Mods.RadioNavigation
             bool zPressed = zEdge.Advance(Input.GetKey(KeyCode.Z));
             bool pPressed = pEdge.Advance(Input.GetKey(KeyCode.P));
             bool shiftHeld = ShiftHeld();
-            inputPoller.SampleEdges(IsOpen);
+            inputPoller.SampleEdges(IsOpen || heldModel.IsHeld);
+            if (PollHandheldInput(zPressed && !shiftHeld))
+                return;
 
             if (IsOpen)
             {
@@ -304,8 +308,9 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 inputPoller.PollArc(Time.unscaledDeltaTime, ref arcAngle, shiftHeld, logArcInputDelegate);
                 inputPoller.PollYawTrim(Time.unscaledDeltaTime, shiftHeld);
-                inputPoller.PollFilters(setFiltersDelegate);
-                inputPoller.PollLens(toggleLensDelegate);
+                PollDeviceFilters();
+                if (!Input.GetKey(KeyCode.LeftAlt) && !Input.GetKey(KeyCode.RightAlt))
+                    inputPoller.PollLens(toggleLensDelegate);
                 inputPoller.PollZoom(zoomInDelegate, zoomOutDelegate, resetArcDelegate);
                 renderCheck.Update(Time.unscaledDeltaTime, arcAngle, pipFactory.LeftRt, pipFactory.RightRt);
                 UpdateGlare(Time.unscaledDeltaTime);
@@ -328,14 +333,11 @@ namespace UBOAT.Mods.RadioNavigation
                 PollUiScale();
                 worksheet.UpdatePanel(Time.unscaledDeltaTime);
             }
-            else if (zPressed && !shiftHeld)
-            {
-                TryOpen();
-            }
         }
 
         private void LateUpdate()
         {
+            UpdateHeldModelPose();
             if (!IsOpen)
                 return;
 
@@ -361,6 +363,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
+            heldModel.Destroy();
             SextantSavePersistence.Unbind(worksheet);
             if (Instance == this)
                 Instance = null;
@@ -1162,6 +1165,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void SetFilters(int count, bool leftSide)
         {
+            if (!applyingHeldShadeCounts) heldModel.SetBankCount(count, leftSide);
             if (leftSide)
                 leftFilterCount = count;
             else

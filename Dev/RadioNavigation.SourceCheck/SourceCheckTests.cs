@@ -3740,15 +3740,18 @@ namespace RadioNavigation.SourceCheck
         private static TypeDeclarationSyntax FindSourceType(
             List<Tuple<string, CompilationUnitSyntax>> roots, string name)
         {
+            TypeDeclarationSyntax found = null;
             foreach (var root in roots)
             {
                 foreach (var type in root.Item2.DescendantNodes().OfType<TypeDeclarationSyntax>())
                 {
-                    if (type.Identifier.Text == name)
-                        return type;
+                    if (type.Identifier.Text != name) continue;
+                    if (found == null) found = type;
+                    else if (found.Modifiers.Any(SyntaxKind.PartialKeyword) && type.Modifiers.Any(SyntaxKind.PartialKeyword))
+                        found = found.AddMembers(type.Members.ToArray()).AddAttributeLists(type.AttributeLists.ToArray());
                 }
             }
-            return null;
+            return found;
         }
 
         private static List<Tuple<string, CompilationUnitSyntax>> ParseAllSources()

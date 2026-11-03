@@ -49,6 +49,15 @@ namespace RadioNavigation.SourceCheck
             "04322020" + "0027", // ve + dagger + apostrophe          -> right arrow
         };
 
+        /// <summary>
+        /// The one machine-readable copy of the last recorded gate run, carried by
+        /// both DOCS.md and AGENTS.md. Prose counts rot; a marker that must match
+        /// byte-for-byte between the two documents cannot drift silently.
+        /// </summary>
+        private static readonly Regex GateSnapshot = new Regex(
+            @"<!--\s*gate-snapshot:\s*date=\d{4}-\d{2}-\d{2}\s+tests=\d+\s+sourcecheck=\d+\s+analyzers=\d+\s*-->",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
         private static string Root => ModCompiler.ModRoot;
 
         private static IEnumerable<string> MaintainedMarkdown()
@@ -227,6 +236,11 @@ namespace RadioNavigation.SourceCheck
                 Path.Combine(Root, "docs"),
                 Path.Combine(Root, "knowledge"),
                 Path.Combine(Root, "knowledge", "inventory"),
+                Path.Combine(Root, "knowledge", "catalogs"),
+                Path.Combine(Root, "knowledge", "classes"),
+                Path.Combine(Root, "knowledge", "playbooks"),
+                Path.Combine(Root, "knowledge", "qa"),
+                Path.Combine(Root, "docs", "plans"),
                 Path.Combine(Root, "docs", "archive"),
                 Path.Combine(Root, "Tools"),
             };
@@ -253,6 +267,58 @@ namespace RadioNavigation.SourceCheck
 
             Assert.True(missing.Count == 0,
                 "DOCS.md references paths that do not exist:" + Environment.NewLine
+                + string.Join(Environment.NewLine, missing));
+        }
+
+        /// <summary>
+        /// Every maintained document must be reachable from the map. The map used to
+        /// list the areas a reader remembered, so three knowledge notes, a keyboard
+        /// plan and the whole local solar-navigation manual were invisible to anyone
+        /// who started at DOCS.md. Directories with their own completeness gate are
+        /// exempt: ADR (unique numbers + SAD/12 table), SAD (class-reference gate),
+        /// confirmed/rejected (registry count), game-source-findings (G1-G4 set),
+        /// archive (historical by definition) and the gitignored local manual.
+        /// </summary>
+        [Fact]
+        public void Docs_EveryMaintainedFileIsMapped()
+        {
+            string mapPath = Path.Combine(Root, "DOCS.md");
+            if (!File.Exists(mapPath))
+                return;
+
+            string map = File.ReadAllText(mapPath);
+
+            var exempt = new[]
+            {
+                "\\artifacts\\",
+                "\\docs\\archive\\", "\\docs\\manual-solar-navigation\\", "\\docs\\adr\\",
+                "\\docs\\sad\\", "\\docs\\refactoring-plan\\confirmed\\",
+                "\\docs\\refactoring-plan\\rejected\\",
+                "\\docs\\refactoring-plan\\game-source-findings\\",
+            };
+
+            var files = MaintainedMarkdown()
+                .Where(path =>
+                {
+                    string relative = path.Substring(Root.Length);
+                    return !exempt.Any(segment =>
+                        relative.IndexOf(segment, StringComparison.OrdinalIgnoreCase) >= 0);
+                })
+                .ToList();
+
+            var missing = new List<string>();
+            foreach (string path in files)
+            {
+                string relative = path.Substring(Root.Length).TrimStart('\\', '/').Replace('\\', '/');
+                string name = Path.GetFileName(path);
+
+                bool mapped = map.Contains(relative) || map.Contains(name);
+                if (!mapped)
+                    missing.Add(relative);
+            }
+
+            Assert.True(missing.Count == 0,
+                "maintained markdown files absent from DOCS.md:" + Environment.NewLine
                 + string.Join(Environment.NewLine, missing));
         }
 
@@ -425,21 +491,28 @@ namespace RadioNavigation.SourceCheck
 
         /// <summary>
         /// AGENTS.md is injected into every session, so a stale count or a broken
-        /// claim in it propagates into all future work. Pin the facts that were
-        /// wrong: the test count (frozen at 786 for weeks) and the non-existent
-        /// graphify-out/wiki/ tree that AGENTS.md told agents to read.
+        /// claim in it propagates into all future work. The first version of this
+        /// gate pinned the literal "1135" as the current test count - and thereby
+        /// became the stale thing: the suite had grown to 1653 while the gate stayed
+        /// green because the old number survived in the history ledger. The gate now
+        /// compares the machine-readable snapshot marker in DOCS.md with the one in
+        /// AGENTS.md, so there is exactly one number to update per run.
         /// </summary>
         [Fact]
         public void Agents_DocStatesCurrentFacts()
         {
             string path = Path.Combine(Root, "AGENTS.md");
-            if (!File.Exists(path))
+            string mapPath = Path.Combine(Root, "DOCS.md");
+            if (!File.Exists(path) || !File.Exists(mapPath))
                 return;
 
             string text = File.ReadAllText(path);
+            Match snapshot = GateSnapshot.Match(File.ReadAllText(mapPath));
 
-            Assert.True(text.Contains("1135"),
-                "AGENTS.md no longer states the current test count (1135 PASS).");
+            Assert.True(snapshot.Success,
+                "DOCS.md has no <!-- gate-snapshot: date=... tests=... sourcecheck=... analyzers=... --> marker.");
+            Assert.True(text.Contains(snapshot.Value),
+                "AGENTS.md does not carry the same gate snapshot as DOCS.md: " + snapshot.Value);
             Assert.True(text.Contains("241"),
                 "AGENTS.md no longer states the current registry size (241 findings).");
             Assert.True(!text.Contains("graphify-out/wiki/index.md exists"),

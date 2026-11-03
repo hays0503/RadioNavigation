@@ -45,6 +45,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [InlineData(1, 0.35)]
         [InlineData(2, 0.1225)]
         [InlineData(3, 0.042875)]
+        [InlineData(4, 0.01500625)]
         public void GlassesMultiplyLight_BeforeTheTonemapper(int count, double transmission)
         {
             Assert.Equal(transmission, SextantShadeFilter.Transmission(count), 10);
@@ -56,7 +57,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         public void GlassesAreAmber_NotGreyOrAWhiteOverlay()
         {
             double previousGreen = 1.0, previousBlue = 1.0;
-            for (int count = 1; count <= 3; count++)
+            for (int count = 1; count <= 4; count++)
             {
                 double green = SextantShadeFilter.Green(count);
                 double blue = SextantShadeFilter.Blue(count);
@@ -72,8 +73,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [Theory]
         [InlineData(int.MinValue, 0)]
         [InlineData(-1, 0)]
-        [InlineData(4, 3)]
-        [InlineData(int.MaxValue, 3)]
+        [InlineData(4, 4)]
+        [InlineData(5, 4)]
+        [InlineData(int.MaxValue, 4)]
         public void InvalidCountsAreBounded(int input, int expected)
         {
             Assert.Equal(expected, SextantShadeFilter.ClampCount(input));
@@ -86,7 +88,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [Fact]
         public void GlareAndImageUseTheSameOpticalTransmission()
         {
-            for (int count = 0; count <= 3; count++)
+            for (int count = 0; count <= 4; count++)
                 Assert.Equal(SextantShadeFilter.Transmission(count),
                     SextantGlare.Glare(0.0, 60.0, count, 65.0), 10);
         }

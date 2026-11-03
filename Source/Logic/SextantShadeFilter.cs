@@ -26,7 +26,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static int ClampCount(int count)
         {
-            return Math.Max(0, Math.Min(3, count));
+            // C. Plath has four independent index shades, three horizon shades.
+            // Keep the existing three-glass source-radiance calibration unchanged.
+            return Math.Max(0, Math.Min(4, count));
         }
 
         public static double Transmission(int count)

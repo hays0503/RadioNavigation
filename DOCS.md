@@ -1,17 +1,19 @@
 # Карта документации RadioNavigation
 
-Единая точка входа: что читать и для чего. Актуализировано **2026-10-10** по текущему
-Source и сохранённым результатам проверок. Приоритет: действующие контракты ниже →
-датированные результаты приёмки → исторические планы. Старый чеклист сам по себе
-не означает, что функцию нужно реализовать заново.
+Единая точка входа: что читать и для чего. Актуализировано **2026-11-03** по
+текущему Source, дереву документов и прогону проверок. Приоритет: действующие
+контракты ниже → датированные результаты приёмки → исторические планы. Старый
+чеклист сам по себе не означает, что функцию нужно реализовать заново.
 
-Актуальный протокол солнечного офлайн-продолжения и полных гейтов:
+<!-- gate-snapshot: date=2026-11-03 tests=1653 sourcecheck=146 analyzers=68 -->
+
+Снимок прогона **2026-11-03** (эта рабочая копия, включая незакоммиченные
+CPlath-файлы): tests **1653 PASS / 0 FAIL**, SourceCheck **146 PASS / 0 FAIL**,
+analyzers **68 PASS / 0 FAIL**. Это датированный снимок, не процент покрытия и
+не живая приёмка. Прежние 1592/127 (2026-10-10) и 1569/119 — история.
+
+Актуальный протокол солнечного офлайн-продолжения:
 [continuation-20261009-lower-limb/FINAL.md](artifacts/reports/solar-table-20261008/continuation-20261009-lower-limb/FINAL.md).
-Отдельный зарегистрированный behavioral-прогон: **1592 PASS / 0 FAIL / 0 SKIP**
-(`units-pass2.log`); прежний полный гейт до этих 23 кейсов — **1569 behavioral /
-119 SourceCheck**, csc/PVS и quick baseline clean. Старый 1569 не сертифицировал
-тогда ещё не зарегистрированный тест. Анализаторы **68 PASS / 0 FAIL** проверены
-отдельно 2026-10-04; этот счётчик не является новым прогоном.
 Игровой save/reload проверен отдельно (`docs/astro-save.md`); количество PASS
 не является процентом покрытия, физической pointer- или визуальной приёмкой.
 
@@ -26,8 +28,8 @@ FIX **55°09.7384′N / 5°40.7440′E**, ошибка **0.441565 NM**, неза
 6 protected files неизменны, режимы/настройки возвращены, процесс закрыт. Серия
 экспортирована вне `.save`. Raw HTTP-журнал содержит один обрезанный read-response,
 поэтому его полнота не сертифицируется. Старые безрезультатные receipts сохранены.
-Production/test/Tools не менялись; последний полный gate **1592 behavioral /
-127 SourceCheck**, 11/11 compiled safety mutations — прежний, не повторённый ради отчёта.
+Production/test/Tools в том проходе не менялись; его гейт **1592 behavioral /
+127 SourceCheck** — история, не текущий снимок.
 
 ## 1. Быстрый старт
 
@@ -41,7 +43,10 @@ Production/test/Tools не менялись; последний полный gat
 | Размеры Солнца/Луны и таблицы 1939–1945 | `docs/celestial-disc-sizes.md` — физические диаметры, PIP-only native isolation, история instrument-only Ho; игровая приёмка открыта |
 | Солнечная навигация SH5 | `docs/sh5-solar-navigation.md` — печатные GHA/δ, F VIII, frozen v3 и безопасные probe-входы; три видимых нижних края и реальный stationary FIX с ошибкой 0.44 NM; независимая редукция/высотные окружности. Ненулевой live-перенос, alpha-край и v3 save/load отдельно |
 | Стенд нижнего края Солнца | `docs/solar-sight-tools.md` — альманах/JPL/C#, внешняя Hs→F VIII→Ho, read-only snapshot/residual и проекция; не новый production-режим |
-| Правила работы агента в репозитории | `AGENTS.md` |
+| Руководство по солнечной навигации (локальное, вне Git) | `docs/manual-solar-navigation/README.md` — учебник и worksheets; каталог целиком в `.gitignore`, на чистом клоне отсутствует |
+| План доведения руководства | `docs/plans/manual-mod-plan.md` — рабочая программа, не production-код |
+| Клавиатурный фронт Z/I и edge-detection | `docs/plans/KEY_EDGE_PLAN.md` — `HeldKeyEdge`, live-проверка Z, открытые дефекты ownership |
+| Правила работы агента в репозитории | `AGENTS.md`; исторический журнал правил — `docs/archive/AGENTS_GOTCHAS_JOURNAL.md` |
 | Структура папок и выходные пути сборки/отчётов | `docs/PROJECT_LAYOUT.md` |
 | Архитектура (почему так, а не иначе) | `docs/SAD/` — 11 глав |
 | Решения с фиксацией (ADR) | `docs/adr/` — 21 файл, ID 014–034 |
@@ -52,7 +57,7 @@ Production/test/Tools не менялись; последний полный gat
 | Иконки маркеров карты (F229) | `docs/map-marker-icons-f229.md` — bundle fallback + контейнерные ключи `Sprite/<имя>`, общий `LoadBundleIconSprite`; датированный отчёт приёмки |
 | Небо против облаков | `docs/sky-vs-clouds.md` — `PointSky` и очередь 1020; главная причина утечки (второй draw через `SRPDefaultUnlit`/`ForwardSRP` после композита) устранена; приёмка главного вида закрыта RenderDoc + `pixel_history`; ограничения моста и грабли RenderDoc |
 | Реестр найденных проблем | `docs/refactoring-plan/hypothesis/INDEX.md` |
-| Знания об API игры UBOAT | `knowledge/` — 21 файл, 6 разделов |
+| Знания об API игры UBOAT | `knowledge/` — 26 файлов, 6 разделов |
 | Граф кода | `graphify-out/` — запросы с явным project path, не замена исходникам |
 
 ## 2. Архитектура — `docs/SAD/`
@@ -104,6 +109,8 @@ F225 и F230 не использованы (пропуски после ревь
 | `PLAN_Phase5.md` | Частично реализован; выделены helpers, snapshot/AudioCoordinator/DiagnosticsBinder не внедрены; P5.2 остаётся частично pending |
 | `PLAN_Phase4_GodObjects.md` | Исторический: 4.1 выполнен, слайсы 4.2+ вытеснены Phase5, не все live-критерии закрыты |
 | `PLAN_InfoPanel_ZoneDebug.md` | Live-валидация перенесена в `LIVE_VALIDATION_CHECKLIST.md`, аудит — в `docs/archive/` |
+| `docs/plans/KEY_EDGE_PLAN.md` | `HeldKeyEdge` реализован; live Z 6/6 PASS; source-дефекты ownership/`OnDisable` открыты |
+| `docs/plans/manual-mod-plan.md` | Рабочая программа руководства по солнечной навигации; не production-код |
 
 Планы функций в `docs/plans/`: `docs/plans/SEXTANT_PLAN.md` (реализация + журнал приёмки, актуальная
 шапка 2026-10-04), `docs/plans/STAR_SKY_PLAN.md` (исторический план, последующие изменения
@@ -123,28 +130,39 @@ F225 и F230 не использованы (пропуски после ревь
 
 ## 5. Знания об игре — `knowledge/`
 
-Скомпилировано 2026-08-24. Подключено как opencode-reference `uboat-kb` и как skill
-`uboat-game-api`. **Проверять здесь до чтения исходников игры.**
+Скомпилировано 2026-08-24, дополнено 2026-10-14. **26 файлов**, 6 разделов.
+Подключено как opencode-reference `uboat-kb` и как skill `uboat-game-api`.
+**Проверять здесь до чтения исходников игры.**
 
-- `inventory/` — `patch-surface.md` (все virtual-методы = цели Harmony),
-  `events.md`, `reflection-contracts.md`, `game-hotkeys.md`, `celestial-renderers.md`
-- `catalogs/locale-keys.md` — 236 кандидатов ключей локализации
-- `classes/` — досье Sandbox / Story / PlayerShip / Characters, DI-and-resources
-- `playbooks/` — рецепты: маркеры карты, персистентность сейвов, решения RadioStory,
-  гейтинг UI по камере, погода/время через события
-- `qa/` — вопросы и ответы, привязанные к разделам выше
+- `knowledge/README.md` — индекс базы.
+- `.opencode/skills/uboat-game-api/SKILL.md` — opencode-skill, который направляет к этой базе.
+- `inventory/` (9): `patch-surface.md` (все virtual-методы = цели Harmony),
+  `events.md`, `reflection-contracts.md`, `game-hotkeys.md`,
+  `game-input-semantics.md`, `celestial-renderers.md`,
+  `navigation-instrument-contracts.md`, `navigation-projection-contract.md`,
+  `solar-flare-postprocess.md`.
+- `catalogs/`: `locale-keys.md` — 236 кандидатов ключей локализации.
+- `classes/` (5): `Sandbox-cluster.md`, `Story-cluster.md`,
+  `PlayerShip-cluster.md`, `Characters-cluster.md`, `DI-and-resources.md`.
+- `playbooks/` (5): `add-custom-map-marker.md`, `persist-mod-state-across-saves.md`,
+  `radio-story-custom-decision.md`, `gate-ui-by-camera-mode.md`,
+  `subscribe-weather-time-events.md`.
+- `qa/` (5): `qa-inventories.md`, `qa-classes.md`, `qa-playbooks.md`,
+  `qa-game-corners.md`, `qa-mod-internals.md`.
 
 ## 6. Справочные материалы
 
 - `documents-readonly/` — первоисточники по радионавигации (CAP 59, AGRD-63, FIAT 1105,
   Rankin 2014, `CONSOL_SONNE_доске.md`) и таблицы 1939–1945 в
   `documents-readonly/celestian-navigation-sh5/`; `pdf/` — выжимки. Не редактируются.
+- `Tools/solar-sight/README.md` — как запускать офлайн-стенд; его результаты
+  не являются production-режимом и не закрывают игровую приёмку.
 - Отчёты swarm-агентов и их сводка (SYNTHESIS) лежат во временном каталоге
   `%TEMP%\opencode\swarm\` и **в репозиторий не входят** — эфемерны.
 
 ## 7. Граф кода — `graphify-out/`
 
-Снимок **2026-10-05: 9635 узлов / 17527 рёбер / 676 сообществ** после группировки. Это размер графа,
+Снимок **2026-10-28: 10705 узлов / 19146 рёбер**. Это размер графа,
 не инвентаризация всех данных проекта. Обновление после правок кода:
 `graphify update .` (AST-only, без API); статистика может меняться после hooks.
 
@@ -174,11 +192,13 @@ F225 и F230 не использованы (пропуски после ревь
    `MapShapeEraser` перехватывает все owned-точки). Лампа, parent-frame поворот и
    первый кадр открытия проверены отдельно;
    результаты в `docs/plans/SEXTANT_PLAN.md` §16.23–16.25, ограничения в `docs/live-diagnostics.md`.
-4. **Внутренние ссылки не проверяются полностью автоматически.** Гейт
-   `Docs_MapLinksResolve` проверяет пути в `DOCS.md`, `Sad_ClassReferencesResolve` —
-   имена C#-файлов в SAD. Дополнительно в этом проходе проверены Markdown-ссылки
-   на файлы; inline-code ссылки, номера секций и исторические file:line не покрыты
-   этим link-check полностью. Отдельный реестр ссылок на секции пока отсутствует.
+4. **Внутренние ссылки и полнота карты.** `Docs_MapLinksResolve` проверяет пути в
+   `DOCS.md`, `Docs_EveryMaintainedFileIsMapped` — что каждый maintained `.md`
+   (кроме `docs/archive/`, ADR, SAD, `confirmed/`, `rejected/`,
+   `game-source-findings/` и локального руководства) назван в карте,
+   `Sad_ClassReferencesResolve` — имена C#-файлов в SAD. Inline-code ссылки,
+   номера секций и исторические file:line по-прежнему не покрыты полностью.
+   Отдельный реестр ссылок на секции отсутствует.
 5. **Словарь ключей и имена файлов.** `knowledge/catalogs/locale-keys.md` содержит
     236 кандидатов; какие из них реально используются модом, не проверено.
 6. **Табличная астронавигация.** Три видимых SH5 нижних края/реальный stationary
@@ -186,8 +206,30 @@ F225 и F230 не использованы (пропуски после ревь
    универсальная приёмка горизонта/рефракции, физического ввода, ненулевого движения
    или live v3 save/load. PIP draw доказан отдельным GPU-кадром; лунная GHA-конвенция открыта.
    Числовая ошибка направления Луны до 2.19′ остаётся отдельно от правильного диаметра.
+7. **Локальные материалы вне Git.** `docs/manual-solar-navigation/` (учебник,
+   worksheets, PDF, ревизии и `drafts/`) целиком в `.gitignore`; на чистом клоне
+   его нет, и это не пропавшая документация. Внутри сохранён намеренно
+   `review-20261015/drafts/INVALID-player-input-all-PDFs-first-export/` — журнал
+   ошибки упаковки, не актуальная выдача.
 
 ## 9. Журнал актуализации
+
+### 2026-11-03
+
+- Гигиена документации и памяти: карта дополнена локальным руководством,
+  `manual-mod-plan.md`, `KEY_EDGE_PLAN.md` и полным списком `knowledge/`
+  (26 файлов); граф обновлён до **10705 / 19146**.
+- `AGENTS.md` разгружен: исторический журнал (2026-08-01 … 2026-11-09, ~171 KB)
+  перенесён без изменений в `docs/archive/AGENTS_GOTCHAS_JOURNAL.md`; в
+  `AGENTS.md` остались действующие правила и датированный снимок.
+- Счётчики приведены к фактическому прогону **2026-11-03**: tests **1653/0**,
+  SourceCheck **146/0**, analyzers **68/0**; строка-маркер `gate-snapshot`
+  синхронизирует `DOCS.md` и `AGENTS.md`.
+- Удалён 24-байтный файл-указатель в `docs/archive/` (patchtogamesource.md,
+  остаётся в истории Git); дубликаты руководства не тронуты — это намеренный
+  журнал ошибки, каталог вне Git.
+- Добавлен гейт `Docs_EveryMaintainedFileIsMapped`; `Agents_DocStatesCurrentFacts`
+  больше не пинит число 1135, а сверяет маркер снимка.
 
 ### 2026-10-10
 
@@ -338,9 +380,11 @@ F225 и F230 не использованы (пропуски после ревь
 
 ## 10. Правила сопровождения
 
-1. **Счётчики проверяются прогоном, а не на память:** `Tools/tests.ps1` (1411),
-   `RadioNavigation.Analyzers.Tests` (68), `RadioNavigation.SourceCheck` (100),
-   снимок 2026-10-05. Общая точка входа — `Tools/gates.ps1`; команды в README.
+1. **Счётчики проверяются прогоном, а не на память:** `Tools/tests.ps1`,
+   `RadioNavigation.Analyzers.Tests`, `RadioNavigation.SourceCheck`; снимок
+   **2026-11-03** — tests **1653**, analyzers **68**, SourceCheck **146**.
+   Строка-маркер `<!-- gate-snapshot: ... -->` в `DOCS.md` и `AGENTS.md` должна
+   совпадать; общая точка входа — `Tools/gates.ps1`; команды в README.
 2. **Новый ADR** = следующий свободный ID; дубли недопустимы, сводная строка
    добавляется в `docs/SAD/12_Architecture_Decisions.md` § 1 в том же коммите.
 3. **Новая находка** = следующий свободный F-номер + строка в `hypothesis/INDEX.md`

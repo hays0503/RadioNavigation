@@ -82,6 +82,8 @@ namespace RadioNavigation.SourceCheck
             "UnityEngine.TextRenderingModule.dll",
             "UnityEngine.AudioModule.dll",
             "UnityEngine.ImageConversionModule.dll",
+            "UnityEngine.AnimationModule.dll",
+            "UnityEngine.JSONSerializeModule.dll",
         };
 
         public static bool HasModSource => Directory.Exists(Path.Combine(ModRoot, "Source"));

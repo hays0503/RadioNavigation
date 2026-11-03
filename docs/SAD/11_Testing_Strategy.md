@@ -1,7 +1,7 @@
 # Testing Strategy — RadioNavigation Mod
 
-> **Актуально 2026-10-05:** xunit 2.9 + собственный раннер `Dev/Tests/Runner`,
-> **1411 PASS / 0 FAIL**; анализаторы **68 PASS**, SourceCheck **100 PASS**.
+> **Актуально 2026-11-03:** xunit 2.9 + собственный раннер `Dev/Tests/Runner`,
+> **1653 PASS / 0 FAIL**; анализаторы **68 PASS**, SourceCheck **146 PASS**.
 > ADR-014 baseline — 182, не текущий счётчик. Количество PASS не равно coverage.
 > Runtime-мод проверяется raw csc/PVS через `Tools/build.ps1`, а игра компилирует Source
 > самостоятельно. Секции 3.x и 7.x ниже — **исторические иллюстрации NUnit/API,
@@ -11,7 +11,7 @@
 
 | Test Type | Coverage Target | Current | Priority |
 |-----------|-----------------|---------|----------|
-| Unit Tests | >60% — историческая цель | 1411 PASS, pure logic + DSP; текущий % не измерялся | High |
+| Unit Tests | >60% — историческая цель | 1653 PASS, pure logic + DSP; текущий % не измерялся | High |
 | Integration Tests | >80% — историческая цель | Offline DSP/контракты + отдельная живая приёмка Unity/игры | Medium |
 | Manual Testing | сценарии с явными постусловиями | Partial; lamp/open-frame проверены, hatch/external PSF pending | Medium |
 | Performance Tests | baseline сравнимых сценариев | отдельные измерения; общей текущей perf-приёмки нет | Low |

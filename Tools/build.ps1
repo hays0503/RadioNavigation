@@ -39,6 +39,8 @@ $refs = @(
     "$GamePath\UBOAT_Data\Managed\com.uboat.rendering.dll",
     "$GamePath\UBOAT_Data\Managed\com.unity.postprocessing.Runtime.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.ImageConversionModule.dll",
+    "$GamePath\UBOAT_Data\Managed\UnityEngine.AnimationModule.dll",
+    "$GamePath\UBOAT_Data\Managed\UnityEngine.JSONSerializeModule.dll",
     "$GamePath\UBOAT_Data\Managed\com.playway.water.Runtime.dll"
 )
 

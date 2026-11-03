@@ -285,13 +285,15 @@ namespace UBOAT.Mods.RadioNavigation
                 GameTime time = framework.GetInstance<GameTime>();
                 Weather weather = framework.GetInstance<Weather>();
                 if (time == null) return false;
-                if (weather == null || weather.Sky == null) { reason = CelestialSkyNotReady.WorldUtc; return false; }
-                TOD_Sky sky = weather.Sky;
-                if (sky.World == null) { reason = CelestialSkyNotReady.WorldUtc; return false; }
+                double latitude, longitude, utc;
+                if (weather == null || !CelestialWorldReadback.TryRead(weather, out latitude, out longitude, out utc))
+                {
+                    reason = CelestialSkyNotReady.WorldUtc; return false;
+                }
                 // Literal game GMT is already CurrentDateTime-1h; NEVER ToUniversalTime/local clock.
                 DateTime gmt = DateTime.SpecifyKind(time.GmtDateTime, DateTimeKind.Utc);
-                input = new CelestialSkyInput(revision, gmt, sky.World.Latitude, sky.World.Longitude,
-                    double.NaN, double.NaN, double.NaN, double.NaN, sky.World.UTC,
+                input = new CelestialSkyInput(revision, gmt, latitude, longitude,
+                    double.NaN, double.NaN, double.NaN, double.NaN, utc,
                     true, true, false, false, true);
                 // Deliberate Stage-1 limit: no trusted ellipsoid/sea-height or
                 // accepted atmospheric provider yet. Never invent 5m/1010hPa/10C.
