@@ -1,0 +1,15 @@
+{
+  "files": {
+    "Source/Logic/CelestialWorldReadback.cs": "84707854526b98ee631a9097579ee50dfb727ea392b7c22e63272631ea9e2769",
+    "Source/Logic/CPlathKinematics.cs": "5b8641b4417e4b97d4c9ad659ede8a4f61a470ce3ea5af0d8f90450ab370a1f4",
+    "Source/UI/CPlathDeviceInput.cs": "1b844d9c13e42bf5079a19f22570236935c96a304759180af54a97356d3ffefe",
+    "Source/UI/CPlathExistingCharacterPrototype.cs": "ad74c4ef7bdee1f795286b2076ee240a1e480d4e8d9eba1bd18c9a7be8db3529",
+    "Source/UI/CPlathHeldModel.cs": "0a8b219ebdaac051a8d2408b66bd02a877bcbe127c0d8a970515bfeb3a350a72",
+    "Source/UI/CPlathModelRig.cs": "5ea5478ac81e2ab19547bd5ed0952eeab5417128cbdd6c38dc6baecc75579705",
+    "Dev/Tests/CelestialWorldReadbackTests.cs": "a906441458d14e5759e4a1b628e9c80bf1309894d120aec61e0a23364accca7f",
+    "Dev/Tests/CPlathKinematicsTests.cs": "9b71d52e4f6388dce80bba226666dd5c9dcde10ead7315bdf5ec6111c9b288a4",
+    "CPlath/cplath_sextant": "beba41c3a3c7e7ee97ef8d6358ea89eaf66af4471afb35c89dfca7871797d5a4"
+  },
+  "owner": "CPlath model integration",
+  "workspace": "C:\\Users\\Sergey Pimenov\\Desktop\\sextant"
+}

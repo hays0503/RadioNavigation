@@ -1,0 +1,30 @@
+{
+  "files": {
+    "Source/UI/CPlathHeldModel.cs": "b8b7c715428a28a9f7790b73f55beef044f678ac02b0e045094f050d79bcc9ea",
+    "Source/UI/CPlathDeviceInput.cs": "6b2811d938d111a3aba876d39e3c780dc7c9e5c7d06cb88e4e1b9dc9133a4a08",
+    "Source/UI/CPlathAnimatedActor.cs": "1e37e6581b3eeee954f6a1bfce40ee9256f59a8698735a8b7af803226c405b92",
+    "Source/UI/CPlathAdaptiveAnimationPlayer.cs": "06535c1a68aeff9cdd161fee3efda65316a4ece4715e271f4ceeaf9d7d029b72",
+    "Source/UI/CPlathAdaptiveMechanismRig.cs": "efacb8f3f64c0d771d64f496d25c5a6a427f4c6e34b8f2d955eb4ea464d42ef5",
+    "CPlath/cplath_animated": "5560dbefe4799e79d66e732d0a0f05c4059d2290509e6495ac56c2a43f263ddd",
+    "Tools/build.ps1": "1581cb9c3cffa30f55e47177d82b203e4264892427aed6fd8f11f29a5f199f3e",
+    "Dev/RadioNavigation.SourceCheck/ModCompiler.cs": "7323a7225d7981d7844b0e38e2cf6eec4a23f0f2839b995ac6ebd7b297728d3c",
+    "Dev/Mod/radionavigation.csproj": "86b4084df9182f4a2fd5ce9d9f86abb83b4bfb29ff678249067f86b774871a8e",
+    "Dev/Analysis/RadioNavigation.Analysis.csproj": "e2259bbdea9c34922b560b4f481ee12c61fd54a003359fcaa5908e6cb958237d",
+    "Dev/RadioNavigation.SourceCheck/CPlathInputSourceTests.cs": "206f36d18c09c2efa5e987595e0e408485ba564293c9f58767015c85f15a0433",
+    "Source/UI/CPlathAdaptiveBindingReader.cs": "98eed157d0d8c24ea95cda84924ef2229f5581000dd4693a23c941105f98eadd",
+    "Source/UI/CPlathAdaptiveReadClearance.cs": "cbd3cf75edfe1991de645112df6dfd6852aaa310c4f91ce12f7f18308cdeed0b",
+    "Source/UI/CPlathPointerGeometry.cs": "3179d7bedf56f9dfed1988edd12a3670231652319585f87e00094241186057f3",
+    "Source/UI/CPlathPointerLease.cs": "04aeaeea2eb9f888a97613f91d3c9fd8d351db984573696b831df4a05dfa7118",
+    "Source/UI/CPlathReadPointer.cs": "3cb7613b4a67226e33a908ff74a2c527f6e6b587a06b2304fa34c63aa7e073d5"
+  },
+  "backup": "C:\\Users\\Sergey Pimenov\\Desktop\\sextant\\Validation\\Adaptive_Animation_20261102\\Live_Backups\\20261103T084404012990Z",
+  "evidence": "C:\\Users\\Sergey Pimenov\\Desktop\\sextant\\Validation\\Ergonomics_20261103\\Engine_Evidence",
+  "delivery": "C:\\Users\\Sergey Pimenov\\Desktop\\sextant\\UBOAT\\Bundles\\Animated_v13",
+  "quarantined": {
+    "Bundles/buildlogtep.json": {
+      "archive": "C:\\Users\\Sergey Pimenov\\Desktop\\sextant\\Validation\\Adaptive_Animation_20261102\\Live_Backups\\20261102T195540405244Z\\quarantined\\Bundles\\buildlogtep.json",
+      "sha256": "630fe7958026769b91bc0dbc73c094f07d3454e6cc4570c727d5cf9c16ffb2d3"
+    }
+  },
+  "live_game_acceptance": false
+}
