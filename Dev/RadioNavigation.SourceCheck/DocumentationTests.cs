@@ -258,6 +258,14 @@ namespace RadioNavigation.SourceCheck
                 if (!seen.Add(relative))
                     continue;
 
+                // The solar-navigation manual is deliberately local (gitignored):
+                // it exists on the author's machine and is absent on a clean clone,
+                // so a map mention must not fail this gate there.
+                if (relative.StartsWith(
+                        "docs" + Path.DirectorySeparatorChar + "manual-solar-navigation",
+                        StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 bool found = searchRoots.Any(dir =>
                     File.Exists(Path.Combine(dir, relative))
                     || Directory.Exists(Path.Combine(dir, relative)));
@@ -306,13 +314,21 @@ namespace RadioNavigation.SourceCheck
                 })
                 .ToList();
 
+            // A bare file name only identifies a file when it is unique. Otherwise
+            // a second README.md/INDEX.md would pass just because the first one is
+            // already named in the map.
+            var nameCounts = files
+                .GroupBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
             var missing = new List<string>();
             foreach (string path in files)
             {
                 string relative = path.Substring(Root.Length).TrimStart('\\', '/').Replace('\\', '/');
                 string name = Path.GetFileName(path);
 
-                bool mapped = map.Contains(relative) || map.Contains(name);
+                bool mapped = map.Contains(relative)
+                    || (nameCounts[name] == 1 && map.Contains(name));
                 if (!mapped)
                     missing.Add(relative);
             }

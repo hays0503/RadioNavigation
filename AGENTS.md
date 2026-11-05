@@ -8,7 +8,7 @@ Rules:
 - Codebase questions: run `graphify query "<question>"` first when graphify-out/graph.json exists. Relationships: `graphify path "<A>" "<B>"`. Concepts: `graphify explain "<concept>"`. Returns scoped subgraph — smaller than GRAPH_REPORT.md or raw grep.
 - Dirty graphify-out/ files expected after hooks/incremental updates; not a reason to skip. Skip only if task is about stale/incorrect graph output or user opts out.
 - `graphify-out/wiki/` is NOT generated in this project — do not reference it. Navigation entry points are `graphify query/path/explain` (preferred) and `graphify-out/GRAPH_REPORT.md`.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain insufficient. This project has no `graph.html` or generated wiki. Graph snapshot 2026-10-28: 10705 nodes / 19146 edges; hooks can change these numbers.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain insufficient. This project has no `graph.html` or generated wiki. Graph snapshot 2026-11-03: 11052 nodes / 19679 edges / 813 communities; hooks can change these numbers.
 - After code changes, run `graphify update .` (AST-only, no API cost).
 - MCP server gotcha (2026-08-24): server default project path resolves to sibling `testui` mod dir — always pass explicit `project_path` = this project root to query/stats/god-nodes tools.
 - **Game-source graph** (2026-08-24): second graph at `C:\code\projects\uboat\graphify-out\` (32140 nodes / 78914 edges / 814 communities, full inference). For game-code questions pass `project_path = C:\code\projects\uboat`. Game digests (Stories/Mods/DI/Time+Weather/Map/Camera/AI/Characters/Sandbox/Serialization/DWS infra) — in supermemory.
@@ -82,7 +82,7 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 
 ## Neural-slop guard (RadioNavigation.SourceCheck)
 
-Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-only reference** built from the real game source (`C:\code\projects\uboat`), so a hallucinated/wrong-signature game API call fails the build instead of passing silently against the obfuscated DLL. Run: `dotnet run --project Dev/RadioNavigation.SourceCheck -c Release` → **145 PASS / 0 FAIL** (2026-11-03). Counts elsewhere in dated entries are historical.
+Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-only reference** built from the real game source (`C:\code\projects\uboat`), so a hallucinated/wrong-signature game API call fails the build instead of passing silently against the obfuscated DLL. Run: `dotnet run --project Dev/RadioNavigation.SourceCheck -c Release` → **146 PASS / 0 FAIL** (2026-11-03). Counts elsewhere in dated entries are historical.
 
 - **`GameSource_CompilesClean`**: the dependency-closure subset of the decompiled game source (only files the mod's game-API surface touches) must compile cleanly with bodies stripped. If this fails, the clean reference is unavailable and the guard can't run.
 - **`Mod_CompilesAgainstCleanGameApi`**: compiles the mod against the emitted clean reference + real Unity/third-party DLLs. Any CS Error = the mod calls a game API that doesn't exist / has the wrong signature → neural slop → FAIL. Cached at `obj/cleanref/com.uboat.game.clean.dll` (`CleanReferenceCache`), invalidated by game-source/DLL/mod-source content hash.
@@ -104,7 +104,7 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 
 ## Актуальные контракты и приёмка (2026-10-05)
 
-- Документация: `DOCS.md` → `README.md`, `docs/CAMERA_GUIDE.md`, `docs/live-diagnostics.md`. Ниже сохранён журнал экспериментов; позднее измерение имеет приоритет над ранней гипотезой. Исторические `PENDING`/счётчики не считать текущей сводкой.
+- Документация: `DOCS.md` → `README.md`, `docs/CAMERA_GUIDE.md`, `docs/live-diagnostics.md`. Датированные эксперименты и отозванные гипотезы — в `docs/archive/AGENTS_GOTCHAS_JOURNAL.md`; позднее измерение имеет приоритет над ранней гипотезой. Исторические `PENDING`/счётчики не считать текущей сводкой.
 - PIP рендерится **attached либо standalone fallback**, не attached + enabled. Внутри `RefreshMirroredState(viewCamera)` идёт **до** `InteriorMirror.Sync(insideBoat)`; последний выставляет `RenderScene=true` и полный culling rect только внутри. Лампа: причинный RenderDoc A/B/A′ **0→12→0** PIP / **1→1→1** main, продуктовый capture и 12 checkpoints — `docs/plans/SEXTANT_PLAN.md` §16.25. Не трогать pose/алидаду/свет/шейдер ради этого уже доказанного фикса.
 - Оба луча внутри переводятся через `SextantPipFrameMath.ToParentFrame` (inverse parent × world); позиция берётся с игровой InteriorCamera. Единое преобразование сохраняет угол алидады. Open-edge очищает только обе PIP-истории (ResetHistory + флаг), не main. Первый кадр: 24/24 записанных B-открытий на 30 fps чистые (§16.24), это не гарантия всех кадров/пресетов.
 - Реальный деплой — `Tools/run-game.ps1` / `Tools/deploy-radionav.ps1`: touch Source + restart + игровая компиляция. DLL из Tools/build.ps1 не копировать в Temp. Скрипт требует ровно McpBridge + RadioNavigation, останавливает игру (даже с `-NoRestart`) и при обычном запуске quick-load'ит последний сейв; не запускать без необходимости/разрешения на смену живого состояния.
@@ -166,7 +166,7 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 ### Граф и знания
 
 - `graphify update .` после правок кода (AST-only, без API). Снимок
-  **2026-10-28**: **10705 узлов / 19146 рёбер**.
+  **2026-11-03**: **11052 узла / 19679 рёбер / 813 сообществ** (сборка от `b00b96e`).
 - MCP graphify: всегда передавать `project_path` = корень этого проекта,
   иначе сервер уходит в соседний `testui`.
 - `knowledge/` — **26 файлов**, проверять до чтения исходников игры.

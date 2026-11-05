@@ -434,4 +434,4 @@ on a Unity codebase (report only).
 
 *Document Version: 2.2*
 
-*Last Updated: 2026-10-04 (1379 / 68 / 98; baseline-история в ADR-014).*
+*Last Updated: 2026-11-03 (1653 / 68 / 146; baseline-история в ADR-014).*
