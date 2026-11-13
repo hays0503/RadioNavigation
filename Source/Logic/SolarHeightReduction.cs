@@ -2,6 +2,16 @@ using System;
 
 namespace UBOAT.Mods.RadioNavigation
 {
+    /// <summary>Actual cells and weights used by the F VIII interpolation.</summary>
+    public struct SolarCorrectionDetails
+    {
+        public double LowAltitudeDeg, HighAltitudeDeg;
+        public int LowEyeM;
+        public double EyeWeight, AltitudeWeight;
+        public double LowLeftArcMin, LowRightArcMin, HighLeftArcMin, HighRightArcMin;
+        public double LowArcMin, HighArcMin, BaseArcMin, MonthArcMin;
+    }
+
     /// <summary>F VIII p.72 (PDF p.98): signed TOTAL lower-limb correction.
     /// Tenths of an arcminute transcribed from the user's scanned original.
     /// It already includes SD, dip and refraction. No extrapolation.</summary>
@@ -79,8 +89,17 @@ namespace UBOAT.Mods.RadioNavigation
         public static bool TryCorrection(double hDeg, double eyeHeightM, int month,
             out double baseArcMin, out double monthArcMin)
         {
-            baseArcMin = 0;
-            monthArcMin = 0;
+            SolarCorrectionDetails details;
+            bool ok = TryDetails(hDeg, eyeHeightM, month, out details);
+            baseArcMin = details.BaseArcMin;
+            monthArcMin = details.MonthArcMin;
+            return ok;
+        }
+
+        public static bool TryDetails(double hDeg, double eyeHeightM, int month,
+            out SolarCorrectionDetails details)
+        {
+            details = new SolarCorrectionDetails();
             if (!Finite(hDeg) || !Finite(eyeHeightM) || hDeg < 3 || hDeg > 90
                 || eyeHeightM < 0 || eyeHeightM > 14 || month < 1 || month > 12)
                 return false;
@@ -92,8 +111,19 @@ namespace UBOAT.Mods.RadioNavigation
             double low = tenths[row, col] + w * (tenths[row, col + 1] - tenths[row, col]);
             double high = tenths[row + 1, col] + w * (tenths[row + 1, col + 1] - tenths[row + 1, col]);
             double t = (hDeg - altitudes[row]) / (altitudes[row + 1] - altitudes[row]);
-            baseArcMin = (low + t * (high - low)) / 10;
-            monthArcMin = monthly[month - 1] / 10.0;
+            details.LowAltitudeDeg = altitudes[row];
+            details.HighAltitudeDeg = altitudes[row + 1];
+            details.LowEyeM = col;
+            details.EyeWeight = w;
+            details.AltitudeWeight = t;
+            details.LowLeftArcMin = tenths[row, col] / 10.0;
+            details.LowRightArcMin = tenths[row, col + 1] / 10.0;
+            details.HighLeftArcMin = tenths[row + 1, col] / 10.0;
+            details.HighRightArcMin = tenths[row + 1, col + 1] / 10.0;
+            details.LowArcMin = low / 10;
+            details.HighArcMin = high / 10;
+            details.BaseArcMin = (low + t * (high - low)) / 10;
+            details.MonthArcMin = monthly[month - 1] / 10.0;
             return true;
         }
 

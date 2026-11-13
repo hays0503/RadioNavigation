@@ -170,7 +170,10 @@ namespace UBOAT.Mods.RadioNavigation
             Instance = this;
             if (Application.isPlaying && GetComponent<CPlathExistingCharacterPrototype>() == null)
                 gameObject.AddComponent<CPlathExistingCharacterPrototype>();
-            worksheet = new SextantWorksheet(positionProvider);
+            string bookDirectory = System.IO.Path.Combine(Application.persistentDataPath, "Mods", "RadioNavigation");
+            worksheet = new SextantWorksheet(positionProvider, text => WriteSightBook(bookDirectory, text),
+                System.IO.File.Exists(System.IO.Path.Combine(bookDirectory, SightBookFileWriter.FileName)));
+            BindLopMap();
             bodiesReadout = new SextantBodiesReadout(positionProvider);
             inputPoller = new SextantInputPoller(arcInput, worksheet, starId);
             // The poller asks at the key press what the disc looked like then.
@@ -188,6 +191,14 @@ namespace UBOAT.Mods.RadioNavigation
             // Pending campaign state takes precedence over the device's
             // global calibration when a saved series is still in progress.
             SextantSavePersistence.Bind(worksheet);
+        }
+
+        private static void WriteSightBook(string directory, string text)
+        {
+            string path, error;
+            if (!SightBookFileWriter.TryWrite(directory, text, out path, out error)
+                && WarnOnce.ShouldLog("SightBook.Write"))
+                Debug.LogWarning(LogPrefix + " sight-book write failed: " + error);
         }
 
         private void OnEnable()
@@ -288,6 +299,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void Update()
         {
+            if (!renderOnlyProbe)
+                UpdateLopMap(Time.unscaledDeltaTime);
             // Sample before the open/closed branch and before Close() can
             // return early. Only the action is mode-gated; held state is not.
             bool zPressed = zEdge.Advance(Input.GetKey(KeyCode.Z));

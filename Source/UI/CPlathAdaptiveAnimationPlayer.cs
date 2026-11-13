@@ -132,6 +132,9 @@ namespace CPlath.AnimationImport
             int active = 0; double time = 0;
             switch (CurrentPhase)
             {
+                // Stowed samples the primary clip at zero, then still evaluates
+                // the graph and updates renderer visibility/events below.
+                case Phase.Stowed: break;
                 case Phase.Raising: case Phase.Lowering: time = clock; break;
                 case Phase.Aiming: time = AimTime; break;
                 case Phase.EnteringRead: active = 1; time = clock; break;

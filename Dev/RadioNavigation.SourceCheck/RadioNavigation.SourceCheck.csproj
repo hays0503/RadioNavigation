@@ -36,10 +36,21 @@
     <Compile Include="SourceCheckTests.cs" />
     <Compile Include="CelestialDiscSourceTests.cs" />
     <Compile Include="SextantRenderProbeTests.cs" />
+    <Compile Include="LopMapColorTests.cs" />
+    <Compile Include="LopMapSourceTests.cs" />
     <Compile Include="CPlathInputSourceTests.cs" />
+    <Compile Include="CPlathAnimationSourceTests.cs" />
+    <Compile Include="CPlathShadeInputSourceTests.cs" />
     <Compile Include="SextantShadeSourceTests.cs" />
     <Compile Include="DocumentationTests.cs" />
     <Compile Include="TempProbeTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures/CPlathAnimationUnity.cs" LogicalName="CPlathAnimation.Unity" />
+    <EmbeddedResource Include="Fixtures/CPlathAnimationScenarios.cs" LogicalName="CPlathAnimation.Scenarios" />
+    <EmbeddedResource Include="Fixtures/LopMapBoundaries.cs" LogicalName="LopMap.Boundaries" />
+    <EmbeddedResource Include="Fixtures/LopMapScenarios.cs" LogicalName="LopMap.Scenarios" />
   </ItemGroup>
 
   <ItemGroup>

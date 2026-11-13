@@ -199,6 +199,8 @@
     <Compile Include="SignalPanelViewTests.cs" />
     <Compile Include="EntityTypeRowValuesTests.cs" />
     <Compile Include="FixCardComposerTests.cs" />
+    <Compile Include="SightBookTextTests.cs" />
+    <Compile Include="SextantLopPlotTests.cs" />
     <Compile Include="CelestialEphemerisTests.cs" />
     <Compile Include="BodyRecommendationTests.cs" />
     <Compile Include="LeuchtfeuerRegistryTests.cs" />
@@ -381,6 +383,10 @@
     <Compile Include="..\..\Source\Logic\SignalPanelView.cs" Link="Source\Logic\SignalPanelView.cs" />
     <Compile Include="..\..\Source\Logic\EntityTypeRowValues.cs" Link="Source\Logic\EntityTypeRowValues.cs" />
     <Compile Include="..\..\Source\UI\FixCardComposer.cs" Link="Source\UI\FixCardComposer.cs" />
+    <Compile Include="..\..\Source\UI\SightBookText.cs" Link="Source\UI\SightBookText.cs" />
+    <Compile Include="..\..\Source\UI\SightBookFixText.cs" Link="Source\UI\SightBookFixText.cs" />
+    <Compile Include="..\..\Source\Logic\SightBookFileWriter.cs" Link="Source\Logic\SightBookFileWriter.cs" />
+    <Compile Include="..\..\Source\Logic\SextantLopPlot.cs" Link="Source\Logic\SextantLopPlot.cs" />
     <Compile Include="..\..\Source\UI\SextantDmFormat.cs" Link="Source\UI\SextantDmFormat.cs" />
     <Compile Include="..\..\Source\UI\SextantZoom.cs" Link="Source\UI\SextantZoom.cs" />
     <Compile Include="..\..\Source\UI\SextantArcInput.cs" Link="Source\UI\SextantArcInput.cs" />

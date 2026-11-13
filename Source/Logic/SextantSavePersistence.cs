@@ -144,6 +144,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             try
             {
+                SextantController.Instance?.FlushLopMap();
                 SextantSaveSnapshot state = worksheet.CaptureState();
                 string payload = SextantSaveCodec.Encode(state);
                 SceneObject carrier = FindCarrier(true);

@@ -540,6 +540,10 @@ public sealed class SextantController {
     // collaborator. Its actual production methods are executed by CPlathInputSourceTests.
     private bool PollHandheldInput(bool take) { return false; }
     private void PollDeviceFilters() { inputPoller.PollFilters(setFiltersDelegate); }
+    // Native map output is a collaborator, not part of the extracted render
+    // control slice. Treat it as a write so the existing render-only test also
+    // proves the new Update guard instead of silently allowing map mutations.
+    private void UpdateLopMap(float dt) { ProbeState.Write(); }
     private readonly FakePip pipFactory = new FakePip();
     private readonly FakeCalibrator calibrator = new FakeCalibrator();
     private readonly FakeZoom zoom = new FakeZoom();

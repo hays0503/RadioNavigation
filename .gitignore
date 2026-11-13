@@ -54,3 +54,6 @@ documents-readonly/
 
 # Locally generated Unity AssetBundle; keep out of Git.
 /Bundles/testui
+
+# Current-series navigation book (regenerated after successful sights)
+/sight-book.txt

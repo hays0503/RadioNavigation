@@ -118,3 +118,66 @@ public class MyMarker : MapMarkerBase
 3. **Забыт `MaskZ(0f)`** в screen-space: сортировка канваса ломается.
 4. **`Update()` вместо ExecutionQueue**: рассинхрон с кадрами игры, мерцание.
 5. **Маркер переживает загрузку сейва со старой ссылкой на entity**: пересоздавайте в `SavesManager.Loaded`.
+
+## 8. Штатные линии положения (контракт проверен 2026-11-12)
+
+Исходники: `UBOAT.Game.UI/MapChartingUI.cs:894–929`,
+`UBOAT.Game.UI.Map/MapLineUI.cs:47–123,150–209`,
+`UBOAT.Game.Scene.Tasks/MapChartingDatabase.cs:21–54`.
+
+- `MapChartingUI.CreateLine(MapPointUI startPoint, MapPointUI endPoint)` возвращает
+  `MapLineUI`, добавляет объект в UI-список, а `MapLineData` — в native database.
+- `MapLineUI.Data`, `StartPoint`, `EndPoint`, `Interactive` публичны.
+  Геометрию/масштаб обновляет сама игра; вручную двигать Transform линии нельзя.
+- Штатная линия имеет `RawImage`, цвет можно менять через компонент без
+  строковой рефлексии. Это не сохранённое свойство `MapLineData`: после загрузки
+  цвет нужно применить снова. Native `MapLineData` содержит только две ссылки
+  `PointA`/`PointB`.
+- `MapPointUI.Name` меняет **и** `MapPointData.Name`, и TMP-подпись. Для отдельной
+  видимой подписи без изменения ключа допустимо менять текст TMP-компонента;
+  не давать инструменту Points переименовать служебный endpoint.
+- Уничтожение endpoint уничтожает связанные UI-линии. Native rows удаляются
+  в обработчиках `Destroyed`, то есть отложенно. Перед программным `Destroy`
+  удалить собственные rows явно: `RemoveLine` / `RemovePoint`.
+- При сбросе автопостроения пользовательская фигура может ссылаться на его
+  endpoint. Такой endpoint следует сохранить, снять служебное имя и оставить
+  исходный `MapPointData` в фигуре; уничтожение endpoint снесёт чужую фигуру.
+
+### Цвет собственных линий: проверка в игре 2026-11-12
+
+Один `RawImage.color` недостаточен для native `UI/Map (Route)`. На живой линии
+цвет уже был `RGBA(0.12,0.36,0.8,0.8)`, но backbuffer-участок содержал 0 синих
+пикселей. При замене **только** `image.material = null` (стандартный UI-путь)
+тот же участок дал 111 синих пикселей. Native dash texture имеет белый RGB и
+альфа-маску; чёрная текстура не была причиной. Штатный шейдер использует tint,
+освещение карты и fog mask, так что по присваиванию цвета нельзя судить о пикселях.
+
+Первое исправление собственных LOP (цвет проверен, мерцание позднее обнаружено):
+
+- `Image/RawImage.material = null`, затем собственный `color`;
+- для подписи сохранить исходный `TMP_FontAsset`, но выбрать
+  `label.fontSharedMaterial = label.font.material` вместо map-route preset.
+  Проверено read-only, что базовый материал этого атласа —
+  `TextMeshPro/Distance Field`, тогда как preset — `(Map, Route Label)`.
+
+Это не мутация общего Material и не создание нового шейдера/бандла. Материал,
+возвращаемый `Graphic.material` после записи null, называется `Default UI Material`;
+простая проверка getter == null неверна. Нужна проверка shader/пикселей.
+
+Поздняя проверка 2026-11-12: `material=null` восстанавливает цвет, но не
+принимается как полный фикс — покрытие линии мерцает. Native route shader
+имеет ZTest Always (8), builtin `UI/Default` — `[unity_GUIZTestMode]` (canvas
+ставит LEqual=4), а `MapLineUI.UpdateLines` ставит world Y=0. Новый локальный
+кандидат — owned clone default UI с собственным depth=Always и OnDestroy
+cleanup (`SextantLopMapMaterial`); не менять общий default Material. Его
+кадровая приёмка описывается в `docs/astro-lop-map-lines.md`, не выводится из
+наличия SetInt. Общий shader-global=8 не годится для A/B: игра перезаписывает
+его в 4 каждый кадр. Bridge overload pitfall: числовая строка может попасть
+в string-overload; для global-readback проверен GetGlobalFloatImpl(int).
+
+После разрешённого рестарта локальный причинный 4→8→4→8 подтвердил depth-loss:
+LEqual скрывает LOP, Always восстанавливает стабильный цвет. Три участка дали
+min/max синего покрытия 0.996/0.990/0.993 в восьмикадровой серии; сквозной
+повтор capture_jitter.py — 0.991. Действующий путь — owned default-UI clone с
+локальным Always и OnDestroy cleanup, **не material=null**. Это стационарный
+1920×1080 / RTX 4080 SUPER / D3D11 тест, не приёмка всех zoom/пресетов.

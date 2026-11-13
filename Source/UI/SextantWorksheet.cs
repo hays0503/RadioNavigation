@@ -71,6 +71,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private readonly RunningFixCalculator runningFix = new RunningFixCalculator();
         private readonly IPlayerPositionProvider positionProvider;
+        private readonly Action<string> writeSightBook;
+        private string sightBookFixSteps;
+        private bool sightBookStarted;
+        internal Action<SextantLopSegment[]> LopPlotChanged;
+        internal Action LopPlotRestored;
 
         private Text cardText;
         // Card fit (2026-09-22): usable column height and the base font size;
@@ -111,8 +116,16 @@ namespace UBOAT.Mods.RadioNavigation
         internal bool FixSameBody { get; private set; }
 
         public SextantWorksheet(IPlayerPositionProvider positionProvider)
+            : this(positionProvider, null)
+        {
+        }
+
+        internal SextantWorksheet(IPlayerPositionProvider positionProvider, Action<string> writeSightBook,
+            bool sightBookExists = false)
         {
             this.positionProvider = positionProvider;
+            this.writeSightBook = writeSightBook;
+            sightBookStarted = sightBookExists;
         }
 
         /// <summary>The underlying calculator (read by the controller for
@@ -280,6 +293,7 @@ namespace UBOAT.Mods.RadioNavigation
             else
             {
                 sectionText = null;
+                sightBookFixSteps = null;
                 FixPublished = false;
                 FixMapMarker.Clear();
             }
@@ -295,6 +309,8 @@ namespace UBOAT.Mods.RadioNavigation
                 obs.HoSigmaArcMin, obs.HoSampleCount, obs.HoRejectedCount,
                 lat, lon, obs.HcDeg, obs.AzDeg, obs.InterceptNm,
                 obs.ObservedSunAngularDiameterDeg, obs.SunDiscCompensationArcMin));
+            ExportSightBook();
+            LopPlotChanged?.Invoke(SextantLopPlot.Build(runningFix, courseSampler.CourseDeg, courseSampler.SpeedKn));
             return true;
         }
 
@@ -373,6 +389,7 @@ namespace UBOAT.Mods.RadioNavigation
             runningFix.Reset();
             FixMapMarker.Clear();
             sectionText = null;
+            sightBookFixSteps = null;
             FixPublished = false;
             // A fresh series starts from the full card (the mode hysteresis
             // would otherwise keep a compact card from the previous series).
@@ -382,6 +399,9 @@ namespace UBOAT.Mods.RadioNavigation
             statusTimer = FixStatusSeconds;
             panelTimer = 0f;
             Debug.Log(LogPrefix + " FIX series reset");
+            LopPlotChanged?.Invoke(new SextantLopSegment[0]);
+            if (sightBookStarted)
+                ExportSightBook();
         }
 
         internal SextantSaveSnapshot CaptureState()
@@ -415,6 +435,7 @@ namespace UBOAT.Mods.RadioNavigation
             runningFix.Record(state.Observation3);
             courseSampler.RestoreState(state.Course);
             sectionText = state.SectionText;
+            sightBookFixSteps = null; // v3 carries only the published card; do not re-solve on load
             seriesCalibrationMinutes = state.CalibrationMinutes;
             if (SeriesActive)
                 SunEphemerisCalibration.SetDelta(seriesCalibrationMinutes);
@@ -430,6 +451,17 @@ namespace UBOAT.Mods.RadioNavigation
             courseSampleTimer = 0f;
             cardCompact = false;
             InvalidateCard();
+            LopPlotRestored?.Invoke();
+            if (SeriesActive || sightBookStarted)
+                ExportSightBook();
+        }
+
+        private void ExportSightBook()
+        {
+            if (writeSightBook == null)
+                return;
+            sightBookStarted = true;
+            writeSightBook(SightBookText.Compose(CaptureState(), sightBookFixSteps));
         }
 
         /// <summary>
@@ -573,6 +605,9 @@ namespace UBOAT.Mods.RadioNavigation
         private void RecomputeFixSnapshot()
         {
             StringBuilder sb = new StringBuilder(256);
+            sightBookFixSteps = SightBookFixText.ComposeTransfers(runningFix,
+                courseSampler.CourseDeg, courseSampler.SpeedKn,
+                courseSampler.IsFresh(runningFix.Observation2.Utc), false);
 
             // The card layout prints only observations №1/№2; a third sight
             // (cocked hat) must be visible too, or the navigator cannot see
@@ -652,6 +687,10 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
             sb.Append("FIX\n");
+            sightBookFixSteps = hat.UsedBestPairFallback ? "" : SightBookFixText.ComposeTransfers(runningFix,
+                courseSampler.CourseDeg, courseSampler.SpeedKn,
+                courseSampler.IsFresh(runningFix.Observation2.Utc), usedTriangle);
+            sightBookFixSteps += SightBookFixText.ComposeSolution(usedTriangle, hat);
             sb.Append("\u03C6 ").Append(SextantDmFormat.FormatLatLon(fixLat, true));
             sb.Append("  \u03BB ").Append(SextantDmFormat.FormatLatLon(fixLon, false)).Append('\n');
             AppendFixTail(sb, usedTriangle, hat);

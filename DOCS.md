@@ -40,6 +40,9 @@ Production/test/Tools в том проходе не менялись; его г�
 | Камеры, интерьер, алидада и первый кадр PIP | `docs/CAMERA_GUIDE.md`; доказательства в `docs/plans/SEXTANT_PLAN.md` §16.23–16.25 |
 | Живая диагностика, ввод, снимки, восстановление, память | `docs/live-diagnostics.md` |
 | Наблюдения, карточка, FIX/LOP и drag/скрытие в конкретном сейве | `docs/astro-save.md` — запись v3, совместимость v1/v2/v3, прежний live save/reload v1 |
+| Текстовая книга расчётов после успешного I | `docs/sight-book.md` — путь/кодировка, события записи, карточки наблюдений/FIX, границы v3 и неоцифрованных таблиц |
+| Состояние убранного CPlath и его регрессия | `docs/cplath-animation.md` — Stowed/Lowering, Evaluate vs OnDisable, явная обработка V3002 и границы офлайн-тестов |
+| Исходные и перенесённые линии положения на карте | `docs/astro-lop-map-lines.md` — O/T, цвета, геометрия первого приближения, native save/load, очистка своей серии |
 | Размеры Солнца/Луны и таблицы 1939–1945 | `docs/celestial-disc-sizes.md` — физические диаметры, PIP-only native isolation, история instrument-only Ho; игровая приёмка открыта |
 | Солнечная навигация SH5 | `docs/sh5-solar-navigation.md` — печатные GHA/δ, F VIII, frozen v3 и безопасные probe-входы; три видимых нижних края и реальный stationary FIX с ошибкой 0.44 NM; независимая редукция/высотные окружности. Ненулевой live-перенос, alpha-край и v3 save/load отдельно |
 | Стенд нижнего края Солнца | `docs/solar-sight-tools.md` — альманах/JPL/C#, внешняя Hs→F VIII→Ho, read-only snapshot/residual и проекция; не новый production-режим |

@@ -4,6 +4,12 @@ using System.Security.Cryptography;
 
 namespace UBOAT.Mods.RadioNavigation
 {
+    public struct Sh5AlmanacDetails
+    {
+        public DateTime RowUtc;
+        public double Hours, GhaDeg, DecDeg, IncrementArcMin;
+    }
+
     /// <summary>Exact printed SH5 campaign rows, not a fitted Meeus offset.
     /// GMT columns; PDF p.73 Sun increments = 15 degrees/hour and signed
     /// four-hour d. Complete leap-aware dense pack, hash-checked on load.</summary>
@@ -65,14 +71,27 @@ namespace UBOAT.Mods.RadioNavigation
         {
             ghaDeg = 0;
             decDeg = 0;
+            Sh5AlmanacDetails details;
+            if (!TryDetails(utc, out details))
+                return false;
+            ghaDeg = RunningFixCalculator.Normalize360(details.GhaDeg + details.Hours * 15);
+            decDeg = details.DecDeg + details.IncrementArcMin / 60 * details.Hours / 4;
+            return true;
+        }
+
+        public static bool TryDetails(DateTime utc, out Sh5AlmanacDetails details)
+        {
+            details = new Sh5AlmanacDetails();
             // Unspecified is the game clock's historical UTC convention. Never
             // silently accept host-local time or extrapolate out of campaign.
             if (!Loaded || utc.Kind == DateTimeKind.Local || utc < start || utc >= end)
                 return false;
             int index = (utc.Date - start).Days * 6 + utc.Hour / 4;
-            double hours = utc.TimeOfDay.TotalHours - utc.Hour / 4 * 4;
-            ghaDeg = RunningFixCalculator.Normalize360(gha[index] / 600.0 + hours * 15);
-            decDeg = declination[index] / 600.0 + increments[index] / 600.0 * hours / 4;
+            details.RowUtc = utc.Date.AddHours(utc.Hour / 4 * 4);
+            details.Hours = utc.TimeOfDay.TotalHours - utc.Hour / 4 * 4;
+            details.GhaDeg = gha[index] / 600.0;
+            details.DecDeg = declination[index] / 600.0;
+            details.IncrementArcMin = increments[index] / 10.0;
             return true;
         }
 

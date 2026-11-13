@@ -146,7 +146,7 @@ namespace UBOAT.Mods.RadioNavigation
         internal bool PollIndependentShades(out bool changed)
         {
             changed = false;
-            if (!IsHeld || rig == null && animated == null) return false;
+            if (!IsHeld || (rig == null && animated == null)) return false;
             bool alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
             bool left = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
             for (int i = 0; i < shadeEdges.Length; i++)
@@ -154,9 +154,16 @@ namespace UBOAT.Mods.RadioNavigation
                 bool pressed = shadeEdges[i].Advance(Input.GetKey(shadeKeys[i]));
                 if (alt && pressed && !(left && i == 3))
                 {
-                    if (animated != null) animated.ToggleShade(left ? 4 + i : i);
-                    else rig.ToggleShade(left ? 4 + i : i);
-                    changed = true;
+                    if (animated != null)
+                    {
+                        animated.ToggleShade(left ? 4 + i : i);
+                        changed = true;
+                    }
+                    else if (rig != null)
+                    {
+                        rig.ToggleShade(left ? 4 + i : i);
+                        changed = true;
+                    }
                 }
             }
             return alt;
