@@ -1,5 +1,8 @@
 using System.Globalization;
 using System.Text;
+using UBOAT.Game.Sandbox;
+using UBOAT.Game.Scene;
+using UBOAT.Game.Scene.Camera;
 using UBOAT.Game.UI.DevConsole;
 using UnityEngine;
 
@@ -90,7 +93,12 @@ namespace UBOAT.Mods.RadioNavigation
                     ApplyVectorDepthArgument(args[2]);
                     return;
                 }
-                Debug.LogWarning("[RadioNav][CURRENT] usage: rn_current_vectors [on|off|depth <meters|ship>]");
+                if (string.Equals(token, "look", System.StringComparison.OrdinalIgnoreCase) && args.Length >= 4)
+                {
+                    ApplyVectorLookArgument(args);
+                    return;
+                }
+                Debug.LogWarning("[RadioNav][CURRENT] usage: rn_current_vectors [on|off|depth <meters|ship>|look <lat> <lon> [elev]]");
                 return;
             }
             float depthM = CurrentSettings.GetVectorSampleDepthMeters();
@@ -119,6 +127,35 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
             Debug.LogWarning("[RadioNav][CURRENT] invalid depth \"" + arg + "\"; expected >= 0 or \"ship\"");
+        }
+
+        private static void ApplyVectorLookArgument(string[] args)
+        {
+            if (!float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float lat)
+                || !float.TryParse(args[3], NumberStyles.Float, CultureInfo.InvariantCulture, out float lon))
+            {
+                Debug.LogWarning("[RadioNav][CURRENT] usage: rn_current_vectors look <lat> <lon> [elevationM]");
+                return;
+            }
+            float elevation = -1f;
+            if (args.Length >= 5 && float.TryParse(args[4], NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedElev))
+                elevation = parsedElev;
+
+            MainCamera cam = MainCamera.Instance;
+            Sandbox sandbox = Sandbox.Instance;
+            if (!(bool)cam || cam.MapController == null || !(bool)sandbox)
+            {
+                Debug.LogWarning("[RadioNav][CURRENT] map camera unavailable");
+                return;
+            }
+            if (cam.CurrentMode != CameraMode.Map)
+                cam.SetMode(CameraMode.Map, CameraTransitionType.InstantManualFadeOut);
+            Vector3 scene = sandbox.EncounterToSceneSpace(Coordinates.ToWorldPosition(lat, lon));
+            cam.MapController.LookAt(scene, elevation, 0f);
+            MapCurrentVectorsDriver.InvalidateSamples();
+            Debug.Log("[RadioNav][CURRENT] map look lat=" + lat.ToString("F2", CultureInfo.InvariantCulture)
+                + " lon=" + lon.ToString("F2", CultureInfo.InvariantCulture)
+                + " elev=" + cam.MapController.CameraElevation.ToString("F0", CultureInfo.InvariantCulture));
         }
     }
 }
