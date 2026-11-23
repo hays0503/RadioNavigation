@@ -326,6 +326,7 @@ namespace UBOAT.Mods.RadioNavigation
     public static class CurrentRuntimeAdapter
     {
         public static bool HasField = true;
+        public static bool IsCoastReady = true;
         public static UBOAT.Game.Scene.Entities.PlayerShip BoundShip;
         public static DateTime Utc = new DateTime(1940, 6, 15, 12, 0, 0, DateTimeKind.Utc);
         public static Func<UnityEngine.Vector2, float, UnityEngine.Vector3> Sampler;

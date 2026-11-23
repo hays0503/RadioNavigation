@@ -25,7 +25,7 @@ namespace UBOAT.Mods.RadioNavigation
 
     internal static class CurrentVectorOverlayMath
     {
-        internal const int MaxPoolSlots = 128;
+        internal const int MaxPoolSlots = 160;
         private const float KnotsPerMps = 1.9438445f;
         private const float MinVisibleKnots = 0.02f;
         private const float FullScaleKnots = 6.0f;
@@ -46,15 +46,15 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static readonly ZoomBand[] Bands =
         {
-            new ZoomBand(3500f, 6, 0.5f),
-            new ZoomBand(8000f, 6, 1.0f),
+            new ZoomBand(3500f, 7, 0.45f),
+            new ZoomBand(8000f, 7, 0.90f),
             new ZoomBand(20000f, 6, 2.5f),
-            new ZoomBand(45000f, 5, 6.0f),
-            new ZoomBand(100000f, 5, 14.0f),
+            new ZoomBand(45000f, 6, 5.5f),
+            new ZoomBand(100000f, 6, 12.0f),
             new ZoomBand(220000f, 5, 30.0f),
-            new ZoomBand(480000f, 4, 75.0f),
-            new ZoomBand(900000f, 4, 150.0f),
-            new ZoomBand(float.PositiveInfinity, 3, 320.0f)
+            new ZoomBand(480000f, 5, 65.0f),
+            new ZoomBand(900000f, 5, 135.0f),
+            new ZoomBand(float.PositiveInfinity, 5, 230.0f)
         };
 
         internal static CurrentVectorGridSpec ComputeGridSpec(float elevationMeters)

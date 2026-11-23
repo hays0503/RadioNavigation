@@ -27,7 +27,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             }
         }
 
-        private static float PeakSpeedAcrossTwoDays(CurrentTidalField field, double lat, double lon, float depth,
+        private static float PeakSpeedAcrossTwoDays(ICurrentField field, double lat, double lon, float depth,
             DateTime startUtc, out Vector3 minVec, out Vector3 maxVec)
         {
             float maxSpeed = 0f;
@@ -253,6 +253,79 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             // Deep Mid-Atlantic (36.0N, -35.0E) remains abyssal barotropic only.
             float abyssPeak = PeakSpeedAcrossTwoDays(field, 36.0, -35.0, 0f, start, out _, out _);
             Assert.InRange(abyssPeak, 0.005f, 0.05f);
+        }
+
+        [Fact]
+        public void CompositeCurrentField_LandMaskSuppressesTidalAndAbyssalFlowOnLandWhileKeepingStraitsWet()
+        {
+            string atlasDir = null;
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            for (int i = 0; i < 8 && dir != null; i++, dir = dir.Parent)
+            {
+                string candidate = Path.Combine(dir.FullName, "Source", "Data", "CurrentAtlas");
+                if (Directory.Exists(candidate))
+                {
+                    atlasDir = candidate;
+                    break;
+                }
+            }
+            Assert.NotNull(atlasDir);
+            Assert.True(CurrentAtlasField.TryLoad(atlasDir, out CurrentAtlasField atlas, out string err), err);
+
+            CurrentTidalField tidal = CurrentTidalField.CreateWithAtlas(atlas);
+            var start = new DateTime(1941, 11, 4, 0, 0, 0, DateTimeKind.Utc);
+
+            // Simulate UBOAT WorldMaps.ElevationMap > 1.0f gating dry interior rectangles
+            // across Britain, Ireland, and Brittany/NW France, leaving straits & open water wet.
+            Func<double, double, bool> britishAndFrenchLandMask = (lat, lon) =>
+                (lat >= 51.3 && lat <= 54.0 && lon >= -3.8 && lon <= -0.5)       // Central/South England & Wales
+                || (lat >= 52.0 && lat <= 54.3 && lon >= -9.6 && lon <= -6.8)    // Interior Ireland
+                || (lat >= 47.6 && lat <= 48.5 && lon >= -3.9 && lon <= -1.2)    // Interior Brittany
+                || (lat >= 50.35 && lat <= 50.9 && lon >= -5.0 && lon <= -3.7);  // Inland Cornwall/Devon
+
+            var masked = new CompositeCurrentField(atlas, tidal, britishAndFrenchLandMask);
+            var unmasked = new CompositeCurrentField(atlas, tidal);
+
+            // Negative domain invariant: unmasked composite leaks non-zero tidal/abyssal flow onto land,
+            // whereas the land-masked composite MUST return false & zero flow across the full 48h tide cycle.
+            (double lat, double lon, string label)[] landPoints =
+            {
+                (50.55, -4.40, "Cornwall inland"),
+                (52.50, -1.80, "Midlands inland"),
+                (53.20, -8.20, "Ireland inland"),
+                (48.10, -2.50, "Brittany inland")
+            };
+            foreach (var p in landPoints)
+            {
+                Assert.True(PeakSpeedAcrossTwoDays(unmasked, p.lat, p.lon, 0f, start, out _, out _) > 0.01f,
+                    p.label + " baseline expectation");
+                Assert.True(PeakSpeedAcrossTwoDays(masked, p.lat, p.lon, 0f, start, out _, out _) == 0f,
+                    p.label + " leaked flow onto land");
+                Assert.False(masked.TrySample(new CurrentQuery
+                {
+                    HasPosition = true,
+                    Latitude = p.lat,
+                    Longitude = p.lon,
+                    DepthMeters = 0f,
+                    Utc = start
+                }, out Vector3 stopped));
+                Assert.Equal(0f, stopped.x);
+                Assert.Equal(0f, stopped.z);
+            }
+
+            // Narrow straits & sea lanes remain wet and retain strong tidal flow.
+            (double lat, double lon, float minPeak, string label)[] straits =
+            {
+                (49.70, -2.10, 1.0f, "Alderney Race"),
+                (58.71, -3.14, 1.2f, "Pentland Firth"),
+                (51.05,  1.50, 0.8f, "Dover Strait"),
+                (35.98, -5.50, 0.5f, "Gibraltar")
+            };
+            foreach (var s in straits)
+            {
+                float peak = PeakSpeedAcrossTwoDays(masked, s.lat, s.lon, 0f, start, out _, out _);
+                Assert.True(peak >= s.minPeak, s.label + " lost tidal speed: " + peak);
+            }
         }
     }
 }

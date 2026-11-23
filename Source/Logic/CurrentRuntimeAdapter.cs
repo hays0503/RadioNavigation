@@ -12,6 +12,7 @@ using UBOAT.Game.Core.Time;
 using UBOAT.Game.Sandbox;
 using UBOAT.Game.Scene.Entities;
 using UBOAT.Game.Scene.Environment;
+using UBOAT.Game.Scene.Environment.Terrain;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -202,7 +203,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (CurrentSettings.TidalCurrentsEnabled())
             {
                 var tidal = CurrentTidalField.CreateWithAtlas(atlas);
-                currentField = new CompositeCurrentField(atlas, tidal);
+                currentField = new CompositeCurrentField(atlas, tidal, IsLandAt);
                 anyFlow = atlas.HasFlow || tidal.HasFlow;
                 fieldKind = "atlas+tidal";
                 return;
@@ -210,6 +211,21 @@ namespace UBOAT.Mods.RadioNavigation
             currentField = atlas;
             anyFlow = atlas.HasFlow;
             fieldKind = "atlas";
+        }
+
+        internal static bool IsCoastReady => LighthouseCoastProbe.Ready;
+
+        private static bool IsLandAt(double latitude, double longitude)
+        {
+            if (LighthouseCoastProbe.TryGetDistanceKm(latitude, longitude, out double coastKm)
+                && coastKm <= 0.0)
+                return true;
+            WorldMaps.Map elevMap = WorldMaps.ElevationMap;
+            if (elevMap == null)
+                return false;
+            Vector2 encounterKm = Coordinates.ToWorldPosition(latitude, longitude);
+            float elevationM = elevMap.GetAtWorldSpace(encounterKm.x, encounterKm.y);
+            return !float.IsNaN(elevationM) && elevationM > 0.5f;
         }
 
         private static bool TryReadField(out bool anyFlow)

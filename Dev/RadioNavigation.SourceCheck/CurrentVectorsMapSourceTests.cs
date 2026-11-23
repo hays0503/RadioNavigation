@@ -23,13 +23,22 @@ namespace RadioNavigation.SourceCheck
         [Fact] public void CurrentVectors_ShiftYToggleAndDepthOverrideWork() { Run("HotkeyShiftYAndDepthMode_ToggleAndDriveDepthSampling"); }
 
         [Fact]
+        public void CurrentVectors_DoesNotOverrideHudDepthTestWithAlways()
+        {
+            Assert.DoesNotContain("CompareFunction.Always", DriverSource(), StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void CurrentVectors_MutationGuardCatchesUnshiftedYAndBrokenCleanup()
         {
             Type noShift = Compile(Mutate("if (!shift)", "if (false)"));
             Assert.Throws<TargetInvocationException>(() => Run(noShift, "HotkeyShiftYAndDepthMode_ToggleAndDriveDepthSampling"));
 
-            Type leakedMaterial = Compile(Mutate("if (overlayMaterial != null)\r\n                Destroy(overlayMaterial);", ""));
-            Assert.Throws<TargetInvocationException>(() => Run(leakedMaterial, "CalmHide_TimeAdvanceResample_AndOnDestroyCleansResources"));
+            Type badSibling = Compile(Mutate("rootGo.transform.SetSiblingIndex(0);", "rootGo.transform.SetSiblingIndex(99);"));
+            Assert.Throws<TargetInvocationException>(() => Run(badSibling, "MapLifecycle_RendersNonInteractiveSiblingPoolAndHidesOutsideMap"));
+
+            Type leakedTexture = Compile(Mutate("if (shaftTexture != null)\r\n                Destroy(shaftTexture);", ""));
+            Assert.Throws<TargetInvocationException>(() => Run(leakedTexture, "CalmHide_TimeAdvanceResample_AndOnDestroyCleansResources"));
         }
 
         private static string DriverSource()

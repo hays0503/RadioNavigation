@@ -99,6 +99,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             GameObject container = ContainerOf(rig);
             Check(container != null && container.activeSelf, "Vectors container missing or inactive on Map");
+            Check(container.transform.GetSiblingIndex() == 0, "Overlay should sit behind chart lines and markers");
             Check(rig.LinesGo.Children.Count == 0, "Overlay polluted MapChartingUI linesContainer");
             Check(container.Children.Count == CurrentVectorOverlayMath.MaxPoolSlots, "Unexpected pool size");
             int active = CountActiveSlots(container);
@@ -109,8 +110,8 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Image img = child.GetComponent<Image>();
                 Check(img != null && !img.raycastTarget, "Arrow graphic intercepts pointer raycasts");
-                Check(img.material != null && img.material != Graphic.defaultGraphicMaterial, "Shared default UI material mutated");
-                Check(img.material.Ints["unity_GUIZTestMode"] == 8, "Overlay lacks Always depth test");
+                Check(img.material == null || img.material == Graphic.defaultGraphicMaterial,
+                    "Overlay must use default UI depth test so HUD renders cleanly above vectors");
             }
 
             // Switching to HQ display or FPP hides container without destroying pool.
@@ -171,10 +172,14 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject container = ContainerOf(rig);
             Check(CountActiveSlots(container) == 0, "Calm water left arrows visible");
 
-            Material mat = container.Children[0].Children[0].GetComponent<Image>().material;
+            List<Texture2D> textures = MapWorld.Objects.OfType<Texture2D>().ToList();
+            List<Sprite> sprites = MapWorld.Objects.OfType<Sprite>().ToList();
+            Check(textures.Count == 2 && sprites.Count == 2, "Expected shaft and head texture/sprite assets");
+
             rig.Driver.OnDestroy();
             Check(container.Destroyed, "OnDestroy leaked vector container");
-            Check(mat.Destroyed, "OnDestroy leaked shared overlay material");
+            Check(textures.All(t => t.Destroyed), "OnDestroy leaked vector textures");
+            Check(sprites.All(s => s.Destroyed), "OnDestroy leaked vector sprites");
             Check(!Graphic.defaultGraphicMaterial.Destroyed, "OnDestroy damaged default UI material");
         }
 

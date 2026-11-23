@@ -358,17 +358,27 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private readonly ICurrentField primary;
         private readonly ICurrentField overlay;
+        private readonly Func<double, double, bool> isLand;
 
-        internal CompositeCurrentField(ICurrentField primary, ICurrentField overlay)
+        internal CompositeCurrentField(
+            ICurrentField primary,
+            ICurrentField overlay,
+            Func<double, double, bool> isLand = null)
         {
             this.primary = primary;
             this.overlay = overlay;
+            this.isLand = isLand;
         }
 
         public bool HasFlow => (primary?.HasFlow == true) || (overlay?.HasFlow == true);
 
         public bool TrySample(CurrentQuery query, out Vector3 velocity)
         {
+            if (isLand != null && isLand(query.Latitude, query.Longitude))
+            {
+                velocity = Vector3.zero;
+                return false;
+            }
             Vector3 v1 = Vector3.zero;
             Vector3 v2 = Vector3.zero;
             bool ok1 = primary != null && primary.TrySample(query, out v1);

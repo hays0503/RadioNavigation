@@ -49,7 +49,6 @@ namespace UBOAT.Mods.RadioNavigation
         private Sandbox sandbox;
         private MapChartingUI charting;
         private RectTransform container;
-        private Material overlayMaterial;
         private Texture2D shaftTexture;
         private Texture2D headTexture;
         private Sprite shaftSprite;
@@ -60,6 +59,7 @@ namespace UBOAT.Mods.RadioNavigation
         private Vector2 cachedCenterKm;
         private long cachedUtcTicks;
         private float cachedDepthM = float.NaN;
+        private bool cachedCoastReady;
         private bool hasSamples;
         private bool warned;
 
@@ -106,8 +106,6 @@ namespace UBOAT.Mods.RadioNavigation
                 Destroy(shaftTexture);
             if (headTexture != null)
                 Destroy(headTexture);
-            if (overlayMaterial != null)
-                Destroy(overlayMaterial);
         }
 
         public void LateUpdate()
@@ -225,7 +223,7 @@ namespace UBOAT.Mods.RadioNavigation
             EnsureAssets();
             GameObject rootGo = new GameObject(ContainerName, typeof(RectTransform));
             rootGo.transform.SetParent(linesTransform.parent, false);
-            rootGo.transform.SetSiblingIndex(linesTransform.GetSiblingIndex());
+            rootGo.transform.SetSiblingIndex(0);
             container = rootGo.GetComponent<RectTransform>();
             container.anchorMin = Vector2.zero;
             container.anchorMax = Vector2.one;
@@ -254,6 +252,7 @@ namespace UBOAT.Mods.RadioNavigation
                 cachedCenterKm = centerKm;
                 cachedUtcTicks = utc.Ticks;
                 cachedDepthM = depthM;
+                cachedCoastReady = CurrentRuntimeAdapter.IsCoastReady;
                 hasSamples = true;
             }
 
@@ -263,6 +262,8 @@ namespace UBOAT.Mods.RadioNavigation
         private bool NeedsResample(CurrentVectorGridSpec spec, Vector2 centerKm, DateTime utc, float depthM)
         {
             if (!hasSamples || Mathf.Abs(spec.StepKm - cachedStepKm) > 1e-3f)
+                return true;
+            if (!cachedCoastReady && CurrentRuntimeAdapter.IsCoastReady)
                 return true;
             if (Mathf.Abs(depthM - cachedDepthM) > 0.25f)
                 return true;
@@ -352,14 +353,6 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void EnsureAssets()
         {
-            if (overlayMaterial == null)
-            {
-                overlayMaterial = new Material(Graphic.defaultGraphicMaterial);
-                overlayMaterial.name = "RadioNav Current Vectors";
-                overlayMaterial.hideFlags = HideFlags.DontSave;
-                overlayMaterial.SetInt("unity_GUIZTestMode", (int)UnityEngine.Rendering.CompareFunction.Always);
-            }
-
             if (shaftTexture == null)
             {
                 shaftTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
@@ -414,14 +407,12 @@ namespace UBOAT.Mods.RadioNavigation
                 shaftGo.transform.SetParent(rootRect, false);
                 Image shaft = shaftGo.AddComponent<Image>();
                 shaft.sprite = shaftSprite;
-                shaft.material = overlayMaterial;
                 shaft.raycastTarget = false;
 
                 var headGo = new GameObject("Head", typeof(RectTransform));
                 headGo.transform.SetParent(rootRect, false);
                 Image head = headGo.AddComponent<Image>();
                 head.sprite = headSprite;
-                head.material = overlayMaterial;
                 head.raycastTarget = false;
 
                 slots[i] = new ArrowSlot
