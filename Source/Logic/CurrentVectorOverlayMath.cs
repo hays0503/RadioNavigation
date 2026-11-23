@@ -25,7 +25,7 @@ namespace UBOAT.Mods.RadioNavigation
 
     internal static class CurrentVectorOverlayMath
     {
-        internal const int MaxPoolSlots = 160;
+        internal const int MaxPoolSlots = 240;
         private const float KnotsPerMps = 1.9438445f;
         private const float MinVisibleKnots = 0.02f;
         private const float FullScaleKnots = 6.0f;
@@ -46,15 +46,15 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static readonly ZoomBand[] Bands =
         {
-            new ZoomBand(3500f, 7, 0.45f),
-            new ZoomBand(8000f, 7, 0.90f),
-            new ZoomBand(20000f, 6, 2.5f),
-            new ZoomBand(45000f, 6, 5.5f),
-            new ZoomBand(100000f, 6, 12.0f),
-            new ZoomBand(220000f, 5, 30.0f),
-            new ZoomBand(480000f, 5, 65.0f),
-            new ZoomBand(900000f, 5, 135.0f),
-            new ZoomBand(float.PositiveInfinity, 5, 230.0f)
+            new ZoomBand(3500f, 8, 0.40f),
+            new ZoomBand(8000f, 8, 0.80f),
+            new ZoomBand(20000f, 7, 2.15f),
+            new ZoomBand(45000f, 7, 4.70f),
+            new ZoomBand(100000f, 7, 10.5f),
+            new ZoomBand(220000f, 6, 25.0f),
+            new ZoomBand(480000f, 6, 54.0f),
+            new ZoomBand(900000f, 6, 112.0f),
+            new ZoomBand(float.PositiveInfinity, 6, 195.0f)
         };
 
         internal static CurrentVectorGridSpec ComputeGridSpec(float elevationMeters)
@@ -99,7 +99,7 @@ namespace UBOAT.Mods.RadioNavigation
             float step = spec.StepKm;
             float snapX = (float)Math.Round(centerKm.x / step) * step;
             float snapY = (float)Math.Round(centerKm.y / step) * step;
-            float maxRadius = spec.RadiusKm + step * 0.15f;
+            float maxRadius = spec.RadiusKm + step * 0.35f;
             float maxRadiusSq = maxRadius * maxRadius;
 
             int count = 0;

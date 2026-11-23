@@ -24,8 +24,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             int countLow = CurrentVectorOverlayMath.BuildSampleGrid(Vector2.zero, low, buffer);
             int countHigh = CurrentVectorOverlayMath.BuildSampleGrid(Vector2.zero, high, buffer);
             Assert.True(countHigh < countLow, "Zoomed-out Atlantic view must show fewer arrows than tactical view");
-            Assert.InRange(countLow, 90, CurrentVectorOverlayMath.MaxPoolSlots);
-            Assert.InRange(countHigh, 55, 95);
+            Assert.InRange(countLow, 180, CurrentVectorOverlayMath.MaxPoolSlots);
+            Assert.InRange(countHigh, 100, 140);
         }
 
         [Fact]
