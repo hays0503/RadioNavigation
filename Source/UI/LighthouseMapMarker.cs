@@ -102,34 +102,32 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected override Sprite LoadIconSprite()
         {
-            if (resourceManager == null)
+            if (resourceManager != null)
             {
-                return null;
-            }
-
-            // The bundle ships the icon as a prefab carrying the sprite on a
-            // UI Image or a SpriteRenderer; a bare Sprite asset is accepted
-            // as a fallback.
-            Resource<GameObject> prefab = resourceManager.RetrieveAsset<GameObject>(IconAssetName, this, false);
-            if (prefab.Valid && prefab.Asset != null)
-            {
-                var image = prefab.Asset.GetComponent<UnityEngine.UI.Image>();
-                if (image != null && image.sprite != null)
+                // The bundle ships the icon as a prefab carrying the sprite on a
+                // UI Image or a SpriteRenderer; a bare Sprite asset is accepted
+                // as a fallback.
+                Resource<GameObject> prefab = resourceManager.RetrieveAsset<GameObject>(IconAssetName, this, false);
+                if (prefab.Valid && prefab.Asset != null)
                 {
-                    return image.sprite;
+                    var image = prefab.Asset.GetComponent<UnityEngine.UI.Image>();
+                    if (image != null && image.sprite != null)
+                    {
+                        return image.sprite;
+                    }
+
+                    var spriteRenderer = prefab.Asset.GetComponent<SpriteRenderer>();
+                    if (spriteRenderer != null && spriteRenderer.sprite != null)
+                    {
+                        return spriteRenderer.sprite;
+                    }
                 }
 
-                var spriteRenderer = prefab.Asset.GetComponent<SpriteRenderer>();
-                if (spriteRenderer != null && spriteRenderer.sprite != null)
+                Resource<Sprite> direct = resourceManager.RetrieveAsset<Sprite>(IconAssetName, this, false);
+                if (direct.Valid)
                 {
-                    return spriteRenderer.sprite;
+                    return direct.Asset;
                 }
-            }
-
-            Resource<Sprite> direct = resourceManager.RetrieveAsset<Sprite>(IconAssetName, this, false);
-            if (direct.Valid)
-            {
-                return direct.Asset;
             }
 
             // F229: ResourceManager cannot see the mod bundle, so the loads

@@ -31,7 +31,7 @@ namespace RadioNavigation.SourceCheck
     {
         private static readonly string[] SkipSegments =
         {
-            "\\bin\\", "\\obj\\", "\\graphify-out\\", "\\.git\\", "\\node_modules\\", "\\documents-readonly\\", "\\temp\\",
+            "\\bin\\", "\\obj\\", "\\artifacts\\", "\\graphify-out\\", "\\.git\\", "\\node_modules\\", "\\documents-readonly\\", "\\temp\\",
         };
 
         /// <summary>

@@ -262,6 +262,11 @@ namespace UBOAT.Mods.RadioNavigation
                     hiddenRenderers.RemoveAt(i);
         }
 
+        internal static void ResetForReload()
+        {
+            RestoreRendererStage();
+        }
+
         private static void RestoreRendererStage()
         {
             PruneDestroyedRenderers();

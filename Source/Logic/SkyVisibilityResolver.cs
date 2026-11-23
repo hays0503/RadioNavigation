@@ -108,7 +108,7 @@ namespace UBOAT.Mods.RadioNavigation
             try
             {
                 object mainCamera = ReadStatic("UBOAT.Game.Scene.Camera.MainCamera", "Instance");
-                if (mainCamera == null)
+                if (mainCamera.IsNull())
                     return false;
 
                 bool insideBoat = ReadBool(mainCamera, "IsInsideBoat");

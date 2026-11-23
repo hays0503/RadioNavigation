@@ -182,12 +182,14 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (instance == this)
                 instance = null;
+            UsesBundledStarShader = false;
             if (spriteTexture != null)
                 Destroy(spriteTexture);
             if (material != null)
                 Destroy(material);
-            if (meshFilter.mesh != null)
-                Destroy(meshFilter.mesh);
+            if (meshFilter != null && meshFilter.sharedMesh != null)
+                Destroy(meshFilter.sharedMesh);
+
         }
 
         /// <summary>One-shot evidence that the star renderer is actually

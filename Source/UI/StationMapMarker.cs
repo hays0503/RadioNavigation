@@ -55,33 +55,33 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected override Sprite LoadIconSprite()
         {
-            if (resourceManager == null)
-                return null;
-
-            // IconSonne prefab: SpriteRenderer or UI Image carrying the
-            // sprite — the exact structure of the proven IconLighthouse.
-            Resource<GameObject> prefab = resourceManager.RetrieveAsset<GameObject>(IconPrefabName, this, false);
-            if (prefab.Valid && prefab.Asset != null)
+            if (resourceManager != null)
             {
-                var image = prefab.Asset.GetComponent<UnityEngine.UI.Image>();
-                if (image != null && image.sprite != null)
-                    return image.sprite;
-                var spriteRenderer = prefab.Asset.GetComponent<SpriteRenderer>();
-                if (spriteRenderer != null && spriteRenderer.sprite != null)
-                    return spriteRenderer.sprite;
+                // IconSonne prefab: SpriteRenderer or UI Image carrying the
+                // sprite — the exact structure of the proven IconLighthouse.
+                Resource<GameObject> prefab = resourceManager.RetrieveAsset<GameObject>(IconPrefabName, this, false);
+                if (prefab.Valid && prefab.Asset != null)
+                {
+                    var image = prefab.Asset.GetComponent<UnityEngine.UI.Image>();
+                    if (image != null && image.sprite != null)
+                        return image.sprite;
+                    var spriteRenderer = prefab.Asset.GetComponent<SpriteRenderer>();
+                    if (spriteRenderer != null && spriteRenderer.sprite != null)
+                        return spriteRenderer.sprite;
+                }
+
+                Resource<Sprite> direct = resourceManager.RetrieveAsset<Sprite>(IconSpriteFallback, this, false);
+                if (direct.Valid && direct.Asset != null)
+                    return direct.Asset;
+
+                // Last resort: the texture behind the sprite import, wrapped in
+                // a runtime sprite (bundle lookups never resolve sub-assets).
+                Resource<Texture2D> texture = resourceManager.RetrieveAsset<Texture2D>(IconSpriteFallback, this, false);
+                if (texture.Valid && texture.Asset != null)
+                    return Sprite.Create(texture.Asset,
+                        new Rect(0f, 0f, texture.Asset.width, texture.Asset.height),
+                        new Vector2(0.5f, 0.5f));
             }
-
-            Resource<Sprite> direct = resourceManager.RetrieveAsset<Sprite>(IconSpriteFallback, this, false);
-            if (direct.Valid && direct.Asset != null)
-                return direct.Asset;
-
-            // Last resort: the texture behind the sprite import, wrapped in
-            // a runtime sprite (bundle lookups never resolve sub-assets).
-            Resource<Texture2D> texture = resourceManager.RetrieveAsset<Texture2D>(IconSpriteFallback, this, false);
-            if (texture.Valid && texture.Asset != null)
-                return Sprite.Create(texture.Asset,
-                    new Rect(0f, 0f, texture.Asset.width, texture.Asset.height),
-                    new Vector2(0.5f, 0.5f));
 
             // F229: ResourceManager cannot see the mod bundle, so the loads
             // above return null in a normal session — resolve the icon from

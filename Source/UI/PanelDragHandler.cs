@@ -204,13 +204,19 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (!moveCursorActive)
             {
-                cursorOverrideTexture = null;
+                if (cursorOverrideTexture.IsNotNull())
+                {
+                    Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+                    cursorOverrideTexture = null;
+                    cursorOverrideHotspot = Vector2.zero;
+                }
                 return;
             }
 
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
             moveCursorActive = false;
             cursorOverrideTexture = null;
+            cursorOverrideHotspot = Vector2.zero;
         }
 
         private void OnDestroy()

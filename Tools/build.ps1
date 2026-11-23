@@ -50,7 +50,7 @@ $refs = @(
 # Prefer Roslyn (modern C#) over the C# 5 framework compiler.
 $cscPath = $null
 $roslyn = Get-ChildItem "$env:ProgramFiles\dotnet\sdk" -Filter "csc.dll" -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -match "Roslyn" } | Sort-Object FullName -Descending | Select-Object -First 1
+    Where-Object { $_.FullName -match "Roslyn" } | Sort-Object { $m = [regex]::Match($_.FullName, '[\\/]sdk[\\/](\d+\.\d+\.\d+)'); if ($m.Success) { [version]$m.Groups[1].Value } else { [version]'0.0.0' } } -Descending | Select-Object -First 1
 if ($roslyn) {
     $cscPath = $roslyn.FullName
 } else {

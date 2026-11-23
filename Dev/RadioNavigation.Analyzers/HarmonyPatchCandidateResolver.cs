@@ -192,8 +192,8 @@ namespace RadioNavigation.Analyzers
             {
                 PatchCall = patchCall,
                 TargetExpr = target,
-                PrefixExpr = GetArgument(patchCall, "prefix", -1),
-                PostfixExpr = GetArgument(patchCall, "postfix", -1)
+                PrefixExpr = GetArgument(patchCall, "prefix", 1),
+                PostfixExpr = GetArgument(patchCall, "postfix", 2)
             };
         }
 

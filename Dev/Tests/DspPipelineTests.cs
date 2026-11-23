@@ -113,5 +113,41 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             }
             Assert.True(isVolatile, type.Name + "." + fieldName + " must be volatile");
         }
+
+        [Fact]
+        public void CarrierGenerator_InvalidSampleRateAndNaNFrequency_NeverEmitsNaN()
+        {
+            var zeroRate = new CarrierGenerator(0f);
+            zeroRate.Frequency = float.NaN;
+            zeroRate.Frequency = 500f;
+            float s1 = zeroRate.NextSample();
+            Assert.False(float.IsNaN(s1) || float.IsInfinity(s1));
+
+            var c = new CarrierGenerator(44100f);
+            c.Frequency = 500f;
+            c.NextSample();
+            c.Frequency = float.NaN;
+            float s2 = c.NextSample();
+            Assert.False(float.IsNaN(s2) || float.IsInfinity(s2));
+            c.Reset();
+            Assert.Equal(0f, c.NextSample());
+        }
+
+        [Fact]
+        public void AtmosphereAndReceiverDsp_RejectNonFiniteAndNegativeCutoff()
+        {
+            var atmo = new Atmosphere(7);
+            float a1 = atmo.Apply(float.NaN, 0f);
+            Assert.False(float.IsNaN(a1) || float.IsInfinity(a1));
+
+            var dsp = new ReceiverDsp(0f);
+            dsp.FilterCutoff = -5000f;
+            Assert.True(dsp.FilterCutoff >= 0f);
+            dsp.FilterCutoff = float.NaN;
+            dsp.WhistleLevel = 1f;
+            Assert.Equal(0f, dsp.Process(float.NaN, 0f));
+            float outVal = dsp.Process(0.5f, 0f);
+            Assert.InRange(outVal, -1f, 1f);
+        }
     }
 }

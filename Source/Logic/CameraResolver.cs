@@ -257,16 +257,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static Camera FindScreenCamera()
         {
-            if (cameraBuffer == null || cameraBuffer.Length == 0)
-                cameraBuffer = new Camera[16];
+            int needed = Camera.allCamerasCount;
+            if (cameraBuffer == null || cameraBuffer.Length < needed)
+                cameraBuffer = new Camera[Math.Max(16, needed + 4)];
 
             int count = Camera.GetAllCameras(cameraBuffer);
-            if (count >= cameraBuffer.Length)
-            {
-                cameraBuffer = new Camera[count + 4];
-                count = Camera.GetAllCameras(cameraBuffer);
-            }
-
             Camera best = null;
             for (int i = 0; i < count; i++)
             {
@@ -281,7 +276,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void OnAnyCameraPreCull(Camera cam)
         {
-            if (cam.orthographic || IsUtilityCamera(cam)) return;
+            if (cam == null || !cam.isActiveAndEnabled || cam.orthographic || cam.targetTexture != null || IsUtilityCamera(cam)) return;
             // Never anchor the sky to a sextant PIP camera (P7): its pose is
             // yaw-only and its far clip is mirrored per frame, so a frame that
             // resolves to it would snap the whole star shell.

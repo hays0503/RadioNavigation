@@ -1,4 +1,4 @@
-# Coverage for the custom xunit runner (vstest is unusable: restricted
+﻿# Coverage for the custom xunit runner (vstest is unusable: restricted
 # tokens crash testhost, so coverlet.collector is out).
 # Uses Microsoft.CodeCoverage in process mode — no vstest involved:
 #   1. dotnet tool install -g dotnet-coverage   (once)
@@ -36,6 +36,7 @@ $outputPath = if ([IO.Path]::IsPathRooted($Output)) { $Output } else { Join-Path
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outputPath) | Out-Null
 # Via the dotnet host: collecting against the raw exe leaves <packages>
 # empty (profiler does not attach, verified 2026-09-04).
+$env:DOTNET_TieredCompilation = "0"
 & dotnet-coverage collect -f cobertura -o $outputPath -- dotnet $runnerDll
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

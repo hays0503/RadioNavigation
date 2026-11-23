@@ -58,6 +58,8 @@ $reportDir = Join-Path $root "artifacts\reports\pvs"
 New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
 $plog = Join-Path $reportDir "pvs-report.plog"
 $txt = Join-Path $reportDir "pvs-report.txt"
+if (Test-Path -LiteralPath $plog) { Remove-Item -LiteralPath $plog -Force }
+if (Test-Path -LiteralPath $txt) { Remove-Item -LiteralPath $txt -Force }
 
 $threadLabel = if ($Threads -eq 0) { "auto" } else { $Threads }
 Write-Host "[RadioNavigation] Running PVS-Studio on $csproj ..."
@@ -91,6 +93,10 @@ if ($filesFail) {
     # We cannot prove there are no issues in files the analyzer never processed.
     # For a blocking quality gate that is a failure, not a warning.
     Write-Error "[RadioNavigation] PVS-Studio crashed analyzing some files; analysis incomplete (exit $code). See $plog"
+    exit 1
+}
+if (($code -band (-bnot (256 -bor 1024))) -ne 0) {
+    Write-Error "[RadioNavigation] PVS-Studio exited with unexpected failure code $code."
     exit 1
 }
 

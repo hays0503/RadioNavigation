@@ -75,6 +75,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Mirrored SSMS components on the PIP cameras (null until mirrored).</summary>
         public Component PipSsmsFog;
         public Component PipSsms;
+        private readonly List<Component> pipSsmsFogs = new List<Component>();
+        private readonly List<Component> pipSsmsList = new List<Component>();
 
         /// <summary>
         /// Copies the PostProcessLayer/SSMS components of the source camera
@@ -112,9 +114,15 @@ namespace UBOAT.Mods.RadioNavigation
                         targetPostLayers.Add(targetLayer);
                 }
                 else if (name == "SSMSGlobalFog")
+                {
                     PipSsmsFog = dst;
+                    pipSsmsFogs.Add(dst);
+                }
                 else if (name == "SSMS")
+                {
                     PipSsms = dst;
+                    pipSsmsList.Add(dst);
+                }
                 else if (name == "PostProcessingBehaviour")
                 {
                     // PPv1 profile arrives per-frame (SyncPostProfile): the
@@ -137,10 +145,24 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Refreshes the mirrored SSMS fields from the live sources.</summary>
         public void RefreshSsms(Component sourceSsmsFog, Component sourceSsms)
         {
-            if (PipSsmsFog != null && sourceSsmsFog != null)
-                CopyMembers(sourceSsmsFog, PipSsmsFog, GetMirrorMembersCached(sourceSsmsFog.GetType()));
-            if (PipSsms != null && sourceSsms != null)
-                CopyMembers(sourceSsms, PipSsms, GetMirrorMembersCached(sourceSsms.GetType()));
+            if (sourceSsmsFog != null && pipSsmsFogs.Count > 0)
+            {
+                MemberInfo[] members = GetMirrorMembersCached(sourceSsmsFog.GetType());
+                for (int i = 0; i < pipSsmsFogs.Count; i++)
+                {
+                    if (pipSsmsFogs[i] != null)
+                        CopyMembers(sourceSsmsFog, pipSsmsFogs[i], members);
+                }
+            }
+            if (sourceSsms != null && pipSsmsList.Count > 0)
+            {
+                MemberInfo[] members = GetMirrorMembersCached(sourceSsms.GetType());
+                for (int i = 0; i < pipSsmsList.Count; i++)
+                {
+                    if (pipSsmsList[i] != null)
+                        CopyMembers(sourceSsms, pipSsmsList[i], members);
+                }
+            }
         }
 
         /// <summary>
@@ -272,12 +294,12 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public void SyncInteriorAmbient(Component sourceSsmsFog)
         {
-            if (sourceSsmsFog == null || PipSsmsFog == null)
+            if (sourceSsmsFog == null || pipSsmsFogs.Count == 0)
                 return;
             if (sourceInteriorAmbientMember == null)
                 sourceInteriorAmbientMember = TypeMemberCache.GetInstanceMember(
                     sourceSsmsFog.GetType(), InteriorAmbientFieldName);
-            if (pipInteriorAmbientMember == null)
+            if (pipInteriorAmbientMember == null && PipSsmsFog != null)
                 pipInteriorAmbientMember = TypeMemberCache.GetInstanceMember(
                     PipSsmsFog.GetType(), InteriorAmbientFieldName);
             if (sourceInteriorAmbientMember == null || pipInteriorAmbientMember == null)
@@ -297,7 +319,11 @@ namespace UBOAT.Mods.RadioNavigation
                 object value = ReadMemberValue(sourceInteriorAmbientMember, sourceSsmsFog);
                 if (value == null)
                     return;
-                WriteMemberValue(pipInteriorAmbientMember, PipSsmsFog, value);
+                for (int i = 0; i < pipSsmsFogs.Count; i++)
+                {
+                    if (pipSsmsFogs[i] != null)
+                        WriteMemberValue(pipInteriorAmbientMember, pipSsmsFogs[i], value);
+                }
             }
             catch (Exception e)
             {

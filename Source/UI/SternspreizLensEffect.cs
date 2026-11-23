@@ -102,6 +102,8 @@ namespace UBOAT.Mods.RadioNavigation
         private Quaternion lastCamRot;
         private double lastLstDeg = double.NaN;
         private float lastLat = float.NaN;
+        private float lastFov = float.NaN;
+        private float lastLengthDeg = float.NaN;
         private float lastRebuildRealtime;
         private float lastTiltRebuildRealtime = float.NegativeInfinity;
         private float lastTiltDeg = float.NaN;
@@ -123,6 +125,8 @@ namespace UBOAT.Mods.RadioNavigation
             get
             {
                 float value = PlayerPrefs.GetFloat(LengthPrefsKey, DefaultLengthDeg);
+                if (float.IsNaN(value) || float.IsInfinity(value))
+                    return DefaultLengthDeg;
                 if (value < MinLengthDeg)
                     value = MinLengthDeg;
                 if (value > MaxLengthDeg)
@@ -242,11 +246,15 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (lastRebuildFrame < 0)
                 return true;
-            if (!positionProvider.TryGetPosition(out float lat, out _))
+            if (!positionProvider.TryGetPosition(out float lat, out float lon))
                 return false;
 
+            if (Math.Abs(pipCamera.fieldOfView - lastFov) > 0.01f
+                || Math.Abs(LengthDeg - lastLengthDeg) > 0.01f)
+                return true;
+
             DateTime utc = GameTimeResolver.GetUtcNow();
-            double lstDeg = AstroMath.LstDeg(AstroMath.ToJulianDay(utc), 0d);
+            double lstDeg = AstroMath.LstDeg(AstroMath.ToJulianDay(utc), lon);
             if (!MeshRebuildPolicy.NeedsRebuild(pipCamera.transform.position, lastCamPos,
                     pipCamera.transform.rotation, lastCamRot, lstDeg, lastLstDeg, lat, lastLat,
                     true))
@@ -280,6 +288,8 @@ namespace UBOAT.Mods.RadioNavigation
             lastCamRot = pipCamera.transform.rotation;
             lastLstDeg = lstDeg;
             lastLat = lat;
+            lastFov = pipCamera.fieldOfView;
+            lastLengthDeg = LengthDeg;
             lastRebuildRealtime = Time.realtimeSinceStartup;
         }
 
@@ -431,6 +441,8 @@ namespace UBOAT.Mods.RadioNavigation
             // exactly this half of the target, so the horizon half stays
             // byte-identical even when the SRP hands both PIP cameras the
             // same colour buffer.
+            if (!sourceAliasesDestination)
+                commandBuffer.Blit(source, destination);
             commandBuffer.EnableScissorRect(
                 new Rect(width * InteriorHalfSplit, 0f, width * (1f - InteriorHalfSplit), height));
             commandBuffer.Blit(sceneSource, destination, interiorMaterial, 3);

@@ -177,7 +177,7 @@ public class Patcher
         var m = typeof(Foo).GetMethod(""ApplyToolPositionLimits"", BindingFlags.Static | BindingFlags.NonPublic);
         h.Patch(m, postfix: new HarmonyLib.HarmonyMethod(typeof(Patcher).GetMethod(""P"")));
     }
-    public static void P(Foo __instance) {}
+    public static void P() {}
 }
 ";
             AssertNone(Run(src));
@@ -361,7 +361,46 @@ public class Patcher
         var target = typeof(Foo).GetMethod(""Bar"", BindingFlags.Public | BindingFlags.Instance);
         h.Patch(target, postfix: new HarmonyLib.HarmonyMethod(typeof(Patcher).GetMethod(""P"")));
     }
-    public static void P() {}
+    public static void P(Foo __instance) {}
+}
+";
+            AssertNone(Run(src));
+        }
+
+        [Fact]
+        public void PositionalPrefixAndTypedArray_MismatchReportsRN0003()
+        {
+            var src = @"
+using System;
+using System.Reflection;
+public class Foo { public void Bar(int x) {} public static void Bar(string s) {} }
+public class Patcher
+{
+    public void Apply(HarmonyLib.Harmony h)
+    {
+        var target = typeof(Foo).GetMethod(""Bar"", new Type[] { typeof(int) }, BindingFlags.Public | BindingFlags.Instance);
+        h.Patch(target, new HarmonyLib.HarmonyMethod(typeof(Patcher).GetMethod(""P"")));
+    }
+    public static bool P(string x) { return true; }
+}
+";
+            AssertHas("RN0003", Run(src));
+        }
+
+        [Fact]
+        public void RequireStaticPin_DisambiguatesRoslynVisibleOverloads()
+        {
+            var src = @"
+using System.Reflection;
+public class Foo { public void Bar(int x) {} public static void Bar(string s) {} }
+public class Patcher
+{
+    public void Apply(HarmonyLib.Harmony h)
+    {
+        var target = typeof(Foo).GetMethod(""Bar"", BindingFlags.Public | BindingFlags.Static);
+        h.Patch(target, prefix: new HarmonyLib.HarmonyMethod(typeof(Patcher).GetMethod(""P"")));
+    }
+    public static bool P(string s) { return true; }
 }
 ";
             AssertNone(Run(src));

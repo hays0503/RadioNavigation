@@ -106,6 +106,20 @@ namespace RadioNavigation.Analyzers
             if (name == null || !LookupMethodNames.Contains(name))
                 return;
 
+            if (name == "Find")
+            {
+                var symbol = context.SemanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+                if (symbol != null && !IsUnityMainThreadType(symbol.ContainingType))
+                    return;
+                if (invocation.Expression is MemberAccessExpressionSyntax findMa)
+                {
+                    var recvType = context.SemanticModel.GetTypeInfo(findMa.Expression).Type
+                        ?? context.SemanticModel.GetSymbolInfo(findMa.Expression).Symbol as ITypeSymbol;
+                    if (recvType != null && !IsUnityMainThreadType(recvType))
+                        return;
+                }
+            }
+
             context.ReportDiagnostic(Diagnostic.Create(
                 Diagnostics.UnityLifecycleMisuse,
                 invocation.GetLocation(),
@@ -151,8 +165,12 @@ namespace RadioNavigation.Analyzers
             switch (context.Node.Kind())
             {
                 case SyntaxKind.ObjectCreationExpression:
-                    ReportAudioAllocation(context, context.Node, "new");
+                {
+                    var createdType = context.SemanticModel.GetTypeInfo(context.Node).Type;
+                    if (createdType == null || !createdType.IsValueType)
+                        ReportAudioAllocation(context, context.Node, "new");
                     break;
+                }
                 case SyntaxKind.InterpolatedStringExpression:
                     ReportAudioAllocation(context, context.Node, "string interpolation");
                     break;
@@ -228,8 +246,12 @@ namespace RadioNavigation.Analyzers
 
             if (LinqMethodNames.Contains(name))
             {
-                ReportAudioAllocation(context, invocation, $"LINQ {name}");
-                return;
+                var symbol = context.SemanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+                if (symbol == null || symbol.ContainingNamespace?.ToDisplayString() == "System.Linq")
+                {
+                    ReportAudioAllocation(context, invocation, $"LINQ {name}");
+                    return;
+                }
             }
 
             // Boxing: implicit conversion of a value type to object/interface via a call
@@ -373,6 +395,9 @@ namespace RadioNavigation.Analyzers
             var body = lambda.Body;
             foreach (var memberAccess in body.DescendantNodesAndSelf().OfType<MemberAccessExpressionSyntax>())
             {
+                if (memberAccess.Parent is InvocationExpressionSyntax parentInv
+                    && parentInv.Expression == memberAccess)
+                    continue;
                 var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression).Type;
                 if (receiverType == null)
                     continue;
@@ -382,6 +407,19 @@ namespace RadioNavigation.Analyzers
                         Diagnostics.MainThreadApiMisuse,
                         memberAccess.GetLocation(),
                         $"{memberAccess.Name.Identifier.ValueText}",
+                        executor));
+                }
+            }
+
+            foreach (var creation in body.DescendantNodesAndSelf().OfType<ObjectCreationExpressionSyntax>())
+            {
+                var createdType = context.SemanticModel.GetTypeInfo(creation).Type;
+                if (createdType != null && IsUnityMainThreadType(createdType))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        Diagnostics.MainThreadApiMisuse,
+                        creation.GetLocation(),
+                        createdType.Name,
                         executor));
                 }
             }
@@ -402,9 +440,24 @@ namespace RadioNavigation.Analyzers
                     continue;
                 }
 
-                // Unresolved symbol (e.g. GetComponent<T>() not declared in a stub): treat
-                // a bare instance call inside a type deriving from UnityEngine as main-thread
-                // API misuse, but only for well-known Unity API names to avoid over-firing.
+                // Unresolved symbol (e.g. GetComponent<T>() not declared in a stub): check
+                // either a member access whose receiver/type is UnityEngine, or a bare
+                // call inside a MonoBehaviour/UnityEngine subclass.
+                if (invocation.Expression is MemberAccessExpressionSyntax ma)
+                {
+                    var recv = context.SemanticModel.GetTypeInfo(ma.Expression).Type
+                        ?? context.SemanticModel.GetSymbolInfo(ma.Expression).Symbol as ITypeSymbol;
+                    if (recv != null && IsUnityMainThreadType(recv))
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            Diagnostics.MainThreadApiMisuse,
+                            invocation.GetLocation(),
+                            ma.Name.Identifier.ValueText,
+                            executor));
+                    }
+                    continue;
+                }
+
                 if (invocation.Expression is IdentifierNameSyntax || invocation.Expression is GenericNameSyntax)
                 {
                     string calledName = GetCalledName(invocation);

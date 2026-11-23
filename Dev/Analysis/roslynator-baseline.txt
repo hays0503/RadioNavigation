@@ -1,132 +1,132 @@
-Source\Data\BeaconData.cs : warning RCS1161:
-Source\Data\MiniJson.cs : warning RCS1221:
-Source\Data\SignalTypes.cs : warning RCS1161:
-Source\Logic\CameraResolver.cs : warning RCS1146:
-Source\Logic\CelestialShaderResolver.cs : warning RCS1146:
-Source\Logic\CloudOcclusionBinding.cs : warning RCS1198:
-Source\Logic\ConstellationMesh.cs : warning RCS1128:
-Source\Logic\ConstellationMesh.cs : warning RCS1146:
-Source\Logic\ConstellationMesh.cs : warning RCS1198:
-Source\Logic\ConstellationMesh.cs : warning RCS1213:
-Source\Logic\CurrentRuntimeAdapter.cs : warning RCS1213:
-Source\Logic\GameStarLayerSuppressor.cs : warning RCS1146:
-Source\Logic\GameStarLayerSuppressor.cs : warning RCS1238:
-Source\Logic\LighthouseBeamGlow.cs : warning RCS1213:
-Source\Logic\LighthouseCoastProbe.cs : warning RCS1129:
-Source\Logic\LighthouseCoastProbe.cs : warning RCS1169:
-Source\Logic\LighthouseDiagnostics.cs : warning RCS1146:
-Source\Logic\LighthouseDistanceGate.cs : warning RCS1161:
-Source\Logic\LighthouseDotUi.cs : warning RCS1146:
-Source\Logic\LighthouseFlareDriver.cs : warning RCS1146:
-Source\Logic\LighthouseHeightProbe.cs : warning RCS1129:
-Source\Logic\LighthouseHeightProbe.cs : warning RCS1146:
-Source\Logic\LighthouseHeightProbe.cs : warning RCS1169:
-Source\Logic\LighthouseLandSweep.cs : warning RCS1129:
-Source\Logic\LighthouseLandSweep.cs : warning RCS1169:
-Source\Logic\LighthousePlacer.cs : warning RCS1129:
-Source\Logic\LighthousePlacer.cs : warning RCS1146:
-Source\Logic\LighthousePlacer.cs : warning RCS1169:
-Source\Logic\LighthousePlacer.cs : warning RCS1213:
-Source\Logic\LighthouseRotator.cs : warning RCS1213:
-Source\Logic\LighthouseScreenProjection.cs : warning RCS1146:
-Source\Logic\LighthouseSpotLight.cs : warning RCS1129:
-Source\Logic\LighthouseSpotLight.cs : warning RCS1169:
-Source\Logic\LighthouseVisualModel.cs : warning RCS1238:
-Source\Logic\Main.cs : warning RCS1129:
-Source\Logic\Main.cs : warning RCS1169:
-Source\Logic\ModBootstrapper.cs : warning RCS1221:
-Source\Logic\MoonDiscRenderer.cs : warning RCS1146:
-Source\Logic\MoonDiscRenderer.cs : warning RCS1213:
-Source\Logic\MorseKeyer.cs : warning RCS1161:
-Source\Logic\PlanetRenderer.cs : warning RCS1146:
-Source\Logic\PlanetRenderer.cs : warning RCS1213:
-Source\Logic\RadioStoryIntegration.cs : warning RCS1163:
-Source\Logic\SextantCelestialRenderScopePatch.cs : warning RCS1128:
-Source\Logic\SextantSightLineColor.cs : warning RCS1238:
-Source\Logic\SkyBrightness.cs : warning RCS1238:
-Source\Logic\SkyMaterialProbe.cs : warning RCS1146:
-Source\Logic\SkyMaterialProbe.cs : warning RCS1213:
-Source\Logic\SkyVisibilityResolver.cs : warning RCS1146:
-Source\Logic\SkyVisibilityResolver.cs : warning RCS1169:
-Source\Logic\SonneController.cs : warning RCS1169:
-Source\Logic\SonneController.cs : warning RCS1213:
-Source\Logic\StarSkyPhase0Probe.cs : warning RCS1129:
-Source\Logic\StarSkyPhase0Probe.cs : warning RCS1146:
-Source\Logic\StarSkyPhase0Probe.cs : warning RCS1198:
-Source\Logic\StarSkyPhase0Probe.cs : warning RCS1213:
-Source\Logic\StarsMesh.cs : warning RCS1128:
-Source\Logic\StarsMesh.cs : warning RCS1146:
-Source\Logic\StarsMesh.cs : warning RCS1198:
-Source\Logic\StarsMesh.cs : warning RCS1213:
-Source\Logic\StationScheduler.cs : warning RCS1161:
-Source\Logic\SternspreizPipRenderScopePatch.cs : warning RCS1146:
-Source\Logic\SunDiscRenderer.cs : warning RCS1146:
-Source\Logic\SunDiscRenderer.cs : warning RCS1213:
-Source\Logic\WindProbeRuntime.cs : warning RCS1213:
-Source\Sound\DspPipeline.cs : warning RCS1169:
-Source\UI\ChronometerCursorPolicy.cs : warning RCS1161:
-Source\UI\ChronometerCursorPolicy.cs : warning RCS1238:
-Source\UI\ChronometerOverlayHandler.cs : warning RCS1146:
-Source\UI\ChronometerOverlayHandler.cs : warning RCS1169:
-Source\UI\ChronometerOverlayHandler.cs : warning RCS1213:
-Source\UI\ChronometerScaleControl.cs : warning RCS1213:
-Source\UI\CPlathAdaptiveAnimationPlayer.cs : warning RCS1161:
-Source\UI\CPlathAdaptiveAnimationPlayer.cs : warning RCS1213:
-Source\UI\CPlathAdaptiveBindingReader.cs : warning RCS1221:
-Source\UI\CPlathAdaptiveMechanismRig.cs : warning RCS1238:
-Source\UI\CPlathAnimatedActor.cs : warning RCS1146:
-Source\UI\CPlathAnimatedActor.cs : warning RCS1221:
-Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1146:
-Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1169:
-Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1213:
-Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1221:
-Source\UI\CPlathHeldModel.cs : warning RCS1146:
-Source\UI\CPlathHeldModel.cs : warning RCS1221:
-Source\UI\CPlathHeldModel.cs : warning RCS1238:
-Source\UI\CPlathReadPointer.cs : warning RCS1128:
-Source\UI\CPlathReadPointer.cs : warning RCS1146:
-Source\UI\CPlathReadPointer.cs : warning RCS1213:
-Source\UI\CursorHandler.cs : warning RCS1213:
-Source\UI\DebugAngleHandler.cs : warning RCS1213:
-Source\UI\ExpanderHandler.cs : warning RCS1213:
-Source\UI\FixCardComposer.cs : warning RCS1238:
-Source\UI\FixMapMarker.cs : warning RCS1146:
-Source\UI\GroundHandler.cs : warning RCS1213:
-Source\UI\InformationPanelHandler.cs : warning RCS1213:
-Source\UI\InformationPanelHandler.cs : warning RCS1238:
-Source\UI\LighthouseMapMarker.cs : warning RCS1146:
-Source\UI\MapMarkerPointBridge.cs : warning RCS1146:
-Source\UI\NavMapMarkerBase.cs : warning RCS1129:
-Source\UI\NavMapMarkerBase.cs : warning RCS1146:
-Source\UI\NavMapMarkerBase.cs : warning RCS1213:
-Source\UI\PanelDragHandler.cs : warning RCS1213:
-Source\UI\RadioHandler.cs : warning RCS1213:
-Source\UI\SextantBloomCut.cs : warning RCS1146:
-Source\UI\SextantCameraProbe.cs : warning RCS1213:
-Source\UI\SextantController.cs : warning RCS1129:
-Source\UI\SextantController.cs : warning RCS1146:
-Source\UI\SextantController.cs : warning RCS1221:
-Source\UI\SextantDmFormat.cs : warning RCS1238:
-Source\UI\SextantEffectMirror.cs : warning RCS1146:
-Source\UI\SextantGameSun.cs : warning RCS1173:
-Source\UI\SextantInteriorMirror.cs : warning RCS1146:
-Source\UI\SextantInteriorPoseFollower.cs : warning RCS1213:
-Source\UI\SextantLopMapLines.cs : warning RCS1128:
-Source\UI\SextantLuneOverlay.cs : warning RCS1146:
-Source\UI\SextantOcularBuilder.cs : warning RCS1146:
-Source\UI\SextantPipFactory.cs : warning RCS1128:
-Source\UI\SextantPipFactory.cs : warning RCS1146:
-Source\UI\SextantPipInteriorPose.cs : warning RCS1146:
-Source\UI\SextantPipInteriorPose.cs : warning RCS1213:
-Source\UI\SextantPipPose.cs : warning RCS1146:
-Source\UI\SextantRenderPasses.cs : warning RCS1146:
-Source\UI\SextantWorksheet.cs : warning RCS1238:
-Source\UI\ShipControlUIBridge.cs : warning RCS1146:
-Source\UI\SpinnerHandlerBase.cs : warning RCS1129:
-Source\UI\StationMapMarker.cs : warning RCS1146:
-Source\UI\StationMapOverlay.cs : warning RCS1213:
-Source\UI\SternspreizLensEffect.cs : warning RCS1146:
-Source\UI\ToggleHandler.cs : warning RCS1213:
-Source\UI\ZoneHandler.cs : warning RCS1129:
-Source\UI\ZoneHandler.cs : warning RCS1169:
-Source\UI\ZoneHandler.cs : warning RCS1213:
+Source\Data\BeaconData.cs : warning RCS1161: Enum should declare explicit values
+Source\Data\MiniJson.cs : warning RCS1221: Use pattern matching instead of combination of 'as' operator and null check
+Source\Data\SignalTypes.cs : warning RCS1161: Enum should declare explicit values
+Source\Logic\CameraResolver.cs : warning RCS1146: Use conditional access
+Source\Logic\CelestialShaderResolver.cs : warning RCS1146: Use conditional access
+Source\Logic\CloudOcclusionBinding.cs : warning RCS1198: Avoid unnecessary boxing of value type
+Source\Logic\ConstellationMesh.cs : warning RCS1128: Use coalesce expression
+Source\Logic\ConstellationMesh.cs : warning RCS1146: Use conditional access
+Source\Logic\ConstellationMesh.cs : warning RCS1198: Avoid unnecessary boxing of value type
+Source\Logic\ConstellationMesh.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\CurrentRuntimeAdapter.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\GameStarLayerSuppressor.cs : warning RCS1146: Use conditional access
+Source\Logic\GameStarLayerSuppressor.cs : warning RCS1238: Avoid nested ?: operators
+Source\Logic\LighthouseBeamGlow.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\LighthouseCoastProbe.cs : warning RCS1129: Remove redundant field initialization
+Source\Logic\LighthouseCoastProbe.cs : warning RCS1169: Make field read-only
+Source\Logic\LighthouseDiagnostics.cs : warning RCS1146: Use conditional access
+Source\Logic\LighthouseDistanceGate.cs : warning RCS1161: Enum should declare explicit values
+Source\Logic\LighthouseDotUi.cs : warning RCS1146: Use conditional access
+Source\Logic\LighthouseFlareDriver.cs : warning RCS1146: Use conditional access
+Source\Logic\LighthouseHeightProbe.cs : warning RCS1129: Remove redundant field initialization
+Source\Logic\LighthouseHeightProbe.cs : warning RCS1146: Use conditional access
+Source\Logic\LighthouseHeightProbe.cs : warning RCS1169: Make field read-only
+Source\Logic\LighthouseLandSweep.cs : warning RCS1129: Remove redundant field initialization
+Source\Logic\LighthouseLandSweep.cs : warning RCS1169: Make field read-only
+Source\Logic\LighthousePlacer.cs : warning RCS1129: Remove redundant field initialization
+Source\Logic\LighthousePlacer.cs : warning RCS1146: Use conditional access
+Source\Logic\LighthousePlacer.cs : warning RCS1169: Make field read-only
+Source\Logic\LighthousePlacer.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\LighthouseRotator.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\LighthouseScreenProjection.cs : warning RCS1146: Use conditional access
+Source\Logic\LighthouseSpotLight.cs : warning RCS1129: Remove redundant field initialization
+Source\Logic\LighthouseSpotLight.cs : warning RCS1169: Make field read-only
+Source\Logic\LighthouseVisualModel.cs : warning RCS1238: Avoid nested ?: operators
+Source\Logic\Main.cs : warning RCS1129: Remove redundant field initialization
+Source\Logic\Main.cs : warning RCS1169: Make field read-only
+Source\Logic\ModBootstrapper.cs : warning RCS1221: Use pattern matching instead of combination of 'as' operator and null check
+Source\Logic\MoonDiscRenderer.cs : warning RCS1146: Use conditional access
+Source\Logic\MoonDiscRenderer.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\MorseKeyer.cs : warning RCS1161: Enum should declare explicit values
+Source\Logic\PlanetRenderer.cs : warning RCS1146: Use conditional access
+Source\Logic\PlanetRenderer.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\RadioStoryIntegration.cs : warning RCS1163: Unused parameter '__instance'
+Source\Logic\SextantCelestialRenderScopePatch.cs : warning RCS1128: Use coalesce expression
+Source\Logic\SextantSightLineColor.cs : warning RCS1238: Avoid nested ?: operators
+Source\Logic\SkyBrightness.cs : warning RCS1238: Avoid nested ?: operators
+Source\Logic\SkyMaterialProbe.cs : warning RCS1146: Use conditional access
+Source\Logic\SkyMaterialProbe.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\SkyVisibilityResolver.cs : warning RCS1146: Use conditional access
+Source\Logic\SkyVisibilityResolver.cs : warning RCS1169: Make field read-only
+Source\Logic\SonneController.cs : warning RCS1169: Make field read-only
+Source\Logic\SonneController.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\StarSkyPhase0Probe.cs : warning RCS1129: Remove redundant field initialization
+Source\Logic\StarSkyPhase0Probe.cs : warning RCS1146: Use conditional access
+Source\Logic\StarSkyPhase0Probe.cs : warning RCS1198: Avoid unnecessary boxing of value type
+Source\Logic\StarSkyPhase0Probe.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\StarsMesh.cs : warning RCS1128: Use coalesce expression
+Source\Logic\StarsMesh.cs : warning RCS1146: Use conditional access
+Source\Logic\StarsMesh.cs : warning RCS1198: Avoid unnecessary boxing of value type
+Source\Logic\StarsMesh.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\StationScheduler.cs : warning RCS1161: Enum should declare explicit values
+Source\Logic\SternspreizPipRenderScopePatch.cs : warning RCS1146: Use conditional access
+Source\Logic\SunDiscRenderer.cs : warning RCS1146: Use conditional access
+Source\Logic\SunDiscRenderer.cs : warning RCS1213: Remove unused method declaration
+Source\Logic\WindProbeRuntime.cs : warning RCS1213: Remove unused method declaration
+Source\Sound\DspPipeline.cs : warning RCS1169: Make field read-only
+Source\UI\ChronometerCursorPolicy.cs : warning RCS1161: Enum should declare explicit values
+Source\UI\ChronometerCursorPolicy.cs : warning RCS1238: Avoid nested ?: operators
+Source\UI\ChronometerOverlayHandler.cs : warning RCS1146: Use conditional access
+Source\UI\ChronometerOverlayHandler.cs : warning RCS1169: Make field read-only
+Source\UI\ChronometerOverlayHandler.cs : warning RCS1213: Remove unused method declaration
+Source\UI\ChronometerScaleControl.cs : warning RCS1213: Remove unused method declaration
+Source\UI\CPlathAdaptiveAnimationPlayer.cs : warning RCS1161: Enum should declare explicit values
+Source\UI\CPlathAdaptiveAnimationPlayer.cs : warning RCS1213: Remove unused method declaration
+Source\UI\CPlathAdaptiveBindingReader.cs : warning RCS1221: Use pattern matching instead of combination of 'as' operator and null check
+Source\UI\CPlathAdaptiveMechanismRig.cs : warning RCS1238: Avoid nested ?: operators
+Source\UI\CPlathAnimatedActor.cs : warning RCS1146: Use conditional access
+Source\UI\CPlathAnimatedActor.cs : warning RCS1221: Use pattern matching instead of combination of 'as' operator and null check
+Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1146: Use conditional access
+Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1169: Make field read-only
+Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1213: Remove unused method declaration
+Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1221: Use pattern matching instead of combination of 'as' operator and null check
+Source\UI\CPlathHeldModel.cs : warning RCS1146: Use conditional access
+Source\UI\CPlathHeldModel.cs : warning RCS1221: Use pattern matching instead of combination of 'as' operator and null check
+Source\UI\CPlathHeldModel.cs : warning RCS1238: Avoid nested ?: operators
+Source\UI\CPlathReadPointer.cs : warning RCS1128: Use coalesce expression
+Source\UI\CPlathReadPointer.cs : warning RCS1146: Use conditional access
+Source\UI\CPlathReadPointer.cs : warning RCS1213: Remove unused method declaration
+Source\UI\CursorHandler.cs : warning RCS1213: Remove unused method declaration
+Source\UI\DebugAngleHandler.cs : warning RCS1213: Remove unused method declaration
+Source\UI\ExpanderHandler.cs : warning RCS1213: Remove unused method declaration
+Source\UI\FixCardComposer.cs : warning RCS1238: Avoid nested ?: operators
+Source\UI\FixMapMarker.cs : warning RCS1146: Use conditional access
+Source\UI\GroundHandler.cs : warning RCS1213: Remove unused method declaration
+Source\UI\InformationPanelHandler.cs : warning RCS1213: Remove unused method declaration
+Source\UI\InformationPanelHandler.cs : warning RCS1238: Avoid nested ?: operators
+Source\UI\LighthouseMapMarker.cs : warning RCS1146: Use conditional access
+Source\UI\MapMarkerPointBridge.cs : warning RCS1146: Use conditional access
+Source\UI\NavMapMarkerBase.cs : warning RCS1129: Remove redundant field initialization
+Source\UI\NavMapMarkerBase.cs : warning RCS1146: Use conditional access
+Source\UI\NavMapMarkerBase.cs : warning RCS1213: Remove unused method declaration
+Source\UI\PanelDragHandler.cs : warning RCS1213: Remove unused method declaration
+Source\UI\RadioHandler.cs : warning RCS1213: Remove unused method declaration
+Source\UI\SextantBloomCut.cs : warning RCS1146: Use conditional access
+Source\UI\SextantCameraProbe.cs : warning RCS1213: Remove unused method declaration
+Source\UI\SextantController.cs : warning RCS1129: Remove redundant field initialization
+Source\UI\SextantController.cs : warning RCS1146: Use conditional access
+Source\UI\SextantController.cs : warning RCS1221: Use pattern matching instead of combination of 'as' operator and null check
+Source\UI\SextantDmFormat.cs : warning RCS1238: Avoid nested ?: operators
+Source\UI\SextantEffectMirror.cs : warning RCS1146: Use conditional access
+Source\UI\SextantGameSun.cs : warning RCS1173: Use coalesce expression instead of 'if'
+Source\UI\SextantInteriorMirror.cs : warning RCS1146: Use conditional access
+Source\UI\SextantInteriorPoseFollower.cs : warning RCS1213: Remove unused method declaration
+Source\UI\SextantLopMapLines.cs : warning RCS1128: Use coalesce expression
+Source\UI\SextantLuneOverlay.cs : warning RCS1146: Use conditional access
+Source\UI\SextantOcularBuilder.cs : warning RCS1146: Use conditional access
+Source\UI\SextantPipFactory.cs : warning RCS1128: Use coalesce expression
+Source\UI\SextantPipFactory.cs : warning RCS1146: Use conditional access
+Source\UI\SextantPipInteriorPose.cs : warning RCS1146: Use conditional access
+Source\UI\SextantPipInteriorPose.cs : warning RCS1213: Remove unused method declaration
+Source\UI\SextantPipPose.cs : warning RCS1146: Use conditional access
+Source\UI\SextantRenderPasses.cs : warning RCS1146: Use conditional access
+Source\UI\SextantWorksheet.cs : warning RCS1238: Avoid nested ?: operators
+Source\UI\ShipControlUIBridge.cs : warning RCS1146: Use conditional access
+Source\UI\SpinnerHandlerBase.cs : warning RCS1129: Remove redundant field initialization
+Source\UI\StationMapMarker.cs : warning RCS1146: Use conditional access
+Source\UI\StationMapOverlay.cs : warning RCS1213: Remove unused method declaration
+Source\UI\SternspreizLensEffect.cs : warning RCS1146: Use conditional access
+Source\UI\ToggleHandler.cs : warning RCS1213: Remove unused method declaration
+Source\UI\ZoneHandler.cs : warning RCS1129: Remove redundant field initialization
+Source\UI\ZoneHandler.cs : warning RCS1169: Make field read-only
+Source\UI\ZoneHandler.cs : warning RCS1213: Remove unused method declaration

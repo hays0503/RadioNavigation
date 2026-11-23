@@ -77,7 +77,7 @@ namespace UBOAT.Mods.RadioNavigation
                 }
             }
 
-            return all.Length > 0 ? all[0] : null;
+            return null;
         }
 
         /// <summary>
@@ -136,17 +136,21 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (positionBridgeProbed)
                 return chronoPosOverrideProp != null && applyToolPositionLimitsMethod != null;
-            positionBridgeProbed = true;
 
             try
             {
                 if (uiDialsDataHolderField == null)
                     uiDialsDataHolderField = typeof(ShipControlUI).GetField(
                         "uiDialsDataHolder", BindingFlags.Static | BindingFlags.NonPublic);
-                object holder = uiDialsDataHolderField?.GetValue(null);
+                object holder = uiDialsDataHolderField != null ? uiDialsDataHolderField.GetValue(null) : null;
                 if (holder == null)
+                {
+                    if (uiDialsDataHolderField == null)
+                        positionBridgeProbed = true;
                     return false;
+                }
 
+                positionBridgeProbed = true;
                 Type iface = holder.GetType().GetInterface("IUserInterfaceDialsDataHolder");
                 if (iface != null)
                     chronoPosOverrideProp = iface.GetProperty("ChronometerPosOverride");
@@ -158,6 +162,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             catch (Exception e)
             {
+                positionBridgeProbed = true;
                 Debug.LogWarning("[RadioNav][Chronometer] expanded-drag position bridge failed: " + e.Message);
                 return false;
             }

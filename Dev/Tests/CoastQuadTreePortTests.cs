@@ -135,7 +135,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(LeuchtfeuerRegistry.Initialize(FindDataDirectory(), null),
                 LeuchtfeuerRegistry.LastLoadError);
 
-            var live = new Dictionary<string, double>(StringComparer.Ordinal);
+            var live = new Dictionary<string, (double Dist, double Lat, double Lon)>(StringComparer.Ordinal);
             string[] lines = File.ReadAllLines(csvPath);
             for (int i = 1; i < lines.Length; i++)
             {
@@ -146,9 +146,13 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 }
 
                 double d;
-                if (double.TryParse(cells[5], NumberStyles.Float, CultureInfo.InvariantCulture, out d))
+                double csvLat;
+                double csvLon;
+                if (double.TryParse(cells[5], NumberStyles.Float, CultureInfo.InvariantCulture, out d)
+                    && double.TryParse(cells[3], NumberStyles.Float, CultureInfo.InvariantCulture, out csvLat)
+                    && double.TryParse(cells[4], NumberStyles.Float, CultureInfo.InvariantCulture, out csvLon))
                 {
-                    live[cells[0]] = d;
+                    live[cells[0]] = (d, csvLat, csvLon);
                 }
             }
 
@@ -156,11 +160,18 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             for (int i = 0; i < LeuchtfeuerRegistry.Profiles.Count; i++)
             {
                 LighthouseProfile profile = LeuchtfeuerRegistry.Profiles[i];
-                double liveDistance;
-                if (!live.TryGetValue(profile.Code ?? "", out liveDistance))
+                (double Dist, double Lat, double Lon) entry;
+                if (!live.TryGetValue(profile.Code ?? "", out entry))
                 {
                     continue;
                 }
+                if (Math.Abs(profile.Latitude - entry.Lat) > 0.001
+                    || Math.Abs(profile.Longitude - entry.Lon) > 0.001)
+                {
+                    continue;
+                }
+
+                double liveDistance = entry.Dist;
 
                 double offline = DistanceKm(port, profile.Latitude, profile.Longitude);
 

@@ -57,8 +57,9 @@ namespace UBOAT.Mods.RadioNavigation
         // LighthouseGlowArt (extracted); the static renderingCamera stays
         // here (per-frame camera hand-off with CameraResolver).
         private static Camera renderingCamera;
-        private Camera farRaisedCamera;
-        private float farRaisedPrevious;
+        private static Camera farRaisedCamera;
+        private static float farRaisedPrevious;
+        private static readonly HashSet<LighthouseBeamGlow> farClipUsers = new HashSet<LighthouseBeamGlow>();
 
         private Transform container;
         private Transform rotator;
@@ -432,10 +433,11 @@ namespace UBOAT.Mods.RadioNavigation
             }
             if (cam != farRaisedCamera)
             {
-                RestoreDeviceCameraFarClip();
+                RestoreAllDeviceCameraFarClips();
                 farRaisedCamera = cam;
                 farRaisedPrevious = cam.farClipPlane;
             }
+            farClipUsers.Add(this);
             if (cam.farClipPlane < MinDeviceCameraFarM)
             {
                 float previous = cam.farClipPlane;
@@ -446,12 +448,21 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// Returns a previously raised far clip. Only restores the exact
-        /// value we wrote — if the game changed the clip meanwhile, its
-        /// value wins.
+        /// Returns a previously raised far clip once no active lighthouse
+        /// controller needs it. Only restores the exact value we wrote — if
+        /// the game changed the clip meanwhile, its value wins.
         /// </summary>
         private void RestoreDeviceCameraFarClip()
         {
+            farClipUsers.Remove(this);
+            if (farClipUsers.Count > 0)
+                return;
+            RestoreAllDeviceCameraFarClips();
+        }
+
+        private static void RestoreAllDeviceCameraFarClips()
+        {
+            farClipUsers.Clear();
             if (farRaisedCamera.IsNull())
             {
                 farRaisedCamera = null;
@@ -486,6 +497,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public static void ResetStatics()
         {
+            RestoreAllDeviceCameraFarClips();
             LighthouseGlowArt.ResetStatics();
             renderingCamera = null;
             CameraResolver.ResetForReload();

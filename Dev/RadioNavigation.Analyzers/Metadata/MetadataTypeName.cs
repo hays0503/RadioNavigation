@@ -40,14 +40,21 @@ namespace RadioNavigation.Analyzers
         /// </summary>
         public static MetadataTypeName FromSymbol(ITypeSymbol symbol)
         {
-            var ns = symbol.ContainingNamespace?.ToDisplayString() ?? "";
+            var ns = symbol.ContainingNamespace == null || symbol.ContainingNamespace.IsGlobalNamespace
+                ? string.Empty
+                : symbol.ContainingNamespace.ToDisplayString();
             var typeName = symbol.Name;
+            if (symbol is INamedTypeSymbol selfNamed && selfNamed.TypeParameters.Length > 0)
+                typeName += "`" + selfNamed.TypeParameters.Length;
 
             // Walk outward through containing types to build the '/' separated nesting path.
             var container = symbol.ContainingType;
             while (container != null)
             {
-                typeName = container.Name + "/" + typeName;
+                var containerSegment = container.Name;
+                if (container is INamedTypeSymbol containerNamed && containerNamed.TypeParameters.Length > 0)
+                    containerSegment += "`" + containerNamed.TypeParameters.Length;
+                typeName = containerSegment + "/" + typeName;
                 container = container.ContainingType;
             }
 

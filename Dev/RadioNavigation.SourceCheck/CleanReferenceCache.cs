@@ -76,40 +76,37 @@ namespace RadioNavigation.SourceCheck
         {
             using var sha = SHA256.Create();
             var parts = new List<string>();
-            CollectSharedInputParts(parts);
-            // Both seed algorithms live in this tool: a change here can break the
-            // old-vs-new equivalence (or the type index) with identical game/mod
-            // inputs, so this tool's own sources join the stamp.
-            var selfDir = Path.Combine(ModCompiler.ModRoot, "Dev", "RadioNavigation.SourceCheck");
-            if (Directory.Exists(selfDir))
-                foreach (var self in Directory.EnumerateFiles(selfDir, "*.cs", SearchOption.AllDirectories))
-                    parts.Add("self:" + self + ":" + File.GetLastWriteTimeUtc(self).Ticks);
+            CollectSharedInputParts(parts, includeOwnAssembly: true);
             var joined = string.Join("\n", parts);
             var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(joined));
             return Convert.ToBase64String(hash);
         }
 
-        private static void CollectSharedInputParts(List<string> parts)
+        private static void CollectSharedInputParts(List<string> parts, bool includeOwnAssembly = false)
         {
             foreach (var src in GameSourceCompiler.EnumerateSources())
                 parts.Add(src + ":" + File.GetLastWriteTimeUtc(src).Ticks);
 
-            foreach (var refPath in Directory.EnumerateFiles(GameSourceCompiler.ManagedDir, "*.dll"))
+            if (Directory.Exists(GameSourceCompiler.ManagedDir))
             {
-                var name = Path.GetFileName(refPath);
-                if (GameSourceCompiler.IsOwnAssembly(name))
-                    continue;
-                parts.Add(name + ":" + File.GetLastWriteTimeUtc(refPath).Ticks);
+                foreach (var refPath in Directory.EnumerateFiles(GameSourceCompiler.ManagedDir, "*.dll")
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+                {
+                    var name = Path.GetFileName(refPath);
+                    if (!includeOwnAssembly && GameSourceCompiler.IsOwnAssembly(name))
+                        continue;
+                    parts.Add(name + ":" + File.GetLastWriteTimeUtc(refPath).Ticks);
+                }
             }
 
-            // The seed set (mod's referenced game types) drives which source files become
-            // real vs stubbed. It derives from the mod source + game source + DLLs, all of
-            // which are already hashed above, so a mod edit that adds/removes a game API
-            // call changes this stamp and invalidates the cache. We deliberately do NOT
-            // call ComputeSeedTypes() here - it is ~4 min and would make every cache check
-            // (and thus every analyze.ps1 run) slow.
             foreach (var modSrc in ModCompiler.EnumerateSources())
                 parts.Add("mod:" + modSrc + ":" + File.GetLastWriteTimeUtc(modSrc).Ticks);
+
+            var selfDir = Path.Combine(ModCompiler.ModRoot, "Dev", "RadioNavigation.SourceCheck");
+            if (Directory.Exists(selfDir))
+                foreach (var self in Directory.EnumerateFiles(selfDir, "*.cs", SearchOption.AllDirectories)
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+                    parts.Add("self:" + self + ":" + File.GetLastWriteTimeUtc(self).Ticks);
         }
 
         private static string ComputeStamp()

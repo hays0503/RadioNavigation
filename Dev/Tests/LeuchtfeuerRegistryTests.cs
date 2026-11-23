@@ -163,6 +163,27 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void Initialize_OuistrehamEastJettyHasWestLon_AndHowthPierExcluded()
+        {
+            Assert.True(LeuchtfeuerRegistry.Initialize(FindDataDirectory(), null),
+                LeuchtfeuerRegistry.LastLoadError);
+
+            LighthouseProfile ouistreham = null;
+            LighthouseProfile howthPier = null;
+            foreach (LighthouseProfile profile in LeuchtfeuerRegistry.Profiles)
+            {
+                if (profile.Code == "A1381")
+                    ouistreham = profile;
+                if (profile.Code == "A5900.5")
+                    howthPier = profile;
+            }
+
+            Assert.NotNull(ouistreham);
+            Assert.True(ouistreham.Longitude < 0f, "Ouistreham A1381 must lie west of 0 deg");
+            Assert.Null(howthPier);
+        }
+
+        [Fact]
         public void Initialize_MissingDirectory_ReturnsFalse()
         {
             Assert.False(LeuchtfeuerRegistry.Initialize(

@@ -8349,9 +8349,10 @@ namespace RadioNavigation.SourceCheck
         /// </summary>
         private static bool IsEventFieldOfType(TypeDeclarationSyntax type, string name)
         {
-            return type.Members.OfType<FieldDeclarationSyntax>()
-                .Any(f => f.Declaration.Variables.Any(v => v.Identifier.Text == name)
-                    && f.Modifiers.Any(m => m.IsKind(SyntaxKind.EventKeyword)));
+            return type.Members.OfType<EventFieldDeclarationSyntax>()
+                       .Any(f => f.Declaration.Variables.Any(v => v.Identifier.Text == name))
+                || type.Members.OfType<EventDeclarationSyntax>()
+                       .Any(e => e.Identifier.Text == name);
         }
 
         /// <summary>
@@ -8386,7 +8387,9 @@ namespace RadioNavigation.SourceCheck
         private static int ComputeCyclomaticComplexity(SyntaxNode method)
         {
             int complexity = 1;
-            foreach (var node in method.DescendantNodes())
+            foreach (var node in method.DescendantNodes(child =>
+                child == method
+                || !(child is AnonymousFunctionExpressionSyntax || child is LocalFunctionStatementSyntax)))
             {
                 if (node is IfStatementSyntax) complexity++;
                 else if (node is SwitchSectionSyntax) complexity++;

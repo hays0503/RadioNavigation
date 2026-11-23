@@ -380,6 +380,46 @@ public class Patcher
             AssertHas("RN0001", badDiags);
         }
 
+        [Fact]
+        public void CanonicalPrimitiveAliases_MatchMetadataNames()
+        {
+            Assert.Equal("String", GameMetadataIndex.CanonicalTypeName("string"));
+            Assert.Equal("Int32", GameMetadataIndex.CanonicalTypeName("int"));
+            Assert.Equal("List<Int32>", GameMetadataIndex.CanonicalTypeName("global::System.Collections.Generic.List<int>"));
+            Assert.Equal("List<Int32>", GameMetadataIndex.CanonicalTypeName("List`1<Int32>"));
+        }
+
+        [Fact]
+        public void MetadataIndex_GlobalNamespaceAndNestedType_MatchFromSymbol()
+        {
+            var src = @"
+public class GlobalOuter { public class Inner { public void Ping() {} } }
+";
+            var tree = CSharpSyntaxTree.ParseText(src);
+            var tpa = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
+            var refs = tpa.Split(';')
+                .Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
+                .ToList();
+            var comp = CSharpCompilation.Create("NestedMetaTest", new[] { tree }, refs,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var innerSym = comp.GetTypeByMetadataName("GlobalOuter+Inner");
+            Assert.NotNull(innerSym);
+
+            using (var ms = new MemoryStream())
+            {
+                var emit = comp.Emit(ms);
+                Assert.True(emit.Success);
+                ms.Position = 0;
+                var peRef = MetadataReference.CreateFromImage(ms.ToArray());
+                var idx = GameMetadataIndex.TryCreateFromReference(peRef);
+                Assert.NotNull(idx);
+                var mtn = MetadataTypeName.FromSymbol(innerSym);
+                Assert.Equal("", mtn.Namespace);
+                Assert.True(idx.HasType(mtn));
+            }
+        }
+
         private static List<Diagnostic> AnalyzeCompilation(string name, string source, List<MetadataReference> refs)
         {
             var tree = CSharpSyntaxTree.ParseText(source);

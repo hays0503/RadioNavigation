@@ -38,6 +38,21 @@ namespace UBOAT.Mods.RadioNavigation
             mapDragActive = false;
         }
 
+        private void OnTransformParentChanged()
+        {
+            canvasResolved = false;
+        }
+
+        private void OnDisable()
+        {
+            if (mapDragActive && owner.IsNotNull())
+                owner.OnMapDragEnd();
+            mapDragActive = false;
+            pressedFromZone = false;
+            downInScale = false;
+            dragExceeded = false;
+        }
+
         private void Update()
         {
             if (owner.IsNull())

@@ -58,6 +58,7 @@ namespace UBOAT.Mods.RadioNavigation
             // has no UnpatchSelf, and a bare UnpatchAll() would remove other
             // mods' patches (F139).
             Harmony owner = new Harmony("UBOAT.Mods.RadioNavigation");
+            GameStarLayerSuppressor.ResetForReload();
             owner.UnpatchAll(owner.Id);
             RadioStoryIntegration.ResetRuntimeState();
             LighthousePlacer.Reset();
@@ -301,7 +302,10 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 resourceManager = direct;
                 if (InjectionFramework.Instance.IsNotNull())
+                {
                     InjectionFramework.Instance.AddInjectableInstance(direct);
+                    InjectionFramework.Instance.InjectIntoAssembly(Assembly.GetExecutingAssembly());
+                }
                 Debug.LogWarning("[RadioNav][Main] ResourceManager resolved via LoadSingleton fallback (DI registration missing)");
                 return true;
             }

@@ -386,6 +386,9 @@ namespace UBOAT.Mods.RadioNavigation
             SextantPipPose.Reset();
             SextantPipPose.ClearTestAim();
             IsOpen = false;
+            StarsMesh.Shielded = false;
+            SunDiscRenderer.Active = false;
+            SunDiscRenderer.ResetDirection();
             CameraResolver.UnfreezeRadius();
 
             if (canvasRoot != null) Destroy(canvasRoot);
@@ -563,6 +566,9 @@ namespace UBOAT.Mods.RadioNavigation
             lune.Reset();
             // The sky shell may breathe again (P7), and the shade filters no
             // longer shield the lookout's dark adaptation (P4).
+            StarsMesh.Shielded = false;
+            SunDiscRenderer.Active = false;
+            SunDiscRenderer.ResetDirection();
             CameraResolver.UnfreezeRadius();
             StarsMesh.Shielded = false;
             if (gameInput != null)

@@ -67,6 +67,7 @@ namespace UBOAT.Mods.RadioNavigation
                         continue;
                     }
 
+                    MapSaveSanitizer.RemovePointDataBeforeDestroy(point.Data);
                     Destroy(point.gameObject);
                     removed++;
                     break;

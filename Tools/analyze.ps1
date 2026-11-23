@@ -93,7 +93,7 @@ if (-not $SkipSourceCheck) {
         }
         if ($LASTEXITCODE -ne 0) {
             Stop-Phase "SourceCheck"
-            Write-Error "[RadioNavigation] SourceCheck FAILED - mod references a game API that does not exist / has wrong signature (neural slop). Fix before analyzing."
+            Write-Host "[RadioNavigation] SourceCheck FAILED - mod references a game API that does not exist / has wrong signature (neural slop). Fix before analyzing." -ForegroundColor Red
             Write-PhaseTimings
             exit $LASTEXITCODE
         }
@@ -110,7 +110,7 @@ $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
 & dotnet restore $csproj | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Stop-Phase "Restore"
-    Write-Error "[RadioNavigation] dotnet restore failed for $csproj"
+    Write-Host "[RadioNavigation] dotnet restore failed for $csproj" -ForegroundColor Red
     Write-PhaseTimings
     exit $LASTEXITCODE
 }
@@ -127,7 +127,7 @@ Stop-Phase "Restore"
 # engine invokes them, Roslyn cannot see it. Everything else blocks (exit 1).
 if ($IdeAudit) {
     $unityNoise = @('Awake','Start','Update','LateUpdate','FixedUpdate',
-        'OnDestroy','OnEnable','OnDisable','OnApplicationFocus','OnApplicationPause',
+        'OnDestroy','OnEnable','OnDisable','OnTransformParentChanged','OnApplicationFocus','OnApplicationPause',
         'OnValidate','OnDrawGizmos',
         'OnPreRender','OnPostRender','OnAudioFilterRead','OnTriggerEnter',
         'OnTriggerExit','OnCollisionEnter','OnPointerClick','OnPointerEnter',
@@ -187,10 +187,10 @@ if ($IdeAudit) {
     # actually compiles; an up-to-date no-op build reports a vacuous clean
     # (same trap as RnAudit).
     $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $buildLines = & dotnet build $csproj -c Release -p:EnforceCodeStyleInBuild=true -p:NoWarn="CS8032%3BCS0162%3BCS0219%3BCS0649" -t:Rebuild 2>&1
+    $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"; $buildLines = & dotnet build $csproj -c Release -p:EnforceCodeStyleInBuild=true -p:NoWarn="CS8032%3BCS0162%3BCS0219%3BCS0649" -t:Rebuild 2>&1; $ErrorActionPreference = $prevEap
     if ($LASTEXITCODE -ne 0) {
         Stop-Phase "IdeAudit-build"
-        Write-Error "[RadioNavigation] IdeAudit build failed (exit $LASTEXITCODE) - refusing to report a clean audit on a broken compile"
+        Write-Host "[RadioNavigation] IdeAudit build failed (exit $LASTEXITCODE) - refusing to report a clean audit on a broken compile" -ForegroundColor Red
         $buildLines | ForEach-Object { Write-Host $_ }
         Write-PhaseTimings
         exit $LASTEXITCODE
@@ -199,7 +199,7 @@ if ($IdeAudit) {
     $buildOut = $buildLines | Out-String
     # Build warnings repeat (project + target passes) — dedupe so counts
     # are stable run over run.
-    $hits = @($buildOut -split "`r?`n" | Select-String -Pattern 'warning (IDE0051|IDE0052|CS0414)' | ForEach-Object { $_.Line.Trim() } | Sort-Object -Unique)
+    $hits = @($buildOut -split "`r?`n" | Select-String -Pattern 'warning (IDE0051|IDE0052|CS0414)' | ForEach-Object { $_.Line.Trim() -replace '^\d+>', '' } | Sort-Object -Unique)
     $genuine = @()
     $noise = @()
     foreach ($h in $hits) {
@@ -239,10 +239,10 @@ if ($IdeAudit) {
 if ($RnAudit) {
     $analyzersProj = Join-Path $root "Dev\RadioNavigation.Analyzers\RadioNavigation.Analyzers.csproj"
     $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
-    & dotnet build $analyzersProj -c Release --nologo -v q 2>&1 | Out-Null
+    $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"; & dotnet build $analyzersProj -c Release --nologo -v q 2>&1 | Out-Null; $ErrorActionPreference = $prevEap
     if ($LASTEXITCODE -ne 0) {
         Stop-Phase "RnAudit-analyzers"
-        Write-Error "[RadioNavigation] analyzers build failed (exit $LASTEXITCODE)"
+        Write-Host "[RadioNavigation] analyzers build failed (exit $LASTEXITCODE)" -ForegroundColor Red
         Write-PhaseTimings
         exit $LASTEXITCODE
     }
@@ -250,10 +250,10 @@ if ($RnAudit) {
     # Rebuild (not incremental): analyzer warnings only surface when Roslyn
     # actually compiles; an up-to-date no-op build reports a vacuous clean.
     $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $rnLines = & dotnet build $csproj -c Release --no-restore --nologo -v n -t:Rebuild 2>&1
+    $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"; $rnLines = & dotnet build $csproj -c Release --no-restore --nologo -v n -t:Rebuild 2>&1; $ErrorActionPreference = $prevEap
     if ($LASTEXITCODE -ne 0) {
         Stop-Phase "RnAudit-build"
-        Write-Error "[RadioNavigation] RnAudit build failed (exit $LASTEXITCODE) - refusing to report a clean audit on a broken compile"
+        Write-Host "[RadioNavigation] RnAudit build failed (exit $LASTEXITCODE) - refusing to report a clean audit on a broken compile" -ForegroundColor Red
         $rnLines | ForEach-Object { Write-Host $_ }
         Write-PhaseTimings
         exit $LASTEXITCODE
@@ -360,7 +360,7 @@ function Get-NormalizedDiagnostics {
         if ($path.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
             $path = $path.Substring($rootPrefix.Length)
         }
-        $out += "$path : $($m.Groups[2].Value): $($m.Groups[4].Value)".TrimEnd()
+        $out += "$path : $($m.Groups[2].Value): $($m.Groups[3].Value)".TrimEnd()
     }
     return @($out | Sort-Object -Unique)
 }
@@ -372,22 +372,33 @@ if ($UpdateBaseline) {
         exit 1
     }
     $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $fresh = & roslynator analyze $csproj --severity-level $Severity @args 2>&1
+    $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"; $fresh = & roslynator analyze $csproj --severity-level $Severity @args 2>&1; $ErrorActionPreference = $prevEap; $rosExit = $LASTEXITCODE
     Stop-Phase "Roslynator"
     $fresh | ForEach-Object { Write-Host $_ }
-    Get-NormalizedDiagnostics $fresh $root | Set-Content -LiteralPath $baselineFile
+    $normalizedFresh = Get-NormalizedDiagnostics $fresh $root
+    if ($rosExit -ne 0 -and $normalizedFresh.Count -eq 0) {
+        Write-Host "[RadioNavigation] roslynator failed without diagnostics (exit $rosExit) - baseline not updated" -ForegroundColor Red
+        Write-PhaseTimings
+        exit $rosExit
+    }
+    $normalizedFresh | Set-Content -LiteralPath $baselineFile
     Write-Host "[RadioNavigation] baseline refreshed - commit it with a reason"
     Write-PhaseTimings
-    exit $LASTEXITCODE
+    exit 0
 }
 
 if ($Profile -eq "quick" -and $Severity -eq "warning") {
     $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $rosOut = & roslynator analyze $csproj --severity-level $Severity @args 2>&1
+    $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"; $rosOut = & roslynator analyze $csproj --severity-level $Severity @args 2>&1; $ErrorActionPreference = $prevEap
     Stop-Phase "Roslynator"
     $rosExit = $LASTEXITCODE
     $rosOut | ForEach-Object { Write-Host $_ }
     $current = Get-NormalizedDiagnostics $rosOut $root
+    if ($rosExit -ne 0 -and $current.Count -eq 0) {
+        Write-Host "[RadioNavigation] roslynator failed without diagnostics (exit $rosExit)" -ForegroundColor Red
+        Write-PhaseTimings
+        exit $rosExit
+    }
     if (-not (Test-Path $baselineFile)) {
         $current | Set-Content -LiteralPath $baselineFile
         Write-Host "[RadioNavigation] no baseline found - written ($($current.Count) entries), commit it as reference"

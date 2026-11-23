@@ -180,6 +180,7 @@ namespace UBOAT.Mods.RadioNavigation
             bool raised = raiseState.Raise(chronometerDragContainer, transform, parentCanvas, this,
                 () => {
                     CaptureDefaultPosition();
+                    scaleSubsystem.Reset(chronometerDragContainer, this);
                     scaleSubsystem.Capture(chronometerDragContainer);
                 },
                 () => {
@@ -406,6 +407,9 @@ namespace UBOAT.Mods.RadioNavigation
             raiseState.DestroyCreated();
 
             scaleSubsystem.ReleaseControl();
+            hoverState.SetScaleHover(false);
+            hoverState.SetMoveHover(false);
+            RefreshCursor();
             cursorBackend.Destroy();
         }
     }

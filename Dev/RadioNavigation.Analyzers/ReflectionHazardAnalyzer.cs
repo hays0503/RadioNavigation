@@ -43,16 +43,21 @@ namespace RadioNavigation.Analyzers
         private void AnalyzeLookup(SyntaxNodeAnalysisContext context)
         {
             var invocation = (InvocationExpressionSyntax)context.Node;
-            if (!IsReflectionLookup(invocation))
+            if (!IsReflectionLookup(context, invocation))
                 return;
 
-            // Walk up through the expression chain. If the lookup result is used as the
+            // Walk up through parens/casts. If the lookup result is used as the
             // receiver of a NON-null-conditional member access / invocation / element access,
             // it is dereferenced without a guard -> report.
             var current = (ExpressionSyntax)invocation;
             while (true)
             {
                 var parent = current.Parent;
+                if (parent is ParenthesizedExpressionSyntax || parent is CastExpressionSyntax)
+                {
+                    current = (ExpressionSyntax)parent;
+                    continue;
+                }
                 switch (parent)
                 {
                     case MemberAccessExpressionSyntax ma when ma.Expression == current:
@@ -112,6 +117,12 @@ namespace RadioNavigation.Analyzers
                 return;
 
             SyntaxNode scope = lookup.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault();
+            if (scope == null)
+                scope = lookup.Ancestors().OfType<ConstructorDeclarationSyntax>().FirstOrDefault();
+            if (scope == null)
+                scope = lookup.Ancestors().OfType<AccessorDeclarationSyntax>().FirstOrDefault();
+            if (scope == null)
+                scope = lookup.Ancestors().OfType<LocalFunctionStatementSyntax>().FirstOrDefault();
             if (scope == null)
                 scope = lookup.Ancestors().OfType<AnonymousFunctionExpressionSyntax>().FirstOrDefault();
             if (scope == null)
@@ -189,11 +200,19 @@ namespace RadioNavigation.Analyzers
             return expr is LiteralExpressionSyntax lit && lit.IsKind(SyntaxKind.NullLiteralExpression);
         }
 
-        private static bool IsReflectionLookup(InvocationExpressionSyntax invocation)
+        private static bool IsReflectionLookup(SyntaxNodeAnalysisContext context, InvocationExpressionSyntax invocation)
         {
             if (!(invocation.Expression is MemberAccessExpressionSyntax ma))
                 return false;
-            return LookupMethods.Contains(ma.Name.Identifier.ValueText);
+            if (!LookupMethods.Contains(ma.Name.Identifier.ValueText))
+                return false;
+            var symbol = context.SemanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+            if (symbol != null && symbol.ContainingType != null)
+            {
+                var ct = symbol.ContainingType;
+                return ct.Name == "Type" && ct.ContainingNamespace?.ToDisplayString() == "System";
+            }
+            return true;
         }
 
         private static string GetMemberName(InvocationExpressionSyntax invocation)

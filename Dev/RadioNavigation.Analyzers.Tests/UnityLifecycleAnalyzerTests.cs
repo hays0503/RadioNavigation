@@ -492,5 +492,43 @@ public class M : UnityEngine.MonoBehaviour
 ";
             AssertHas("RN0008", Run(src));
         }
+
+        [Fact]
+        public void StructCreationAndNonLinqCount_NoFalseRN0007_AndListFind_NoRN0006()
+        {
+            var src = @"
+using System.Collections.Generic;
+public class M : UnityEngine.MonoBehaviour
+{
+    private readonly List<int> items = new List<int>();
+    private void Update() { int first = items.Find(x => x > 0); }
+    private void OnAudioFilterRead(float[] data, int channels)
+    {
+        var v = new UnityEngine.Vector3();
+        int c = items.Count;
+        v.x = c;
+    }
+}
+";
+            AssertNone(Run(src));
+        }
+
+        [Fact]
+        public void ObjectCreationInTaskRun_ReportsSingleRN0008()
+        {
+            var src = @"
+using System.Threading.Tasks;
+public class M : UnityEngine.MonoBehaviour
+{
+    private void Go()
+    {
+        Task.Run(() => { var go = new UnityEngine.GameObject(); });
+    }
+}
+";
+            var diags = Run(src);
+            AssertHas("RN0008", diags);
+            Assert.Single(diags);
+        }
     }
 }

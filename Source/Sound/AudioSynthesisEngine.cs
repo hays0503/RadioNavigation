@@ -58,7 +58,11 @@ namespace UBOAT.Mods.RadioNavigation
         public float OutputVolume
         {
             get => outputVolume;
-            set => outputVolume = Mathf.Clamp(value, 0f, 1f);
+            set
+            {
+                if (!float.IsNaN(value) && !float.IsInfinity(value))
+                    outputVolume = Mathf.Clamp(value, 0f, 1f);
+            }
         }
 
         // F115: clear accumulated DSP state (QSB phase, AGC gain, filter
@@ -124,7 +128,7 @@ namespace UBOAT.Mods.RadioNavigation
         // thread; here everything already runs on the main thread).
         public void UpdateStations(float deltaSeconds, float currentTime, StationState[] stations, StationScheduler[] schedulers, MorseKeyer[] keyers, CarrierGenerator[] carriers, bool radioOn)
         {
-            if (!radioOn)
+            if (!radioOn || deltaSeconds <= 0f || float.IsNaN(deltaSeconds) || float.IsInfinity(deltaSeconds))
                 return;
 
             tickAccumulator += deltaSeconds;

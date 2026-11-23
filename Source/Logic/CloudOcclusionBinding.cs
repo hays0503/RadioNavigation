@@ -50,8 +50,18 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         internal static void Apply(Material material)
         {
-            if (material == null || CloudOcclusionSwitch.Mode <= 0)
+            if (material == null)
                 return;
+
+            if (CloudOcclusionSwitch.Mode <= 0)
+            {
+                if (material.HasProperty("_CloudOcclusionMode")
+                    && material.GetFloat("_CloudOcclusionMode") != 0f)
+                {
+                    material.SetFloat("_CloudOcclusionMode", 0f);
+                }
+                return;
+            }
 
             RenderTexture rt = CloudOcclusionSwitch.Mode >= 3
                 ? ResolveGBufferTexture()

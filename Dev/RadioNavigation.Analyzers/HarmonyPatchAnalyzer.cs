@@ -235,7 +235,7 @@ namespace RadioNavigation.Analyzers
                     TryGetMethodTarget(context, inv, out var declaringType, out var methodName,
                         out var paramTypes, out var requireStatic))
                 {
-                    var resolved = ResolveTargetMethod(context, declaringType, methodName, paramTypes);
+                    var resolved = ResolveTargetMethod(context, declaringType, methodName, paramTypes, requireStatic);
                     if (resolved == null)
                         getMethod = new ResolvedGetMethod(declaringType, methodName, inv.GetLocation(), paramTypes, requireStatic);
                     return resolved;
@@ -304,6 +304,8 @@ namespace RadioNavigation.Analyzers
 
         private static ExpressionSyntax GetVariableInitializer(ISymbol symbol)
         {
+            if (symbol == null)
+                return null;
             foreach (var loc in symbol.DeclaringSyntaxReferences)
             {
                 if (loc.GetSyntax() is VariableDeclaratorSyntax decl && decl.Initializer != null)
@@ -380,9 +382,7 @@ namespace RadioNavigation.Analyzers
                 // GetConstructor(Type[] types) -> target .ctor with those parameter types.
                 methodName = ".ctor";
                 var ctorArg = invocation.ArgumentList.Arguments[0].Expression;
-                if (!(ctorArg is ImplicitArrayCreationExpressionSyntax ctorArr))
-                    return false;
-                parameterTypes = ExtractParameterTypes(context, ctorArr);
+                parameterTypes = ExtractParameterTypes(context, ctorArg);
                 if (parameterTypes == null)
                     return false;
                 scanStart = 1;
@@ -404,9 +404,10 @@ namespace RadioNavigation.Analyzers
             for (int i = scanStart; i < invocation.ArgumentList.Arguments.Count; i++)
             {
                 var expr = invocation.ArgumentList.Arguments[i].Expression;
-                if (expr is ImplicitArrayCreationExpressionSyntax arr)
+                var types = ExtractParameterTypes(context, expr);
+                if (types != null)
                 {
-                    parameterTypes = ExtractParameterTypes(context, arr);
+                    parameterTypes = types;
                 }
                 else if (IsBindingFlagsExpression(context, expr))
                 {
@@ -436,8 +437,10 @@ namespace RadioNavigation.Analyzers
             return false;
         }
 
-        private static bool IsBindingFlagsExpression(SyntaxNodeAnalysisContext context, ExpressionSyntax expr)
+        private static bool IsBindingFlagsExpression(SyntaxNodeAnalysisContext context, ExpressionSyntax expr, int depth = 0)
         {
+            if (depth > 8)
+                return false;
             switch (expr)
             {
                 case IdentifierNameSyntax id:
@@ -445,12 +448,13 @@ namespace RadioNavigation.Analyzers
                     // BindingFlags bitwise-or (e.g. anyStatic = Public|NonPublic|Static).
                     if (BindingFlagNames.Contains(id.Identifier.Text))
                         return true;
-                    return FollowBindingFlagsVariable(context, id) != null;
+                    return FollowBindingFlagsVariable(context, id, depth + 1) != null;
                 // BindingFlags.Static etc. parse as a member access whose Name is the flag.
                 case MemberAccessExpressionSyntax ma:
                     return BindingFlagNames.Contains(ma.Name.Identifier.Text);
                 case BinaryExpressionSyntax bin when bin.IsKind(SyntaxKind.BitwiseOrExpression):
-                    return IsBindingFlagsExpression(context, bin.Left) && IsBindingFlagsExpression(context, bin.Right);
+                    return IsBindingFlagsExpression(context, bin.Left, depth + 1)
+                        && IsBindingFlagsExpression(context, bin.Right, depth + 1);
                 default:
                     return false;
             }
@@ -462,13 +466,16 @@ namespace RadioNavigation.Analyzers
         /// </summary>
         private static ExpressionSyntax FollowBindingFlagsVariable(
             SyntaxNodeAnalysisContext context,
-            IdentifierNameSyntax id)
+            IdentifierNameSyntax id,
+            int depth = 0)
         {
+            if (depth > 8)
+                return null;
             var symbol = context.SemanticModel.GetSymbolInfo(id).Symbol;
             if (symbol == null)
                 return null;
             var init = GetVariableInitializer(symbol);
-            if (init == null || !IsBindingFlagsExpression(context, init))
+            if (init == null || !IsBindingFlagsExpression(context, init, depth + 1))
                 return null;
             return init;
         }
@@ -498,8 +505,11 @@ namespace RadioNavigation.Analyzers
             SyntaxNodeAnalysisContext context,
             ExpressionSyntax expr,
             ref bool hasStatic,
-            ref bool hasInstance)
+            ref bool hasInstance,
+            int depth = 0)
         {
+            if (depth > 8)
+                return;
             switch (expr)
             {
                 case IdentifierNameSyntax id:
@@ -507,9 +517,9 @@ namespace RadioNavigation.Analyzers
                     else if (id.Identifier.Text == "Instance") hasInstance = true;
                     else
                     {
-                        var followed = FollowBindingFlagsVariable(context, id);
+                        var followed = FollowBindingFlagsVariable(context, id, depth + 1);
                         if (followed != null)
-                            CollectBindingFlags(context, followed, ref hasStatic, ref hasInstance);
+                            CollectBindingFlags(context, followed, ref hasStatic, ref hasInstance, depth + 1);
                     }
                     break;
                 case MemberAccessExpressionSyntax ma:
@@ -517,25 +527,31 @@ namespace RadioNavigation.Analyzers
                     else if (ma.Name.Identifier.Text == "Instance") hasInstance = true;
                     break;
                 case BinaryExpressionSyntax bin when bin.IsKind(SyntaxKind.BitwiseOrExpression):
-                    CollectBindingFlags(context, bin.Left, ref hasStatic, ref hasInstance);
-                    CollectBindingFlags(context, bin.Right, ref hasStatic, ref hasInstance);
+                    CollectBindingFlags(context, bin.Left, ref hasStatic, ref hasInstance, depth + 1);
+                    CollectBindingFlags(context, bin.Right, ref hasStatic, ref hasInstance, depth + 1);
                     break;
             }
         }
 
         /// <summary>
-        /// Parse <c>new[] { typeof(A), typeof(B) }</c> into normalized type names, or null when
-        /// the argument is not such an array literal.
+        /// Parse <c>new[] { typeof(A), typeof(B) }</c> or <c>new Type[] { typeof(A), typeof(B) }</c>
+        /// into normalized type names, or null when the argument is not such an array literal.
         /// </summary>
         private static IReadOnlyList<string> ExtractParameterTypes(
             SyntaxNodeAnalysisContext context,
             ExpressionSyntax arg)
         {
-            if (!(arg is ImplicitArrayCreationExpressionSyntax arr))
+            InitializerExpressionSyntax initializer = null;
+            if (arg is ImplicitArrayCreationExpressionSyntax implicitArr)
+                initializer = implicitArr.Initializer;
+            else if (arg is ArrayCreationExpressionSyntax typedArr)
+                initializer = typedArr.Initializer;
+
+            if (initializer == null)
                 return null;
 
             var result = new List<string>();
-            foreach (var element in arr.Initializer.Expressions)
+            foreach (var element in initializer.Expressions)
             {
                 if (element is TypeOfExpressionSyntax tof)
                 {
@@ -556,12 +572,15 @@ namespace RadioNavigation.Analyzers
             SyntaxNodeAnalysisContext context,
             ITypeSymbol declaringType,
             string methodName,
-            IReadOnlyList<string> parameterTypes)
+            IReadOnlyList<string> parameterTypes,
+            bool? requireStatic)
         {
             foreach (var member in declaringType.GetMembers(methodName))
             {
                 if (!(member is IMethodSymbol m) ||
                     (m.MethodKind != MethodKind.Ordinary && m.MethodKind != MethodKind.Constructor))
+                    continue;
+                if (requireStatic.HasValue && m.IsStatic != requireStatic.Value)
                     continue;
                 // When an explicit Type[] was given, only a candidate whose parameter count and
                 // canonical type names match can be the requested overload.
@@ -572,8 +591,8 @@ namespace RadioNavigation.Analyzers
                     bool allMatch = true;
                     for (int i = 0; i < parameterTypes.Count; i++)
                     {
-                        var canon = CanonicalTypeName(m.Parameters[i].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-                        if (!string.Equals(canon, CanonicalTypeName(parameterTypes[i]), System.StringComparison.Ordinal))
+                        var canon = GameMetadataIndex.CanonicalTypeName(m.Parameters[i].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+                        if (!string.Equals(canon, GameMetadataIndex.CanonicalTypeName(parameterTypes[i]), System.StringComparison.Ordinal))
                         {
                             allMatch = false;
                             break;
@@ -585,20 +604,6 @@ namespace RadioNavigation.Analyzers
                 return m;
             }
             return null;
-        }
-
-        /// <summary>
-        /// Reduce a type name to a canonical simple form for cross-source matching (mirrors
-        /// GameMetadataIndex.CanonicalTypeName). "global::System.String" and "String" both -> "String".
-        /// </summary>
-        private static string CanonicalTypeName(string typeName)
-        {
-            if (typeName == null)
-                return string.Empty;
-            if (typeName.StartsWith("global::", System.StringComparison.Ordinal))
-                typeName = typeName.Substring(8);
-            int dot = typeName.LastIndexOf('.');
-            return dot >= 0 ? typeName.Substring(dot + 1) : typeName;
         }
 
         private static void ValidateSignature(

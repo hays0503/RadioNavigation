@@ -59,10 +59,10 @@ namespace RadioNavigation.SourceCheck
             {
                 foreach (var node in tree.GetRoot().DescendantNodes())
                 {
-                    if (node is IdentifierNameSyntax idn && sourceTypeNames.Contains(idn.Identifier.Text))
-                        seeds[idn.Identifier.Text] = 0;
+                    if (node is IdentifierNameSyntax idn && sourceTypeNames.Contains(idn.Identifier.Text) && !seeds.ContainsKey(idn.Identifier.Text)) seeds[idn.Identifier.Text] = 0;
+
                     else if (node is GenericNameSyntax gn && sourceTypeNames.Contains(gn.Identifier.Text))
-                        seeds[gn.Identifier.Text] = gn.TypeArgumentList.Arguments.Count;
+                    { int arity = gn.TypeArgumentList.Arguments.Count; if (!seeds.TryGetValue(gn.Identifier.Text, out int existing) || arity > existing) seeds[gn.Identifier.Text] = arity; }
                 }
             }
 
@@ -158,10 +158,10 @@ namespace RadioNavigation.SourceCheck
             {
                 foreach (var node in tree.GetRoot().DescendantNodes())
                 {
-                    if (node is IdentifierNameSyntax idn && sourceTypeNames.Contains(idn.Identifier.Text))
-                        seeds[idn.Identifier.Text] = 0;
+                    if (node is IdentifierNameSyntax idn && sourceTypeNames.Contains(idn.Identifier.Text) && !seeds.ContainsKey(idn.Identifier.Text)) seeds[idn.Identifier.Text] = 0;
+
                     else if (node is GenericNameSyntax gn && sourceTypeNames.Contains(gn.Identifier.Text))
-                        seeds[gn.Identifier.Text] = gn.TypeArgumentList.Arguments.Count;
+                    { int arity = gn.TypeArgumentList.Arguments.Count; if (!seeds.TryGetValue(gn.Identifier.Text, out int existing) || arity > existing) seeds[gn.Identifier.Text] = arity; }
                 }
             }
 
@@ -720,19 +720,47 @@ foreach (var name in missing)
         /// <summary>True when the stub path marks a generic stub.</summary>
         public static bool StubIsGeneric(string stubPath)
         {
-            return stubPath.StartsWith("stub:generic:", StringComparison.Ordinal);
+            return HasStubFlag(stubPath, "generic:");
         }
 
         /// <summary>True when the stub path marks an enum stub.</summary>
         public static bool StubIsEnum(string stubPath)
         {
-            return stubPath.StartsWith("stub:enum:", StringComparison.Ordinal);
+            return HasStubFlag(stubPath, "enum:");
         }
 
         /// <summary>True when the stub path marks an interface stub.</summary>
         public static bool StubIsInterface(string stubPath)
         {
-            return stubPath.StartsWith("stub:interface:", StringComparison.Ordinal);
+            return HasStubFlag(stubPath, "interface:");
+        }
+
+        private static bool HasStubFlag(string stubPath, string flag)
+        {
+            if (!stubPath.StartsWith("stub:", StringComparison.Ordinal))
+                return false;
+            var s = stubPath.Substring("stub:".Length);
+            while (true)
+            {
+                if (s.StartsWith(flag, StringComparison.Ordinal)) return true;
+                if (s.StartsWith("generic:", StringComparison.Ordinal)) s = s.Substring("generic:".Length);
+                else if (s.StartsWith("enum:", StringComparison.Ordinal)) s = s.Substring("enum:".Length);
+                else if (s.StartsWith("interface:", StringComparison.Ordinal)) s = s.Substring("interface:".Length);
+                else return false;
+            }
+        }
+
+        private static string StripStubFlags(string stubPath)
+        {
+            var s = stubPath.StartsWith("stub:", StringComparison.Ordinal) ? stubPath.Substring("stub:".Length) : stubPath;
+            while (true)
+            {
+                if (s.StartsWith("generic:", StringComparison.Ordinal)) s = s.Substring("generic:".Length);
+                else if (s.StartsWith("enum:", StringComparison.Ordinal)) s = s.Substring("enum:".Length);
+                else if (s.StartsWith("interface:", StringComparison.Ordinal)) s = s.Substring("interface:".Length);
+                else break;
+            }
+            return s;
         }
 
         /// <summary>True when the stub type is an attribute (name ends in Attribute).</summary>
@@ -743,15 +771,7 @@ foreach (var name in missing)
 
         private static string StripStubPrefix(string stubPath)
         {
-            var s = stubPath;
-            foreach (var p in new[] { "stub:generic:", "stub:enum:", "stub:interface:", "stub:" })
-            {
-                if (s.StartsWith(p, StringComparison.Ordinal))
-                {
-                    s = s.Substring(p.Length);
-                    break;
-                }
-            }
+            var s = StripStubFlags(stubPath);
             // Optional leading "N:" arity segment (generic stubs).
             var colon = s.IndexOf(':');
             if (colon > 0 && int.TryParse(s.Substring(0, colon), out _))
@@ -804,15 +824,7 @@ foreach (var name in missing)
         /// <summary>Arity of a generic stub (0 for non-generic).</summary>
         public static int StubArity(string stubPath)
         {
-            var s = stubPath;
-            foreach (var p in new[] { "stub:generic:", "stub:enum:", "stub:interface:", "stub:" })
-            {
-                if (s.StartsWith(p, StringComparison.Ordinal))
-                {
-                    s = s.Substring(p.Length);
-                    break;
-                }
-            }
+            var s = StripStubFlags(stubPath);
             var colon = s.IndexOf(':');
             if (colon > 0 && int.TryParse(s.Substring(0, colon), out var arity))
                 return arity;

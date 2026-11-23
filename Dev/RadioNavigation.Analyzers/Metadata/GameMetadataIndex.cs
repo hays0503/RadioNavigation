@@ -92,9 +92,7 @@ namespace RadioNavigation.Analyzers
             foreach (var th in md.TypeDefinitions)
             {
                 var td = md.GetTypeDefinition(th);
-                var ns = md.GetString(td.Namespace);
-                var name = md.GetString(td.Name);
-                var fullName = string.IsNullOrEmpty(ns) ? name : ns + "." + name;
+                var fullName = BuildTypeFullName(md, td);
 
                 var entry = new TypeEntry();
                 foreach (var mh in td.GetMethods())
@@ -290,20 +288,102 @@ namespace RadioNavigation.Analyzers
         /// (obfuscated UBOAT) emits bare names like "String"/"Int32" with empty namespaces, while
         /// Roslyn emits "global::System.String". Both reduce to "String".
         /// </summary>
-        private static string CanonicalTypeName(string typeName)
+        internal static string CanonicalTypeName(string typeName)
         {
-            if (typeName == null)
+            if (string.IsNullOrEmpty(typeName))
                 return string.Empty;
+
+            typeName = typeName.Trim();
+
+            if (typeName.EndsWith("[]", StringComparison.Ordinal))
+                return CanonicalTypeName(typeName.Substring(0, typeName.Length - 2)) + "[]";
+            if (typeName.EndsWith("&", StringComparison.Ordinal))
+                return CanonicalTypeName(typeName.Substring(0, typeName.Length - 1)) + "&";
+            if (typeName.EndsWith("*", StringComparison.Ordinal))
+                return CanonicalTypeName(typeName.Substring(0, typeName.Length - 1)) + "*";
+
+            int genStart = typeName.IndexOf('<');
+            if (genStart >= 0 && typeName.EndsWith(">", StringComparison.Ordinal))
+            {
+                string head = CanonicalTypeName(typeName.Substring(0, genStart));
+                int backtick = head.IndexOf('`');
+                if (backtick >= 0)
+                    head = head.Substring(0, backtick);
+                string inner = typeName.Substring(genStart + 1, typeName.Length - genStart - 2);
+                return head + "<" + CanonicalizeGenericArguments(inner) + ">";
+            }
+
             if (typeName.StartsWith("global::", StringComparison.Ordinal))
                 typeName = typeName.Substring(8);
             int dot = typeName.LastIndexOf('.');
-            return dot >= 0 ? typeName.Substring(dot + 1) : typeName;
+            string simple = dot >= 0 ? typeName.Substring(dot + 1) : typeName;
+            return MapPrimitiveAlias(simple);
+        }
+
+        private static string CanonicalizeGenericArguments(string inner)
+        {
+            var parts = new List<string>();
+            int depth = 0;
+            int start = 0;
+            for (int i = 0; i < inner.Length; i++)
+            {
+                char ch = inner[i];
+                if (ch == '<') depth++;
+                else if (ch == '>') depth--;
+                else if (ch == ',' && depth == 0)
+                {
+                    parts.Add(CanonicalTypeName(inner.Substring(start, i - start)));
+                    start = i + 1;
+                }
+            }
+            parts.Add(CanonicalTypeName(inner.Substring(start)));
+            return string.Join(",", parts);
+        }
+
+        private static string MapPrimitiveAlias(string simple)
+        {
+            switch (simple)
+            {
+                case "bool": return "Boolean";
+                case "byte": return "Byte";
+                case "sbyte": return "SByte";
+                case "char": return "Char";
+                case "decimal": return "Decimal";
+                case "double": return "Double";
+                case "float": return "Single";
+                case "int": return "Int32";
+                case "uint": return "UInt32";
+                case "long": return "Int64";
+                case "ulong": return "UInt64";
+                case "short": return "Int16";
+                case "ushort": return "UInt16";
+                case "object": return "Object";
+                case "string": return "String";
+                case "void": return "Void";
+                default: return simple;
+            }
+        }
+
+        private static string BuildTypeFullName(MetadataReader md, TypeDefinition td)
+        {
+            string name = md.GetString(td.Name);
+            TypeDefinition current = td;
+            while (true)
+            {
+                var declaring = current.GetDeclaringType();
+                if (declaring.IsNil)
+                    break;
+                current = md.GetTypeDefinition(declaring);
+                name = md.GetString(current.Name) + "/" + name;
+            }
+            string ns = md.GetString(current.Namespace);
+            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
         }
 
         private static string FullNameOf(in MetadataTypeName typeName)
         {
             var name = typeName.TypeName;
-            if (typeName.GenericArity > 0 && !name.EndsWith("`", StringComparison.Ordinal))
+            if (typeName.GenericArity > 0 && name.IndexOf('`') < 0)
                 name += "`" + typeName.GenericArity;
             return string.IsNullOrEmpty(typeName.Namespace) ? name : typeName.Namespace + "." + name;
         }

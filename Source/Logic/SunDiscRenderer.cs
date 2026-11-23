@@ -192,6 +192,10 @@ namespace UBOAT.Mods.RadioNavigation
         private void OnDestroy()
         {
             RestoreProbeRadiance();
+            Active = false;
+            SunDirection = Vector3.zero;
+            ConfiguredTableDiameterDeg = 0f;
+            AngularDiameterDeg = SunDiscScale.TrueAngularDiameterDeg;
             if (instance == this)
                 instance = null;
             if (discTexture != null)

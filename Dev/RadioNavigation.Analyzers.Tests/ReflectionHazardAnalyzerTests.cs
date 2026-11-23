@@ -186,5 +186,22 @@ public class M
 ";
             AssertNone(Run(src));
         }
+
+        [Fact]
+        public void CastOrConstructorScope_ReportsRN0010()
+        {
+            var src = @"
+using System.Reflection;
+public class Foo { public int P { get; set; } }
+public class M
+{
+    public M(object data)
+    {
+        ((PropertyInfo)typeof(Foo).GetProperty(""P"")).SetValue(data, 1);
+    }
+}
+";
+            AssertHas("RN0010", Run(src));
+        }
     }
 }

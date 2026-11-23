@@ -63,19 +63,25 @@ foreach ($entry in $entries) {
     $height = ParseHeight ([string]$entry.fireHeight)
     $enabledLiteral = if ($Enabled) { 'true' } else { 'false' }
 
+    $code = Quote([string]$entry.code)
+    $lat = ([double]$entry.lat).ToString([Globalization.CultureInfo]::InvariantCulture)
+    $lon = ([double]$entry.lon).ToString([Globalization.CultureInfo]::InvariantCulture)
+    $heightStr = ([double]$height).ToString([Globalization.CultureInfo]::InvariantCulture)
+    $rotStr = ([double]$RotationDegreesPerSecond).ToString([Globalization.CultureInfo]::InvariantCulture)
+
     [void]$builder.AppendLine('            new LighthouseProfile(')
-    [void]$builder.AppendLine("                code: ""$($entry.code)"",")
+    [void]$builder.AppendLine("                code: ""$code"",")
     [void]$builder.AppendLine("                name: ""$name"",")
     [void]$builder.AppendLine("                country: ""$country"",")
     [void]$builder.AppendLine("                location: ""$location"",")
-    [void]$builder.AppendLine("                latitude: $($entry.lat)f,")
-    [void]$builder.AppendLine("                longitude: $($entry.lon)f,")
-    [void]$builder.AppendLine("                fireHeightM: ${height}f,")
+    [void]$builder.AppendLine("                latitude: ${lat}f,")
+    [void]$builder.AppendLine("                longitude: ${lon}f,")
+    [void]$builder.AppendLine("                fireHeightM: ${heightStr}f,")
     [void]$builder.AppendLine("                characteristic: ""$chars"",")
     [void]$builder.AppendLine("                type: ""$type"",")
     [void]$builder.AppendLine("                prefabPath: ""$PrefabPath"",")
     [void]$builder.AppendLine("                rotatorObjectName: ""$RotatorObjectName"",")
-    [void]$builder.AppendLine("                rotationDegreesPerSecond: ${RotationDegreesPerSecond}f,")
+    [void]$builder.AppendLine("                rotationDegreesPerSecond: ${rotStr}f,")
     [void]$builder.AppendLine('                enabled: ' + $enabledLiteral + '),')
 }
 

@@ -19,12 +19,19 @@ namespace UBOAT.Mods.RadioNavigation
             // F40: unbounded carrier frequencies alias above Nyquist; keep
             // the carrier below a sane audio ceiling (well above the
             // 300-1800 Hz beat range the controller actually produces).
-            set => targetFrequency = Math.Max(0f, Math.Min(value, MaxFrequencyHz));
+            set
+            {
+                if (float.IsNaN(value))
+                    return;
+                targetFrequency = Math.Max(0f, Math.Min(value, MaxFrequencyHz));
+            }
         }
 
         public CarrierGenerator(float sampleRate)
         {
-            this.sampleRate = sampleRate;
+            this.sampleRate = IsValidSampleRate(sampleRate)
+                ? sampleRate
+                : AudioSynthesisEngine.SampleRate;
             phase = 0.0;
         }
 
@@ -35,8 +42,10 @@ namespace UBOAT.Mods.RadioNavigation
         public float NextSample()
         {
             smoothedFrequency += (targetFrequency - smoothedFrequency) * SmoothingFactor;
+            if (targetFrequency == 0f && smoothedFrequency < 1e-6f)
+                smoothedFrequency = 0f;
 
-            if (smoothedFrequency.IsNonPositive())
+            if (float.IsNaN(smoothedFrequency) || smoothedFrequency.IsNonPositive())
                 return 0f;
 
             float sample = (float)Math.Sin(2.0 * Math.PI * phase);
@@ -51,6 +60,14 @@ namespace UBOAT.Mods.RadioNavigation
         public void Reset()
         {
             phase = 0.0;
+            smoothedFrequency = 0f;
+            if (float.IsNaN(targetFrequency) || float.IsInfinity(targetFrequency))
+                targetFrequency = 0f;
+        }
+
+        internal static bool IsValidSampleRate(float sampleRate)
+        {
+            return sampleRate > 0f && !float.IsNaN(sampleRate) && !float.IsInfinity(sampleRate);
         }
     }
 
@@ -104,10 +121,17 @@ namespace UBOAT.Mods.RadioNavigation
 
         public float Apply(float sample, float sampleRate)
         {
-            float qsb = 1f - QsbDepth * (0.5f + 0.5f * (float)Math.Sin(2.0 * Math.PI * QsbFrequency * qsbPhase / sampleRate));
-            qsbPhase += 1f;
-            if (qsbPhase >= sampleRate)
-                qsbPhase -= sampleRate;
+            if (float.IsNaN(sample) || float.IsInfinity(sample))
+                sample = 0f;
+
+            float qsb = 1f;
+            if (CarrierGenerator.IsValidSampleRate(sampleRate))
+            {
+                qsb = 1f - QsbDepth * (0.5f + 0.5f * (float)Math.Sin(2.0 * Math.PI * QsbFrequency * qsbPhase / sampleRate));
+                qsbPhase += 1f;
+                if (qsbPhase >= sampleRate)
+                    qsbPhase -= sampleRate;
+            }
 
             float noise = GaussianNoise() * NoiseFloor;
 
@@ -117,7 +141,10 @@ namespace UBOAT.Mods.RadioNavigation
             if (rng.NextDouble() < LoudCrackleProbability)
                 noise += LoudCrackleAmplitude * ((float)rng.NextDouble() * 2f - 1f);
 
-            return Mathf.Clamp(sample * qsb + noise, -1f, 1f);
+            float mixed = sample * qsb + noise;
+            if (float.IsNaN(mixed) || float.IsInfinity(mixed))
+                return 0f;
+            return Mathf.Clamp(mixed, -1f, 1f);
         }
 
         // F153: Box-Muller yields two independent normals per two uniforms;
@@ -144,7 +171,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const double WhistleFrequencyHz = 600.0;
         private const float WhistleMix = 0.12f;
 
-        private readonly float sampleRate;
+        private float sampleRate;
         private float agcGain;
         private float prevFilter;
         private double whistlePhase;
@@ -160,8 +187,10 @@ namespace UBOAT.Mods.RadioNavigation
             get => filterCutoff;
             set
             {
-                filterCutoff = value;
-                cachedAlpha = ComputeAlpha(value);
+                if (float.IsNaN(value) || float.IsInfinity(value))
+                    return;
+                filterCutoff = Mathf.Clamp(value, 0f, sampleRate * 0.45f);
+                cachedAlpha = ComputeAlpha(filterCutoff);
             }
         }
         public float SaturationDrive { get; set; } = 1.5f;
@@ -179,15 +208,27 @@ namespace UBOAT.Mods.RadioNavigation
         {
             // F154: the constructor sampleRate was accepted but discarded,
             // misleading callers; it now configures the filter.
-            this.sampleRate = sampleRate;
+            this.sampleRate = CarrierGenerator.IsValidSampleRate(sampleRate)
+                ? sampleRate
+                : AudioSynthesisEngine.SampleRate;
             agcGain = 1f;
             prevFilter = 0f;
             whistlePhase = 0.0;
+            filterCutoff = Mathf.Clamp(filterCutoff, 0f, this.sampleRate * 0.45f);
             cachedAlpha = ComputeAlpha(filterCutoff);
         }
 
         public float Process(float sample, float sampleRate)
         {
+            if (float.IsNaN(sample) || float.IsInfinity(sample))
+                return 0f;
+
+            if (CarrierGenerator.IsValidSampleRate(sampleRate) && Math.Abs(sampleRate - this.sampleRate) > 0.5f)
+            {
+                this.sampleRate = sampleRate;
+                cachedAlpha = ComputeAlpha(filterCutoff);
+            }
+
             float envelope = Math.Abs(sample);
 
             if (envelope > agcGain)
@@ -195,16 +236,18 @@ namespace UBOAT.Mods.RadioNavigation
             else
                 agcGain += AgcReleaseRate * (envelope - agcGain);
 
-            if (agcGain.IsNegligible(0.01f))
+            if (float.IsNaN(agcGain) || agcGain.IsNegligible(0.01f))
                 agcGain = 0.01f;
 
             float agcSample = sample / agcGain;
 
             prevFilter += cachedAlpha * (agcSample - prevFilter);
+            if (Math.Abs(prevFilter) < 1e-15f)
+                prevFilter = 0f;
 
             float saturated = (float)Math.Tanh(SaturationDrive * prevFilter);
 
-            if (WhistleLevel.IsSignificant())
+            if (WhistleLevel.IsSignificant() && CarrierGenerator.IsValidSampleRate(sampleRate))
             {
                 float whistle = (float)Math.Sin(2.0 * Math.PI * WhistleFrequencyHz * whistlePhase / sampleRate);
                 whistlePhase += 1.0;
@@ -212,6 +255,8 @@ namespace UBOAT.Mods.RadioNavigation
                 saturated += whistle * WhistleLevel * WhistleMix;
             }
 
+            if (float.IsNaN(saturated) || float.IsInfinity(saturated))
+                return 0f;
             return Mathf.Clamp(saturated, -1f, 1f);
         }
 
@@ -224,7 +269,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         private float ComputeAlpha(float cutoff)
         {
-            return cutoff / (cutoff + sampleRate / (2f * (float)Math.PI));
+            float clampedCutoff = Mathf.Clamp(cutoff, 0f, sampleRate * 0.45f);
+            float alpha = clampedCutoff / (clampedCutoff + sampleRate / (2f * (float)Math.PI));
+            return Mathf.Clamp01(alpha);
         }
     }
 }

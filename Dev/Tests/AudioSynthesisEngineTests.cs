@@ -364,5 +364,26 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             Assert.Equal(StationScheduler.Phase.PostNavSilence, scheduler.CurrentPhase);
         }
+
+        [Fact]
+        public void OutputVolumeAndUpdateStations_RejectNaNAndInfinity()
+        {
+            var engine = CreateEngine();
+            engine.OutputVolume = 0.7f;
+            engine.OutputVolume = float.NaN;
+            engine.OutputVolume = float.PositiveInfinity;
+            Assert.Equal(0.7f, engine.OutputVolume);
+
+            var stations = CreateStation(1f);
+            var scheduler = CreateSchedulerInPreNavPause();
+            var schedulers = new[] { scheduler };
+            var keyers = new[] { new MorseKeyer() };
+            var carriers = new[] { new CarrierGenerator(AudioSynthesisEngine.SampleRate) };
+
+            engine.UpdateStations(float.NaN, 1f, stations, schedulers, keyers, carriers, true);
+            engine.UpdateStations(float.PositiveInfinity, 1f, stations, schedulers, keyers, carriers, true);
+            engine.UpdateStations(0.05f, 1f, stations, schedulers, keyers, carriers, true);
+            Assert.Equal(StationScheduler.Phase.PreNavPause, scheduler.CurrentPhase);
+        }
     }
 }

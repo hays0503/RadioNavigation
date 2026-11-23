@@ -17,7 +17,7 @@ namespace RadioNavigation.SourceCheck
     {
         private static MethodDeclarationSyntax Style(string name)
         {
-            string source = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(),
+            string source = File.ReadAllText(Path.Combine(ModCompiler.ModRoot,
                 "Source", "UI", "SextantLopMapLines.cs"));
             return CSharpSyntaxTree.ParseText(source).GetRoot().DescendantNodes()
                 .OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == name);

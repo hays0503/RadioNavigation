@@ -242,19 +242,19 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         protected override Sprite LoadIconSprite()
         {
-            if (resourceManager == null)
-                return null;
-
-            Resource<GameObject> prefab =
-                resourceManager.RetrieveAsset<GameObject>(IconPrefabName, this, false);
-            if (prefab.Valid && prefab.Asset != null)
+            if (resourceManager != null)
             {
-                var image = prefab.Asset.GetComponent<UnityEngine.UI.Image>();
-                if (image != null && image.sprite != null)
-                    return image.sprite;
-                var spriteRenderer = prefab.Asset.GetComponent<SpriteRenderer>();
-                if (spriteRenderer != null && spriteRenderer.sprite != null)
-                    return spriteRenderer.sprite;
+                Resource<GameObject> prefab =
+                    resourceManager.RetrieveAsset<GameObject>(IconPrefabName, this, false);
+                if (prefab.Valid && prefab.Asset != null)
+                {
+                    var image = prefab.Asset.GetComponent<UnityEngine.UI.Image>();
+                    if (image != null && image.sprite != null)
+                        return image.sprite;
+                    var spriteRenderer = prefab.Asset.GetComponent<SpriteRenderer>();
+                    if (spriteRenderer != null && spriteRenderer.sprite != null)
+                        return spriteRenderer.sprite;
+                }
             }
 
             // F229: resolve from the bundle the mod itself loaded (prefab
