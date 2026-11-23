@@ -44,6 +44,7 @@
     <Compile Include="SextantShadeSourceTests.cs" />
     <Compile Include="DocumentationTests.cs" />
     <Compile Include="TempProbeTests.cs" />
+    <Compile Include="CurrentVectorsMapSourceTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -51,6 +52,8 @@
     <EmbeddedResource Include="Fixtures/CPlathAnimationScenarios.cs" LogicalName="CPlathAnimation.Scenarios" />
     <EmbeddedResource Include="Fixtures/LopMapBoundaries.cs" LogicalName="LopMap.Boundaries" />
     <EmbeddedResource Include="Fixtures/LopMapScenarios.cs" LogicalName="LopMap.Scenarios" />
+    <EmbeddedResource Include="Fixtures/CurrentVectorsMapBoundaries.cs" LogicalName="CurrentVectorsMap.Boundaries" />
+    <EmbeddedResource Include="Fixtures/CurrentVectorsMapScenarios.cs" LogicalName="CurrentVectorsMap.Scenarios" />
   </ItemGroup>
 
   <ItemGroup>

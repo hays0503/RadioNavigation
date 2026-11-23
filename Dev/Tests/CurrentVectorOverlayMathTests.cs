@@ -83,5 +83,47 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(channel.r > 0.9f && channel.g > 0.5f);
             Assert.True(race.r > 0.9f && race.g < 0.4f);
         }
+
+        [Fact]
+        public void AllZoomBandsMaintainMonotonicRadiusAndBoundedPoolBudget()
+        {
+            float[] elevations = { 1500f, 5000f, 12000f, 30000f, 70000f, 150000f, 320000f, 650000f, 1100000f };
+            float prevRadius = 0f;
+            float prevStep = 0f;
+            int prevHalf = 100;
+            var buffer = new Vector2[CurrentVectorOverlayMath.MaxPoolSlots];
+
+            for (int i = 0; i < elevations.Length; i++)
+            {
+                CurrentVectorGridSpec spec = CurrentVectorOverlayMath.ComputeGridSpec(elevations[i]);
+                Assert.True(spec.RadiusKm >= prevRadius);
+                Assert.True(spec.StepKm >= prevStep);
+                Assert.True(spec.HalfSteps <= prevHalf);
+                Assert.True(spec.ArrowThicknessScene > 0f);
+                Assert.True(spec.HeadSizeScene > 0f);
+                Assert.True(spec.MinArrowLengthScene <= spec.MaxArrowLengthScene);
+
+                int count = CurrentVectorOverlayMath.BuildSampleGrid(new Vector2(210f, 5400f), spec, buffer);
+                Assert.InRange(count, 20, CurrentVectorOverlayMath.MaxPoolSlots);
+                prevRadius = spec.RadiusKm;
+                prevStep = spec.StepKm;
+                prevHalf = spec.HalfSteps;
+            }
+        }
+
+        [Fact]
+        public void InvalidInputsAndCompassHeadingsBehaveSafely()
+        {
+            CurrentVectorGridSpec bad = CurrentVectorOverlayMath.ComputeGridSpec(float.NaN);
+            Assert.True(bad.StepKm > 0f && bad.RadiusKm > 0f);
+            Assert.Equal(0f, CurrentVectorOverlayMath.ComputeArrowLengthScene(float.NaN, bad));
+            Assert.Equal(0f, CurrentVectorOverlayMath.ComputeArrowLengthScene(-2f, bad));
+            Assert.Equal(0, CurrentVectorOverlayMath.BuildSampleGrid(Vector2.zero, bad, null));
+
+            float southYaw = CurrentVectorOverlayMath.ComputeMapYawDegrees(0f, -1f);
+            float westYaw = CurrentVectorOverlayMath.ComputeMapYawDegrees(-1f, 0f);
+            Assert.InRange(Math.Abs(southYaw - 90f), 0f, 1e-4f);
+            Assert.InRange(Math.Abs(Math.Abs(westYaw) - 180f), 0f, 1e-4f);
+        }
     }
 }

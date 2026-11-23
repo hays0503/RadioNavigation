@@ -86,6 +86,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Assert.False(CurrentSettings.RouteCurrentEnabled());
                 Assert.False(CurrentSettings.BallisticWindEnabled());
                 Assert.False(CurrentSettings.TidalCurrentsEnabled());
+                Assert.False(CurrentSettings.MapVectorsEnabled());
             });
         }
 
@@ -124,13 +125,19 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Environment.SetEnvironmentVariable(CurrentSettings.FarVariable, "0");
                 Environment.SetEnvironmentVariable(CurrentSettings.BallisticWindVariable, "off");
                 Environment.SetEnvironmentVariable(CurrentSettings.TidalVariable, "0");
+                Environment.SetEnvironmentVariable(CurrentSettings.VectorsVariable, "off");
                 Assert.False(CurrentSettings.DirectWindEnabled());
                 Assert.False(CurrentSettings.RouteCurrentEnabled());
                 Assert.False(CurrentSettings.FarDriftEnabled());
                 Assert.False(CurrentSettings.BallisticWindEnabled());
                 Assert.False(CurrentSettings.TidalCurrentsEnabled());
+                Assert.False(CurrentSettings.MapVectorsEnabled());
                 Assert.True(CurrentSettings.NearbyDriftEnabled());
                 Assert.True(CurrentSettings.RelativeRudderEnabled(true));
+
+                Environment.SetEnvironmentVariable(CurrentSettings.VectorsVariable, "1");
+                CurrentSettings.SaveMapVectorsPreference(false);
+                Assert.True(CurrentSettings.MapVectorsEnabled());
             });
         }
     }
