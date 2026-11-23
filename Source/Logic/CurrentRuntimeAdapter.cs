@@ -50,6 +50,9 @@ namespace UBOAT.Mods.RadioNavigation
         private static Vector3 wind;
         private static float exposure;
         private static bool docked;
+        private static bool grounded;
+        private static int seabedContactTicks;
+        private static PlayerShip collisionHookShip;
         private static bool useWind;
         private static Weather weather;
         private static Transform windDirection;
@@ -64,6 +67,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static Vector3 lastAir;
         private static bool useNearby;
         private static bool useRelativeRudder;
+        private static bool useBallistic;
         private static float nextNearbyScan;
         private static readonly Dictionary<NeuralNetworkPhysics, NearbyDriftHull> Nearby =
             new Dictionary<NeuralNetworkPhysics, NearbyDriftHull>();
@@ -78,6 +82,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (stale != null)
                 Object.Destroy(stale);
 
+            BindCollisionHooks(null);
             CurrentDiagnostics.EnsureRegistered();
             if (!CurrentSettings.IsMasterEnabled())
             {
@@ -87,19 +92,21 @@ namespace UBOAT.Mods.RadioNavigation
                 useWind = false;
                 useNearby = false;
                 useRelativeRudder = false;
+                useBallistic = false;
                 Debug.Log(LogPrefix + "disabled (RADIONAV_CURRENT_FIELD unset); currents off; stock physics untouched");
                 return;
             }
             useWind = CurrentSettings.DirectWindEnabled();
             useNearby = CurrentSettings.NearbyDriftEnabled();
+            useBallistic = CurrentSettings.BallisticWindEnabled();
             if (!TryReadField(out bool anyFlow))
                 return;
-            if (!useWind && !anyFlow)
+            if (!useWind && !anyFlow && !useBallistic)
             {
                 Debug.Log(LogPrefix + "no ambient flow requested; no water drag transpilers installed");
                 return;
             }
-            if (!TryInstall(harmony))
+            if ((useWind || anyFlow) && !TryInstall(harmony))
                 return;
             useRelativeRudder = CurrentSettings.RelativeRudderEnabled(anyFlow)
                 && CurrentRudderAdapter.TryInstall(harmony, typeof(PlayerShip).Assembly.GetType("UBOAT.Game.Scene.Items.Rudder"));
@@ -119,7 +126,7 @@ namespace UBOAT.Mods.RadioNavigation
                 + (lastPositionValid ? " position=" + lastLatitude.ToString("F4", CultureInfo.InvariantCulture)
                     + "," + lastLongitude.ToString("F4", CultureInfo.InvariantCulture) : " position=unavailable")
                 + " wind=" + Horizontal(wind) + " m/s exposure="
-                + exposure.ToString("F3", CultureInfo.InvariantCulture) + " docked=" + docked
+                + exposure.ToString("F3", CultureInfo.InvariantCulture) + " docked=" + docked + " grounded=" + grounded
                 + " relativeRudder=" + useRelativeRudder + " nearbyFlag=" + useNearby
                 + " boundPlayer=" + (target != null) + " full=" + appliedFull + " simple=" + appliedSimple
                 + " waterSteps=" + appliedWater + " airSteps=" + appliedAir
@@ -176,12 +183,27 @@ namespace UBOAT.Mods.RadioNavigation
         internal static bool TryGetRouteWater(PlayerShip ship, out Vector3 flow)
         {
             flow = water;
-            return boundShip == ship && target != null && !ship.Docked && HasFlow(water);
+            return boundShip == ship && target != null && !ship.Docked && !grounded && HasFlow(water);
         }
 
         // Reads the requested source once. Precedence: atlas tile, then depth
         // profile, then constant field. All are explicit experimental inputs,
         // not a silent year/depth extrapolation.
+        private static void WrapAtlasWithTidalLayer(CurrentAtlasField atlas, out bool anyFlow)
+        {
+            if (CurrentSettings.TidalCurrentsEnabled())
+            {
+                var tidal = CurrentTidalField.CreateWithAtlas(atlas);
+                currentField = new CompositeCurrentField(atlas, tidal);
+                anyFlow = atlas.HasFlow || tidal.HasFlow;
+                fieldKind = "atlas+tidal";
+                return;
+            }
+            currentField = atlas;
+            anyFlow = atlas.HasFlow;
+            fieldKind = "atlas";
+        }
+
         private static bool TryReadField(out bool anyFlow)
         {
             anyFlow = false;
@@ -197,14 +219,13 @@ namespace UBOAT.Mods.RadioNavigation
                         + "\": " + error + "; adapter disabled");
                     return false;
                 }
-                currentField = atlas;
-                anyFlow = atlas.HasFlow;
-                fieldKind = "atlas";
+                WrapAtlasWithTidalLayer(atlas, out anyFlow);
                 fieldSummary = atlas.ToString();
                 if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(CurrentSettings.ProfileVariable))
                     || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(CurrentSettings.FieldVariable)))
                     Debug.LogWarning(LogPrefix + CurrentSettings.AtlasVariable + " overrides profile/constant sources");
                 Debug.Log(LogPrefix + "requested atlas tile " + fieldSummary
+                    + "; tidal=" + CurrentSettings.TidalCurrentsEnabled()
                     + "; sample uses campaign UTC and hull lat/lon");
                 return true;
             }
@@ -363,7 +384,7 @@ namespace UBOAT.Mods.RadioNavigation
             entry = null;
             if (ReferenceEquals(hull, target))
             {
-                if (docked)
+                if (docked || grounded)
                     return false;
                 drag = step;
                 exposed = exposure;
@@ -394,7 +415,7 @@ namespace UBOAT.Mods.RadioNavigation
                 RefreshSampledWater();
             if (useNearby && Time.realtimeSinceStartup >= nextNearbyScan)
                 ScanNearby();
-            if (useWind && Time.realtimeSinceStartup >= nextWeatherSample)
+            if ((useWind || useBallistic) && Time.realtimeSinceStartup >= nextWeatherSample)
                 RefreshWind();
             if (++heartbeat < 1800)
                 return;
@@ -447,6 +468,19 @@ namespace UBOAT.Mods.RadioNavigation
                 velocity = Vector3.zero;
         }
 
+        internal static Vector3 CurrentWindMps => wind;
+
+        internal static bool TrySampleWaterAtDepth(Vector3 scenePosition, float depthMeters, out Vector3 velocity)
+        {
+            if (currentField == null)
+            {
+                velocity = water;
+                return HasFlow(velocity);
+            }
+            SampleWater(scenePosition, depthMeters, out velocity, false);
+            return HasFlow(velocity);
+        }
+
         internal static DateTime GameUtc()
         {
             if (!gameTime)
@@ -474,16 +508,51 @@ namespace UBOAT.Mods.RadioNavigation
         {
             var ship = boundShip;
             docked = true;
+            bool sleeping = false;
             if (ship)
+            {
                 docked = ship.Docked;
+                sleeping = (bool)ship.RigidBody && ship.RigidBody.IsSleeping();
+            }
+            seabedContactTicks = CurrentBallisticsMath.AdvanceSeabedContactTicks(seabedContactTicks, sleeping, false);
+            grounded = (bool)ship && seabedContactTicks > 0;
             if (useRelativeRudder)
-                CurrentRudderAdapter.SetHeld(docked);
+                CurrentRudderAdapter.SetHeld(docked || grounded);
             // Depth is measured to the top of the hull/conning tower, not to
             // the deck. Fade over the last exposed metre; omit mast drag.
             exposure = ship == null ? 0f : Mathf.Clamp01(-ship.Depth);
             if (useNearby)
                 foreach (var entry in Nearby.Values)
                     entry.Refresh();
+        }
+
+        private static void BindCollisionHooks(PlayerShip ship)
+        {
+            if (ReferenceEquals(collisionHookShip, ship))
+                return;
+            if (collisionHookShip != null)
+            {
+                collisionHookShip.CollisionEnter -= OnPlayerCollision;
+                collisionHookShip.CollisionStay -= OnPlayerCollision;
+            }
+            collisionHookShip = ship;
+            seabedContactTicks = 0;
+            grounded = false;
+            if (ship != null)
+            {
+                ship.CollisionEnter += OnPlayerCollision;
+                ship.CollisionStay += OnPlayerCollision;
+            }
+        }
+
+        private static void OnPlayerCollision(Collision collision)
+        {
+            if (collision?.collider != null
+                && string.Equals(collision.collider.GetType().Name, "TerrainCollider", StringComparison.Ordinal))
+            {
+                seabedContactTicks = CurrentBallisticsMath.SeabedContactGraceTicks;
+                grounded = boundShip != null;
+            }
         }
 
         private static void RefreshWind()
@@ -548,6 +617,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             boundShip = null;
             target = null;
+            BindCollisionHooks(null);
             if (useRelativeRudder)
                 CurrentRudderAdapter.Bind(null, null, Vector3.zero);
             if (ship == null)
@@ -561,6 +631,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             boundShip = ship;
             target = hull;
+            BindCollisionHooks(ship);
             RefreshSampledWater();
             if (useRelativeRudder)
                 CurrentRudderAdapter.Bind(body, ship.Rudders, water);

@@ -22,6 +22,8 @@ namespace UBOAT.Mods.RadioNavigation
         internal const string RudderVariable = "RADIONAV_RELATIVE_RUDDER";
         internal const string FarVariable = "RADIONAV_FAR_DRIFT";
         internal const string RouteVariable = "RADIONAV_ROUTE_CURRENT";
+        internal const string BallisticWindVariable = "RADIONAV_BALLISTIC_WIND";
+        internal const string TidalVariable = "RADIONAV_TIDAL_CURRENTS";
         internal const string BundledAtlasValue = "bundled";
 
         internal static bool IsMasterEnabled()
@@ -57,6 +59,16 @@ namespace UBOAT.Mods.RadioNavigation
         internal static bool RouteCurrentEnabled()
         {
             return IsMasterEnabled() && ReadFlag(RouteVariable, true);
+        }
+
+        internal static bool BallisticWindEnabled()
+        {
+            return IsMasterEnabled() && ReadFlag(BallisticWindVariable, true);
+        }
+
+        internal static bool TidalCurrentsEnabled()
+        {
+            return IsMasterEnabled() && ReadFlag(TidalVariable, true);
         }
 
         internal static string ResolveRequestedAtlas()

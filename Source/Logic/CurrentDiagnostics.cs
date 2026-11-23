@@ -59,7 +59,9 @@ namespace UBOAT.Mods.RadioNavigation
                 + " wind=" + CurrentSettings.DirectWindEnabled()
                 + " nearby=" + CurrentSettings.NearbyDriftEnabled()
                 + " far=" + CurrentSettings.FarDriftEnabled()
-                + " route=" + CurrentSettings.RouteCurrentEnabled());
+                + " route=" + CurrentSettings.RouteCurrentEnabled()
+                + " ballistics=" + CurrentSettings.BallisticWindEnabled()
+                + " tidal=" + CurrentSettings.TidalCurrentsEnabled());
         }
     }
 }

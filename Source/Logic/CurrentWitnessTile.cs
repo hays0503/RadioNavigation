@@ -60,6 +60,37 @@ namespace UBOAT.Mods.RadioNavigation
         public double South => axes[2][0];
         public double North => axes[2][latitudeCount - 1];
 
+        public bool TryGetSurfaceLandMask(double latitude, double longitude, out bool isLand)
+        {
+            isLand = false;
+            if (!TryNearestAxis(axes[2], latitude, out int iy) || !TryNearestAxis(axes[3], longitude, out int ix))
+                return false;
+            int packed = PackedIndex(0, 0, iy, ix);
+            isLand = vectors[packed] == short.MinValue;
+            return true;
+        }
+
+        private static bool TryNearestAxis(double[] axis, double value, out int index)
+        {
+            index = 0;
+            if (value < axis[0] - 0.5 || value > axis[axis.Length - 1] + 0.5)
+                return false;
+            int hit = Array.BinarySearch(axis, value);
+            if (hit >= 0)
+            {
+                index = hit;
+                return true;
+            }
+            int right = ~hit;
+            if (right <= 0)
+                index = 0;
+            else if (right >= axis.Length)
+                index = axis.Length - 1;
+            else
+                index = Math.Abs(value - axis[right - 1]) <= Math.Abs(axis[right] - value) ? right - 1 : right;
+            return true;
+        }
+
         // The bounded regional fixture format admits disjoint rectangles and
         // fully matched edges/corners, not overlapping interiors or T junctions.
         public bool IsCompatibleWith(CurrentWitnessTile other)

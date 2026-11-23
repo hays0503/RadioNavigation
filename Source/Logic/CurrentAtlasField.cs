@@ -165,5 +165,24 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         public override string ToString() => description;
+
+        internal bool TryGetSurfaceLandMask(double latitude, double longitude, out bool isLand)
+        {
+            if (MaskAt(latitude, longitude, out isLand)
+                || MaskAt(latitude, longitude + 360.0, out isLand)
+                || MaskAt(latitude, longitude - 360.0, out isLand))
+                return true;
+            isLand = false;
+            return false;
+        }
+
+        private bool MaskAt(double latitude, double longitude, out bool isLand)
+        {
+            foreach (CurrentWitnessTile tile in tiles)
+                if (tile.TryGetSurfaceLandMask(latitude, longitude, out isLand))
+                    return true;
+            isLand = false;
+            return false;
+        }
     }
 }

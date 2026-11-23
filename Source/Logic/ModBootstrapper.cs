@@ -78,6 +78,7 @@ namespace UBOAT.Mods.RadioNavigation
             SkyMaterialProbe.Reset();
             WarnOnce.Reset();
             FixMapMarker.Clear();
+            CurrentBallisticsAdapter.Reset();
             Debug.Log("[RadioNav][Main] Previous patches removed, runtime state reset (reload)");
 
             harmony = owner;
@@ -89,6 +90,7 @@ namespace UBOAT.Mods.RadioNavigation
             CurrentRuntimeAdapter.EnsureRunning(harmony);
             CurrentRouteRuntime.TryInstall(harmony);
             CurrentStrategicDrift.TryInstall(harmony);
+            CurrentBallisticsAdapter.TryInstall(harmony);
 
             // Save/load hygiene for the native map points: prune duplicate
             // owned rows before the game's restore (Loaded) and before every

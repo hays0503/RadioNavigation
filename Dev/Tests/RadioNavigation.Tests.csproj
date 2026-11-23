@@ -44,6 +44,8 @@
     <Compile Include="CurrentProfileFieldTests.cs" />
     <Compile Include="CurrentAtlasFieldTests.cs" />
     <Compile Include="CurrentSettingsTests.cs" />
+    <Compile Include="CurrentBallisticsTests.cs" />
+    <Compile Include="CurrentTidalFieldTests.cs" />
     <Compile Include="CurrentWaterDragTests.cs" />
     <Compile Include="CurrentOwnershipTests.cs" />
     <Compile Include="CurrentTrack2DTests.cs" />
@@ -244,6 +246,8 @@
     <Compile Include="..\..\Source\Logic\CurrentProfileField.cs" Link="Source\Logic\CurrentProfileField.cs" />
     <Compile Include="..\..\Source\Logic\CurrentAtlasField.cs" Link="Source\Logic\CurrentAtlasField.cs" />
     <Compile Include="..\..\Source\Logic\CurrentSettings.cs" Link="Source\Logic\CurrentSettings.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentBallisticsMath.cs" Link="Source\Logic\CurrentBallisticsMath.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentTidalField.cs" Link="Source\Logic\CurrentTidalField.cs" />
     <Compile Include="..\..\Source\Logic\CurrentWaterDrag.cs" Link="Source\Logic\CurrentWaterDrag.cs" />
     <Compile Include="..\..\Source\Logic\CurrentOwnership.cs" Link="Source\Logic\CurrentOwnership.cs" />
     <Compile Include="..\..\Source\Logic\CurrentTrack2D.cs" Link="Source\Logic\CurrentTrack2D.cs" />

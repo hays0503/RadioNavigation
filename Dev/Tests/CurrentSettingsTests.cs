@@ -18,7 +18,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 CurrentSettings.NearbyVariable,
                 CurrentSettings.RudderVariable,
                 CurrentSettings.FarVariable,
-                CurrentSettings.RouteVariable
+                CurrentSettings.RouteVariable,
+                CurrentSettings.BallisticWindVariable,
+                CurrentSettings.TidalVariable
             };
             var saved = new string[vars.Length];
             for (int i = 0; i < vars.Length; i++)
@@ -52,6 +54,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Assert.False(CurrentSettings.RelativeRudderEnabled(false));
                 Assert.True(CurrentSettings.FarDriftEnabled());
                 Assert.True(CurrentSettings.RouteCurrentEnabled());
+                Assert.True(CurrentSettings.BallisticWindEnabled());
+                Assert.True(CurrentSettings.TidalCurrentsEnabled());
             });
         }
 
@@ -69,6 +73,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Assert.False(CurrentSettings.RelativeRudderEnabled(true));
                 Assert.False(CurrentSettings.FarDriftEnabled());
                 Assert.False(CurrentSettings.RouteCurrentEnabled());
+                Assert.False(CurrentSettings.BallisticWindEnabled());
+                Assert.False(CurrentSettings.TidalCurrentsEnabled());
             });
         }
 
@@ -105,9 +111,13 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Environment.SetEnvironmentVariable(CurrentSettings.WindVariable, "0");
                 Environment.SetEnvironmentVariable(CurrentSettings.RouteVariable, "off");
                 Environment.SetEnvironmentVariable(CurrentSettings.FarVariable, "0");
+                Environment.SetEnvironmentVariable(CurrentSettings.BallisticWindVariable, "off");
+                Environment.SetEnvironmentVariable(CurrentSettings.TidalVariable, "0");
                 Assert.False(CurrentSettings.DirectWindEnabled());
                 Assert.False(CurrentSettings.RouteCurrentEnabled());
                 Assert.False(CurrentSettings.FarDriftEnabled());
+                Assert.False(CurrentSettings.BallisticWindEnabled());
+                Assert.False(CurrentSettings.TidalCurrentsEnabled());
                 Assert.True(CurrentSettings.NearbyDriftEnabled());
                 Assert.True(CurrentSettings.RelativeRudderEnabled(true));
             });
