@@ -7,6 +7,7 @@ using System.Reflection.Emit;
 using DWS.Common.InjectionFramework;
 using HarmonyLib;
 using PlayWay.Water.Extensions;
+using UBOAT.Game.Core.Data;
 using UBOAT.Game.Core.Time;
 using UBOAT.Game.Sandbox;
 using UBOAT.Game.Scene.Entities;
@@ -634,25 +635,51 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void BindNearby(Entity entity)
         {
-            if (entity == null || entity is PlayerShip || entity.SandboxEntity == null)
+            if (!IsEligibleNearbyShip(entity, out Ship ship, out Rigidbody body, out NeuralNetworkPhysics hull))
                 return;
-            string kind = entity.Blueprint.Type.Name;
-            if (kind != "Liberty" && kind != "Lifeboat")
+            if (!TryBuildStep(hull, out CurrentSurfaceDragStep drag))
                 return;
-            var hull = entity.GetComponentInChildren<NeuralNetworkPhysics>();
-            if (hull == null || Nearby.ContainsKey(hull))
-                return;
-            var body = hull.GetComponentInParent<Rigidbody>();
-            if (body == null || !TryBuildStep(hull, out CurrentSurfaceDragStep drag))
-                return;
-            var entry = new NearbyDriftHull(kind, entity, body, drag);
+            string kind = entity.Blueprint?.Type?.Name ?? entity.GetType().Name;
+            var entry = new NearbyDriftHull(kind, entity, ship, body, drag);
             entry.Refresh();
             Nearby.Add(hull, entry);
-            if (useRelativeRudder && entity is Ship rudderShip)
-                CurrentRudderAdapter.BindNearby(body, rudderShip.Rudders, entry.Water);
-            if (useNearby && entity is Ship speedShip)
-                CurrentShipSpeedAdapter.Bind(speedShip, entry.Water);
+            if (useRelativeRudder)
+                CurrentRudderAdapter.BindNearby(body, ship.Rudders, entry.Water);
+            if (useNearby)
+                CurrentShipSpeedAdapter.Bind(ship, entry.Water);
             Debug.Log(LogPrefix + "bound nearby " + kind + " (" + entity.name + ")");
+        }
+
+        private static bool IsEligibleNearbyShip(Entity entity, out Ship ship, out Rigidbody body,
+            out NeuralNetworkPhysics hull)
+        {
+            ship = entity as Ship;
+            body = null;
+            hull = null;
+            if (ship == null || ship is PlayerShip || ship is Aircraft || ship.DockPoint != null)
+                return false;
+            var sandboxEntity = entity.SandboxEntity;
+            if (sandboxEntity == null)
+                return false;
+            var group = sandboxEntity.Group;
+            if (group == null)
+                return false;
+            if (group.IsAirborne)
+                return false;
+            var blueprintType = entity.Blueprint != null ? entity.Blueprint.Type : null;
+            if (blueprintType != null)
+            {
+                if (blueprintType.Category == EntityTypeCategory.Pontoon
+                    || (blueprintType.Category & EntityTypeCategory.AircraftMask) != 0)
+                    return false;
+            }
+            hull = entity.GetComponentInChildren<NeuralNetworkPhysics>();
+            if (hull == null || Nearby.ContainsKey(hull))
+                return false;
+            body = hull.GetComponentInParent<Rigidbody>();
+            if (body == null)
+                return false;
+            return !body.isKinematic;
         }
 
         private sealed class NearbyDriftHull
@@ -664,24 +691,25 @@ namespace UBOAT.Mods.RadioNavigation
             private int airSteps;
             internal readonly Rigidbody Body;
             internal readonly CurrentSurfaceDragStep Drag;
-            internal Ship Ship => entity as Ship;
+            internal readonly Ship Ship;
             internal bool Active { get; private set; }
             internal float Exposure { get; private set; }
             internal Vector3 Water { get; private set; }
 
-            internal NearbyDriftHull(string kind, Entity entity, Rigidbody body, CurrentSurfaceDragStep drag)
+            internal NearbyDriftHull(string kind, Entity entity, Ship ship, Rigidbody body, CurrentSurfaceDragStep drag)
             {
                 this.kind = kind;
                 this.entity = entity;
                 identity = entity.SandboxEntity;
+                Ship = ship;
                 Body = body;
                 Drag = drag;
             }
 
             internal bool Current()
             {
-                return entity && entity.isActiveAndEnabled && Body
-                    && ReferenceEquals(identity, entity.SandboxEntity);
+                return entity && entity.isActiveAndEnabled && Body && !Body.isKinematic
+                    && Ship.DockPoint == null && ReferenceEquals(identity, entity.SandboxEntity);
             }
 
             internal void Refresh()

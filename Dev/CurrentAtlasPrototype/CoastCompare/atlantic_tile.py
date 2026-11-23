@@ -21,7 +21,7 @@ SHA = "1c321e7f894fc7d981c282d37b9046c9c47df7fca41a34a4a337955540ac35c9"
 
 def pack(axes, values, supported):
     sizes = tuple(len(axis) for axis in axes)
-    if not all(2 <= length <= 64 for length in sizes) or values.shape != (*sizes, 2):
+    if not all(2 <= length <= 128 for length in sizes) or values.shape != (*sizes, 2):
         raise ValueError("unexpected tile dimensions")
     for axis in axes:
         if not np.isfinite(axis).all() or not (np.diff(axis) > 0).all():
@@ -41,7 +41,7 @@ class Tile:
         if len(data) < HEADER.size:
             raise ValueError("truncated tile")
         magic, *sizes = HEADER.unpack_from(data)
-        if magic != b"RNW1" or not all(2 <= n <= 64 for n in sizes):
+        if magic != b"RNW1" or not all(2 <= n <= 128 for n in sizes):
             raise ValueError("unsupported tile")
         vectors = np.prod(sizes, dtype=np.int64)
         if len(data) != HEADER.size + 8 * sum(sizes) + 4 * vectors:

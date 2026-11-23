@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using HarmonyLib;
@@ -107,10 +108,16 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        private struct SceneHandoff
+        private struct SceneHandoffHull
         {
             public Ship Ship;
             public Rigidbody Body;
+        }
+
+        private struct SceneHandoff
+        {
+            public SceneHandoffHull Single;
+            public List<SceneHandoffHull> GroupHulls;
             public Vector3 Water;
         }
 
@@ -119,39 +126,85 @@ namespace UBOAT.Mods.RadioNavigation
         {
             __state = default(SceneHandoff);
             var group = __instance as SandboxMobileGroup;
-            if (!IsSingleLibertySpawn(group, sandboxEntity))
-                return;
-            var ship = sandboxEntity.SpawnedEntity as Ship;
-            var transform = sandboxEntity.SpawnedTransform;
-            if (!ship || !transform)
-                return;
-            var body = transform.GetComponent<Rigidbody>();
-            if (!body || body.isKinematic || body.constraints != RigidbodyConstraints.FreezeAll)
+            if (!IsSurfaceHandoffGroup(group))
                 return;
             if (!CurrentRuntimeAdapter.TrySampleEncounter(group.Position, CurrentRuntimeAdapter.GameUtc(),
-                    out Vector3 water) || water.x == 0f && water.z == 0f)
+                    out Vector3 water) || (water.x == 0f && water.z == 0f))
                 return;
-            __state = new SceneHandoff { Ship = ship, Body = body, Water = water };
+            var entities = group.Entities;
+            if (entities.Count == 1)
+            {
+                if (!ReferenceEquals(entities[0], sandboxEntity))
+                    return;
+                if (TryCaptureHandoffHull(sandboxEntity, out SceneHandoffHull single))
+                    __state = new SceneHandoff { Single = single, Water = water };
+                return;
+            }
+            var captured = new List<SceneHandoffHull>(entities.Count);
+            for (int i = 0; i < entities.Count; i++)
+            {
+                if (TryCaptureHandoffHull(entities[i], out SceneHandoffHull item))
+                    captured.Add(item);
+            }
+            if (captured.Count != 0)
+                __state = new SceneHandoff { GroupHulls = captured, Water = water };
         }
 
-        private static bool IsSingleLibertySpawn(SandboxMobileGroup group, SandboxEntity entity) =>
-            enabled && CurrentRuntimeAdapter.NearbyDriftEnabled
-            && group && !(group is SandboxPlayerWolfpack) && !group.IsAirborne
-            && !group.IsBeingDestroyed && group.SpawnState == SpawnState.Spawning
-            && group.Route.Count != 0 && group.Entities.Count == 1
-            && ReferenceEquals(group.Entities[0], entity) && entity.Type.Name == "Liberty";
+        private static bool IsSurfaceHandoffGroup(SandboxMobileGroup group)
+        {
+            if (!enabled || !CurrentRuntimeAdapter.NearbyDriftEnabled || !group
+                || group is SandboxPlayerWolfpack || group.IsAirborne || group.IsBeingDestroyed
+                || group.SpawnState != SpawnState.Spawning || group.Route.Count == 0)
+                return false;
+            var entities = group.Entities;
+            if (entities == null)
+                return false;
+            return entities.Count != 0;
+        }
+
+        private static bool TryCaptureHandoffHull(SandboxEntity sandboxEntity, out SceneHandoffHull captured)
+        {
+            captured = default(SceneHandoffHull);
+            if (sandboxEntity == null)
+                return false;
+            if (!sandboxEntity.Enabled)
+                return false;
+            var ship = sandboxEntity.SpawnedEntity as Ship;
+            var transform = sandboxEntity.SpawnedTransform;
+            if (!ship || ship is PlayerShip || ship is Aircraft || ship.DockPoint != null || !transform)
+                return false;
+            var body = transform.GetComponent<Rigidbody>();
+            if (!body || body.isKinematic || body.constraints != RigidbodyConstraints.FreezeAll)
+                return false;
+            captured = new SceneHandoffHull { Ship = ship, Body = body };
+            return true;
+        }
 
         private static void AfterSceneHandoff(SandboxGroup __instance, SceneHandoff __state)
         {
-            var body = __state.Body;
+            if (__instance.SpawnState != SpawnState.Spawned)
+                return;
+            if (__state.Single.Body != null)
+            {
+                ApplySceneHandoffHull(__state.Single, __state.Water);
+                return;
+            }
+            if (__state.GroupHulls == null)
+                return;
+            for (int i = 0; i < __state.GroupHulls.Count; i++)
+                ApplySceneHandoffHull(__state.GroupHulls[i], __state.Water);
+        }
+
+        private static void ApplySceneHandoffHull(SceneHandoffHull item, Vector3 water)
+        {
+            var body = item.Body;
             // Native initialization only releases FreezeAll and assigns the
             // launch speed on undocked bodies. Do not touch a body it left
             // frozen; add only the carried current once.
-            if (!body || !__state.Ship || __instance.SpawnState != SpawnState.Spawned
-                || body.isKinematic || body.constraints != RigidbodyConstraints.None
-                || !CurrentRuntimeAdapter.BindHandoffHull(__state.Ship, body))
+            if (!body || !item.Ship || body.isKinematic || body.constraints != RigidbodyConstraints.None
+                || !CurrentRuntimeAdapter.BindHandoffHull(item.Ship, body))
                 return;
-            body.velocity += __state.Water;
+            body.velocity += water;
         }
 
         internal static string Describe()

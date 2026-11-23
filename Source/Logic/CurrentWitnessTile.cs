@@ -145,7 +145,7 @@ namespace UBOAT.Mods.RadioNavigation
             count = 1;
             foreach (int size in sizes)
             {
-                if (size < 2 || size > 64)
+                if (size < 2 || size > 128)
                     return false;
                 sum += size;
                 count *= size;

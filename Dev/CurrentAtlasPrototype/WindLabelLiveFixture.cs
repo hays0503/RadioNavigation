@@ -46,6 +46,10 @@ namespace UBOAT.Mods.RadioNavigation
         private static Units origUnits;
         private static bool savedUiScaleState;
         private static float origUiScale = 1f;
+        private static bool savedResolutionState;
+        private static int origScreenWidth;
+        private static int origScreenHeight;
+        private static FullScreenMode origFullScreenMode;
 
         /// <summary>Bridge numbers plus every wind-speed label with its parsed text and bounds.</summary>
         public static string Probe()
@@ -80,12 +84,13 @@ namespace UBOAT.Mods.RadioNavigation
             var settings = framework.GetInstance<UserSettings>();
             var loc = framework.GetInstance<Locale>();
             text.AppendFormat(CultureInfo.InvariantCulture,
-                ";frame={0};ticks={1};tc={2:R};nativeWeather={3};nativeKnots={4:R};units={5};lang={6};uiScale={7:R}",
+                ";frame={0};ticks={1};tc={2:R};nativeWeather={3};nativeKnots={4:R};units={5};lang={6};uiScale={7:R};screen={8}x{9}",
                 Time.frameCount, time ? time.StoryTicks : 0L, time ? (float)time.TimeScale.Value : float.NaN,
                 weather ? weather.GetInstanceID() : 0, weather ? weather.TotalWindSpeed : float.NaN,
                 settings != null ? settings.GameplaySettings.units.ToString() : "?",
                 loc != null ? (loc.Language ?? "?") : "?",
-                settings != null ? settings.ControlSettings.uiScale : float.NaN);
+                settings != null ? settings.ControlSettings.uiScale : float.NaN,
+                Screen.width, Screen.height);
             if (!ship || !ship.RigidBody)
                 return;
             Vector3 vector = ship.RigidBody.velocity;
@@ -347,6 +352,27 @@ namespace UBOAT.Mods.RadioNavigation
                 settings.ApplySettings(writeToHDD: false, applyGraphics: false, applyVideo: false, applyAudio: false, callEvent: true);
             }
             return origUiScale.ToString("R", CultureInfo.InvariantCulture);
+        }
+
+        public static string SetResolutionInMemory(int width, int height)
+        {
+            if (!savedResolutionState)
+            {
+                origScreenWidth = Screen.width;
+                origScreenHeight = Screen.height;
+                origFullScreenMode = Screen.fullScreenMode;
+                savedResolutionState = true;
+            }
+            Screen.SetResolution(width, height, FullScreenMode.Windowed);
+            return width + "x" + height;
+        }
+
+        public static string RestoreResolution()
+        {
+            if (!savedResolutionState)
+                return "unmodified";
+            Screen.SetResolution(origScreenWidth, origScreenHeight, origFullScreenMode);
+            return origScreenWidth + "x" + origScreenHeight;
         }
 
         private static void InvalidateMapWindCache()

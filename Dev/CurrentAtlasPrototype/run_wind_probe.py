@@ -155,6 +155,22 @@ def collect(label):
         fixture("RestoreUiScale")
     time.sleep(1.5)
 
+    live.progress(f"{label}: alt resolution (1280x720) check")
+    try:
+        fixture("SetResolutionInMemory", 1280, 720)
+        time.sleep(1.5)
+        alt_res_frame = still_frame("alt-resolution.png")
+    finally:
+        fixture("RestoreResolution")
+    time.sleep(1.5)
+
+    live.progress(f"{label}: natural storm weather check")
+    console("Weather Storm")
+    time.sleep(2.5)
+    storm_frame = still_frame("storm.png")
+    console("Weather Reset")
+    time.sleep(1.5)
+
     live.progress(f"{label}: requesting dive")
     if fixture("SetDepth", 12.0) is not True:
         raise RuntimeError("dive order refused")
@@ -193,6 +209,8 @@ def collect(label):
         metric_en_frame=metric_en_frame,
         imperial_en_frame=imperial_en_frame,
         second_scale_frame=second_scale_frame,
+        alt_res_frame=alt_res_frame,
+        storm_frame=storm_frame,
         dived=dived_frame["before"]["probe"],
         dived_panel=dived_frame["before"]["panel"],
         dived_state=dived_state,
@@ -232,6 +250,7 @@ def numbers(data):
         "units": data.get("units", ["?"])[0],
         "lang": data.get("lang", ["?"])[0],
         "uiScale": float(data["uiScale"][0]) if "uiScale" in data else None,
+        "screen": data.get("screen", [None])[0],
         "mapScale": data.get("mapScale", []),
         "nativeMapTextAndCache": data["mapNative"],
         "mapParsed": data.get("mapParsed", []),
@@ -363,6 +382,8 @@ def report():
         ("metric_en", data["metric_en_frame"], True),
         ("imperial_en", data["imperial_en_frame"], True),
         ("second_scale", data["second_scale_frame"], True),
+        ("alt_resolution", data["alt_res_frame"], True),
+        ("storm", data["storm_frame"], True),
         ("dived", data["dived_frame"], False),
         ("resurfaced", data["resurfaced_frame"], True),
         ("reloaded", data["reloaded_frame"], True),
@@ -374,7 +395,11 @@ def report():
     surf_scale = checks[0]["numbers"].get("uiScale")
     alt_num = next((item["numbers"].get("uiScale") for item in checks if item["name"] == "second_scale"), None)
     second_scale_ok = (surf_scale is not None and alt_num is not None and abs(alt_num - surf_scale) >= 0.1)
-    ok = (closed_ok and second_scale_ok
+    alt_res_screen = next((item["numbers"].get("screen") for item in checks if item["name"] == "alt_resolution"), None)
+    alt_resolution_ok = alt_res_screen == "1280x720"
+    storm_knots = next((item["numbers"].get("windKnots", 0.0) for item in checks if item["name"] == "storm"), 0.0)
+    storm_ok = storm_knots >= 15.0
+    ok = (closed_ok and second_scale_ok and alt_resolution_ok and storm_ok
           and float(data["surface"]["depth"][0]) <= 0.5
           and float(data["dived"]["depth"][0]) > 0.5
           and all(item["stable"] and item["overlayOk"] and item["layoutOk"] and item["windValueOk"]
@@ -383,6 +408,8 @@ def report():
         telemetry="PASS" if ok else "FAIL",
         closed_ok=closed_ok,
         second_scale_ok=second_scale_ok,
+        alt_resolution_ok=alt_resolution_ok,
+        storm_ok=storm_ok,
         closed_mode=data.get("closed_mode"),
         reopen_mode=data.get("reopen_mode"),
         closed_nodes=closed_nodes,

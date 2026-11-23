@@ -147,7 +147,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 "Source/Data/CurrentAtlas not found from " + Directory.GetCurrentDirectory());
             Assert.True(CurrentAtlasField.TryLoad(directory, out var field, out var error), error);
             Assert.True(field.HasFlow);
-            Assert.Contains("tiles=2", field.ToString());
+            Assert.Contains("tiles=6", field.ToString());
 
             var query = new CurrentQuery
             {
@@ -164,23 +164,32 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(surface, shallow);
             Assert.InRange(Math.Sqrt(surface.x * surface.x + surface.z * surface.z), 0.001, 0.5);
 
-            // More than the old regional slice, in February 1941.
+            // Expanded coverage: 1939-1945 and up to 75.5 N (Norwegian Sea / Arctic).
             query.Latitude = 54;
             query.Longitude = -35;
             query.Utc = new DateTime(1941, 2, 25, 0, 0, 0, DateTimeKind.Utc);
             Assert.True(field.TrySample(query, out _));
             query.Latitude = 58;
             query.Longitude = 0.01;
-            Assert.True(field.TrySample(query, out _)); // crosses the source longitude seam
+            Assert.True(field.TrySample(query, out _)); // crosses the +0.5 longitude seam
+            query.Latitude = 68;
+            query.Longitude = 5;
+            query.Utc = new DateTime(1944, 6, 15, 0, 0, 0, DateTimeKind.Utc);
+            Assert.True(field.TrySample(query, out _)); // Norwegian Sea in 1944
             query.Latitude = 48;
             query.Longitude = 2;
+            query.Utc = T0;
             Assert.False(field.TrySample(query, out _)); // land mask
             query.DepthMeters = 10;
             query.Latitude = 29;
             Assert.False(field.TrySample(query, out _));
+            query.Latitude = 76.5;
+            Assert.False(field.TrySample(query, out _));
             query.Latitude = 54;
             query.Longitude = -35;
-            query.Utc = new DateTime(1942, 2, 1, 0, 0, 0, DateTimeKind.Utc);
+            query.Utc = new DateTime(1946, 2, 1, 0, 0, 0, DateTimeKind.Utc);
+            Assert.False(field.TrySample(query, out _));
+            query.Utc = new DateTime(1938, 12, 1, 0, 0, 0, DateTimeKind.Utc);
             Assert.False(field.TrySample(query, out _));
         }
 

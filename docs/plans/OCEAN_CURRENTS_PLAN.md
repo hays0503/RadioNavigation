@@ -2,7 +2,7 @@
 
 Дата: **2026-11-23**.
 
-**Статус: разделы [§13.36](#1336-план-оставшихся-работ) выполнены и приняты (включая save/load после выхода Liberty, второй UI‑масштаб и водную точность на поворотах; `F8` на среднем ПК и отдельное окно `farIntervals` на границе `0.0166 с` — `NOT RUN`; журнал — [§13.37](#1337-результаты-выполнения-1336-2026-11-23)).** Исторически ранее: для лодки
+**Статус: разделы [§13.36](#1336-план-оставшихся-работ) и последующие пункты расширения ([§13.38](#1338-расширение-2026-11-23-разрешение-шторм-флот-атлас-и-реестр-oc-001oc-052)) выполнены и приняты; `F8` на среднем ПК (`OC-051`, `OC-052`) и отдельное окно `farIntervals` на границе `0.0166 с` остаются `NOT RUN`; журналы — [§13.37](#1337-результаты-выполнения-1336-2026-11-23) и [§13.38](#1338-расширение-2026-11-23-разрешение-шторм-флот-атлас-и-реестр-oc-001oc-052).** Исторически ранее: для лодки
 подтверждены постоянное течение, профиль по глубине, рантайм-потребитель
 RNW1-плитки (в том числе ограниченный многоплиточный регион), прямой
 ветер и отсечение ветрового вклада при полном погружении
@@ -2791,3 +2791,23 @@ Steam Cloud, без изменения экранных настроек. Све
 5. **Регрессии и F8**
    - Повторены после физических правок на текущем манифесте `current-wind-stage-20261122` (30/30 SHA‑256 подтверждены): Ла‑Рошель `water` + `water-wind` (`artifacts/reports/current-fairway-reg-1/comparison.json`: `passed = true`), шлюпка и Liberty `water + wind` (`artifacts/reports/current-lifeboat-reg-1/nearby.json`: `Liberty water=208 air=208`, `Lifeboat water=87 air=84`), причал/отход `off` vs `both` (`artifacts/reports/current-dock-reg-1/comparison.json`: `passed = true`), глубина и рули `off` vs `water` + возврат на поверхность (`artifacts/reports/current-depth-reg-1/water.json`: `full_submersion = true`, `deck_mean = 6.40 м`). Исторический `B1.2 FAIL` не переписывался.
    - **F8: `NOT RUN`** (текущий стенд оснащён `NVIDIA GeForce RTX 4080 SUPER` + `Ryzen 9 7950X`, не согласованный средний ПК; кадровый вердикт F8 выносится отдельно на целевом стенде).
+
+### 13.38 Расширение 2026-11-23: разрешение `1280×720`, `naturalStorm`, флот/конвои, атлас 1939–1945 и аудит `OC-001…OC-052`
+
+Выполнен пакет доработок и живых приёмок в UBOAT (`30/30` оригинальных сейвов сохранены и сверены по SHA‑256):
+
+1. **Дополнительное разрешение экрана (`1280×720`) и отображение ветра при шторме (`MapWindDirectionDriver`)**:
+   - `Dev/CurrentAtlasPrototype/{WindLabelLiveFixture.cs,run_wind_probe.py}` дополнены временной сменой разрешения через in‑memory `Screen.SetResolution(..., FullScreenMode.Windowed)` с гарантированным восстановлением и запуском живого шторма `Weather Storm` -> `Weather Reset`.
+   - Живая приёмка (`artifacts/reports/current-wind-instruments-4/{comparison.json,visual-review.json}`): `telemetry = PASS`, `visual = PASS` (инспектированы все 12 PNG: `1360×768` на масштабах `1.26` и `0.85`, дополнительное разрешение `alt-resolution.png` `1280×720`, естественный шторм `storm.png` с `22 уз 95° В` / `11.318 м/с`, погружение `dived.png` `> 0.5 м` без пеленга, закрытие в `FreeFly`, переоткрытие и перезагрузка).
+2. **`naturalStorm` (поверхность и погружение) и расширение типов судов/конвоев**:
+   - `Source/Logic/CurrentRuntimeAdapter.cs`: `IsEligibleNearbyShip` обобщён с одиночных `Liberty`/`Lifeboat` на любые действующие не-игроковые надводные и подводные суда (`Ship`, кроме `PlayerShip`, `Aircraft`/`IsAirborne`/`AircraftMask`, `Pontoon`, `DockPoint != null` и `isKinematic`), а `NearbyDriftHull.Current()` дополнительно контролирует `!isKinematic` и `DockPoint == null` в каждом обновлении.
+   - `Source/Logic/CurrentStrategicDrift.cs`: `BeforeSceneHandoff`/`AfterSceneHandoff` переведены на многосудовой снимок `List<SceneHandoffHull>` с сохранением нулевых дополнительных аллокаций для одиночных корпусов.
+   - Живая приёмка (`artifacts/reports/current-expansion-v2-1/{comparison.json,storm_convoy-data.json}`): `status = PASS`, `storm_wind_ok = true`, `storm_surface_ok = true` (`11.318 м/с`, `exposure = 1.000`, `waterSteps +903`, `airSteps +903`), `storm_dived_ok = true` (`exposure = 0.000`, `waterSteps +721`, `airSteps +0`), `convoy_multi_ok = true`, `no_aircraft = true`, 15 одновременно сопровождаемых судов (`F-Class`, `War-Class`, `Dale-Class`, `9× N-A1`, `MTB`, `Large Freighter 02`, `Type IXC`).
+3. **Расширенный атлас ORA-20C `1939–1945` (`30.5–75.5° N`, `-64.5..+25.5° E`) и прибрежная политика `0 м`**:
+   - `Dev/CurrentAtlasPrototype/ora20c_atlantic.py` пересобран под полный диапазон кампании `1939–1945` (`84` непрерывных месячных центра) в 6 RNW1-тайлов `< 2 MiB` каждый (`ora_atlantic_{sw,sm,se,nw,nm,ne}.rnw`, суммарно `8,818,944 B`, загрузка `66 ms` в игре); лимиты осей в `CurrentWitnessTile.cs` (`size <= 128`) и `Dev/CurrentAtlasPrototype/CoastCompare/atlantic_tile.py` обновлены, `Source/Data/CurrentAtlas/atlas.provenance.json` и `Dev/Tests/CurrentAtlasFieldTests.cs` актуализированы. На поверхности `0 м` сохраняется честная опора на верхний реальный слой `5.02 м` без двойного счёта ветра и без синтетической воды на суше/в непокрытых мелководьях.
+   - Живая приёмка (`artifacts/reports/current-high-tc-7/comparison.json`, пересмотрена граница `75.5° N` в `run_high_tc_live.py`): `status = PASS`, `seam_crossed = true`, `seam_all_covered = true`, `seam_arrived = true`, `north_exit_coverage_dropped = true`, `far_1200s_vs_fine_integral_m = 0.405 м`, `far_turn_water_error_m = 0.234 м`, `far_turn_multistep_water_error_m = 1.193 м`, `far_turn_multistep_leg2_ok = true`, `far_over_30d_cap_rejected = true`.
+4. **Полный аудит реестра рисков (`docs/plans/OCEAN_CURRENTS_RISKS.md`)**:
+   - Все 52 позиции `OC-001…OC-052` сверены по коду, оффлайн-тестам и живым квитанциям: **32** закрыты со статусом `устранён`, **18** закрыты как `принят предел охвата` (включая все conditional-P0 `OC-010`, `OC-012`, `OC-038`, `OC-040`), **2** остаются `открыт` (`OC-051`, `OC-052` — профиль F8 на целевом среднем ПК `NOT RUN`).
+5. **Оффлайн-гейты (`RadioNavigation.SourceCheck`)**:
+   - Исправлена коллизия вложенного типа `SandboxDock.DockPoint` vs верхнеуровневого `UBOAT.Game.Scene.Items.DockPoint` в `Dev/RadioNavigation.SourceCheck/DependencyClosure.cs`.
+   - Все оффлайн-гейты (`build.ps1` + PVS-Studio, `analyze.ps1`, `SourceCheck`, `TestRunner`, `Analyzers.Tests`, Python `unittest`) пройдены без ошибок.

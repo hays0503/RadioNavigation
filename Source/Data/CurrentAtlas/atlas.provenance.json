@@ -1,11 +1,35 @@
 {
   "schema": 1,
-  "dataset": "ECMWF ORA-20C, member opa0, WOA 1° grid, 1941",
+  "dataset": "ECMWF ORA-20C, member opa0, WOA 1° grid, 1939-1945",
   "provider": "Integrated Climate Data Center (ICDC), Universität Hamburg",
   "record_url": "https://cen.uni-hamburg.de/en/icdc/data/ocean/easy-init-ocean/ecmwf-ensemble-of-ocean-reanalyses-of-the-20th-century-ora-20c.html",
   "attribution": "ECMWF ORA-20C, distributed by ICDC, Universität Hamburg.",
   "axes": {
     "time_centres_utc_seconds": [
+      -976968000.0,
+      -974419200.0,
+      -971870400.0,
+      -969235200.0,
+      -966600000.0,
+      -963964800.0,
+      -961329600.0,
+      -958651200.0,
+      -956016000.0,
+      -953380800.0,
+      -950745600.0,
+      -948110400.0,
+      -945432000.0,
+      -942840000.0,
+      -940248000.0,
+      -937612800.0,
+      -934977600.0,
+      -932342400.0,
+      -929707200.0,
+      -927028800.0,
+      -924393600.0,
+      -921758400.0,
+      -919123200.0,
+      -916488000.0,
       -913809600.0,
       -911260800.0,
       -908712000.0,
@@ -17,7 +41,55 @@
       -892857600.0,
       -890222400.0,
       -887587200.0,
-      -884952000.0
+      -884952000.0,
+      -882273600.0,
+      -879724800.0,
+      -877176000.0,
+      -874540800.0,
+      -871905600.0,
+      -869270400.0,
+      -866635200.0,
+      -863956800.0,
+      -861321600.0,
+      -858686400.0,
+      -856051200.0,
+      -853416000.0,
+      -850737600.0,
+      -848188800.0,
+      -845640000.0,
+      -843004800.0,
+      -840369600.0,
+      -837734400.0,
+      -835099200.0,
+      -832420800.0,
+      -829785600.0,
+      -827150400.0,
+      -824515200.0,
+      -821880000.0,
+      -819201600.0,
+      -816609600.0,
+      -814017600.0,
+      -811382400.0,
+      -808747200.0,
+      -806112000.0,
+      -803476800.0,
+      -800798400.0,
+      -798163200.0,
+      -795528000.0,
+      -792892800.0,
+      -790257600.0,
+      -787579200.0,
+      -785030400.0,
+      -782481600.0,
+      -779846400.0,
+      -777211200.0,
+      -774576000.0,
+      -771940800.0,
+      -769262400.0,
+      -766627200.0,
+      -763992000.0,
+      -761356800.0,
+      -758721600.0
     ],
     "depth_meters": [
       0.0,
@@ -58,9 +130,29 @@
       57.5,
       58.5,
       59.5,
-      60.5
+      60.5,
+      61.5,
+      62.5,
+      63.5,
+      64.5,
+      65.5,
+      66.5,
+      67.5,
+      68.5,
+      69.5,
+      70.5,
+      71.5,
+      72.5,
+      73.5,
+      74.5,
+      75.5
     ],
     "longitude_degrees_east": [
+      -64.5,
+      -63.5,
+      -62.5,
+      -61.5,
+      -60.5,
       -59.5,
       -58.5,
       -57.5,
@@ -131,60 +223,287 @@
       7.5,
       8.5,
       9.5,
-      10.5
+      10.5,
+      11.5,
+      12.5,
+      13.5,
+      14.5,
+      15.5,
+      16.5,
+      17.5,
+      18.5,
+      19.5,
+      20.5,
+      21.5,
+      22.5,
+      23.5,
+      24.5,
+      25.5
     ]
   },
   "surface": "0 m repeats the shallowest model level (5.0215898 m) and its wet mask; not observed surface data",
   "quantization_mps": 0.0001,
-  "max_quantization_error_mps": 7.063198299701066e-05,
+  "max_quantization_error_mps": 7.066641325806746e-05,
   "tiles": [
     {
-      "file": "ora_atlantic_west.rnw",
-      "bytes": 322100,
-      "sha256": "b6364ed3fcab4006e08c9e9d45a0d482752f95380ea289a03819a05fda73107f",
-      "supported": 78756,
-      "total": 80352,
+      "file": "ora_atlantic_sw.rnw",
+      "bytes": 1984996,
+      "sha256": "0295bd6464bea4de320660f8aebcaa36971a286917689e93aef32f78722a2f2e",
+      "supported": 477036,
+      "total": 495936,
       "max_quantization_mps": 7.063198299701066e-05
     },
     {
-      "file": "ora_atlantic_east.rnw",
-      "bytes": 322100,
-      "sha256": "59ac830b1f58cbdcf097d093466bc5d69d4700dad09f1b6920b4a421298b8410",
-      "supported": 57060,
-      "total": 80352,
-      "max_quantization_mps": 7.047683523683519e-05
+      "file": "ora_atlantic_sm.rnw",
+      "bytes": 1259116,
+      "sha256": "9033f34d3099c5124d4c4c906d4cd48982b5e6c93560bb840041bb6b17fda6cf",
+      "supported": 247800,
+      "total": 314496,
+      "max_quantization_mps": 7.057117541950096e-05
+    },
+    {
+      "file": "ora_atlantic_se.rnw",
+      "bytes": 1259116,
+      "sha256": "170b35c89f20c144203a8f9f728270ac7b31309a5477e6d0d2b83fbd6cede7ad",
+      "supported": 118440,
+      "total": 314496,
+      "max_quantization_mps": 7.041666656410118e-05
+    },
+    {
+      "file": "ora_atlantic_nw.rnw",
+      "bytes": 1902332,
+      "sha256": "02d387a1354c262c186635d6df09cab846be673b74ac587cad24d3fab42933e0",
+      "supported": 293328,
+      "total": 475272,
+      "max_quantization_mps": 7.065270221300752e-05
+    },
+    {
+      "file": "ora_atlantic_nm.rnw",
+      "bytes": 1206692,
+      "sha256": "3691ffe163907373dcee5e42eb3487d31e41d2e1375f8cbd973ce2c9a8f122c0",
+      "supported": 274680,
+      "total": 301392,
+      "max_quantization_mps": 7.066641325806746e-05
+    },
+    {
+      "file": "ora_atlantic_ne.rnw",
+      "bytes": 1206692,
+      "sha256": "cb268306106aaca7e1cfe0f48fca8bfaab3d0a08afe050a6240e699a292fb6bf",
+      "supported": 196560,
+      "total": 301392,
+      "max_quantization_mps": 7.065524616445535e-05
     }
   ],
   "source_slices": [
     {
-      "file": "uo_300_329.txt",
-      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A150%5D%5B300%3A329%5D,mask%5B0%3A4%5D%5B120%3A150%5D%5B300%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A150%5D,lon%5B300%3A329%5D,time%5B0%3A11%5D",
-      "sha256": "cb5b69acc505b5cd96c7bb50f6dbbd4f9d09e31351635b77d0580a049a0408ef"
+      "file": "1939_uo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1939_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "1c8a53ddfa7cbaf768db51e227be0ea79c2f313f63650ac9ead6c45bf1343ca8"
     },
     {
-      "file": "uo_330_359.txt",
-      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A150%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A150%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A150%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
-      "sha256": "10ad9f84ccb5a4f999ad1e9e93515dad884f1e99a80bc48b323aa71ea2292305"
+      "file": "1939_uo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1939_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "5399a120b18ae4ea6e21d2fa69a557b6a09e6e86a8eda5c3c15689d1cba8a5e6"
     },
     {
-      "file": "uo_0_10.txt",
-      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A150%5D%5B0%3A10%5D,mask%5B0%3A4%5D%5B120%3A150%5D%5B0%3A10%5D,depth%5B0%3A4%5D,lat%5B120%3A150%5D,lon%5B0%3A10%5D,time%5B0%3A11%5D",
-      "sha256": "af10f3e0818af801e91264f2e2a39fd882f080d2456676119db0cff0d8cedf46"
+      "file": "1939_uo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1939_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "4150fe6626ac6bf3b2f4dbc0385eb9e37f95bc2fc5a114f1ee6c98971438112b"
     },
     {
-      "file": "vo_300_329.txt",
-      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A150%5D%5B300%3A329%5D,mask%5B0%3A4%5D%5B120%3A150%5D%5B300%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A150%5D,lon%5B300%3A329%5D,time%5B0%3A11%5D",
-      "sha256": "63c188f238a02b36cea7d6202cc3636342a565bd3afc25336c67b4ddc5fc38d3"
+      "file": "1939_vo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1939_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "8abea6b96274b16bf4e0bc5971e1c8608ab62aff35f29a95fe021baf5ea5b547"
     },
     {
-      "file": "vo_330_359.txt",
-      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A150%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A150%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A150%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
-      "sha256": "c7ac4b23eab33eab8322d85ce01b0dc669c0bbda7ed4803431f082ea97bb6dc1"
+      "file": "1939_vo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1939_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "feac8519af6709abf9f471261f696b5b50a98dd7b94bba48463e5c2726e48d40"
     },
     {
-      "file": "vo_0_10.txt",
-      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A150%5D%5B0%3A10%5D,mask%5B0%3A4%5D%5B120%3A150%5D%5B0%3A10%5D,depth%5B0%3A4%5D,lat%5B120%3A150%5D,lon%5B0%3A10%5D,time%5B0%3A11%5D",
-      "sha256": "2dff5f9bff76facfbe67755c54a71022e181a90317dddf59bd69c9a126dde47e"
+      "file": "1939_vo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1939_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "42275ac76c01f31a120072bfad13590449c7c20f3065e5a9e3beaf73f7d27a40"
+    },
+    {
+      "file": "1940_uo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1940_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "0dfc928a503c7133389c94175c215068c317ef1136a85d1c488702d96b2c2ada"
+    },
+    {
+      "file": "1940_uo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1940_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "7d2d67fcd60fb5e129aa9aeab5a6895caff5f09e9a8164b84c6c09a15b58afb6"
+    },
+    {
+      "file": "1940_uo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1940_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "f36145606a047e62988a9edfbb29482edbbf8d3164fd4b8fff789d1648234f20"
+    },
+    {
+      "file": "1940_vo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1940_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "69cb5933fc100de387478ece7cb74ae01e56decae157a1cc6dbeccd57537ed47"
+    },
+    {
+      "file": "1940_vo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1940_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "981b6f95191429b85faba593ff9f68b02c2fdf88d6a81fb009fb4d5c075cf6af"
+    },
+    {
+      "file": "1940_vo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1940_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "c80bf00ff33393686ce773a334eabec0edeb8c5b74b8089b0be8f115f8441060"
+    },
+    {
+      "file": "1941_uo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "199951ee5616aaf98fe618bdfc9f41bfeeaaaffcb85d30cedb24695a039c1096"
+    },
+    {
+      "file": "1941_uo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "25000c814c97346e4f52421e40856424eeef4e4c9f916ed2987bfaa3d65e0b3d"
+    },
+    {
+      "file": "1941_uo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "ffca9ec72af69b092eb10d40b4bcb30c6a02d41fe96b962f8f5013e309b15c68"
+    },
+    {
+      "file": "1941_vo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "bdf12371a9cb8367b67ca03e534d6f1982d52ff67c3b3e1a092e56f830555e6d"
+    },
+    {
+      "file": "1941_vo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "3e58f97d0f8cf9f65014a3312b0e9f6b38da0ee7fbb666f83d660ccd33e0b18a"
+    },
+    {
+      "file": "1941_vo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1941_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "f2d259d21b7b4fad505739b8c71e38fb9ee56d58571ae3b3ecdbd33a5854dc3a"
+    },
+    {
+      "file": "1942_uo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1942_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "788ca4da430e90a14fd20324f3b24cada841d233b76ee58cc442f634c0d35815"
+    },
+    {
+      "file": "1942_uo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1942_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "93c9c982065fc2fcb492231abd5b9a6c6d59e9133acd74c357d9f9cff109721a"
+    },
+    {
+      "file": "1942_uo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1942_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "31e98a9d76f3577bf8d8a9bbc60e82ea7cd618794e5b8a06bf697dcd2f6639aa"
+    },
+    {
+      "file": "1942_vo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1942_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "d5a408801c3e9ddd50750c512a18a850d51f9bfe457a733bf5a73737825b1016"
+    },
+    {
+      "file": "1942_vo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1942_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "bc1b2e79c8a5c936a146960258d193f5afceb3a00d7c61b37411fc3a814099e2"
+    },
+    {
+      "file": "1942_vo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1942_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "a7373579b8c9e8a815abdfe376119a3d5b2babaf1ddc6d1108d7b0c0572063b8"
+    },
+    {
+      "file": "1943_uo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1943_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "b1533d92dbdbafeb69e9d2b52dc48fc05ea57c7b739bd7a1f452f60cf1194407"
+    },
+    {
+      "file": "1943_uo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1943_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "bf3ca3933f1d6a9635ff7a6da7cfb099f9ada53131fa8439d1f44537c2b26066"
+    },
+    {
+      "file": "1943_uo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1943_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "95b4d8ca4e14487f16cfec10a4e993fa31e5d75dc9f832eba469d13e04ae5cb1"
+    },
+    {
+      "file": "1943_vo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1943_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "3c9c3e893e7396b314fd289c81f8ed61334196bbf305c695ed05c3e70e762a4b"
+    },
+    {
+      "file": "1943_vo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1943_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "41ee8cbf080c9d69ccd6a410cc300c9b4c46f9527a27110763a5ddf7dd49de7a"
+    },
+    {
+      "file": "1943_vo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1943_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "ded2e53d2a4a1fd774516f38c6c7508f127596f178c10425e678316c31863a13"
+    },
+    {
+      "file": "1944_uo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1944_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "c3233af3a7cfc10f2e489f79e2635641a6ed734193e8fc8852abc58d02623a7c"
+    },
+    {
+      "file": "1944_uo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1944_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "553ae6ad1e1c3c1d52d9f7007a7abe44dd3bef34835af352cf18920133d93255"
+    },
+    {
+      "file": "1944_uo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1944_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "20deeee5d308f7d00a4dd6301b1fdb561cb92b3b0dbe70251466017c02c0c710"
+    },
+    {
+      "file": "1944_vo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1944_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "413adef938ca22a5ff38f64ed66bae816f3b33f4afa5a3a6e87f6ef45e2fef00"
+    },
+    {
+      "file": "1944_vo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1944_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "eed883c80548c4d4b448f7c1371224544c0c79e85b71a5cf7ef3f37df59c8502"
+    },
+    {
+      "file": "1944_vo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1944_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "df7e45c99e8e20a9bd63f08e34b7814f8ccdfb17b44a249cf99d1197384627db"
+    },
+    {
+      "file": "1945_uo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1945_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "eab56ed449e88aa7b0cd8afde87a42cb25d2e0f2a810f886841044cf007cbebf"
+    },
+    {
+      "file": "1945_uo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1945_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "f1749a6deb244d4362a26529e625067bc48caa49526b4f35e8e60af643d710bc"
+    },
+    {
+      "file": "1945_uo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/uo_ora20c_1m_1945_grid_1x1.nc.gz.ascii?uo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "04859341ddd14f7810a31cc1d14d8651f1754f8325b6e735a0263af8ffc44d58"
+    },
+    {
+      "file": "1945_vo_295_329.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1945_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B295%3A329%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B295%3A329%5D,time%5B0%3A11%5D",
+      "sha256": "df0d8f6da6bd20c61f5d6714cfd88f19a6a5ba989714f5dfb46b171080a7a560"
+    },
+    {
+      "file": "1945_vo_330_359.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1945_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B330%3A359%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B330%3A359%5D,time%5B0%3A11%5D",
+      "sha256": "76e628d5dd342f2792818b03fb7c1992d01f034c41aa1d7981cc4bc9de8a4b72"
+    },
+    {
+      "file": "1945_vo_0_25.txt",
+      "url": "https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/EASYInit/ora20c/opa0/vo_ora20c_1m_1945_grid_1x1.nc.gz.ascii?vo%5B0%3A11%5D%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,mask%5B0%3A4%5D%5B120%3A165%5D%5B0%3A25%5D,depth%5B0%3A4%5D,lat%5B120%3A165%5D,lon%5B0%3A25%5D,time%5B0%3A11%5D",
+      "sha256": "e04b3428ee830931be2bc0b0014cca86766c8d08726a2acf1971f7212123980c"
     }
   ],
   "terms": {

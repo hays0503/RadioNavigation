@@ -299,7 +299,7 @@ namespace RadioNavigation.SourceCheck
                 return (ImmutableArray<string>.Empty, ImmutableArray<string>.Empty);
 
             // type simple name -> declaring files (with declared arity).
-            var typeToFiles = new Dictionary<string, List<(string Path, int Arity)>>(StringComparer.Ordinal);
+            var typeToFiles = new Dictionary<string, List<(string Path, int Arity, bool IsTopLevel)>>(StringComparer.Ordinal);
             foreach (var path in allSourceFiles)
             {
                 var root = CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path)
@@ -313,8 +313,8 @@ namespace RadioNavigation.SourceCheck
                         ? td.TypeParameterList?.Parameters.Count ?? 0
                         : 0;
                     if (!typeToFiles.TryGetValue(id, out var list))
-                        typeToFiles[id] = list = new List<(string, int)>();
-                    list.Add((path, arity));
+                        typeToFiles[id] = list = new List<(string, int, bool)>();
+                    list.Add((path, arity, IsTopLevelType(decl)));
                 }
             }
 
@@ -359,8 +359,8 @@ namespace RadioNavigation.SourceCheck
             {
                 if (typeToFiles.TryGetValue(seed.Name, out var files))
                 {
-                    var match = files.FirstOrDefault(f => f.Arity == seed.Arity);
-                    realByType[seed.Name] = match.Path ?? files[0].Path;
+                    var selected = PickTypeFile(files, seed.Arity);
+                    realByType[seed.Name] = selected;
                 }
             }
 
@@ -376,7 +376,7 @@ namespace RadioNavigation.SourceCheck
                     {
                         if (realByType.ContainsKey(baseName)) continue;
                         if (!typeToFiles.TryGetValue(baseName, out var files)) continue;
-                        realByType[baseName] = files[0].Path;
+                        realByType[baseName] = PickTypeFile(files, arity: -1);
                         baseChanged = true;
                     }
                 }
@@ -887,6 +887,7 @@ foreach (var name in missing)
                 {
                     var id = decl is BaseTypeDeclarationSyntax b ? b.Identifier.Text
                         : ((DelegateDeclarationSyntax)decl).Identifier.Text;
+                    if (!IsTopLevelType(decl)) continue;
                     var ns = GetNamespace(decl);
                     if (!map.TryGetValue(id, out var set))
                         map[id] = set = new HashSet<string>(StringComparer.Ordinal);
@@ -1069,6 +1070,32 @@ foreach (var name in missing)
                     return known.First();
             }
             return null;
+        }
+
+        private static bool IsTopLevelType(SyntaxNode decl)
+        {
+            return decl.Parent is CompilationUnitSyntax
+                || decl.Parent is NamespaceDeclarationSyntax
+                || decl.Parent is FileScopedNamespaceDeclarationSyntax;
+        }
+
+        private static string PickTypeFile(
+            List<(string Path, int Arity, bool IsTopLevel)> files,
+            int arity)
+        {
+            if (arity >= 0)
+            {
+                var exactTop = files.FirstOrDefault(f => f.IsTopLevel && f.Arity == arity);
+                if (exactTop.Path != null) return exactTop.Path;
+            }
+            var anyTop = files.FirstOrDefault(f => f.IsTopLevel);
+            if (anyTop.Path != null) return anyTop.Path;
+            if (arity >= 0)
+            {
+                var exactNested = files.FirstOrDefault(f => f.Arity == arity);
+                if (exactNested.Path != null) return exactNested.Path;
+            }
+            return files[0].Path;
         }
 
         public static string GetFileNamespace(SyntaxNode node)

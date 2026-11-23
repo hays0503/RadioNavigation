@@ -281,10 +281,10 @@ def collect_atlas(label):
             time.sleep(0.3)
         post("/time/scale", value=1)
 
-        # 2. Player exiting northern atlas coverage (60.47N -> 60.56N, -15.0W)
+        # 2. Player exiting northern atlas coverage (75.47N -> 75.56N, -15.0W)
         x_north = -15.0 * KM_PER_DEG
-        y_in = 60.47 * KM_PER_DEG
-        y_out = 60.56 * KM_PER_DEG
+        y_in = 75.47 * KM_PER_DEG
+        y_out = 75.56 * KM_PER_DEG
         post("/ship/heading", deg=0)
         post("/ship/rudder", value=0)
         time.sleep(0.5)
@@ -351,8 +351,8 @@ def collect_atlas(label):
         before_cap = far_state(gid_reloaded)
         after_cap = parse_far_str(call("ForceFarInterval", gid_reloaded, 2600000))
 
-        # Test out-of-coverage far interval at 61.0N, -15.0W
-        gid_out = int(call("SetupFarGroup", x_north, 61.0 * KM_PER_DEG, f"{x_north},{61.2 * KM_PER_DEG}", 0.0))
+        # Test out-of-coverage far interval at 76.0N, -15.0W
+        gid_out = int(call("SetupFarGroup", x_north, 76.0 * KM_PER_DEG, f"{x_north},{76.2 * KM_PER_DEG}", 0.0))
         out_before = far_state(gid_out)
         out_after = parse_far_str(call("ForceFarInterval", gid_out, 1200))
 
