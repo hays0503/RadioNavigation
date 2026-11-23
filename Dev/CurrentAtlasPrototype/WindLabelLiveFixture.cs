@@ -44,6 +44,8 @@ namespace UBOAT.Mods.RadioNavigation
         private static string origKnots;
         private static string origKmh;
         private static Units origUnits;
+        private static bool savedUiScaleState;
+        private static float origUiScale = 1f;
 
         /// <summary>Bridge numbers plus every wind-speed label with its parsed text and bounds.</summary>
         public static string Probe()
@@ -78,11 +80,12 @@ namespace UBOAT.Mods.RadioNavigation
             var settings = framework.GetInstance<UserSettings>();
             var loc = framework.GetInstance<Locale>();
             text.AppendFormat(CultureInfo.InvariantCulture,
-                ";frame={0};ticks={1};tc={2:R};nativeWeather={3};nativeKnots={4:R};units={5};lang={6}",
+                ";frame={0};ticks={1};tc={2:R};nativeWeather={3};nativeKnots={4:R};units={5};lang={6};uiScale={7:R}",
                 Time.frameCount, time ? time.StoryTicks : 0L, time ? (float)time.TimeScale.Value : float.NaN,
                 weather ? weather.GetInstanceID() : 0, weather ? weather.TotalWindSpeed : float.NaN,
                 settings != null ? settings.GameplaySettings.units.ToString() : "?",
-                loc != null ? (loc.Language ?? "?") : "?");
+                loc != null ? (loc.Language ?? "?") : "?",
+                settings != null ? settings.ControlSettings.uiScale : float.NaN);
             if (!ship || !ship.RigidBody)
                 return;
             Vector3 vector = ship.RigidBody.velocity;
@@ -112,6 +115,10 @@ namespace UBOAT.Mods.RadioNavigation
                 var mapDepth = NativeDepthLabelField?.GetValue(map) as TextMeshProUGUI;
                 text.AppendFormat(CultureInfo.InvariantCulture, ";mapNative={0}:{1}:{2}",
                     map.GetInstanceID(), NativeWindCacheField?.GetValue(map), mapDepth ? mapDepth.text : "");
+                var canvas = map.GetComponentInParent<Canvas>();
+                float canvasScale = canvas != null ? canvas.rootCanvas.scaleFactor : float.NaN;
+                text.AppendFormat(CultureInfo.InvariantCulture, ";mapScale={0}:{1:R}",
+                    map.GetInstanceID(), canvasScale);
             }
         }
 
@@ -312,6 +319,34 @@ namespace UBOAT.Mods.RadioNavigation
             CacheKmhField?.SetValue(null, null);
             InvalidateMapWindCache();
             return (origLanguage ?? "?") + ":" + origUnits;
+        }
+
+        public static string SetUiScaleInMemory(double scale)
+        {
+            var settings = InjectionFramework.Instance?.GetInstance<UserSettings>();
+            if (settings == null)
+                return "no settings";
+            if (!savedUiScaleState)
+            {
+                origUiScale = settings.ControlSettings.uiScale;
+                savedUiScaleState = true;
+            }
+            settings.ControlSettings.uiScale = (float)scale;
+            settings.ApplySettings(writeToHDD: false, applyGraphics: false, applyVideo: false, applyAudio: false, callEvent: true);
+            return settings.ControlSettings.uiScale.ToString("R", CultureInfo.InvariantCulture);
+        }
+
+        public static string RestoreUiScale()
+        {
+            if (!savedUiScaleState)
+                return "unmodified";
+            var settings = InjectionFramework.Instance?.GetInstance<UserSettings>();
+            if (settings != null)
+            {
+                settings.ControlSettings.uiScale = origUiScale;
+                settings.ApplySettings(writeToHDD: false, applyGraphics: false, applyVideo: false, applyAudio: false, callEvent: true);
+            }
+            return origUiScale.ToString("R", CultureInfo.InvariantCulture);
         }
 
         private static void InvalidateMapWindCache()

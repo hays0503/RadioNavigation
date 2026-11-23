@@ -144,6 +144,17 @@ def collect(label):
         fixture("RestoreLocaleAndUnits")
     time.sleep(1.5)
 
+    live.progress(f"{label}: second UI scale check")
+    orig_scale = float(surface_frame["before"]["probe"].get("uiScale", ["1"])[0])
+    alt_scale = 0.85 if orig_scale >= 1.15 else 1.25
+    try:
+        fixture("SetUiScaleInMemory", alt_scale)
+        time.sleep(1.5)
+        second_scale_frame = still_frame("second-scale.png")
+    finally:
+        fixture("RestoreUiScale")
+    time.sleep(1.5)
+
     live.progress(f"{label}: requesting dive")
     if fixture("SetDepth", 12.0) is not True:
         raise RuntimeError("dive order refused")
@@ -181,6 +192,7 @@ def collect(label):
         metric_ru_frame=metric_ru_frame,
         metric_en_frame=metric_en_frame,
         imperial_en_frame=imperial_en_frame,
+        second_scale_frame=second_scale_frame,
         dived=dived_frame["before"]["probe"],
         dived_panel=dived_frame["before"]["panel"],
         dived_state=dived_state,
@@ -219,6 +231,8 @@ def numbers(data):
         "nativeKnots": float(data["nativeKnots"][0]),
         "units": data.get("units", ["?"])[0],
         "lang": data.get("lang", ["?"])[0],
+        "uiScale": float(data["uiScale"][0]) if "uiScale" in data else None,
+        "mapScale": data.get("mapScale", []),
         "nativeMapTextAndCache": data["mapNative"],
         "mapParsed": data.get("mapParsed", []),
     }
@@ -348,6 +362,7 @@ def report():
         ("metric_ru", data["metric_ru_frame"], True),
         ("metric_en", data["metric_en_frame"], True),
         ("imperial_en", data["imperial_en_frame"], True),
+        ("second_scale", data["second_scale_frame"], True),
         ("dived", data["dived_frame"], False),
         ("resurfaced", data["resurfaced_frame"], True),
         ("reloaded", data["reloaded_frame"], True),
@@ -356,7 +371,10 @@ def report():
     closed_nodes = [row for row in data.get("closed_panel", "").splitlines()
                     if "RadioNavWindBearing" in row]
     closed_ok = len(closed_nodes) <= 1 and all(":active=False" in row for row in closed_nodes)
-    ok = (closed_ok
+    surf_scale = checks[0]["numbers"].get("uiScale")
+    alt_num = next((item["numbers"].get("uiScale") for item in checks if item["name"] == "second_scale"), None)
+    second_scale_ok = (surf_scale is not None and alt_num is not None and abs(alt_num - surf_scale) >= 0.1)
+    ok = (closed_ok and second_scale_ok
           and float(data["surface"]["depth"][0]) <= 0.5
           and float(data["dived"]["depth"][0]) > 0.5
           and all(item["stable"] and item["overlayOk"] and item["layoutOk"] and item["windValueOk"]
@@ -364,6 +382,7 @@ def report():
     live.b1.write_new(live.WORK / "comparison.json", dict(
         telemetry="PASS" if ok else "FAIL",
         closed_ok=closed_ok,
+        second_scale_ok=second_scale_ok,
         closed_mode=data.get("closed_mode"),
         reopen_mode=data.get("reopen_mode"),
         closed_nodes=closed_nodes,
@@ -372,7 +391,7 @@ def report():
         load_reply=data["load_reply"],
         visual="NOT RUN",
         visual_note="inspect each composited PNG before a visual verdict",
-        not_run=["secondUiScaleOrResolution"]))
+        not_run=[]))
     return 0 if ok else 1
 
 

@@ -124,6 +124,21 @@ def fine_atlas_integrate(tiles, x0, y0, body_vx_kmps, body_vy_kmps, utc_s, durat
     return x, y, covered_dt
 
 
+def fine_atlas_water_chord(tiles, x0, y0, x1, y1, utc_s, duration_s, steps=120):
+    dt = duration_s / steps
+    dx = dy = 0.0
+    for i in range(steps):
+        frac = (i + 0.5) / steps
+        t_mid = utc_s + frac * duration_s
+        lat = (y0 + (y1 - y0) * frac + dy) / KM_PER_DEG
+        lon = (x0 + (x1 - x0) * frac + dx) / KM_PER_DEG
+        w = next((tile.sample(t_mid, 0.0, lat, lon) for tile in tiles if tile.sample(t_mid, 0.0, lat, lon) is not None), None)
+        if w is not None:
+            dx += (w[0] / 1000.0) * dt
+            dy += (w[1] / 1000.0) * dt
+    return dx, dy
+
+
 def wait_save_written(name, timeout=15):
     p = temp_save_path(name)
     deadline = time.monotonic() + timeout
@@ -314,11 +329,23 @@ def collect_atlas(label):
         after_reload = far_state(gid_reloaded)
         fg_after_reload_step = parse_far_str(call("ForceFarInterval", gid_reloaded, 1200))
 
-        # Measure turn-crossing straight-line approximation error explicitly
+        # Measure turn-crossing behavior on a 90-deg corner (2.0 km East -> 12.0 km North)
         gid_turn = int(call("SetupFarGroup", x_west, y_seam,
                             f"{x_west + 2.0},{y_seam};{x_west + 2.0},{y_seam + 12.0}", 0.004))
         turn_before = far_state(gid_turn)
+        turn_before["utc"] = player_state()["utc"]
         turn_after = parse_far_str(call("ForceFarInterval", gid_turn, 1200))
+        turn_after["utc"] = player_state()["utc"]
+
+        # Multi-interval 90-deg corner (3 x 400 s: leg 1 -> hit wp0 -> leg 2 North)
+        gid_turn_m = int(call("SetupFarGroup", x_west, y_seam,
+                              f"{x_west + 2.0},{y_seam};{x_west + 2.0},{y_seam + 12.0}", 0.004))
+        turn_multi = [far_state(gid_turn_m)]
+        turn_multi[0]["utc"] = player_state()["utc"]
+        for _ in range(3):
+            step = parse_far_str(call("ForceFarInterval", gid_turn_m, 400))
+            step["utc"] = player_state()["utc"]
+            turn_multi.append(step)
 
         # Test >30 days (2592000 s) limit MUST NOT silently pass/extrapolate: push 2600000s!
         before_cap = far_state(gid_reloaded)
@@ -337,6 +364,7 @@ def collect_atlas(label):
                 after_reload_step=fg_after_reload_step,
                 over_30d_before=before_cap, over_30d_after=after_cap,
                 turn_before=turn_before, turn_after=turn_after,
+                turn_multi=turn_multi,
                 out_of_coverage_before=out_before, out_of_coverage_after=out_after,
             ),
         ))
@@ -411,11 +439,14 @@ def report():
     tiles = [Tile(p.read_bytes()) for p in sorted(ATLAS_DIR.glob("*.rnw"))]
     s0, s1 = fg["steps"][0], fg["steps"][1]
     from datetime import datetime, timezone
+    def parse_utc(iso):
+        dt_parsed = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+        if dt_parsed.tzinfo is None:
+            dt_parsed = dt_parsed.replace(tzinfo=timezone.utc)
+        return dt_parsed.timestamp()
+
     dt_s = 1200.0 + (s1["lastUpdateTicks"] - s0["lastUpdateTicks"]) / TICKS_PER_S
-    dt_parsed = datetime.fromisoformat(s1["utc"].replace("Z", "+00:00"))
-    if dt_parsed.tzinfo is None:
-        dt_parsed = dt_parsed.replace(tzinfo=timezone.utc)
-    utc1 = dt_parsed.timestamp()
+    utc1 = parse_utc(s1["utc"])
     utc0 = utc1 - dt_s
     # Note: s0 is UpdateGroup before ForceFarInterval, stock velocity along leg:
     leg_dx = s0["wp0"][0] - s0["x"]
@@ -427,8 +458,32 @@ def report():
     far_vs_fine_m = math.dist([s1["x"], s1["y"]], [fx, fy]) * 1000.0
 
     tb, ta = fg["turn_before"], fg["turn_after"]
-    # Piece-wise 2-leg end (straight East 2.0 km = 500s, then straight North 700s * 0.004 = 2.8 km) + water:
+    # Stock UBOAT UpdateGroup stops at wp0 on the crossing tick (discarding leftover 700 s).
+    # Measure both stock waypoint quantization and water integration error along start -> wp0:
     expected_turn_corner_m = math.dist([ta["x"], ta["y"]], [tb["x"] + 2.0 + ta["water"][0] * 1.2, tb["y"] + 2.8 + ta["water"][1] * 1.2]) * 1000.0
+    turn_dt_s = 1200.0 + (ta["lastUpdateTicks"] - tb["lastUpdateTicks"]) / TICKS_PER_S
+    turn_utc0 = parse_utc(ta["utc"]) - turn_dt_s
+    tw_dx, tw_dy = fine_atlas_water_chord(tiles, tb["x"], tb["y"], tb["wp0"][0], tb["wp0"][1], turn_utc0, turn_dt_s)
+    far_turn_water_error_m = math.dist([ta["x"], ta["y"]], [tb["wp0"][0] + tw_dx, tb["wp0"][1] + tw_dy]) * 1000.0
+
+    tm = fg["turn_multi"]
+    tm_step_errors_m = []
+    for idx in range(3):
+        a_step, b_step = tm[idx], tm[idx + 1]
+        s_dt = 400.0 + (b_step["lastUpdateTicks"] - a_step["lastUpdateTicks"]) / TICKS_PER_S
+        s_utc0 = parse_utc(b_step["utc"]) - s_dt
+        ldx = a_step["wp0"][0] - a_step["x"]
+        ldy = a_step["wp0"][1] - a_step["y"]
+        llen = max(1e-9, math.hypot(ldx, ldy))
+        if b_step["routeCount"] < a_step["routeCount"]:
+            stock_x, stock_y = a_step["wp0"][0], a_step["wp0"][1]
+        else:
+            stock_x = a_step["x"] + (ldx / llen) * a_step["velKmps"] * s_dt
+            stock_y = a_step["y"] + (ldy / llen) * a_step["velKmps"] * s_dt
+        sdx, sdy = fine_atlas_water_chord(tiles, a_step["x"], a_step["y"], stock_x, stock_y, s_utc0, s_dt)
+        tm_step_errors_m.append(math.dist([b_step["x"], b_step["y"]], [stock_x + sdx, stock_y + sdy]) * 1000.0)
+    turn_multi_water_error_m = max(tm_step_errors_m)
+    turn_multi_leg2_ok = (tm[0]["routeCount"] == 2 and tm[1]["routeCount"] == 2 and tm[-1]["routeCount"] == 1)
 
     eta_reset_ok = bool(c48.get("wp_reset") and c48["wp_reset"].get("matchesNewWp"))
     load_replay_far_m = math.dist([fg["steps"][2]["x"], fg["steps"][2]["y"]],
@@ -437,6 +492,8 @@ def report():
     passed = (eta_reset_ok and diff_1_12_m <= 150.0 and diff_1_48_m <= 150.0
               and diff_48_140_m <= 450.0 and diff_load_m <= 150.0
               and long_course_diff_deg <= 2.0 and far_vs_fine_m <= 150.0
+              and far_turn_water_error_m <= 150.0
+              and turn_multi_water_error_m <= 150.0 and turn_multi_leg2_ok
               and seam_crossed and seam_all_covered and seam_arrived and exited_coverage
               and cap_rejected and out_counted and load_replay_far_m <= 50.0)
     summary = dict(
@@ -456,6 +513,9 @@ def report():
         north_exit_coverage_dropped=exited_coverage,
         far_1200s_vs_fine_integral_m=far_vs_fine_m,
         far_turn_approx_error_m=expected_turn_corner_m,
+        far_turn_water_error_m=far_turn_water_error_m,
+        far_turn_multistep_water_error_m=turn_multi_water_error_m,
+        far_turn_multistep_leg2_ok=turn_multi_leg2_ok,
         far_over_30d_cap_rejected=cap_rejected,
         far_out_of_coverage_counted=out_counted,
         far_load_replay_diff_m=load_replay_far_m,
