@@ -13,7 +13,13 @@ Write-Host "== RadioNavigation tests (F22 baseline) ==" -ForegroundColor Cyan
 # comparisons on envelope thresholds (Render_Cycle60 flake, 2 in ~12 runs).
 # Pinned off for test runs only; production (game process) unaffected.
 $env:DOTNET_TieredCompilation = "0"
-& dotnet run --project "$root\Dev\Tests\Runner\Runner.csproj" --configuration $Configuration --nologo
+$runnerProj = "$root\Dev\Tests\Runner\Runner.csproj"
+$runnerDll = "$root\Dev\Tests\Runner\bin\$Configuration\net10.0\RadioNavigation.TestRunner.dll"
+& dotnet build $runnerProj -c $Configuration --nologo -v quiet
+if ($LASTEXITCODE -eq 0) {
+    # Invoke managed DLL via dotnet exec so restricted tokens do not crash apphost.exe.
+    & dotnet exec $runnerDll
+}
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "TESTS FAILED (exit $LASTEXITCODE)" -ForegroundColor Red

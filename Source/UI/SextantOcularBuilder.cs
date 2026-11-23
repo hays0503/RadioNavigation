@@ -460,7 +460,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void ApplyApertureEdge(Material material)
         {
-            if (material?.HasProperty(ApertureEdgePixelsId) != true)
+            if (material == null || !material.HasProperty(ApertureEdgePixelsId))
                 return;
             material.SetFloat(ApertureEdgePixelsId, ApertureEdgePixels);
         }

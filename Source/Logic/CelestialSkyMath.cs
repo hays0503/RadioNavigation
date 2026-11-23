@@ -132,7 +132,8 @@ namespace UBOAT.Mods.RadioNavigation
                 CelestialSkyVector eq = FromRaDec(ra, dec);
                 eq = RotateX(RotateZ(RotateX(eq, -eps), dp / 3600 * R), eps + de / 3600 * R);
                 result.Add(new CelestialSkyBody(star.Hip, ToEnu(eq, input, gast),
-                    Math.Atan2(eq.Y, eq.X), Math.Asin(eq.Z), double.PositiveInfinity, 0, input));
+                    Math.Atan2(eq.Y, eq.X), Math.Asin(Math.Max(-1.0, Math.Min(1.0, eq.Z))),
+                    double.PositiveInfinity, 0, input));
             }
             return result;
         }

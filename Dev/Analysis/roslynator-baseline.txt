@@ -11,7 +11,6 @@ Source\Logic\ConstellationMesh.cs : warning RCS1213:
 Source\Logic\CurrentRuntimeAdapter.cs : warning RCS1213:
 Source\Logic\GameStarLayerSuppressor.cs : warning RCS1146:
 Source\Logic\GameStarLayerSuppressor.cs : warning RCS1238:
-Source\Logic\LighthouseBeamGlow.cs : warning RCS1163:
 Source\Logic\LighthouseBeamGlow.cs : warning RCS1213:
 Source\Logic\LighthouseCoastProbe.cs : warning RCS1129:
 Source\Logic\LighthouseCoastProbe.cs : warning RCS1169:
@@ -59,6 +58,7 @@ Source\Logic\StarsMesh.cs : warning RCS1146:
 Source\Logic\StarsMesh.cs : warning RCS1198:
 Source\Logic\StarsMesh.cs : warning RCS1213:
 Source\Logic\StationScheduler.cs : warning RCS1161:
+Source\Logic\SternspreizPipRenderScopePatch.cs : warning RCS1146:
 Source\Logic\SunDiscRenderer.cs : warning RCS1146:
 Source\Logic\SunDiscRenderer.cs : warning RCS1213:
 Source\Logic\WindProbeRuntime.cs : warning RCS1213:
@@ -109,6 +109,8 @@ Source\UI\SextantEffectMirror.cs : warning RCS1146:
 Source\UI\SextantGameSun.cs : warning RCS1173:
 Source\UI\SextantInteriorMirror.cs : warning RCS1146:
 Source\UI\SextantInteriorPoseFollower.cs : warning RCS1213:
+Source\UI\SextantLuneOverlay.cs : warning RCS1146:
+Source\UI\SextantOcularBuilder.cs : warning RCS1146:
 Source\UI\SextantPipFactory.cs : warning RCS1128:
 Source\UI\SextantPipFactory.cs : warning RCS1146:
 Source\UI\SextantPipInteriorPose.cs : warning RCS1213:
@@ -118,6 +120,7 @@ Source\UI\ShipControlUIBridge.cs : warning RCS1146:
 Source\UI\SpinnerHandlerBase.cs : warning RCS1129:
 Source\UI\StationMapMarker.cs : warning RCS1146:
 Source\UI\StationMapOverlay.cs : warning RCS1213:
+Source\UI\SternspreizLensEffect.cs : warning RCS1146:
 Source\UI\ToggleHandler.cs : warning RCS1213:
 Source\UI\ZoneHandler.cs : warning RCS1129:
 Source\UI\ZoneHandler.cs : warning RCS1169:

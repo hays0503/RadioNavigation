@@ -551,12 +551,12 @@ namespace UBOAT.Mods.RadioNavigation
         private static bool TryBool(string text, out bool value)
         {
             value = false;
-            if (text == "1" || text.ToLowerInvariant() == "true")
+            if (text == "1" || string.Equals(text, "true", StringComparison.OrdinalIgnoreCase))
             {
                 value = true;
                 return true;
             }
-            if (text == "0" || text.ToLowerInvariant() == "false")
+            if (text == "0" || string.Equals(text, "false", StringComparison.OrdinalIgnoreCase))
             {
                 value = false;
                 return true;

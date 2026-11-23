@@ -89,15 +89,11 @@ namespace RadioNavigation.SourceCheck
                         foreach (var seedName in seeds.Keys.ToList())
                         {
                             var curType = seedName;
-                            var ok = true;
                             for (int i = 1; i < segments.Count; i++)
                             {
                                 var mtype = ResolveMemberType(memberIndex, curType, segments[i]);
                                 if (mtype.Length == 0)
-                                {
-                                    ok = false;
                                     break;
-                                }
                                 if (sourceTypeNames.Contains(mtype) && !seeds.ContainsKey(mtype))
                                 {
                                     seeds[mtype] = 0;
@@ -184,15 +180,11 @@ namespace RadioNavigation.SourceCheck
                         foreach (var seedName in seeds.Keys.ToList())
                         {
                             var curType = seedName;
-                            var ok = true;
                             for (int i = 1; i < segments.Count; i++)
                             {
                                 var mtype = ResolveMemberType(memberIndex, curType, segments[i]);
                                 if (mtype.Length == 0)
-                                {
-                                    ok = false;
                                     break;
-                                }
                                 if (sourceTypeNames.Contains(mtype) && !seeds.ContainsKey(mtype))
                                 {
                                     seeds[mtype] = 0;

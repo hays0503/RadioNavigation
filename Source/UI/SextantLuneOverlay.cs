@@ -264,7 +264,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (material == null)
                 return;
             SextantLuneOffset centre = SextantLuneMath.ObstructionCentre(state.Offset);
-            material?.SetVector(OffsetId, new Vector4((float)centre.X, (float)centre.Y, 0f, 0f));
+            material.SetVector(OffsetId, new Vector4((float)centre.X, (float)centre.Y, 0f, 0f));
             // The lit wall's brightness has to follow the displacement, not just
             // the settings poll: the wall is drawn from the shadow's distance
             // field, so without this it stays at full strength while it is being
@@ -276,7 +276,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void SetFloatIfPresent(int id, float value)
         {
-            if (material?.HasProperty(id) == true)
+            if (material != null && material.HasProperty(id))
                 material.SetFloat(id, value);
         }
 

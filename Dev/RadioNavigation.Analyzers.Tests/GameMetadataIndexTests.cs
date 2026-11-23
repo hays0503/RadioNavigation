@@ -345,6 +345,49 @@ public class Patcher
             AssertNone(Run(src));
         }
 
+        [Fact]
+        public void PluginAssemblyTarget_NonPublicSimpleUpdate_FoundInWaterDll()
+        {
+            string waterDllPath = Path.Combine(Path.GetDirectoryName(GameDllPath) ?? "", "com.playway.water.Runtime.dll");
+            if (!File.Exists(waterDllPath)) return;
+
+            var tpa = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
+            var refs = tpa.Split(';')
+                .Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
+                .ToList();
+            if (HasGameDll)
+                refs.Add(MetadataReference.CreateFromFile(GameDllPath));
+            refs.Add(MetadataReference.CreateFromFile(waterDllPath));
+
+            var okSrc = @"
+using System.Reflection;
+public class Patcher
+{
+    private static readonly System.Type HullType = typeof(PlayWay.Water.Extensions.NeuralNetworkPhysics);
+    public void Apply(HarmonyLib.Harmony h)
+    {
+        var simple = HullType.GetMethod(""SimpleUpdate"", BindingFlags.Instance | BindingFlags.NonPublic);
+        h.Patch(simple, postfix: new HarmonyLib.HarmonyMethod(typeof(Patcher).GetMethod(""P"")));
+    }
+    public static void P() {}
+}
+";
+            var okDiags = AnalyzeCompilation("TestWaterOk", HarmonyStub + okSrc, refs);
+            AssertNone(okDiags);
+
+            var badDiags = AnalyzeCompilation("TestWaterBad", HarmonyStub + okSrc.Replace("\"SimpleUpdate\"", "\"NoSuchWaterMethod\""), refs);
+            AssertHas("RN0001", badDiags);
+        }
+
+        private static List<Diagnostic> AnalyzeCompilation(string name, string source, List<MetadataReference> refs)
+        {
+            var tree = CSharpSyntaxTree.ParseText(source);
+            var comp = CSharpCompilation.Create(name, new[] { tree }, refs, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            return comp.WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(new HarmonyPatchAnalyzer()))
+                .GetAnalyzerDiagnosticsAsync().GetAwaiter().GetResult().ToList();
+        }
+
         // ---- Helpers -----------------------------------------------------------------------
 
         private static GameMetadataIndex LoadIndex()

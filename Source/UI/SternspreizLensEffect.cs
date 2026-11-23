@@ -476,7 +476,7 @@ namespace UBOAT.Mods.RadioNavigation
             SetFloatIfPresent(interiorMaterial, InteriorStreakHalfLengthId, halfLengthTexels);
             SetFloatIfPresent(interiorMaterial, InteriorStreakHalfThicknessId, halfThicknessTexels);
             SetFloatIfPresent(interiorMaterial, InteriorCompactnessRadiusId, compactnessRadiusPixels);
-            if (interiorMaterial?.HasProperty(InteriorStreakDirectionId) == true)
+            if (interiorMaterial.HasProperty(InteriorStreakDirectionId))
                 interiorMaterial.SetVector(InteriorStreakDirectionId, direction);
 
             interiorLogTimer -= Time.unscaledDeltaTime;
@@ -636,14 +636,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void SetFloatIfPresent(Material material, string property, float value)
         {
-            if (material?.HasProperty(property) != true)
+            if (material == null || !material.HasProperty(property))
                 return;
             material.SetFloat(property, value);
         }
 
         private static void SetFloatIfPresent(Material material, int property, float value)
         {
-            if (material?.HasProperty(property) != true)
+            if (material == null || !material.HasProperty(property))
                 return;
             material.SetFloat(property, value);
         }

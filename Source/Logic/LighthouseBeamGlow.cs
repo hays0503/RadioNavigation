@@ -189,7 +189,7 @@ namespace UBOAT.Mods.RadioNavigation
             // FlareRenderingNow() (renderer.isVisible flickers while
             // KeepFlareInView inflates the bounds), which made the dot jump
             // around as the beam rotated.
-            if (IsFlareTakingOver(worldPosition, distance))
+            if (IsFlareTakingOver(distance))
             {
                 SetDotEnabled(false, "flare rendering, in far clip");
                 return;
@@ -250,7 +250,7 @@ namespace UBOAT.Mods.RadioNavigation
             return renderingCamera.IsNotNull() && IsDeviceCamera(renderingCamera);
         }
 
-        private bool IsFlareTakingOver(Vector3 worldPosition, float distance)
+        private bool IsFlareTakingOver(float distance)
         {
             return LighthouseBeamGate.FlareTakesOver(
                 flareDriver.HasFlare,

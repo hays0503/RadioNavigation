@@ -33,17 +33,36 @@ namespace RadioNavigation.Analyzers
         /// </summary>
         public static GameMetadataIndex GetIndex(SyntaxNodeAnalysisContext context)
         {
+            return GetIndex(context, null);
+        }
+
+        /// <summary>
+        /// Locate the PE reference matching <paramref name="declaringType"/>'s containing assembly
+        /// (falling back to com.uboat.game.dll) and build/reuse an index over its raw metadata.
+        /// Supports obfuscated or non-public targets in plugin assemblies such as com.playway.water.Runtime.
+        /// </summary>
+        public static GameMetadataIndex GetIndex(SyntaxNodeAnalysisContext context, ITypeSymbol declaringType)
+        {
+            string assemblyName = declaringType?.ContainingAssembly?.Name;
+            string expectedFileName = !string.IsNullOrEmpty(assemblyName)
+                ? assemblyName + ".dll"
+                : GameAssemblyFileName;
+
             foreach (var reference in context.SemanticModel.Compilation.References)
             {
                 if (reference is PortableExecutableReference pe &&
                     !string.IsNullOrEmpty(pe.FilePath) &&
-                    Path.GetFileName(pe.FilePath).Equals(GameAssemblyFileName, StringComparison.OrdinalIgnoreCase))
+                    Path.GetFileName(pe.FilePath).Equals(expectedFileName, StringComparison.OrdinalIgnoreCase))
                 {
                     return _indexCache.GetOrAdd(
                         pe.FilePath,
                         _ => new Lazy<GameMetadataIndex>(() => GameMetadataIndex.TryCreateFromReference(pe))).Value;
                 }
             }
+
+            if (!expectedFileName.Equals(GameAssemblyFileName, StringComparison.OrdinalIgnoreCase))
+                return GetIndex(context, null);
+
             return null;
         }
 

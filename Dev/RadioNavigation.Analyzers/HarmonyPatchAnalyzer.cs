@@ -104,7 +104,7 @@ namespace RadioNavigation.Analyzers
             ResolvedGetMethod getMethod)
         {
             var lookup = HarmonyTargetResolver.Lookup(
-                HarmonyTargetResolver.GetIndex(context),
+                HarmonyTargetResolver.GetIndex(context, getMethod.DeclaringType),
                 getMethod.DeclaringType,
                 getMethod.MethodName,
                 getMethod.ParameterTypes,

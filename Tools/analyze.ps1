@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("info", "warning", "error")]
     [string]$Severity = "warning",
     [ValidateSet("quick", "full")]
@@ -84,7 +84,13 @@ if (-not $SkipSourceCheck) {
     if (Test-Path $scproj) {
         Write-Host "[RadioNavigation] SourceCheck (neural-slop guard) ..."
         $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
-        & dotnet run --project $scproj -c Release
+        $scdll = Join-Path $root "Dev\RadioNavigation.SourceCheck\bin\Release\net10.0\RadioNavigation.SourceCheck.dll"
+        & dotnet build $scproj -c Release --nologo -v quiet
+        if ($LASTEXITCODE -eq 0) {
+            # Invoke via dotnet exec rather than dotnet run/apphost: native
+            # apphost.exe fails with 0xC0000142 on restricted tokens.
+            & dotnet exec $scdll
+        }
         if ($LASTEXITCODE -ne 0) {
             Stop-Phase "SourceCheck"
             Write-Error "[RadioNavigation] SourceCheck FAILED - mod references a game API that does not exist / has wrong signature (neural slop). Fix before analyzing."
@@ -121,7 +127,8 @@ Stop-Phase "Restore"
 # engine invokes them, Roslyn cannot see it. Everything else blocks (exit 1).
 if ($IdeAudit) {
     $unityNoise = @('Awake','Start','Update','LateUpdate','FixedUpdate',
-        'OnDestroy','OnEnable','OnDisable','OnValidate','OnDrawGizmos',
+        'OnDestroy','OnEnable','OnDisable','OnApplicationFocus','OnApplicationPause',
+        'OnValidate','OnDrawGizmos',
         'OnPreRender','OnPostRender','OnAudioFilterRead','OnTriggerEnter',
         'OnTriggerExit','OnCollisionEnter','OnPointerClick','OnPointerEnter',
         'OnPointerExit','OnDrag','OnBeginDrag','OnEndDrag','OnScroll')
@@ -360,6 +367,10 @@ function Get-NormalizedDiagnostics {
 
 $baselineFile = Join-Path $root "Dev\Analysis\roslynator-baseline.txt"
 if ($UpdateBaseline) {
+    if ($Profile -ne "quick" -or $Severity -ne "warning") {
+        Write-Error "[RadioNavigation] -UpdateBaseline requires -Profile quick -Severity warning (found Profile=$Profile Severity=$Severity)"
+        exit 1
+    }
     $phaseWatch = [System.Diagnostics.Stopwatch]::StartNew()
     $fresh = & roslynator analyze $csproj --severity-level $Severity @args 2>&1
     Stop-Phase "Roslynator"

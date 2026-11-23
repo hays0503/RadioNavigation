@@ -138,12 +138,12 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 
 ### Проверки
 
-<!-- gate-snapshot: date=2026-11-23 tests=1868 sourcecheck=178 analyzers=68 -->
+<!-- gate-snapshot: date=2026-11-23 tests=1868 sourcecheck=178 analyzers=69 -->
 
 - `Tools/gates.ps1` = build → SourceCheck + quick → tests → PVS, fail-fast.
   `-Parallel` — быстрая/медленная линии.
 - Снимок **2026-11-23**: tests **1868 PASS / 0 FAIL**,
-  SourceCheck **178 PASS / 0 FAIL**, analyzers **68 PASS / 0 FAIL**.
+  SourceCheck **178 PASS / 0 FAIL**, analyzers **69 PASS / 0 FAIL**.
   Историю счётчика не выдавать за текущий прогон.
 - Baseline Roslynator обновлён **2026-11-21** (`-UpdateBaseline`): в дереве
   уже были 16 не учтённых предупреждений CPlath UI, эти файлы не менялись;

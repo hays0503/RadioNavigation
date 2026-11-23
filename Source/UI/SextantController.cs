@@ -1270,7 +1270,9 @@ namespace UBOAT.Mods.RadioNavigation
             frame.GameDir = gameDir;
             frame.TableOk = solarOptics.Ready;
             frame.TableDir = solarOptics.Direction;
-            frame.TableAlt = solarOptics.Ready ? (float)(Math.Asin(solarOptics.Direction.y) * 180 / Math.PI) : 0;
+            frame.TableAlt = solarOptics.Ready
+                ? (float)(Math.Asin(Math.Max(-1f, Math.Min(1f, solarOptics.Direction.y))) * 180 / Math.PI)
+                : 0;
             frame.RightFilterCount = rightFilterCount;
             frame.GlareImage = glareImage;
             frame.FilterDimLeft = filterDimLeftImage;

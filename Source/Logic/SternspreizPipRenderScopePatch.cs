@@ -175,7 +175,8 @@ namespace UBOAT.Mods.RadioNavigation
                 || mode == SternspreizPipProbeEffect.StarSourceSuppressionMode
                 || mode == SternspreizPipProbeEffect.StarRedrawMode;
             if (!suppressSource
-                || renderer?.enabled != true)
+                || renderer == null
+                || !renderer.enabled)
                 return;
 
             renderer.enabled = false;
@@ -225,7 +226,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return "{\"registered\":false,\"hookAvailable\":"
                     + (IsAvailable ? "true" : "false") + "}";
 
-            bool rendererEnabled = target.Renderer?.enabled == true;
+            bool rendererEnabled = target.Renderer != null && target.Renderer.enabled;
             return string.Format(CultureInfo.InvariantCulture,
                 "{{\"registered\":true,\"hookAvailable\":{0},\"rendererEnabled\":{1},"
                 + "\"suppressed\":{2},\"renderCallCount\":{3},\"deferredCallCount\":{4},"
