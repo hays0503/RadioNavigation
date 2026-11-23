@@ -353,7 +353,7 @@ function Get-NormalizedDiagnostics {
         if ($path.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
             $path = $path.Substring($rootPrefix.Length)
         }
-        $out += "$path : $($m.Groups[2].Value): $($m.Groups[4].Value)"
+        $out += "$path : $($m.Groups[2].Value): $($m.Groups[4].Value)".TrimEnd()
     }
     return @($out | Sort-Object -Unique)
 }

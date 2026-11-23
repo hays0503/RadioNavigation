@@ -49,8 +49,10 @@ namespace UBOAT.Mods.RadioNavigation
         internal const int TooltipFontSizeUnits = 30;
 
         /// <summary>How often the desired set is reconciled with the scene.
-        /// The fix marker appears within this delay after a new result.</summary>
-        private const float ReconcileIntervalSeconds = 1f;
+        /// The fix marker appears within this delay after a new result; the
+        /// 210 static lighthouse markers override it with a slower cadence
+        /// because a full scene reconcile costs ~25 ms.</summary>
+        protected virtual float ReconcileIntervalSeconds => 1f;
 
         [Inject] protected static ResourceManager resourceManager = null;
         [Inject] protected static Sandbox sandbox = null;

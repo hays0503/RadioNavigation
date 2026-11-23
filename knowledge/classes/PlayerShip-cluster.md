@@ -21,10 +21,10 @@ Game source: `UBOAT.Game.Scene.Entities\*.cs`, `UBOAT.Game.Sandbox\SandboxEntity
    `Ship.cs:334 public Rigidbody RigidBody => rigidBody;`). `transform.position` also works but
    during kinematic setup frames rigidbody and transform can differ briefly; game logic itself
    reads `rigidBody.position/velocity` throughout `PlayerShip.cs` (e.g. L2403-2432).
-3. Map coordinates: `playerShip.SandboxEntity.ScenePosition2D` → `Vector2` XZ in world units
-   (`SandboxEntity.cs:518-528`; falls back to `sandbox.EncounterToSceneSpace2D(Position)` when not
-   spawned). `ScenePosition` (Vector3) is the same for full Y. Note: `SandboxEntity.Position`
-   (encounter space, used by mod's `PlayerPositionProvider`) differs from scene space — do not mix.
+3. For map coordinates use `playerShip.SandboxEntity.Position` in encounter space.
+   `ScenePosition2D` returns local scene XZ, not map coordinates (`SandboxEntity.cs:518-528`;
+   falls back to `sandbox.EncounterToSceneSpace2D(Position)` when not spawned).
+   `ScenePosition` includes the scene Y coordinate. Do not mix these spaces.
 4. Guard: before first spawn the sandbox position can be NaN — check finiteness before use.
 
 ## Lat/lon conversion
@@ -32,7 +32,7 @@ Game source: `UBOAT.Game.Scene.Entities\*.cs`, `UBOAT.Game.Sandbox\SandboxEntity
 No `GeoPositionConverter` exists in game source. The mod ships its own:
 `Source/Logic/GeoPositionConverter.cs` — pure static, `DegreesPerWorldUnit = 0.008983120716174308`
 (= 1/111.3198888888889, mirrors game `WorldPosition.Latitude/Longitude`).
-`ToLatLong(worldX, worldY)` → lat = Y·k, lon = X·k. Use with scene-space XZ from step 3.
+`ToLatLong(worldX, worldY)` → lat = Y·k, lon = X·k. Pass encounter-space XY, not scene-space XZ.
 Mod's existing consumer: `Source/Logic/PlayerPositionProvider.cs` (reflection path via
 `Entity.playerShip` static field + `SandboxPlayerShip.Position`, NaN-guarded).
 

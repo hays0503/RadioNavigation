@@ -1,108 +1,124 @@
-  Source\Data\BeaconData.cs : warning RCS1161: 
-  Source\Data\MiniJson.cs : warning RCS1221: 
-  Source\Data\SignalTypes.cs : warning RCS1161: 
-  Source\Logic\CameraResolver.cs : warning RCS1146: 
-  Source\Logic\CelestialShaderResolver.cs : warning RCS1146: 
-  Source\Logic\CloudOcclusionBinding.cs : warning RCS1198: 
-  Source\Logic\ConstellationMesh.cs : warning RCS1128: 
-  Source\Logic\ConstellationMesh.cs : warning RCS1146: 
-  Source\Logic\ConstellationMesh.cs : warning RCS1198: 
-  Source\Logic\ConstellationMesh.cs : warning RCS1213: 
-  Source\Logic\GameStarLayerSuppressor.cs : warning RCS1146: 
-  Source\Logic\GameStarLayerSuppressor.cs : warning RCS1238: 
-  Source\Logic\LighthouseBeamGlow.cs : warning RCS1163: 
-  Source\Logic\LighthouseBeamGlow.cs : warning RCS1213: 
-  Source\Logic\LighthouseCoastProbe.cs : warning RCS1129: 
-  Source\Logic\LighthouseCoastProbe.cs : warning RCS1169: 
-  Source\Logic\LighthouseDiagnostics.cs : warning RCS1146: 
-  Source\Logic\LighthouseDistanceGate.cs : warning RCS1161: 
-  Source\Logic\LighthouseDotUi.cs : warning RCS1146: 
-  Source\Logic\LighthouseFlareDriver.cs : warning RCS1146: 
-  Source\Logic\LighthouseHeightProbe.cs : warning RCS1129: 
-  Source\Logic\LighthouseHeightProbe.cs : warning RCS1146: 
-  Source\Logic\LighthouseHeightProbe.cs : warning RCS1169: 
-  Source\Logic\LighthouseLandSweep.cs : warning RCS1129: 
-  Source\Logic\LighthouseLandSweep.cs : warning RCS1169: 
-  Source\Logic\LighthousePlacer.cs : warning RCS1129: 
-  Source\Logic\LighthousePlacer.cs : warning RCS1146: 
-  Source\Logic\LighthousePlacer.cs : warning RCS1169: 
-  Source\Logic\LighthousePlacer.cs : warning RCS1213: 
-  Source\Logic\LighthouseRotator.cs : warning RCS1213: 
-  Source\Logic\LighthouseScreenProjection.cs : warning RCS1146: 
-  Source\Logic\LighthouseSpotLight.cs : warning RCS1129: 
-  Source\Logic\LighthouseSpotLight.cs : warning RCS1169: 
-  Source\Logic\LighthouseVisualModel.cs : warning RCS1238: 
-  Source\Logic\Main.cs : warning RCS1129: 
-  Source\Logic\Main.cs : warning RCS1169: 
-  Source\Logic\ModBootstrapper.cs : warning RCS1221: 
-  Source\Logic\MoonDiscRenderer.cs : warning RCS1146: 
-  Source\Logic\MoonDiscRenderer.cs : warning RCS1213: 
-  Source\Logic\MorseKeyer.cs : warning RCS1161: 
-  Source\Logic\PlanetRenderer.cs : warning RCS1146: 
-  Source\Logic\PlanetRenderer.cs : warning RCS1213: 
-  Source\Logic\RadioStoryIntegration.cs : warning RCS1163: 
-  Source\Logic\SextantSightLineColor.cs : warning RCS1238: 
-  Source\Logic\SkyBrightness.cs : warning RCS1238: 
-  Source\Logic\SkyMaterialProbe.cs : warning RCS1146: 
-  Source\Logic\SkyMaterialProbe.cs : warning RCS1213: 
-  Source\Logic\SkyVisibilityResolver.cs : warning RCS1146: 
-  Source\Logic\SkyVisibilityResolver.cs : warning RCS1169: 
-  Source\Logic\SonneController.cs : warning RCS1169: 
-  Source\Logic\SonneController.cs : warning RCS1213: 
-  Source\Logic\StarSkyPhase0Probe.cs : warning RCS1129: 
-  Source\Logic\StarSkyPhase0Probe.cs : warning RCS1146: 
-  Source\Logic\StarSkyPhase0Probe.cs : warning RCS1198: 
-  Source\Logic\StarSkyPhase0Probe.cs : warning RCS1213: 
-  Source\Logic\StarsMesh.cs : warning RCS1128: 
-  Source\Logic\StarsMesh.cs : warning RCS1146: 
-  Source\Logic\StarsMesh.cs : warning RCS1198: 
-  Source\Logic\StarsMesh.cs : warning RCS1213: 
-  Source\Logic\StationScheduler.cs : warning RCS1161: 
-  Source\Logic\SunDiscRenderer.cs : warning RCS1146: 
-  Source\Logic\SunDiscRenderer.cs : warning RCS1213: 
-  Source\Sound\DspPipeline.cs : warning RCS1169: 
-  Source\UI\ChronometerCursorPolicy.cs : warning RCS1161: 
-  Source\UI\ChronometerCursorPolicy.cs : warning RCS1238: 
-  Source\UI\ChronometerOverlayHandler.cs : warning RCS1146: 
-  Source\UI\ChronometerOverlayHandler.cs : warning RCS1169: 
-  Source\UI\ChronometerOverlayHandler.cs : warning RCS1213: 
-  Source\UI\ChronometerScaleControl.cs : warning RCS1213: 
-  Source\UI\CursorHandler.cs : warning RCS1213: 
-  Source\UI\DebugAngleHandler.cs : warning RCS1213: 
-  Source\UI\ExpanderHandler.cs : warning RCS1213: 
-  Source\UI\FixCardComposer.cs : warning RCS1238: 
-  Source\UI\FixMapMarker.cs : warning RCS1146: 
-  Source\UI\GroundHandler.cs : warning RCS1213: 
-  Source\UI\InformationPanelHandler.cs : warning RCS1213: 
-  Source\UI\InformationPanelHandler.cs : warning RCS1238: 
-  Source\UI\LighthouseMapMarker.cs : warning RCS1146: 
-  Source\UI\NavMapMarkerBase.cs : warning RCS1129: 
-  Source\UI\NavMapMarkerBase.cs : warning RCS1146: 
-  Source\UI\NavMapMarkerBase.cs : warning RCS1213: 
-  Source\UI\PanelDragHandler.cs : warning RCS1213: 
-  Source\UI\RadioHandler.cs : warning RCS1213: 
-  Source\UI\SextantBloomCut.cs : warning RCS1146: 
-  Source\UI\SextantCameraProbe.cs : warning RCS1213: 
-  Source\UI\SextantController.cs : warning RCS1129: 
-  Source\UI\SextantController.cs : warning RCS1146: 
-  Source\UI\SextantController.cs : warning RCS1169: 
-  Source\UI\SextantController.cs : warning RCS1213: 
-  Source\UI\SextantController.cs : warning RCS1221: 
-  Source\UI\SextantDmFormat.cs : warning RCS1238: 
-  Source\UI\SextantEffectMirror.cs : warning RCS1146: 
-  Source\UI\SextantGameSun.cs : warning RCS1173: 
-  Source\UI\SextantInteriorMirror.cs : warning RCS1146: 
-  Source\UI\SextantInteriorPoseFollower.cs : warning RCS1213: 
-  Source\UI\SextantPipFactory.cs : warning RCS1128: 
-  Source\UI\SextantPipFactory.cs : warning RCS1146: 
-  Source\UI\SextantPipInteriorPose.cs : warning RCS1213: 
-  Source\UI\SextantRenderPasses.cs : warning RCS1146: 
-  Source\UI\SextantWorksheet.cs : warning RCS1238: 
-  Source\UI\ShipControlUIBridge.cs : warning RCS1146: 
-  Source\UI\SpinnerHandlerBase.cs : warning RCS1129: 
-  Source\UI\StationMapMarker.cs : warning RCS1146: 
-  Source\UI\StationMapOverlay.cs : warning RCS1213: 
-  Source\UI\ToggleHandler.cs : warning RCS1213: 
-  Source\UI\ZoneHandler.cs : warning RCS1129: 
-  Source\UI\ZoneHandler.cs : warning RCS1169: 
-  Source\UI\ZoneHandler.cs : warning RCS1213: 
+Source\Data\BeaconData.cs : warning RCS1161:
+Source\Data\MiniJson.cs : warning RCS1221:
+Source\Data\SignalTypes.cs : warning RCS1161:
+Source\Logic\CameraResolver.cs : warning RCS1146:
+Source\Logic\CelestialShaderResolver.cs : warning RCS1146:
+Source\Logic\CloudOcclusionBinding.cs : warning RCS1198:
+Source\Logic\ConstellationMesh.cs : warning RCS1128:
+Source\Logic\ConstellationMesh.cs : warning RCS1146:
+Source\Logic\ConstellationMesh.cs : warning RCS1198:
+Source\Logic\ConstellationMesh.cs : warning RCS1213:
+Source\Logic\CurrentRuntimeAdapter.cs : warning RCS1213:
+Source\Logic\GameStarLayerSuppressor.cs : warning RCS1146:
+Source\Logic\GameStarLayerSuppressor.cs : warning RCS1238:
+Source\Logic\LighthouseBeamGlow.cs : warning RCS1163:
+Source\Logic\LighthouseBeamGlow.cs : warning RCS1213:
+Source\Logic\LighthouseCoastProbe.cs : warning RCS1129:
+Source\Logic\LighthouseCoastProbe.cs : warning RCS1169:
+Source\Logic\LighthouseDiagnostics.cs : warning RCS1146:
+Source\Logic\LighthouseDistanceGate.cs : warning RCS1161:
+Source\Logic\LighthouseDotUi.cs : warning RCS1146:
+Source\Logic\LighthouseFlareDriver.cs : warning RCS1146:
+Source\Logic\LighthouseHeightProbe.cs : warning RCS1129:
+Source\Logic\LighthouseHeightProbe.cs : warning RCS1146:
+Source\Logic\LighthouseHeightProbe.cs : warning RCS1169:
+Source\Logic\LighthouseLandSweep.cs : warning RCS1129:
+Source\Logic\LighthouseLandSweep.cs : warning RCS1169:
+Source\Logic\LighthousePlacer.cs : warning RCS1129:
+Source\Logic\LighthousePlacer.cs : warning RCS1146:
+Source\Logic\LighthousePlacer.cs : warning RCS1169:
+Source\Logic\LighthousePlacer.cs : warning RCS1213:
+Source\Logic\LighthouseRotator.cs : warning RCS1213:
+Source\Logic\LighthouseScreenProjection.cs : warning RCS1146:
+Source\Logic\LighthouseSpotLight.cs : warning RCS1129:
+Source\Logic\LighthouseSpotLight.cs : warning RCS1169:
+Source\Logic\LighthouseVisualModel.cs : warning RCS1238:
+Source\Logic\Main.cs : warning RCS1129:
+Source\Logic\Main.cs : warning RCS1169:
+Source\Logic\ModBootstrapper.cs : warning RCS1221:
+Source\Logic\MoonDiscRenderer.cs : warning RCS1146:
+Source\Logic\MoonDiscRenderer.cs : warning RCS1213:
+Source\Logic\MorseKeyer.cs : warning RCS1161:
+Source\Logic\PlanetRenderer.cs : warning RCS1146:
+Source\Logic\PlanetRenderer.cs : warning RCS1213:
+Source\Logic\RadioStoryIntegration.cs : warning RCS1163:
+Source\Logic\SextantSightLineColor.cs : warning RCS1238:
+Source\Logic\SkyBrightness.cs : warning RCS1238:
+Source\Logic\SkyMaterialProbe.cs : warning RCS1146:
+Source\Logic\SkyMaterialProbe.cs : warning RCS1213:
+Source\Logic\SkyVisibilityResolver.cs : warning RCS1146:
+Source\Logic\SkyVisibilityResolver.cs : warning RCS1169:
+Source\Logic\SonneController.cs : warning RCS1169:
+Source\Logic\SonneController.cs : warning RCS1213:
+Source\Logic\StarSkyPhase0Probe.cs : warning RCS1129:
+Source\Logic\StarSkyPhase0Probe.cs : warning RCS1146:
+Source\Logic\StarSkyPhase0Probe.cs : warning RCS1198:
+Source\Logic\StarSkyPhase0Probe.cs : warning RCS1213:
+Source\Logic\StarsMesh.cs : warning RCS1128:
+Source\Logic\StarsMesh.cs : warning RCS1146:
+Source\Logic\StarsMesh.cs : warning RCS1198:
+Source\Logic\StarsMesh.cs : warning RCS1213:
+Source\Logic\StationScheduler.cs : warning RCS1161:
+Source\Logic\SunDiscRenderer.cs : warning RCS1146:
+Source\Logic\SunDiscRenderer.cs : warning RCS1213:
+Source\Logic\WindProbeRuntime.cs : warning RCS1213:
+Source\Sound\DspPipeline.cs : warning RCS1169:
+Source\UI\ChronometerCursorPolicy.cs : warning RCS1161:
+Source\UI\ChronometerCursorPolicy.cs : warning RCS1238:
+Source\UI\ChronometerOverlayHandler.cs : warning RCS1146:
+Source\UI\ChronometerOverlayHandler.cs : warning RCS1169:
+Source\UI\ChronometerOverlayHandler.cs : warning RCS1213:
+Source\UI\ChronometerScaleControl.cs : warning RCS1213:
+Source\UI\CPlathAdaptiveAnimationPlayer.cs : warning RCS1161:
+Source\UI\CPlathAdaptiveAnimationPlayer.cs : warning RCS1213:
+Source\UI\CPlathAdaptiveBindingReader.cs : warning RCS1221:
+Source\UI\CPlathAdaptiveMechanismRig.cs : warning RCS1238:
+Source\UI\CPlathAnimatedActor.cs : warning RCS1146:
+Source\UI\CPlathAnimatedActor.cs : warning RCS1221:
+Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1146:
+Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1169:
+Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1213:
+Source\UI\CPlathExistingCharacterPrototype.cs : warning RCS1221:
+Source\UI\CPlathHeldModel.cs : warning RCS1146:
+Source\UI\CPlathHeldModel.cs : warning RCS1221:
+Source\UI\CPlathHeldModel.cs : warning RCS1238:
+Source\UI\CPlathReadPointer.cs : warning RCS1128:
+Source\UI\CPlathReadPointer.cs : warning RCS1146:
+Source\UI\CPlathReadPointer.cs : warning RCS1213:
+Source\UI\CursorHandler.cs : warning RCS1213:
+Source\UI\DebugAngleHandler.cs : warning RCS1213:
+Source\UI\ExpanderHandler.cs : warning RCS1213:
+Source\UI\FixCardComposer.cs : warning RCS1238:
+Source\UI\FixMapMarker.cs : warning RCS1146:
+Source\UI\GroundHandler.cs : warning RCS1213:
+Source\UI\InformationPanelHandler.cs : warning RCS1213:
+Source\UI\InformationPanelHandler.cs : warning RCS1238:
+Source\UI\LighthouseMapMarker.cs : warning RCS1146:
+Source\UI\NavMapMarkerBase.cs : warning RCS1129:
+Source\UI\NavMapMarkerBase.cs : warning RCS1146:
+Source\UI\NavMapMarkerBase.cs : warning RCS1213:
+Source\UI\PanelDragHandler.cs : warning RCS1213:
+Source\UI\RadioHandler.cs : warning RCS1213:
+Source\UI\SextantBloomCut.cs : warning RCS1146:
+Source\UI\SextantCameraProbe.cs : warning RCS1213:
+Source\UI\SextantController.cs : warning RCS1129:
+Source\UI\SextantController.cs : warning RCS1146:
+Source\UI\SextantController.cs : warning RCS1221:
+Source\UI\SextantDmFormat.cs : warning RCS1238:
+Source\UI\SextantEffectMirror.cs : warning RCS1146:
+Source\UI\SextantGameSun.cs : warning RCS1173:
+Source\UI\SextantInteriorMirror.cs : warning RCS1146:
+Source\UI\SextantInteriorPoseFollower.cs : warning RCS1213:
+Source\UI\SextantPipFactory.cs : warning RCS1128:
+Source\UI\SextantPipFactory.cs : warning RCS1146:
+Source\UI\SextantPipInteriorPose.cs : warning RCS1213:
+Source\UI\SextantRenderPasses.cs : warning RCS1146:
+Source\UI\SextantWorksheet.cs : warning RCS1238:
+Source\UI\ShipControlUIBridge.cs : warning RCS1146:
+Source\UI\SpinnerHandlerBase.cs : warning RCS1129:
+Source\UI\StationMapMarker.cs : warning RCS1146:
+Source\UI\StationMapOverlay.cs : warning RCS1213:
+Source\UI\ToggleHandler.cs : warning RCS1213:
+Source\UI\ZoneHandler.cs : warning RCS1129:
+Source\UI\ZoneHandler.cs : warning RCS1169:
+Source\UI\ZoneHandler.cs : warning RCS1213:

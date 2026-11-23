@@ -79,6 +79,8 @@ namespace RadioNavigation.SourceCheck
             "UnityEngine.IMGUIModule.dll",
             "UnityEngine.InputLegacyModule.dll",
             "UnityEngine.PhysicsModule.dll",
+            "UnityEngine.Physics2DModule.dll",
+            "UnityEngine.AIModule.dll",
             "UnityEngine.TextRenderingModule.dll",
             "UnityEngine.AudioModule.dll",
             "UnityEngine.ImageConversionModule.dll",

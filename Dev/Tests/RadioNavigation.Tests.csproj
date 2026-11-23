@@ -40,6 +40,18 @@
     <Compile Include="SkipTestException.cs" />
     <Compile Include="GameContractTests.cs" />
     <Compile Include="GeoMathTests.cs" />
+    <Compile Include="ConstantCurrentFieldTests.cs" />
+    <Compile Include="CurrentProfileFieldTests.cs" />
+    <Compile Include="CurrentAtlasFieldTests.cs" />
+    <Compile Include="CurrentWaterDragTests.cs" />
+    <Compile Include="CurrentOwnershipTests.cs" />
+    <Compile Include="CurrentTrack2DTests.cs" />
+    <Compile Include="CurrentRouteSteeringTests.cs" />
+    <Compile Include="CurrentStrategicStepTests.cs" />
+    <Compile Include="CurrentRouteNoticeStateTests.cs" />
+    <Compile Include="WindCompassTests.cs" />    <Compile Include="CurrentWitnessTileTests.cs" />
+    <Compile Include="WindLabelLayoutTests.cs" />
+    <Compile Include="WindSnapshotCacheTests.cs" />
     <Compile Include="GeoPositionConverterTests.cs" />
     <Compile Include="PanelStateStoreTests.cs" />
     <Compile Include="PanelStateTests.cs" />
@@ -227,6 +239,20 @@
     <Compile Include="..\..\Source\Data\StationState.cs" Link="Source\Data\StationState.cs" />
     <Compile Include="..\..\Source\Logic\ComparisonExtensions.cs" Link="Source\Logic\ComparisonExtensions.cs" />
     <Compile Include="..\..\Source\Logic\GeoMath.cs" Link="Source\Logic\GeoMath.cs" />
+    <Compile Include="..\..\Source\Logic\ConstantCurrentField.cs" Link="Source\Logic\ConstantCurrentField.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentProfileField.cs" Link="Source\Logic\CurrentProfileField.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentAtlasField.cs" Link="Source\Logic\CurrentAtlasField.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentWaterDrag.cs" Link="Source\Logic\CurrentWaterDrag.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentOwnership.cs" Link="Source\Logic\CurrentOwnership.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentTrack2D.cs" Link="Source\Logic\CurrentTrack2D.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentRouteSteering.cs" Link="Source\Logic\CurrentRouteSteering.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentStrategicStep.cs" Link="Source\Logic\CurrentStrategicStep.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentRouteNoticeState.cs" Link="Source\Logic\CurrentRouteNoticeState.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentRouteNoticeText.cs" Link="Source\Logic\CurrentRouteNoticeText.cs" />
+    <Compile Include="..\..\Source\Logic\WindCompass.cs" Link="Source\Logic\WindCompass.cs" />
+    <Compile Include="..\..\Source\Logic\WindLabelLayout.cs" Link="Source\Logic\WindLabelLayout.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentWitnessTile.cs" Link="Source\Logic\CurrentWitnessTile.cs" />
+    <Compile Include="..\..\Source\Logic\WindSnapshotCache.cs" Link="Source\Logic\WindSnapshotCache.cs" />
     <Compile Include="..\..\Source\Logic\Constants.cs" Link="Source\Logic\Constants.cs" />
     <Compile Include="..\..\Source\Logic\MorseAlphabet.cs" Link="Source\Logic\MorseAlphabet.cs" />
     <Compile Include="..\..\Source\Logic\MorseDecoder.cs" Link="Source\Logic\MorseDecoder.cs" />

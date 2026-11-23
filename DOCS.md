@@ -1,16 +1,20 @@
 # Карта документации RadioNavigation
 
-Единая точка входа: что читать и для чего. Актуализировано **2026-11-03** по
+Единая точка входа: что читать и для чего. Актуализировано **2026-11-21** по
 текущему Source, дереву документов и прогону проверок. Приоритет: действующие
 контракты ниже → датированные результаты приёмки → исторические планы. Старый
 чеклист сам по себе не означает, что функцию нужно реализовать заново.
 
-<!-- gate-snapshot: date=2026-11-03 tests=1653 sourcecheck=146 analyzers=68 -->
+<!-- gate-snapshot: date=2026-11-22 tests=1832 sourcecheck=172 analyzers=68 -->
 
-Снимок прогона **2026-11-03** (коммит `b00b96e`): tests **1653 PASS / 0 FAIL**,
-SourceCheck **146 PASS / 0 FAIL**, analyzers **68 PASS / 0 FAIL**. Это датированный
-снимок, не процент покрытия и не живая приёмка. Прежние 1592/127 (2026-10-10) и
-1569/119 — история.
+Снимок прогона **2026-11-22** (рабочее дерево, без коммита): tests
+**1832 PASS / 0 FAIL**, SourceCheck **172 PASS / 0 FAIL**, analyzers
+**68 PASS / 0 FAIL**. Это датированный снимок, не процент покрытия и не живая
+приёмка. Прежние 1757/171 (2026-11-22, до нормализации долготы), 1755/171
+(2026-11-22, до atlas-транспорта), 1750/171
+(2026-11-21, до профиля глубины), 1728/171
+(тот же день, до правок ревью), 1653/146
+(2026-11-03, `b00b96e`), 1592/127 (2026-10-10) и 1569/119 — история.
 
 Актуальный протокол солнечного офлайн-продолжения:
 [continuation-20261009-lower-limb/FINAL.md](artifacts/reports/solar-table-20261008/continuation-20261009-lower-limb/FINAL.md).
@@ -60,8 +64,16 @@ Production/test/Tools в том проходе не менялись; его г�
 | Иконки маркеров карты (F229) | `docs/map-marker-icons-f229.md` — bundle fallback + контейнерные ключи `Sprite/<имя>`, общий `LoadBundleIconSprite`; датированный отчёт приёмки |
 | Небо против облаков | `docs/sky-vs-clouds.md` — `PointSky` и очередь 1020; главная причина утечки (второй draw через `SRPDefaultUnlit`/`ForwardSRP` после композита) устранена; приёмка главного вида закрыта RenderDoc + `pixel_history`; ограничения моста и грабли RenderDoc |
 | Реестр найденных проблем | `docs/refactoring-plan/hypothesis/INDEX.md` |
-| Знания об API игры UBOAT | `knowledge/` — 26 файлов, 6 разделов |
+| Знания об API игры UBOAT | `knowledge/` — 26 файлов в Git, 6 разделов |
+| Течения, волновой снос и границы измерений | `docs/plans/OCEAN_CURRENTS_PLAN.md` §2; обязательный вход не зависит от локальных отчётов |
 | Граф кода | `graphify-out/` — запросы с явным project path, не замена исходникам |
+
+**Локальные свидетельства, не входящие в поставку:** журнал
+docs/drift-simulation-20261115.md и инвентарь
+knowledge/inventory/submarine-motion-and-drift.md; отчёты
+artifacts/reports/drift-causal-qa-20261115/QA_REPORT.md и
+artifacts/reports/drift-engine-off-20261115/REPORT.md. На чистом клоне этих
+четырёх файлов нет; итоги и ограничения приведены в плане течений §2.
 
 ## 2. Архитектура — `docs/SAD/`
 
@@ -114,6 +126,11 @@ F225 и F230 не использованы (пропуски после ревь
 | `PLAN_InfoPanel_ZoneDebug.md` | Live-валидация перенесена в `LIVE_VALIDATION_CHECKLIST.md`, аудит — в `docs/archive/` |
 | `docs/plans/KEY_EDGE_PLAN.md` | `HeldKeyEdge` реализован; live Z 6/6 PASS; source-дефекты ownership/`OnDisable` открыты |
 | `docs/plans/manual-mod-plan.md` | Рабочая программа руководства по солнечной навигации; не production-код |
+| `docs/plans/OCEAN_CURRENTS_PLAN.md` | План и журнал течений и ветрового сноса: [результаты §13.37](docs/plans/OCEAN_CURRENTS_PLAN.md#1337-результаты-выполнения-1336-2026-11-23), [оставшиеся работы §13.36](docs/plans/OCEAN_CURRENTS_PLAN.md#1336-план-оставшихся-работ), F8 отдельно (`NOT RUN`) |
+| `docs/plans/OCEAN_CURRENTS_RISKS.md` | Отдельный реестр OC-001…OC-052: основания, последствия и проверки потенциальных проблем; не список доказанных дефектов готового мода |
+| `docs/plans/OCEAN_CURRENTS_REALTIME.md` | Real-time профиль течений: хранение, горячая выборка, sparse/dense, события, стратегические источники; синтетические offline-измерения v4, не Unity/60 FPS |
+| `docs/plans/OCEAN_CURRENTS_DATA_RESEARCH.md` | Исследование первоисточников: CNES/CF/Unity/Microsoft, лицензии и offline-прототип; evidence и выводы, не реализация |
+| `docs/plans/OCEAN_CURRENTS_WIND.md` | Течение, относительный ветер и штатные волны: контракт для лодки и других объектов, синтетические проверки |
 
 Планы функций в `docs/plans/`: `docs/plans/SEXTANT_PLAN.md` (реализация + журнал приёмки, актуальная
 шапка 2026-10-04), `docs/plans/STAR_SKY_PLAN.md` (исторический план, последующие изменения
@@ -133,13 +150,14 @@ F225 и F230 не использованы (пропуски после ревь
 
 ## 5. Знания об игре — `knowledge/`
 
-Скомпилировано 2026-08-24, дополнено 2026-10-14. **26 файлов**, 6 разделов.
+Скомпилировано 2026-08-24. **26 файлов в Git**, 6 разделов; локальный
+инвентарь движения лодки даёт 27-й файл в исследовательской рабочей копии.
 Подключено как opencode-reference `uboat-kb` и как skill `uboat-game-api`.
 **Проверять здесь до чтения исходников игры.**
 
 - `knowledge/README.md` — индекс базы.
 - `.opencode/skills/uboat-game-api/SKILL.md` — opencode-skill, который направляет к этой базе.
-- `inventory/` (9): `patch-surface.md` (все virtual-методы = цели Harmony),
+- `inventory/` (9 в Git): `patch-surface.md` (все virtual-методы = цели Harmony),
   `events.md`, `reflection-contracts.md`, `game-hotkeys.md`,
   `game-input-semantics.md`, `celestial-renderers.md`,
   `navigation-instrument-contracts.md`, `navigation-projection-contract.md`,

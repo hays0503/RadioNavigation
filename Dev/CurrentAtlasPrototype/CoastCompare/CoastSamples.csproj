@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>7.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../Tests/Helpers/CoastQuadTreePort.cs" Link="CoastQuadTreePort.cs" />
+    <Compile Include="../../../Source/Logic/LighthouseLandGate.cs" Link="LighthouseLandGate.cs" />
+  </ItemGroup>
+</Project>

@@ -35,6 +35,19 @@ MonoBehaviour but everything static. Scale k = 40075.16/360 = 111.3199 km per de
 - Instance props: `Latitude = transform.position.y/40075.16*360`, `Longitude = position.x/...*360`.
 - `GetCoordinatesString(lat,lon)` / `WithSymbols` — DMS ("52° 06' N") vs decimal per `UserSettings.GameplaySettings.coordinatesType`.
 
+### Global elevation is not scene terrain
+
+`WorldMaps.ElevationMap` (`UBOAT.Game.Scene.Environment.Terrain/WorldMaps.cs:348`)
+reads `Maps/etopo1_bed_g_f4.dat`: 21601×10801 samples in padded 256² tiles.
+`Map.GetAtWorldSpace(x,z)` takes encounter km and flips north to raster rows;
+`Map.GetAt` bilinearly interpolates elevation, not positive-down depth.
+Cold loads in `GetElevationAt` use a lock and file I/O (`:214–243`).
+`WorldSegmentGenerator.ParseGpuDataJob` (`:110–153`) modifies the interpolated
+base using GPU height/shore and other inputs. `Hull.GetDepthBelow` reads the
+global map (`Hull.cs:1737–1739`), while `EnsureWreckAboveTerrain` queries a
+loaded terrain segment (`:1714–1733`). Neither can substitute for the other
+when checking actual bottom contact.
+
 ## SandboxGroup (SandboxGroup.cs, 2678 lines) — abstract MonoBehaviour
 One contact cluster (convoy/patrol/port/wreck...): entity container, aggregated detection params, observation memory, spawn lifecycle.
 
@@ -58,6 +71,20 @@ Observations API: `GroupObservation AddObservation(SandboxGroup observed, GroupD
 
 Events: `Changed`, `Destroyed`, `EntityAdded(SandboxEntity)`, `EntityRemoved`, `HoverOrSelectionChanged`,
 `ObservationAdded(SandboxGroup, GroupObservation)`, `ObservationRemoved(SandboxGroup, GroupObservation)`, `Spawned`, `VisibilityChanged`.
+
+- For handoff measurements, `SandboxPlayerWolfpack.EnterGroupArea` /
+  `LeaveGroupArea` distinguish native encounter crossings from direct test calls
+  to `SandboxGroup.Spawn()` / `Unspawn()`. Events follow the native calls where
+  the encounter mode requests them; an area event alone does not prove that
+  a physical hull exists.
+- `SandboxGroup.OnSpawned(SandboxEntity)` completes the transition after all
+  enabled members are ready. For unfreezing dynamic, undocked bodies with a
+  nonempty route it initializes `Rigidbody.velocity` from transform forward
+  and `SandboxMobileGroup.Velocity × 1000`; `Spawned` is raised afterward.
+  `Unspawn()` enters `Unspawning`, releases members and destroys the scene
+  container; container cleanup can defer `NotSpawned` to a frame callback.
+  Capture the member and its 3D body separately from group/2D body; neither
+  group `Position` nor a delayed bridge poll is the native handoff frame.
 
 ## SandboxEntity (SandboxEntity.cs, 3134 lines)
 Serializable unit record (ship/aircraft/port/minefield); bridges to scene `Entity` via spawn lifecycle `EntitySpawnState {Unspawned, Spawning, Spawned, Virtual, SpawnError, Destroyed}`.

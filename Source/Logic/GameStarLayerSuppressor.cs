@@ -37,11 +37,12 @@ namespace UBOAT.Mods.RadioNavigation
         private const string SkyTypeName = "TOD_Sky";
         private const string SkyAssembly = "com.uboat.dependencies";
         private const string SkyMethodName = "LateUpdate";
-        private const float RendererScanIntervalSeconds = 1f;
+        private const float MissingRendererRetrySeconds = 5f;
 
         private static int starVisibilityId = -1;
         private static int applyCount;
         private static int blockedCount;
+        private static int scanCount;
         private static bool patchAttempted;
         private static bool patched;
 
@@ -50,7 +51,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// (see ApplyRendererStage), so the mod never claims one it did not
         /// turn off.</summary>
         private static readonly List<SuppressedRenderer> hiddenRenderers = new List<SuppressedRenderer>();
-        private static float lastRendererScanRealtime = float.NegativeInfinity;
+        private static bool rendererScanRequested = true;
+        private static float nextMissingRendererScanRealtime = float.NegativeInfinity;
         private static int lastReportedHiddenCount = -1;
 
         private sealed class SuppressedRenderer
@@ -84,6 +86,11 @@ namespace UBOAT.Mods.RadioNavigation
         internal static int HiddenRendererCount
         {
             get { return CountHiddenRenderers(); }
+        }
+
+        internal static int ScanCount
+        {
+            get { return scanCount; }
         }
 
         internal static bool Apply(Harmony harmony)
@@ -150,12 +157,28 @@ namespace UBOAT.Mods.RadioNavigation
             // camera render.
             ReassertRendererStage();
 
-            if (Time.realtimeSinceStartup - lastRendererScanRealtime
-                    >= RendererScanIntervalSeconds)
+            // A full Resources.FindObjectsOfTypeAll scan costs ~25 ms. Run it
+            // once per scene (requested by the scene hook) and retry only while
+            // no dome has been found yet; a found dome is re-asserted per frame.
+            float now = Time.realtimeSinceStartup;
+            if (rendererScanRequested)
             {
-                lastRendererScanRealtime = Time.realtimeSinceStartup;
+                rendererScanRequested = false;
                 ApplyRendererStage();
+                nextMissingRendererScanRealtime = now + MissingRendererRetrySeconds;
             }
+            else if (hiddenRenderers.Count == 0 && now >= nextMissingRendererScanRealtime)
+            {
+                ApplyRendererStage();
+                nextMissingRendererScanRealtime = now + MissingRendererRetrySeconds;
+            }
+        }
+
+        /// <summary>Requests one discovery scan after a scene transition. The
+        /// scan itself runs in the next TOD_Sky.LateUpdate postfix.</summary>
+        internal static void RequestRendererScan()
+        {
+            rendererScanRequested = true;
         }
 
         /// <summary>Cheap per-frame re-assertion of the cached suppression:
@@ -183,6 +206,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// enabled state is retained for an exact restore.</summary>
         private static void ApplyRendererStage()
         {
+            scanCount++;
             PruneDestroyedRenderers();
 
             Renderer[] all = Resources.FindObjectsOfTypeAll<Renderer>();
@@ -251,6 +275,8 @@ namespace UBOAT.Mods.RadioNavigation
                     entry.Renderer.enabled = entry.OriginalEnabled;
             }
             hiddenRenderers.Clear();
+            rendererScanRequested = true;
+            nextMissingRendererScanRealtime = Time.realtimeSinceStartup + MissingRendererRetrySeconds;
             ReportHiddenRendererCount();
         }
 

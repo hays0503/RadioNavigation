@@ -31,7 +31,7 @@ namespace RadioNavigation.SourceCheck
     {
         private static readonly string[] SkipSegments =
         {
-            "\\bin\\", "\\obj\\", "\\graphify-out\\", "\\.git\\", "\\node_modules\\", "\\documents-readonly\\",
+            "\\bin\\", "\\obj\\", "\\graphify-out\\", "\\.git\\", "\\node_modules\\", "\\documents-readonly\\", "\\temp\\",
         };
 
         /// <summary>
@@ -533,8 +533,61 @@ namespace RadioNavigation.SourceCheck
                 "AGENTS.md no longer states the current registry size (241 findings).");
             Assert.True(!text.Contains("graphify-out/wiki/index.md exists"),
                 "AGENTS.md still claims graphify-out/wiki/index.md exists; that tree is not generated.");
-            Assert.True(!text.Contains("786 PASS"),
+            // Boundary-aware: a current count like 1786 legitimately contains
+            // "786 PASS" as a substring, which is not a stale statement.
+            Assert.True(!Regex.IsMatch(text, @"(?<!\d)786 PASS"),
                 "AGENTS.md still states the superseded 786-PASS test count as current.");
+        }
+
+        /// <summary>
+        /// The shipped ORA-20C slice is the only external data set in the mod
+        /// whose bytes cannot be regenerated offline: the tiles are derived
+        /// from a remote archive, so a corrupted or silently regenerated tile
+        /// would ship without any other gate noticing. Pinning every tile hash
+        /// to the provenance file makes that mismatch fail here. The check also
+        /// pins the two things the package owes the data provider: the
+        /// provenance names the provider and the terms, and the mod description
+        /// names the source. Raw OPeNDAP replies are deliberately not shipped.
+        /// </summary>
+        [Fact]
+        public void Data_ShippedAtlasMatchesProvenance()
+        {
+            string directory = Path.Combine(Root, "Source", "Data", "CurrentAtlas");
+            string[] tiles = Directory.Exists(directory)
+                ? Directory.GetFiles(directory, "*.rnw").OrderBy(Path.GetFileName, StringComparer.Ordinal).ToArray()
+                : new string[0];
+            Assert.True(tiles.Length != 0, "no RNW1 tiles shipped in Source/Data/CurrentAtlas");
+
+            string provenance = File.ReadAllText(Path.Combine(directory, "atlas.provenance.json"));
+            using var document = System.Text.Json.JsonDocument.Parse(provenance);
+            var declared = document.RootElement.GetProperty("tiles").EnumerateArray()
+                .ToDictionary(tile => tile.GetProperty("file").GetString(), StringComparer.Ordinal);
+            Assert.Equal(tiles.Length, declared.Count);
+            foreach (string tile in tiles)
+            {
+                string name = Path.GetFileName(tile);
+                Assert.True(declared.TryGetValue(name, out var entry),
+                    "atlas.provenance.json does not list the shipped tile " + name);
+                Assert.Equal(entry.GetProperty("sha256").GetString(), Sha256(tile));
+                Assert.Equal(entry.GetProperty("bytes").GetInt64(), new FileInfo(tile).Length);
+            }
+
+            Assert.True(provenance.Contains("ICDC"),
+                "atlas.provenance.json no longer names the data provider (ICDC)");
+            Assert.True(document.RootElement.TryGetProperty("terms", out _),
+                "atlas.provenance.json no longer states the terms of use");
+
+            string manifest = File.ReadAllText(Path.Combine(Root, "Manifest.json"));
+            Assert.True(manifest.Contains("ORA-20C"),
+                "Manifest.json description no longer names the shipped atlas source");
+        }
+
+        private static string Sha256(string path)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            using (FileStream stream = File.OpenRead(path))
+                return string.Concat(sha.ComputeHash(stream)
+                    .Select(value => value.ToString("x2", CultureInfo.InvariantCulture)));
         }
     }
 }

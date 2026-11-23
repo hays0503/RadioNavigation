@@ -8,7 +8,7 @@ Rules:
 - Codebase questions: run `graphify query "<question>"` first when graphify-out/graph.json exists. Relationships: `graphify path "<A>" "<B>"`. Concepts: `graphify explain "<concept>"`. Returns scoped subgraph — smaller than GRAPH_REPORT.md or raw grep.
 - Dirty graphify-out/ files expected after hooks/incremental updates; not a reason to skip. Skip only if task is about stale/incorrect graph output or user opts out.
 - `graphify-out/wiki/` is NOT generated in this project — do not reference it. Navigation entry points are `graphify query/path/explain` (preferred) and `graphify-out/GRAPH_REPORT.md`.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain insufficient. This project has no `graph.html` or generated wiki. Graph snapshot 2026-11-03: 11052 nodes / 19679 edges / 813 communities; hooks can change these numbers.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain insufficient. This project has no `graph.html` or generated wiki. Graph snapshot 2026-11-21: 11976 nodes / 23478 edges / 758 communities; hooks can change these numbers.
 - After code changes, run `graphify update .` (AST-only, no API cost).
 - MCP server gotcha (2026-08-24): server default project path resolves to sibling `testui` mod dir — always pass explicit `project_path` = this project root to query/stats/god-nodes tools.
 - **Game-source graph** (2026-08-24): second graph at `C:\code\projects\uboat\graphify-out\` (32140 nodes / 78914 edges / 814 communities, full inference). For game-code questions pass `project_path = C:\code\projects\uboat`. Game digests (Stories/Mods/DI/Time+Weather/Map/Camera/AI/Characters/Sandbox/Serialization/DWS infra) — in supermemory.
@@ -28,7 +28,7 @@ Rules:
 
 ## knowledge/
 
-Compiled game/modding knowledge base (built 2026-08-24 during free-token window; **26 файлов** на 2026-11-03):
+Compiled game/modding knowledge base (built 2026-08-24 during free-token window; **26 файлов в Git**, локальный инвентарь дрейфа не входит в поставку):
 - `knowledge/inventory/patch-surface.md` — все virtual-методы игрового кода (2562 файла, цели Harmony)
 - `knowledge/inventory/events.md` — все события игры (наблюдение без патчей)
 - `knowledge/inventory/reflection-contracts.md` — рефлексия мода vs декларации игры
@@ -82,7 +82,7 @@ Default game path: `C:\Program Files (x86)\Steam\steamapps\common\UBOAT`. Output
 
 ## Neural-slop guard (RadioNavigation.SourceCheck)
 
-Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-only reference** built from the real game source (`C:\code\projects\uboat`), so a hallucinated/wrong-signature game API call fails the build instead of passing silently against the obfuscated DLL. Run: `dotnet run --project Dev/RadioNavigation.SourceCheck -c Release` → **146 PASS / 0 FAIL** (2026-11-03). Counts elsewhere in dated entries are historical.
+Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-only reference** built from the real game source (`C:\code\projects\uboat`), so a hallucinated/wrong-signature game API call fails the build instead of passing silently against the obfuscated DLL. Run: `dotnet run --project Dev/RadioNavigation.SourceCheck -c Release` → **171 PASS / 0 FAIL** (2026-11-21). Counts elsewhere in dated entries are historical.
 
 - **`GameSource_CompilesClean`**: the dependency-closure subset of the decompiled game source (only files the mod's game-API surface touches) must compile cleanly with bodies stripped. If this fails, the clean reference is unavailable and the guard can't run.
 - **`Mod_CompilesAgainstCleanGameApi`**: compiles the mod against the emitted clean reference + real Unity/third-party DLLs. Any CS Error = the mod calls a game API that doesn't exist / has the wrong signature → neural slop → FAIL. Cached at `obj/cleanref/com.uboat.game.clean.dll` (`CleanReferenceCache`), invalidated by game-source/DLL/mod-source content hash.
@@ -138,13 +138,19 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 
 ### Проверки
 
-<!-- gate-snapshot: date=2026-11-03 tests=1653 sourcecheck=146 analyzers=68 -->
+<!-- gate-snapshot: date=2026-11-22 tests=1832 sourcecheck=172 analyzers=68 -->
 
 - `Tools/gates.ps1` = build → SourceCheck + quick → tests → PVS, fail-fast.
   `-Parallel` — быстрая/медленная линии.
-- Снимок **2026-11-03**: tests **1653 PASS / 0 FAIL**,
-  SourceCheck **146 PASS / 0 FAIL**, analyzers **68 PASS / 0 FAIL**.
+- Снимок **2026-11-22**: tests **1832 PASS / 0 FAIL**,
+  SourceCheck **172 PASS / 0 FAIL**, analyzers **68 PASS / 0 FAIL**.
   Историю счётчика не выдавать за текущий прогон.
+- Baseline Roslynator обновлён **2026-11-21** (`-UpdateBaseline`): в дереве
+  уже были 16 не учтённых предупреждений CPlath UI, эти файлы не менялись;
+  также приняты штатные Unity-lifecycle RCS1213 у новых компонентов.
+  Остальные замечания по файлам течений исправлены до обновления.
+  Формат baseline теперь без хвостового пробела после правила (иначе
+  каждая строка ловится `git diff --check`); сравнение нормализует обе стороны.
 - Один гейт: `dotnet run --project Dev/RadioNavigation.SourceCheck -c Release -- <подстрока>`.
 - Мутация считается пойманной, если упал **любой** гейт. Проверять надо
   **вызов и его аргументы**, а не наличие имени: «объявлено» ≠ «используется».
@@ -166,10 +172,10 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 ### Граф и знания
 
 - `graphify update .` после правок кода (AST-only, без API). Снимок
-  **2026-11-03**: **11052 узла / 19679 рёбер / 813 сообществ** (сборка от `b00b96e`).
+  **2026-11-21**: **11976 узлов / 23478 рёбер / 758 сообществ**.
 - MCP graphify: всегда передавать `project_path` = корень этого проекта,
   иначе сервер уходит в соседний `testui`.
-- `knowledge/` — **26 файлов**, проверять до чтения исходников игры.
+- `knowledge/` — **26 файлов в Git**, проверять до чтения исходников игры.
   `graphify-out/wiki/` в проекте не генерируется.
 
 ### Диагностика
@@ -216,6 +222,6 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 - `docs/refactoring-plan/hypothesis/INDEX.md` — реестр находок F001-F243 (241 строка; номера F225/F230 не использованы). Аудит 2026-08-01 дал F01-F207, из них 194 в `docs/refactoring-plan/confirmed/` и 13 в `docs/refactoring-plan/rejected/`; поздние раунды F208-F229 и F231-F243 лежат только строками в таблице
 - `docs/refactoring-plan/RESOLVED_LEDGER.md` — закрытие гипотез с доказательствами (теги file:line, коммиты)
 - `docs/refactoring-plan/game-source-findings/` — G1-G4 (dead RadioStoryIntegration chain) + `GAME_SOURCE_REFERENCE.md` (mod→game API map)
-- `knowledge/` — скомпилированная база по API игры (26 файлов на 2026-11-03: inventory/catalogs/classes/playbooks/qa), подключена как reference `uboat-kb` + skill `uboat-game-api`. Проверять до чтения исходников игры
+- `knowledge/` — скомпилированная база по API игры (inventory/catalogs/classes/playbooks/qa), подключена как reference `uboat-kb` + skill `uboat-game-api`. Проверять до чтения исходников игры
 - `documents-readonly/` — первоисточники по радионавигации, не редактируются
 - `.opencode/opencode.json` — graphify.js plugin config for OpenCode

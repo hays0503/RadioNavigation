@@ -29,6 +29,8 @@ $refs = @(
     "$GamePath\UBOAT_Data\Managed\UnityEngine.IMGUIModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.InputLegacyModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.PhysicsModule.dll",
+    "$GamePath\UBOAT_Data\Managed\UnityEngine.Physics2DModule.dll",
+    "$GamePath\UBOAT_Data\Managed\UnityEngine.AIModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.TextRenderingModule.dll",
     "$GamePath\UBOAT_Data\Managed\UnityEngine.AudioModule.dll",
     "$GamePath\UBOAT_Data\Managed\0Harmony.dll",

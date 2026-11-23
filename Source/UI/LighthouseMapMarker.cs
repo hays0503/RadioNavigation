@@ -85,6 +85,12 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected override float MaintenanceIntervalSeconds => 1f;
 
+        /// <summary>The lighthouse fleet is static during a session; a
+        /// whole-scene reconcile every second cost ~25 ms and hitched the map.
+        /// Ten seconds keeps the marker set fresh after a load without a
+        /// visible periodic stutter.</summary>
+        protected override float ReconcileIntervalSeconds => 10f;
+
         protected override void PrepareContent()
         {
             fleet.Clear();

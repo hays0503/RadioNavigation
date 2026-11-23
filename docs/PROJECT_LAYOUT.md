@@ -25,6 +25,7 @@
 | `Dev/RadioNavigation.Analyzers.Tests/` | Тесты анализаторов |
 | `Dev/RadioNavigation.SourceCheck/` | Проверка чистого игрового API и структурные гейты |
 | `Dev/SolarSightAudit/` | Отдельный offline C#-стенд солнечной эфемериды; не сборка/деплой мода, см. `solar-sight-tools.md` |
+| `Dev/CurrentAtlasPrototype/` | Воспроизводимый синтетический стенд атласа течений; запуск и ограничения в `docs/plans/OCEAN_CURRENTS_REALTIME.md` §15 |
 | `Tools/` | Все PowerShell-точки входа и вспомогательные скрипты |
 | `docs/` | Действующие справочники и спецификация радиопанели `docs/DESIGN.md` |
 | `docs/plans/` | Четыре плана функций и журналы приёмки, ранее лежавшие в корне |

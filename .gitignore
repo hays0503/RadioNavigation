@@ -38,6 +38,9 @@ Tools/pause_check/*.wav
 # Offline solar bench bytecode (regenerable)
 /Tools/solar-sight/**/__pycache__/
 
+# Offline ocean-current prototype bytecode (regenerable)
+/Dev/CurrentAtlasPrototype/**/__pycache__/
+
 # Local solar-navigation manual outputs (large PDFs; source tables live in documents-readonly)
 /docs/manual-solar-navigation/
 
@@ -49,6 +52,8 @@ Bundles/buildlogtep.json
 
 # Local supermemory tool artifacts (contain key material)
 .supermemory/
+.supermemory.upgrade-backups/
+/temp/
 memory.txt
 documents-readonly/
 

@@ -566,8 +566,23 @@ namespace RadioNavigation.SourceCheck
                         // If "nsName.typeName" is itself a known namespace, then typeName is a
                         // NAMESPACE segment (e.g. UBOAT.Game.Scene.Characters), not a type.
                         // Stubbing it would collide with the real namespace (CS0101).
-                        if (typeName.Length > 0 && nsName.Length > 0 &&
-                            !knownGameNamespaces.Contains(nsName + "." + typeName))
+                        if (knownGameNamespaces.Contains(nsName + "." + typeName))
+                        {
+                            // Roslyn can report the missing namespace segment of
+                            // A.B.Type when the subset contains no type in A.B.
+                            // Stub the referenced leaf type, not the namespace.
+                            var node = diag.Location.SourceTree.GetRoot().FindNode(diag.Location.SourceSpan);
+                            var qualified = node.AncestorsAndSelf().OfType<QualifiedNameSyntax>()
+                                .LastOrDefault();
+                            if (qualified != null && typeNamespaces.TryGetValue(
+                                qualified.Right.Identifier.ValueText, out var namespaces)
+                                && namespaces.Contains(qualified.Left.ToString()))
+                            {
+                                missing.Add(qualified.Right.Identifier.ValueText);
+                                missingNs[qualified.Right.Identifier.ValueText] = qualified.Left.ToString();
+                            }
+                        }
+                        else if (typeName.Length > 0 && nsName.Length > 0)
                         {
                             missing.Add(typeName);
                             missingNs[typeName] = nsName;
@@ -1298,6 +1313,15 @@ foreach (var name in missing)
         {
             public override SyntaxNode VisitMethodDeclaration(MethodDeclarationSyntax node)
             {
+                // This legacy mod-loader hint describes an *old* signature,
+                // not the current API. Its decompiled Type[] can be
+                // unbindable against the signature-only subset.
+                var legacy = node.AttributeLists.SelectMany(list => list.Attributes)
+                    .Where(attribute => attribute.Name.ToString() == "MethodChangedSignature")
+                    .Select(attribute => ((AttributeListSyntax)attribute.Parent).Attributes.Count == 1
+                        ? attribute.Parent : attribute).Distinct().ToArray();
+                if (legacy.Length != 0)
+                    node = node.RemoveNodes(legacy, SyntaxRemoveOptions.KeepExteriorTrivia);
                 if (node.Body != null)
                     node = node.WithBody(ThrowBlock());
                 else if (node.ExpressionBody != null)

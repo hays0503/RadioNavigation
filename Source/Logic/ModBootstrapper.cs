@@ -64,6 +64,7 @@ namespace UBOAT.Mods.RadioNavigation
             LighthouseBeamGlow.ResetStatics(); // ADR-017: GPU + hook утечка маяка
             GameTimeResolver.Reset();
             ClockSecondsDriver.EnsureRunning();
+            MapWindDirectionDriver.EnsureRunning();
             SceneContentBuilder.EnsureWorldSource();
             // Lifecycle sweep (risk register iter2): stale cross-scene
             // state that the four resets above do not cover — camera hook
@@ -81,6 +82,13 @@ namespace UBOAT.Mods.RadioNavigation
 
             harmony = owner;
             HarmonyPatchInstaller.Apply(harmony);
+
+            // Current transport adapter (plan §13.2 B1.1): fully inert — no
+            // patches, no GameObject — unless RADIONAV_CURRENT_FIELD is set
+            // before launch. Installs nothing by default.
+            CurrentRuntimeAdapter.EnsureRunning(harmony);
+            CurrentRouteRuntime.TryInstall(harmony);
+            CurrentStrategicDrift.TryInstall(harmony);
 
             // Save/load hygiene for the native map points: prune duplicate
             // owned rows before the game's restore (Loaded) and before every
@@ -259,6 +267,12 @@ namespace UBOAT.Mods.RadioNavigation
             // singleton is resolvable (LoadSingleton returns null early).
             MapSaveSanitizer.TryInstall();
             SextantSavePersistence.TryInstall();
+            // A scene transition may expose a new decorative star dome; ask
+            // the suppressor for one discovery scan instead of polling every
+            // second (a full renderer scan costs ~25 ms).
+            GameStarLayerSuppressor.RequestRendererScan();
+            // Opt-in live wind/cost measurement; no-op without its env flag.
+            WindProbeRuntime.EnsureRunning();
         }
 
         /// Self-recovery for a missing/evicted DI registration of the

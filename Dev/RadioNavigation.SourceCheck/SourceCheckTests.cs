@@ -4309,6 +4309,13 @@ namespace RadioNavigation.SourceCheck
                     problems.Add("Suppressor preference must default to ON while our sky is authoritative");
                 if (text.IndexOf("Resources.FindObjectsOfTypeAll", StringComparison.Ordinal) < 0)
                     problems.Add("Suppressor renderer stage must scan the loaded renderers (FindObjectsOfTypeAll)");
+                if (text.IndexOf("rendererScanRequested", StringComparison.Ordinal) < 0
+                    || text.IndexOf("RequestRendererScan", StringComparison.Ordinal) < 0
+                    || text.IndexOf("MissingRendererRetrySeconds", StringComparison.Ordinal) < 0)
+                    problems.Add("Suppressor scan must be scene-requested with a missing-renderer retry");
+                if (text.IndexOf("RendererScanIntervalSeconds", StringComparison.Ordinal) >= 0
+                    || text.IndexOf("lastRendererScanRealtime", StringComparison.Ordinal) >= 0)
+                    problems.Add("Suppressor must not return to a periodic renderer scan");
                 var postfix = FindMethod(suppressor, "AfterSkyLateUpdate");
                 if (postfix == null
                     || !InvokesName(postfix, "ShouldHide")
@@ -4342,6 +4349,12 @@ namespace RadioNavigation.SourceCheck
             if (apply == null
                 || apply.ToString().IndexOf("GameStarLayerSuppressor.Apply", StringComparison.Ordinal) < 0)
                 problems.Add("Startup must install the game-star suppression postfix");
+
+            var bootstrapper = FindSourceType(roots, "ModBootstrapper");
+            var sceneAwake = bootstrapper != null
+                ? FindMethod(bootstrapper, "SceneEventsListener_OnSceneAwake") : null;
+            if (sceneAwake == null || !InvokesName(sceneAwake, "RequestRendererScan"))
+                problems.Add("Scene awake must request one renderer scan after a scene transition");
 
             Assert.True(problems.Count == 0,
                 $"{problems.Count} game-star suppression violation(s):\n" + string.Join("\n", problems));

@@ -26,11 +26,27 @@
 #   powershell -ExecutionPolicy Bypass -File Tools/run-game.ps1
 #   powershell -ExecutionPolicy Bypass -File Tools/run-game.ps1 -SkipBuild
 #   powershell -ExecutionPolicy Bypass -File Tools/run-game.ps1 -NoRestart
+# Experimental drift (launch variables; defaults unchanged):
+#   powershell -ExecutionPolicy Bypass -File Tools/run-game.ps1 -DriftDemo
+#   powershell -ExecutionPolicy Bypass -File Tools/run-game.ps1 -CurrentField '1,0' -DirectWind -NearbyDrift -RelativeRudder
+# Route steering follows a constant field; a directory of RNW1 tiles replaces it:
+#   powershell -ExecutionPolicy Bypass -File Tools/run-game.ps1 -CurrentField '1,0' -RouteCurrent
+#   powershell -ExecutionPolicy Bypass -File Tools/run-game.ps1 -AtlasTile 'X:\tiles' -CurrentProfile '0:1,0;20:0,0'
+#   powershell -ExecutionPolicy Bypass -File Tools/run-game.ps1 -CurrentField '1,0' -FarDrift
 param(
     [switch]$SkipBuild,
     [switch]$NoRestart,
     [int]$TimeoutMinutes = 12,
-    [string]$GamePath = 'C:\Program Files (x86)\Steam\steamapps\common\UBOAT'
+    [string]$GamePath = 'C:\Program Files (x86)\Steam\steamapps\common\UBOAT',
+    [string]$CurrentField,
+    [switch]$DirectWind,
+    [switch]$NearbyDrift,
+    [switch]$RelativeRudder,
+    [switch]$RouteCurrent,
+    [switch]$FarDrift,
+    [string]$CurrentProfile,
+    [string]$AtlasTile,
+    [switch]$DriftDemo
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,6 +56,19 @@ $modsRoot = Split-Path -Parent $modDir
 function Ok($msg) { Write-Host "[OK] $msg" -ForegroundColor Green }
 function Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
 function Fail($msg) { Write-Host "[FAIL] $msg" -ForegroundColor Red; exit 1 }
+
+if ($PSBoundParameters.ContainsKey('CurrentField')) {
+    $parts = $CurrentField -split ','
+    if ($parts.Count -ne 2) { Fail "CurrentField must be 'east,north' in m/s" }
+    foreach ($part in $parts) {
+        [float]$number = 0
+        if (-not [float]::TryParse($part, [Globalization.NumberStyles]::Float,
+                [Globalization.CultureInfo]::InvariantCulture, [ref]$number) -or
+                [float]::IsNaN($number) -or [float]::IsInfinity($number)) {
+            Fail "CurrentField must contain two finite speeds in m/s"
+        }
+    }
+}
 
 # --- 1. build (static checks only; the game compiles the mod itself) ---------
 if (-not $SkipBuild) {
@@ -86,6 +115,12 @@ if (-not (Test-Path -LiteralPath $gameExe)) { Fail "UBOAT.exe not found at $game
 
 Get-CimInstance Win32_Process -Filter "Name LIKE '%UBOAT%'" -ErrorAction SilentlyContinue |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+if ($PSBoundParameters.ContainsKey('AtlasTile') -and
+    $AtlasTile -ne 'bundled' -and
+    -not (Test-Path -LiteralPath $AtlasTile)) {
+    Fail "AtlasTile path does not exist: $AtlasTile (use 'bundled' for the shipped slice)"
+}
+
 Start-Sleep -Seconds 5
 
 if (-not $NoRestart) {
@@ -93,6 +128,22 @@ if (-not $NoRestart) {
     $env:SteamGameId = '494840'
     $env:SteamClientLaunch = '1'
     $env:SteamPath = 'C:\Program Files (x86)\Steam'
+    if ($DriftDemo) {
+        $env:RADIONAV_CURRENT_FIELD = '1,0'
+        $env:RADIONAV_DIRECT_WIND = '1'
+        $env:RADIONAV_NEARBY_DRIFT = '1'
+        $env:RADIONAV_RELATIVE_RUDDER = '1'
+        $env:RADIONAV_ROUTE_CURRENT = '1'
+        $env:RADIONAV_FAR_DRIFT = '1'
+    }
+    if ($PSBoundParameters.ContainsKey('CurrentField')) { $env:RADIONAV_CURRENT_FIELD = $CurrentField }
+    if ($PSBoundParameters.ContainsKey('CurrentProfile')) { $env:RADIONAV_CURRENT_PROFILE = $CurrentProfile }
+    if ($PSBoundParameters.ContainsKey('AtlasTile')) { $env:RADIONAV_ATLAS_TILE = $AtlasTile }
+    if ($DirectWind) { $env:RADIONAV_DIRECT_WIND = '1' }
+    if ($NearbyDrift) { $env:RADIONAV_NEARBY_DRIFT = '1' }
+    if ($RelativeRudder) { $env:RADIONAV_RELATIVE_RUDDER = '1' }
+    if ($RouteCurrent) { $env:RADIONAV_ROUTE_CURRENT = '1' }
+    if ($FarDrift) { $env:RADIONAV_FAR_DRIFT = '1' }
     $gameArgs = @($launcherExe, '-quicklatestgamestate') | ForEach-Object { "`"$_`"" }
     Start-Process -FilePath $gameExe -ArgumentList $gameArgs -WorkingDirectory $GamePath
     Ok 'game started (direct UBOAT.exe -quicklatestgamestate)'
