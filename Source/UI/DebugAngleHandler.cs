@@ -57,7 +57,7 @@ namespace UBOAT.Mods.RadioNavigation
             isUpdating = true;
 
             if (beaconText.IsNotNull())
-                beaconText.text = angle.ToString("F1") + "\u00B0";
+                beaconText.text = angle.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + "\u00B0";
 
             if (slider.IsNotNull())
                 slider.value = angle;

@@ -46,6 +46,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const float PatternLabelHeight = 60f;
         private float signalUpdateTimer;
         private const float SignalUpdateInterval = 0.15f;
+        private bool stateInitialized;
 
         private void Start()
         {
@@ -91,6 +92,7 @@ namespace UBOAT.Mods.RadioNavigation
             FindHandlers();
             Subscribe();
             RestorePanelState();
+            stateInitialized = true;
             RefreshAll();
         }
 
@@ -374,7 +376,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void OnDestroy()
         {
-            SaveCachedState();
+            if (stateInitialized)
+                SaveCachedState();
             Unsubscribe();
         }
     }

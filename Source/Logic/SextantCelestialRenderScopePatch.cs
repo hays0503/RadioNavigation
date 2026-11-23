@@ -55,7 +55,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (pip == null || nativeSun == null || nativeMoon == null)
                 return;
-            Component sources = FindSources(pip) ?? pip.gameObject.AddComponent<SextantCelestialSources>();
+            Component sources = FindSources(pip);
+            if (sources == null)
+                sources = pip.gameObject.AddComponent<SextantCelestialSources>();
             // Register is refreshed from LateUpdate. Enumerate the solar
             // subtree only when the native Sun reference changes, not per frame.
             if (ReadRenderer(sources, "NativeSun") != nativeSun)

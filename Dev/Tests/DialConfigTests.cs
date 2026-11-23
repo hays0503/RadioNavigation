@@ -87,5 +87,11 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             float f = DialConfig.AngleToFrequency(15f, 3);
             Assert.True(f > 720f && f < 740f, $"expected interpolation, got {f}");
         }
+
+        [Fact]
+        public void AngleToFrequency_NaN_ReturnsNaN()
+        {
+            Assert.True(float.IsNaN(DialConfig.AngleToFrequency(float.NaN, 1)));
+        }
     }
 }

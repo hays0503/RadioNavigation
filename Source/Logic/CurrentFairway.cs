@@ -31,7 +31,17 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 saves = ScriptableObjectSingleton.LoadSingleton<SavesManager>();
                 if (saves)
+                {
+                    var field = typeof(SavesManager).GetField("LoadingInitialization",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    if (field != null)
+                    {
+                        var handlers = field.GetValue(saves) as Delegate;
+                        field.SetValue(saves, SceneEventHandlerPurge.RemoveAll(handlers,
+                            typeof(CurrentFairway).FullName, nameof(OnLoading)));
+                    }
                     saves.LoadingInitialization += OnLoading;
+                }
             }
             if (ship != lastSkipper)
                 ForgetDeparture(ship);

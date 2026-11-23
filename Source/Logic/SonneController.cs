@@ -242,7 +242,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (navUpdateTimer >= NavUpdateInterval)
             {
                 navUpdateTimer = 0f;
-                stationManager.UpdateNavigation();
+                if (stationManager.HasPosition)
+                    stationManager.UpdateNavigation();
             }
 
             // F01/F29: the scheduler/keyer state machine runs on the main

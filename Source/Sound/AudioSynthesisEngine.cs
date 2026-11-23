@@ -170,7 +170,7 @@ namespace UBOAT.Mods.RadioNavigation
                         keyers[s].Advance();
                     }
 
-                    UpdateCarrierPitch(carriers[s], stations[s], keyers[s]);
+                    ApplyCarrierPitch(carriers[s], stations[s], keyers[s]);
 
                     if (phaseBefore == StationScheduler.Phase.PreNavPause &&
                         sched.CurrentPhase == StationScheduler.Phase.Navigation)
@@ -186,11 +186,18 @@ namespace UBOAT.Mods.RadioNavigation
         // stays on the base beat. Main-thread only, and element boundaries are
         // tick-aligned so the switch never lands mid-tone. Stations without a
         // BeatFrequency keep whatever carrier frequency was set manually.
-        private static void UpdateCarrierPitch(CarrierGenerator carrier, StationState station, MorseKeyer keyer)
+        internal static void ApplyCarrierPitch(CarrierGenerator carrier, StationState station, MorseKeyer keyer)
         {
+            if (carrier == null)
+                return;
             float beat = station.BeatFrequency;
             if (beat.IsNegligible(0.001f))
                 return;
+            if (keyer == null)
+            {
+                carrier.Frequency = beat;
+                return;
+            }
             if (!keyer.KeyOn || keyer.IsTone)
                 carrier.Frequency = beat;
             else if (keyer.CurrentElementIsDash)

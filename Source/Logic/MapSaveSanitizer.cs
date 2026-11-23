@@ -34,6 +34,8 @@ namespace UBOAT.Mods.RadioNavigation
     {
         private static readonly FieldInfo DatabaseField = typeof(MapChartingUI).GetField(
             "mapChartingDatabase", BindingFlags.NonPublic | BindingFlags.Static);
+        private static readonly FieldInfo BearingsField = typeof(MapChartingDatabase).GetField(
+            "bearingCircles", BindingFlags.NonPublic | BindingFlags.Instance);
 
 #pragma warning disable IDE0052 // Keep the installed event publisher rooted; equivalent lifetime after singleton replacement/unload is not proven.
         private static SavesManager savesManager;
@@ -54,9 +56,9 @@ namespace UBOAT.Mods.RadioNavigation
             if (manager == null)
                 return;
 
-            manager.Loaded -= OnLoaded;
+            PurgeHandler(manager, "Loaded", "OnLoaded");
+            PurgeHandler(manager, "SavingStarted", "OnSavingStarted");
             manager.Loaded += OnLoaded;
-            manager.SavingStarted -= OnSavingStarted;
             manager.SavingStarted += OnSavingStarted;
             savesManager = manager;
             installed = true;
@@ -169,46 +171,79 @@ namespace UBOAT.Mods.RadioNavigation
         private static HashSet<MapPointData> CollectReferencedPoints(MapChartingDatabase database)
         {
             var referenced = new HashSet<MapPointData>();
+            CollectLinePoints(referenced, database.Lines);
+            CollectCirclePoints(referenced, database.Circles);
+            CollectAnglePoints(referenced, database.Angles);
+            CollectBearingCirclePoints(referenced, database);
+            return referenced;
+        }
 
-            var lines = database.Lines;
+        private static void AddReferencedPoint(HashSet<MapPointData> referenced, MapPointData point)
+        {
+            if (point != null)
+                referenced.Add(point);
+        }
+
+        private static void CollectLinePoints(HashSet<MapPointData> referenced, IList<MapLineData> lines)
+        {
             for (int i = 0; i < lines.Count; i++)
             {
                 MapLineData line = lines[i];
                 if (line == null)
                     continue;
-                if (line.PointA != null)
-                    referenced.Add(line.PointA);
-                if (line.PointB != null)
-                    referenced.Add(line.PointB);
+                AddReferencedPoint(referenced, line.PointA);
+                AddReferencedPoint(referenced, line.PointB);
             }
+        }
 
-            var circles = database.Circles;
+        private static void CollectCirclePoints(HashSet<MapPointData> referenced, IList<MapCircleData> circles)
+        {
             for (int i = 0; i < circles.Count; i++)
             {
                 MapCircleData circle = circles[i];
                 if (circle == null)
                     continue;
-                if (circle.PointA != null)
-                    referenced.Add(circle.PointA);
-                if (circle.PointB != null)
-                    referenced.Add(circle.PointB);
+                AddReferencedPoint(referenced, circle.PointA);
+                AddReferencedPoint(referenced, circle.PointB);
             }
+        }
 
-            var angles = database.Angles;
+        private static void CollectAnglePoints(HashSet<MapPointData> referenced, IList<MapAngleData> angles)
+        {
             for (int i = 0; i < angles.Count; i++)
             {
                 MapAngleData angle = angles[i];
                 if (angle == null)
                     continue;
-                if (angle.PointA != null)
-                    referenced.Add(angle.PointA);
-                if (angle.PointB != null)
-                    referenced.Add(angle.PointB);
-                if (angle.PointC != null)
-                    referenced.Add(angle.PointC);
+                AddReferencedPoint(referenced, angle.PointA);
+                AddReferencedPoint(referenced, angle.PointB);
+                AddReferencedPoint(referenced, angle.PointC);
             }
+        }
 
-            return referenced;
+        private static void CollectBearingCirclePoints(HashSet<MapPointData> referenced, MapChartingDatabase database)
+        {
+            if (BearingsField == null || !(BearingsField.GetValue(database) is IList<MapBearingCircleData> bearings))
+                return;
+            for (int i = 0; i < bearings.Count; i++)
+            {
+                MapBearingCircleData bearing = bearings[i];
+                if (bearing == null)
+                    continue;
+                AddReferencedPoint(referenced, bearing.PointA);
+                AddReferencedPoint(referenced, bearing.PointB);
+            }
+        }
+
+        private static void PurgeHandler(SavesManager target, string eventName, string method)
+        {
+            FieldInfo field = typeof(SavesManager).GetField(eventName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field == null)
+                return;
+            Delegate handlers = field.GetValue(target) as Delegate;
+            field.SetValue(target, SceneEventHandlerPurge.RemoveAll(handlers,
+                typeof(MapSaveSanitizer).FullName, method));
         }
 
         /// <summary>Destroys scene points that are duplicates of a kept row.

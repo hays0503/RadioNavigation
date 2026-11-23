@@ -56,7 +56,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             internal Entity LastTarget;
             internal Vector3 LastTargetVelocity;
-            internal float LastShotGameSeconds;
+            internal double LastShotGameSeconds;
             internal float WindProgress;
             internal int ShotsAtTarget;
         }
@@ -468,7 +468,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             GunBracketingState state = GetOrCreateState(__instance, target);
-            float nowSec = ResolveGameSeconds();
+            double nowSec = ResolveGameSeconds();
             Vector3 targetVel = ReadTargetVelocity(target);
 
             if (!ReferenceEquals(state.LastTarget, target))
@@ -483,8 +483,9 @@ namespace UBOAT.Mods.RadioNavigation
             }
             else
             {
-                if (state.LastShotGameSeconds > 0f && nowSec > state.LastShotGameSeconds)
-                    state.WindProgress = CurrentBallisticsMath.DecayProgressOnTimeGap(state.WindProgress, nowSec - state.LastShotGameSeconds);
+                if (state.LastShotGameSeconds > 0.0 && nowSec > state.LastShotGameSeconds)
+                    state.WindProgress = CurrentBallisticsMath.DecayProgressOnTimeGap(
+                        state.WindProgress, (float)(nowSec - state.LastShotGameSeconds));
                 float deltaV = (targetVel - state.LastTargetVelocity).magnitude;
                 state.WindProgress = CurrentBallisticsMath.DecayProgressOnTargetManeuver(state.WindProgress, deltaV);
                 state.LastTargetVelocity = targetVel;
@@ -561,11 +562,11 @@ namespace UBOAT.Mods.RadioNavigation
             return weather?.Sea != null ? weather.Sea.VerticalOffset : 0f;
         }
 
-        private static float ResolveGameSeconds()
+        private static double ResolveGameSeconds()
         {
             if (!gameTime)
                 gameTime = InjectionFramework.Instance?.GetInstance<GameTime>();
-            return gameTime ? (float)(gameTime.Ticks * 1e-7) : Time.realtimeSinceStartup;
+            return gameTime ? gameTime.Ticks * 1e-7 : (double)Time.realtimeSinceStartup;
         }
 
         private static Vector3 ReadTargetVelocity(Entity target)

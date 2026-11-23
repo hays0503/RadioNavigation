@@ -548,6 +548,29 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             return sight;
         }
 
+        [Fact]
+        public void TryObservation_TinyNegativeLhaRoundingTo360_ClampsQuadrantForSaveCodec()
+        {
+            var utc = new DateTime(1941, 6, 15, 12, 0, 0, DateTimeKind.Utc);
+            double gha, dec;
+            Assert.True(Sh5SunAlmanac.TryPlace(utc, out gha, out dec));
+            double baseLon = gha > 180.0 ? 360.0 - gha : -gha;
+            double lon = baseLon - 1e-14;
+            Assert.InRange(lon, -180.0, 180.0);
+            SextantObservation sight;
+            Assert.True(Sh5SolarNavigation.TryObservation(utc, 45.0, 0.0, 45.0, lon,
+                new SunDiscSighting
+                {
+                    TableRequested = true, TableCompatible = true, ConfiguredUtc = utc,
+                    ObservedDiameterDeg = 0.53, Limb = SunSightLimb.LowerLimb, EyeHeightM = 5.5,
+                    HorizonAltitudeDeg = -0.1, ObserverLatDeg = 45.0, ObserverLonDeg = lon
+                }, out sight));
+            Assert.InRange(sight.Quadrant, 1, 4);
+
+            string encoded = SextantSaveCodec.Encode(new SextantSaveSnapshot { Observation1 = sight });
+            Assert.False(string.IsNullOrEmpty(encoded));
+        }
+
         private sealed class Position : IPlayerPositionProvider
         {
             public float Lat = 55, Lon = 5.75f;

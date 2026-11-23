@@ -30,6 +30,8 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
             cursorRect.pivot = new Vector2(0.5f, 0.5f);
+            if (RadioHandler.Instance.IsNotNull())
+                cursorRect.localRotation = Quaternion.Euler(0f, 0f, -RadioHandler.Instance.CursorAngle);
 
             Image img = GetComponent<Image>();
             if (img.IsNotNull())

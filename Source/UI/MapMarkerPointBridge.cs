@@ -101,7 +101,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (pointLabel == null)
                 pointLabel = GetComponentInChildren<TextMeshProUGUI>(true);
-            if (pointLabel?.enabled == true)
+            if (pointLabel != null && pointLabel.enabled)
                 pointLabel.enabled = false;
         }
 
@@ -274,14 +274,14 @@ namespace UBOAT.Mods.RadioNavigation
                     preferred.y + NavMapMarkerBase.TooltipPaddingYUnits);
             }
 
-            if (tooltip?.activeSelf == false)
+            if (tooltip != null && !tooltip.activeSelf)
                 tooltip.SetActive(true);
             pinned = isPinned;
         }
 
         public void HideTooltip()
         {
-            if (tooltip?.activeSelf == true)
+            if (tooltip != null && tooltip.activeSelf)
                 tooltip.SetActive(false);
         }
 

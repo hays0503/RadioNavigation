@@ -65,7 +65,7 @@ namespace UBOAT.Mods.RadioNavigation
             GameObject prefab = LoadPrefab(SextantPath);
             if (prefab == null) return;
 
-            object main = MainCamera.Instance;
+            MainCamera main = MainCamera.Instance;
             object fpp = Read(main, "FPPController");
             fppBody = Read(fpp, "FPPBody") as SkinnedMeshRenderer;
             if (fppBody == null || fppBody.sharedMesh == null)
@@ -79,7 +79,7 @@ namespace UBOAT.Mods.RadioNavigation
             sextant.name = "CPlath_ExistingHands_Sextant";
             sextant.transform.SetParent(holder.transform, false);
 
-            rightHand = BuildHand("CPlath_ExistingHands_Right", fppBody, false, out Vector3 rightCentroid);
+            rightHand = BuildHand("CPlath_ExistingHands_Right", fppBody, true, out Vector3 rightCentroid);
             leftHand = BuildHand("CPlath_ExistingHands_Left", fppBody, false, out Vector3 leftCentroid);
             if (rightHand == null || leftHand == null)
             {
@@ -186,6 +186,8 @@ namespace UBOAT.Mods.RadioNavigation
                 distance, height, lateral, yaw, pitch, roll));
             if (fppBody != null) fppBody.enabled = fppBodyWasEnabled;
             fppBody = null;
+            DestroyHandMesh(rightHand);
+            DestroyHandMesh(leftHand);
             if (holder != null) Destroy(holder);
             holder = null;
             sextant = null;
@@ -193,9 +195,27 @@ namespace UBOAT.Mods.RadioNavigation
             leftHand = null;
         }
 
+        private void OnDestroy()
+        {
+            if (held)
+                Stow();
+        }
+
+        private static void DestroyHandMesh(GameObject hand)
+        {
+            if (hand == null)
+                return;
+            MeshFilter filter = hand.GetComponent<MeshFilter>();
+            if (filter != null && filter.sharedMesh != null)
+            {
+                Destroy(filter.sharedMesh);
+                filter.sharedMesh = null;
+            }
+        }
+
         private static int ResolveLayer()
         {
-            object main = MainCamera.Instance;
+            MainCamera main = MainCamera.Instance;
             return main != null && Read(main, "IsInsideBoat") is bool inside && inside
                 ? LayerMask.NameToLayer("Interior")
                 : LayerMask.NameToLayer("Default");
@@ -203,7 +223,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static Camera ResolveViewCamera()
         {
-            object main = MainCamera.Instance;
+            MainCamera main = MainCamera.Instance;
             if (main == null) return Camera.main;
             object interior = Read(main, "InteriorCamera");
             Camera camera = interior != null ? Read(interior, "Camera") as Camera : null;

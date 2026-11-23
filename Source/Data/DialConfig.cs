@@ -104,7 +104,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static float AngleToFrequency(float angle, int bandIndex)
         {
-            if (bandIndex.IsNegative() || bandIndex >= Bands.Length)
+            if (float.IsNaN(angle) || bandIndex.IsNegative() || bandIndex >= Bands.Length)
                 return float.NaN;
 
             BandConfig band = Bands[bandIndex];
@@ -145,15 +145,15 @@ namespace UBOAT.Mods.RadioNavigation
                 return "---";
 
             if (bandIndex.IsNegative() || bandIndex >= Bands.Length)
-                return frequency.ToString("F0");
+                return frequency.ToString("F0", System.Globalization.CultureInfo.InvariantCulture);
 
             BandConfig band = Bands[bandIndex];
 
             if (band.Unit == "MHz")
-                return frequency.ToString("F1") + " MHz";
+                return frequency.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " MHz";
 
             // F161: kHz bands used to truncate sub-kHz detail (332.5 -> "333 kHz").
-            return frequency.ToString("F1") + " kHz";
+            return frequency.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " kHz";
         }
     }
 }

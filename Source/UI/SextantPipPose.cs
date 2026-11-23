@@ -138,7 +138,7 @@ namespace UBOAT.Mods.RadioNavigation
             factory.PrepareLens();
 
             MainCamera interiorMain = MainCamera.Instance;
-            bool insideBoat = interiorMain?.IsInsideBoat == true;
+            bool insideBoat = interiorMain != null && interiorMain.IsInsideBoat;
 
             // Stabilization inputs (2026-11-04): the smoothing gate, the aim
             // freeze gate and the raw mouse motion (read once per frame).
@@ -666,7 +666,8 @@ namespace UBOAT.Mods.RadioNavigation
                 layer = camera.GetComponent<PostProcessLayer>();
                 layerCache[camera] = layer;
             }
-            layer?.ResetHistory();
+            if (layer != null)
+                layer.ResetHistory();
             UBOAT.Game.Scene.Rendering.AdditionalCameraData data;
             if (!addCache.TryGetValue(camera, out data) || data == null)
             {

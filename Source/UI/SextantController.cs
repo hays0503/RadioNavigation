@@ -1297,7 +1297,9 @@ namespace UBOAT.Mods.RadioNavigation
         internal bool TryGetMeasuringSun(out Vector3 direction, out float altitude)
         {
             direction = solarOptics.Direction;
-            altitude = solarOptics.Ready ? (float)(Math.Asin(direction.y) * 180 / Math.PI) : 0;
+            altitude = solarOptics.Ready
+                ? (float)(Math.Asin(Math.Max(-1f, Math.Min(1f, direction.y))) * 180 / Math.PI)
+                : 0;
             return solarOptics.Ready;
         }
 

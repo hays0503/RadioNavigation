@@ -260,8 +260,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static void Apply(Graphic graphic)
         {
-            SextantLopMapMaterial owner = graphic.GetComponent<SextantLopMapMaterial>()
-                ?? graphic.gameObject.AddComponent<SextantLopMapMaterial>();
+            SextantLopMapMaterial owner = graphic.GetComponent<SextantLopMapMaterial>();
+            if (owner == null)
+                owner = graphic.gameObject.AddComponent<SextantLopMapMaterial>();
             owner.Bind(graphic);
         }
 

@@ -92,7 +92,8 @@ namespace UBOAT.Mods.RadioNavigation
             velocity = Vector3.zero;
             if (!query.HasPosition || query.Utc == default(DateTime))
                 return false;
-            if (double.IsNaN(query.Latitude) || double.IsNaN(query.Longitude))
+            if (double.IsNaN(query.Latitude) || double.IsInfinity(query.Latitude)
+                || double.IsNaN(query.Longitude) || double.IsInfinity(query.Longitude))
                 return false;
 
             double lon = NormalizeLon180(query.Longitude);
@@ -159,7 +160,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static void ComputeAstronomicalAngles(DateTime utc, out double phiM2Deg, out double phiS2Deg)
         {
-            double daysSinceJ2000 = (utc.ToUniversalTime() - J2000Utc).TotalSeconds / 86400.0;
+            DateTime asUtc = utc.Kind == DateTimeKind.Local
+                ? utc.ToUniversalTime()
+                : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+            double daysSinceJ2000 = (asUtc - J2000Utc).TotalSeconds / 86400.0;
             double elongDeg = 297.8501921 + 12.19074912 * daysSinceJ2000;
             phiS2Deg = 720.0 * daysSinceJ2000;
             phiM2Deg = phiS2Deg - 2.0 * elongDeg;
@@ -167,11 +171,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static double NormalizeLon180(double lon)
         {
-            double normalized = lon;
-            while (normalized > 180.0)
-                normalized -= 360.0;
-            while (normalized < -180.0)
-                normalized += 360.0;
+            double normalized = Math.IEEERemainder(lon, 360.0);
             return normalized;
         }
 

@@ -113,5 +113,29 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(manager.HasPosition);
             Assert.Equal(50f, manager.PlayerLatitude);
         }
+
+        [Fact]
+        public void UpdateGains_PreservesActiveKeyerPitchSplit_AndFiresDominantChangedWhenCleared()
+        {
+            StationManager manager = Create();
+            float freq = TwoDistinctSonneFreqs()[0];
+
+            int changed = 0;
+            manager.UpdateGains(true, freq, 20f, () => changed++);
+            Assert.Equal(1, changed);
+            int dom = manager.DominantStationIndex;
+            Assert.True(dom >= 0);
+
+            // Simulate active Morse dot/dash keyer state and verify UpdateGains preserves ±150 Hz pitch offset.
+            manager.Keyers[dom].LoadConsol(new[] { NavigationElementType.Dash });
+            manager.UpdateGains(true, freq, 20f, () => changed++);
+            Assert.Equal(manager.Stations[dom].BeatFrequency - Constants.DashPitchOffsetHz,
+                manager.Carriers[dom].Frequency, 2);
+
+            // Tuning out of zone / off-station clears DominantStationIndex and notifies decoder.Clear.
+            manager.UpdateGains(false, freq, 20f, () => changed++);
+            Assert.Equal(-1, manager.DominantStationIndex);
+            Assert.Equal(2, changed);
+        }
     }
 }

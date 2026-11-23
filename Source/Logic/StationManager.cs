@@ -70,7 +70,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 for (int i = 0; i < Stations.Length; i++)
                     Stations[i].Gain = 0f;
-                DominantStationIndex = -1;
+                ClearDominantStation(dominantChanged);
                 return;
             }
 
@@ -82,7 +82,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 for (int i = 0; i < Stations.Length; i++)
                     Stations[i].Gain = 0f;
-                DominantStationIndex = -1;
+                ClearDominantStation(dominantChanged);
                 return;
             }
 
@@ -111,7 +111,7 @@ namespace UBOAT.Mods.RadioNavigation
 
                 float offset = frequencyKHz - freq.Value;
                 Stations[i].BeatFrequency = StationGainModel.ComputeBeatFrequency(offset);
-                Carriers[i].Frequency = Stations[i].BeatFrequency;
+                AudioSynthesisEngine.ApplyCarrierPitch(Carriers[i], Stations[i], Keyers[i]);
 
                 if (gain > maxGain)
                 {
@@ -122,17 +122,21 @@ namespace UBOAT.Mods.RadioNavigation
 
             if (maxGain.IsSignificant(0.01f))
             {
-                if (maxIndex != DominantStationIndex)
-                {
-                    if (dominantChanged != null)
-                        dominantChanged();
-                }
+                if (maxIndex != DominantStationIndex && dominantChanged != null)
+                    dominantChanged();
                 DominantStationIndex = maxIndex;
             }
             else
             {
-                DominantStationIndex = -1;
+                ClearDominantStation(dominantChanged);
             }
+        }
+
+        private void ClearDominantStation(Action dominantChanged)
+        {
+            if (DominantStationIndex >= 0 && dominantChanged != null)
+                dominantChanged();
+            DominantStationIndex = -1;
         }
 
         public void UpdateNavigation()

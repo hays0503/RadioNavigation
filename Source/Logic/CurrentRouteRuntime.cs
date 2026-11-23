@@ -166,15 +166,11 @@ namespace UBOAT.Mods.RadioNavigation
             pendingNotice = null;
             if (noticeUnavailable)
                 return;
-            if (notificationBar == null)
+            if ((notificationBar as UnityEngine.Object) == null)
                 notificationBar = DWS.Common.InjectionFramework.InjectionFramework.Instance?
                     .GetInstance<UBOAT.Game.UI.INotificationBarUI>();
-            if (notificationBar == null)
-            {
-                noticeUnavailable = true;
-                Debug.LogWarning(LogPrefix + "notification bar unavailable; route notices disabled");
+            if ((notificationBar as UnityEngine.Object) == null)
                 return;
-            }
             try
             {
                 notificationBar.OpenNow("", text);

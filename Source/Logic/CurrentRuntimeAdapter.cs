@@ -84,6 +84,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Object.Destroy(stale);
 
             BindCollisionHooks(null);
+            CurrentRudderAdapter.ClearNearby();
             CurrentDiagnostics.EnsureRegistered();
             if (!CurrentSettings.IsMasterEnabled())
             {
@@ -509,7 +510,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (!gameTime)
                 gameTime = InjectionFramework.Instance?.GetInstance<GameTime>();
-            return gameTime ? gameTime.GmtDateTime : default(DateTime);
+            return gameTime
+                ? DateTime.SpecifyKind(gameTime.GmtDateTime, DateTimeKind.Utc)
+                : default(DateTime);
         }
 
         private static bool TryLatLong(Vector3 scenePosition, out double latitude, out double longitude)

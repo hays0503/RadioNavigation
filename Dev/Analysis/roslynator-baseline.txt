@@ -41,6 +41,7 @@ Source\Logic\MorseKeyer.cs : warning RCS1161:
 Source\Logic\PlanetRenderer.cs : warning RCS1146:
 Source\Logic\PlanetRenderer.cs : warning RCS1213:
 Source\Logic\RadioStoryIntegration.cs : warning RCS1163:
+Source\Logic\SextantCelestialRenderScopePatch.cs : warning RCS1128:
 Source\Logic\SextantSightLineColor.cs : warning RCS1238:
 Source\Logic\SkyBrightness.cs : warning RCS1238:
 Source\Logic\SkyMaterialProbe.cs : warning RCS1146:
@@ -94,6 +95,7 @@ Source\UI\GroundHandler.cs : warning RCS1213:
 Source\UI\InformationPanelHandler.cs : warning RCS1213:
 Source\UI\InformationPanelHandler.cs : warning RCS1238:
 Source\UI\LighthouseMapMarker.cs : warning RCS1146:
+Source\UI\MapMarkerPointBridge.cs : warning RCS1146:
 Source\UI\NavMapMarkerBase.cs : warning RCS1129:
 Source\UI\NavMapMarkerBase.cs : warning RCS1146:
 Source\UI\NavMapMarkerBase.cs : warning RCS1213:
@@ -109,11 +111,14 @@ Source\UI\SextantEffectMirror.cs : warning RCS1146:
 Source\UI\SextantGameSun.cs : warning RCS1173:
 Source\UI\SextantInteriorMirror.cs : warning RCS1146:
 Source\UI\SextantInteriorPoseFollower.cs : warning RCS1213:
+Source\UI\SextantLopMapLines.cs : warning RCS1128:
 Source\UI\SextantLuneOverlay.cs : warning RCS1146:
 Source\UI\SextantOcularBuilder.cs : warning RCS1146:
 Source\UI\SextantPipFactory.cs : warning RCS1128:
 Source\UI\SextantPipFactory.cs : warning RCS1146:
+Source\UI\SextantPipInteriorPose.cs : warning RCS1146:
 Source\UI\SextantPipInteriorPose.cs : warning RCS1213:
+Source\UI\SextantPipPose.cs : warning RCS1146:
 Source\UI\SextantRenderPasses.cs : warning RCS1146:
 Source\UI\SextantWorksheet.cs : warning RCS1238:
 Source\UI\ShipControlUIBridge.cs : warning RCS1146:

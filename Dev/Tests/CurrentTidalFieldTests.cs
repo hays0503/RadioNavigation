@@ -327,5 +327,41 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Assert.True(peak >= s.minPeak, s.label + " lost tidal speed: " + peak);
             }
         }
+
+        [Fact]
+        public void TidalAnglesTreatUnspecifiedAsUtc_AndRejectInfiniteLongitudeWithoutHanging()
+        {
+            var utc = new DateTime(1941, 11, 4, 12, 30, 0, DateTimeKind.Utc);
+            var unspec = new DateTime(1941, 11, 4, 12, 30, 0, DateTimeKind.Unspecified);
+
+            CurrentTidalField.ComputeAstronomicalAngles(utc, out double m2Utc, out double s2Utc);
+            CurrentTidalField.ComputeAstronomicalAngles(unspec, out double m2Unspec, out double s2Unspec);
+            Assert.Equal(m2Utc, m2Unspec, 10);
+            Assert.Equal(s2Utc, s2Unspec, 10);
+
+            CurrentTidalField field = CurrentTidalField.CreateWithAtlas(null);
+            Assert.False(field.TrySample(new CurrentQuery
+            {
+                HasPosition = true,
+                Latitude = 50.0,
+                Longitude = double.PositiveInfinity,
+                Utc = utc
+            }, out _));
+            Assert.False(field.TrySample(new CurrentQuery
+            {
+                HasPosition = true,
+                Latitude = double.NegativeInfinity,
+                Longitude = 0.0,
+                Utc = utc
+            }, out _));
+            // Huge finite longitude also terminates in O(1) without hanging
+            Assert.True(field.TrySample(new CurrentQuery
+            {
+                HasPosition = true,
+                Latitude = 50.0,
+                Longitude = 1e25,
+                Utc = utc
+            }, out _));
+        }
     }
 }

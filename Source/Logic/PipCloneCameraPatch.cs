@@ -72,16 +72,16 @@ namespace UBOAT.Mods.RadioNavigation
 
             MethodInfo prefix = typeof(PipCloneCameraPatch).GetMethod(
                 "SuppressCloneForPip", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-            MethodInfo postfix = typeof(PipCloneCameraPatch).GetMethod(
+            MethodInfo finalizer = typeof(PipCloneCameraPatch).GetMethod(
                 "RestoreCloneAfterCollect", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-            if (prefix == null || postfix == null)
+            if (prefix == null || finalizer == null)
                 return false;
 
             try
             {
                 harmony.Patch(target,
                     prefix: new HarmonyMethod(prefix),
-                    postfix: new HarmonyMethod(postfix));
+                    finalizer: new HarmonyMethod(finalizer));
                 Debug.Log(LogPrefix + " Patched DeepPipeline.CollectCameras (PIP single-writer)");
                 return true;
             }
@@ -167,14 +167,14 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        /// <summary>Postfix: restores the renderer flag cleared by the prefix.</summary>
-        [HarmonyPostfix]
-        public static void RestoreCloneAfterCollect(ref object __state)
+        /// <summary>Finalizer: restores the renderer flag cleared by the prefix even if CollectCameras throws.</summary>
+        [HarmonyFinalizer]
+        public static Exception RestoreCloneAfterCollect(ref object __state, Exception __exception)
         {
             if (!(__state is SuppressionState state) || state.Vsr == null)
-                return;
+                return __exception;
             if (!(renderingEnabledMember is FieldInfo field))
-                return;
+                return __exception;
             try
             {
                 field.SetValue(state.Vsr, state.Previous);
@@ -184,6 +184,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (WarnOnce.ShouldLog("PipCloneCameraPatch.Restore"))
                     Debug.LogWarning(LogPrefix + " clone restore failed: " + e.Message);
             }
+            return __exception;
         }
 
         private static Component FindVsr(Camera camera)

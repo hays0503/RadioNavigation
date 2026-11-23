@@ -62,6 +62,11 @@ namespace UBOAT.Mods.RadioNavigation
             Place(gha, dec, latDeg, lonDeg, out hc, out az);
             double gamma = AstroMath.GmstDeg(AstroMath.ToJulianDay(utc));
             double lha = RunningFixCalculator.Normalize360(gha + lonDeg);
+            int quadrant = (int)(lha / 90) + 1;
+            if (quadrant > 4)
+                quadrant = 4;
+            else if (quadrant < 1)
+                quadrant = 1;
             observation = new SextantObservation
             {
                 Utc = utc, HoDeg = ho, DrLatDeg = latDeg, DrLonDeg = lonDeg,
@@ -69,7 +74,7 @@ namespace UBOAT.Mods.RadioNavigation
                 BodyRaDeg = RunningFixCalculator.Normalize360(gamma - gha), BodyDecDeg = dec,
                 GhaAriesDeg = gamma, ShaBodyDeg = RunningFixCalculator.Normalize360(gha - gamma),
                 GhaBodyDeg = gha, DecDeg = dec, LhaDeg = lha, HcDeg = hc, AzDeg = az,
-                InterceptNm = (ho - hc) * 60, Quadrant = (int)(lha / 90) + 1,
+                InterceptNm = (ho - hc) * 60, Quadrant = quadrant,
                 QuadrantWest = lha < 180, SolarReductionVersion = 1,
                 RawHsDeg = rawHsDeg, IndexCorrectedHDeg = rawHsDeg + indexArcMin / 60,
                 SolarEyeHeightM = disc.EyeHeightM, SolarFviiiArcMin = correction,

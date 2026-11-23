@@ -60,10 +60,14 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        internal static void ClearNearby()
+        {
+            Nearby.Clear();
+        }
+
         internal static void Bind(Rigidbody targetBody, System.Collections.IEnumerable rudders, Vector3 flow)
         {
             Rudders.Clear();
-            Nearby.Clear();
             body = targetBody;
             water = flow;
             if (body == null || rudders == null)

@@ -38,7 +38,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (Pip == null || Mirror == null)
                 return;
             MainCamera main = MainCamera.Instance;
-            if (main?.IsInsideBoat != true)
+            if (main == null || !main.IsInsideBoat)
                 return;
             Camera interiorView = Mirror.InteriorViewCamera;
             if (interiorView == null)

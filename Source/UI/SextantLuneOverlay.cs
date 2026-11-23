@@ -226,7 +226,7 @@ namespace UBOAT.Mods.RadioNavigation
                 SextantLuneMath.StrengthPrefsKey,
                 (int)(SextantLuneMath.DefaultStrength * 100f)) / 100f);
             maxUnits = Sanitize(PlayerPrefs.GetInt(SextantLuneMath.MaxUnitsPrefsKey,
-                (int)(SextantLuneMath.MaxOffsetUnits * 100f)), SextantLuneMath.MaxOffsetUnits) / 100d;
+                (int)(SextantLuneMath.MaxOffsetUnits * 100f)), SextantLuneMath.MaxOffsetUnits * 100d) / 100d;
             rateFull = Sanitize(PlayerPrefs.GetInt(SextantLuneMath.RateFullPrefsKey,
                 (int)SextantLuneMath.RateFullDegPerSec), SextantLuneMath.RateFullDegPerSec);
             deadZone = Sanitize(PlayerPrefs.GetInt(SextantLuneMath.DeadZonePrefsKey,

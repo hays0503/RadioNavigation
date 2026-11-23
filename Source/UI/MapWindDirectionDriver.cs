@@ -107,9 +107,14 @@ namespace UBOAT.Mods.RadioNavigation
 
             // Wait for Canvas pre-render to populate textInfo after ZString SetCharArray
             // updates so glyph bounds and parsed text match what is actually drawn.
-            if (reference.havePropertiesChanged || reference.textInfo == null || reference.textInfo.characterCount == 0)
+            if (reference.havePropertiesChanged)
             {
                 nextRefresh = 0f;
+                return;
+            }
+            if (reference.textInfo == null || reference.textInfo.characterCount == 0)
+            {
+                SetVisible(false);
                 return;
             }
 

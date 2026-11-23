@@ -72,16 +72,15 @@ namespace UBOAT.Mods.RadioNavigation
             }
             if (probeTex == null)
                 probeTex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            RenderTexture prev = RenderTexture.active;
             try
             {
-                RenderTexture prev = RenderTexture.active;
                 Color lt = SampleRt(leftRt, 0.9f);
                 Color lm = SampleRt(leftRt, 0.5f);
                 Color lb = SampleRt(leftRt, 0.1f);
                 Color rtTop = SampleRt(rightRt, 0.9f);
                 Color rm = SampleRt(rightRt, 0.5f);
                 Color rb = SampleRt(rightRt, 0.1f);
-                RenderTexture.active = prev;
                 Debug.Log(string.Format(CultureInfo.InvariantCulture,
                     "{0} RENDERCHECK {1} left(t/m/b)=#{2}({3:F2})/#{4}({5:F2})/#{6}({7:F2}) right(t/m/b)=#{8}({9:F2})/#{10}({11:F2})/#{12}({13:F2})",
                     LogPrefix, tag,
@@ -95,6 +94,10 @@ namespace UBOAT.Mods.RadioNavigation
             catch (Exception e)
             {
                 Debug.LogWarning(LogPrefix + " RENDERCHECK failed: " + e.Message);
+            }
+            finally
+            {
+                RenderTexture.active = prev;
             }
         }
 

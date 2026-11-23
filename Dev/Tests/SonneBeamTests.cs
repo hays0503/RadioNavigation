@@ -207,6 +207,32 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                     "{\"station\":\"abc\\\",\"dashes\":{},\"dots\":{}}"));
         }
 
+        [Fact]
+        public void Initialize_PloneisDotSectorsMatchRealPloneisCurveNotBushmills()
+        {
+            DirectoryInfo directory = new DirectoryInfo(AppContext.BaseDirectory);
+            while (directory != null
+                && !Directory.Exists(Path.Combine(directory.FullName, "Source", "Data")))
+            {
+                directory = directory.Parent;
+            }
+            Assert.NotNull(directory);
+            Assert.True(SonneBeam.Initialize(Path.Combine(directory.FullName, "Source", "Data")), SonneBeam.LastLoadError);
+
+            // Real Ploneis has its dot sector at 33..56.3 (60 -> 0 dots), matching dashes ending at 33.0:0.
+            // Previously Ploneis.json had Bushmills' dashes table pasted under "dots" (where 45 deg gave ~50-60).
+            NavigationElementType[] pattern;
+            SonneBeamSignal signal;
+            Assert.True(SonneBeam.TryGetNavigationPattern("Quimper/Ploneis", 45.0, out pattern, out signal));
+            Assert.False(signal.IsDashSector);
+            Assert.InRange(signal.DotCount, 30, 36);
+
+            // On 130.2 deg, Ploneis is unambiguously in the dash sector (53 dashes, 7 dots).
+            Assert.True(SonneBeam.TryGetNavigationPattern("Quimper/Ploneis", 130.2, out pattern, out signal));
+            Assert.True(signal.IsDashSector);
+            Assert.Equal(53, signal.DashCount);
+        }
+
         private static void AssertRepeated(
             NavigationElementType[] pattern,
             int start,
