@@ -20,7 +20,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 CurrentSettings.FarVariable,
                 CurrentSettings.RouteVariable,
                 CurrentSettings.BallisticWindVariable,
-                CurrentSettings.TidalVariable
+                CurrentSettings.TidalVariable,
+                CurrentSettings.VectorsVariable
             };
             var saved = new string[vars.Length];
             for (int i = 0; i < vars.Length; i++)
@@ -29,6 +30,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Environment.SetEnvironmentVariable(vars[i], null);
             }
             PlayerPrefs.DeleteKey(CurrentSettings.MasterPrefsKey);
+            PlayerPrefs.DeleteKey(CurrentSettings.VectorsPrefsKey);
+            PlayerPrefs.DeleteKey(CurrentSettings.VectorDepthPrefsKey);
             try
             {
                 body();
@@ -36,6 +39,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             finally
             {
                 PlayerPrefs.DeleteKey(CurrentSettings.MasterPrefsKey);
+                PlayerPrefs.DeleteKey(CurrentSettings.VectorsPrefsKey);
+                PlayerPrefs.DeleteKey(CurrentSettings.VectorDepthPrefsKey);
                 for (int i = 0; i < vars.Length; i++)
                     Environment.SetEnvironmentVariable(vars[i], saved[i]);
             }
@@ -56,6 +61,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 Assert.True(CurrentSettings.RouteCurrentEnabled());
                 Assert.True(CurrentSettings.BallisticWindEnabled());
                 Assert.True(CurrentSettings.TidalCurrentsEnabled());
+                Assert.True(CurrentSettings.MapVectorsEnabled());
+                Assert.Equal(-1f, CurrentSettings.GetVectorSampleDepthMeters());
+                CurrentSettings.SaveMapVectorsPreference(false);
+                Assert.False(CurrentSettings.MapVectorsEnabled());
+                CurrentSettings.SaveVectorSampleDepthMeters(50f);
+                Assert.Equal(50f, CurrentSettings.GetVectorSampleDepthMeters());
             });
         }
 

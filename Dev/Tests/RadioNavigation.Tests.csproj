@@ -46,6 +46,7 @@
     <Compile Include="CurrentSettingsTests.cs" />
     <Compile Include="CurrentBallisticsTests.cs" />
     <Compile Include="CurrentTidalFieldTests.cs" />
+    <Compile Include="CurrentVectorOverlayMathTests.cs" />
     <Compile Include="CurrentWaterDragTests.cs" />
     <Compile Include="CurrentOwnershipTests.cs" />
     <Compile Include="CurrentTrack2DTests.cs" />
@@ -248,6 +249,7 @@
     <Compile Include="..\..\Source\Logic\CurrentSettings.cs" Link="Source\Logic\CurrentSettings.cs" />
     <Compile Include="..\..\Source\Logic\CurrentBallisticsMath.cs" Link="Source\Logic\CurrentBallisticsMath.cs" />
     <Compile Include="..\..\Source\Logic\CurrentTidalField.cs" Link="Source\Logic\CurrentTidalField.cs" />
+    <Compile Include="..\..\Source\Logic\CurrentVectorOverlayMath.cs" Link="Source\Logic\CurrentVectorOverlayMath.cs" />
     <Compile Include="..\..\Source\Logic\CurrentWaterDrag.cs" Link="Source\Logic\CurrentWaterDrag.cs" />
     <Compile Include="..\..\Source\Logic\CurrentOwnership.cs" Link="Source\Logic\CurrentOwnership.cs" />
     <Compile Include="..\..\Source\Logic\CurrentTrack2D.cs" Link="Source\Logic\CurrentTrack2D.cs" />

@@ -21,6 +21,7 @@ namespace UBOAT.Mods.RadioNavigation
             registered = true;
             DevConsole.AddListener("rn_current", Report);
             DevConsole.AddListener("rn_currents", ToggleOrDescribe);
+            DevConsole.AddListener("rn_current_vectors", ToggleOrConfigureVectors);
             Debug.Log("[RadioNav][CURRENT] rn_current registered");
         }
 
@@ -61,7 +62,63 @@ namespace UBOAT.Mods.RadioNavigation
                 + " far=" + CurrentSettings.FarDriftEnabled()
                 + " route=" + CurrentSettings.RouteCurrentEnabled()
                 + " ballistics=" + CurrentSettings.BallisticWindEnabled()
-                + " tidal=" + CurrentSettings.TidalCurrentsEnabled());
+                + " tidal=" + CurrentSettings.TidalCurrentsEnabled()
+                + " vectors=" + CurrentSettings.MapVectorsEnabled());
+        }
+
+        private static void ToggleOrConfigureVectors(string[] args)
+        {
+            if (args?.Length >= 2)
+            {
+                string token = args[1];
+                if (CurrentSettings.IsDisabledToken(token))
+                {
+                    CurrentSettings.SaveMapVectorsPreference(false);
+                    MapCurrentVectorsDriver.InvalidateSamples();
+                    Debug.Log("[RadioNav][CURRENT] map vectors OFF (Shift+Y to toggle)");
+                    return;
+                }
+                if (CurrentSettings.IsEnabledToken(token))
+                {
+                    CurrentSettings.SaveMapVectorsPreference(true);
+                    MapCurrentVectorsDriver.InvalidateSamples();
+                    Debug.Log("[RadioNav][CURRENT] map vectors ON (Shift+Y to toggle)");
+                    return;
+                }
+                if (string.Equals(token, "depth", System.StringComparison.OrdinalIgnoreCase) && args.Length >= 3)
+                {
+                    ApplyVectorDepthArgument(args[2]);
+                    return;
+                }
+                Debug.LogWarning("[RadioNav][CURRENT] usage: rn_current_vectors [on|off|depth <meters|ship>]");
+                return;
+            }
+            float depthM = CurrentSettings.GetVectorSampleDepthMeters();
+            Debug.Log("[RadioNav][CURRENT] map vectors=" + CurrentSettings.MapVectorsEnabled()
+                + " depth=" + (depthM < 0f ? "ship" : depthM.ToString("F1", CultureInfo.InvariantCulture) + "m")
+                + " (toggle: Shift+Y or rn_current_vectors [on|off|depth <m|ship>])");
+        }
+
+        private static void ApplyVectorDepthArgument(string arg)
+        {
+            if (string.Equals(arg, "ship", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(arg, "auto", System.StringComparison.OrdinalIgnoreCase))
+            {
+                CurrentSettings.SaveVectorSampleDepthMeters(-1f);
+                MapCurrentVectorsDriver.InvalidateSamples();
+                Debug.Log("[RadioNav][CURRENT] map vectors depth=ship");
+                return;
+            }
+            if (float.TryParse(arg, NumberStyles.Float, CultureInfo.InvariantCulture, out float meters)
+                && !float.IsNaN(meters) && !float.IsInfinity(meters) && meters >= 0f)
+            {
+                CurrentSettings.SaveVectorSampleDepthMeters(meters);
+                MapCurrentVectorsDriver.InvalidateSamples();
+                Debug.Log("[RadioNav][CURRENT] map vectors depth="
+                    + meters.ToString("F1", CultureInfo.InvariantCulture) + "m");
+                return;
+            }
+            Debug.LogWarning("[RadioNav][CURRENT] invalid depth \"" + arg + "\"; expected >= 0 or \"ship\"");
         }
     }
 }

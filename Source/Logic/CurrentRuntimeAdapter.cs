@@ -165,6 +165,11 @@ namespace UBOAT.Mods.RadioNavigation
         // query is built straight from the group's encounter position (km).
         internal static bool TrySampleEncounter(Vector2 positionKm, DateTime utc, out Vector3 velocity)
         {
+            return TrySampleEncounterAtDepth(positionKm, 0f, utc, out velocity);
+        }
+
+        internal static bool TrySampleEncounterAtDepth(Vector2 positionKm, float depthMeters, DateTime utc, out Vector3 velocity)
+        {
             velocity = Vector3.zero;
             if (currentField == null)
                 return false;
@@ -174,8 +179,11 @@ namespace UBOAT.Mods.RadioNavigation
                 return false;
             var query = new CurrentQuery
             {
-                DepthMeters = 0f, Utc = utc, HasPosition = true,
-                Latitude = latLong.x, Longitude = latLong.y
+                DepthMeters = depthMeters > 0f ? depthMeters : 0f,
+                Utc = utc,
+                HasPosition = true,
+                Latitude = latLong.x,
+                Longitude = latLong.y
             };
             return currentField.TrySample(query, out velocity);
         }

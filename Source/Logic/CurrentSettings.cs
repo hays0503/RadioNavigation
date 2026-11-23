@@ -24,6 +24,9 @@ namespace UBOAT.Mods.RadioNavigation
         internal const string RouteVariable = "RADIONAV_ROUTE_CURRENT";
         internal const string BallisticWindVariable = "RADIONAV_BALLISTIC_WIND";
         internal const string TidalVariable = "RADIONAV_TIDAL_CURRENTS";
+        internal const string VectorsPrefsKey = "RadioNav.CurrentVectors";
+        internal const string VectorsVariable = "RADIONAV_CURRENT_VECTORS";
+        internal const string VectorDepthPrefsKey = "RadioNav.CurrentVectorsDepthM";
         internal const string BundledAtlasValue = "bundled";
 
         internal static bool IsMasterEnabled()
@@ -69,6 +72,35 @@ namespace UBOAT.Mods.RadioNavigation
         internal static bool TidalCurrentsEnabled()
         {
             return IsMasterEnabled() && ReadFlag(TidalVariable, true);
+        }
+
+        internal static bool MapVectorsEnabled()
+        {
+            if (!IsMasterEnabled())
+                return false;
+            string raw = Environment.GetEnvironmentVariable(VectorsVariable);
+            if (IsDisabledToken(raw))
+                return false;
+            if (IsEnabledToken(raw))
+                return true;
+            return PlayerPrefs.GetInt(VectorsPrefsKey, 1) != 0;
+        }
+
+        internal static void SaveMapVectorsPreference(bool enabled)
+        {
+            PlayerPrefs.SetInt(VectorsPrefsKey, enabled ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+
+        internal static float GetVectorSampleDepthMeters()
+        {
+            return PlayerPrefs.GetFloat(VectorDepthPrefsKey, -1f);
+        }
+
+        internal static void SaveVectorSampleDepthMeters(float depthMeters)
+        {
+            PlayerPrefs.SetFloat(VectorDepthPrefsKey, depthMeters);
+            PlayerPrefs.Save();
         }
 
         internal static string ResolveRequestedAtlas()

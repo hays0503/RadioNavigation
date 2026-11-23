@@ -65,6 +65,7 @@ namespace UBOAT.Mods.RadioNavigation
             GameTimeResolver.Reset();
             ClockSecondsDriver.EnsureRunning();
             MapWindDirectionDriver.EnsureRunning();
+            MapCurrentVectorsDriver.EnsureRunning();
             SceneContentBuilder.EnsureWorldSource();
             // Lifecycle sweep (risk register iter2): stale cross-scene
             // state that the four resets above do not cover — camera hook

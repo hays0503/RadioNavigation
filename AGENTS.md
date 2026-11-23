@@ -138,11 +138,11 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 
 ### Проверки
 
-<!-- gate-snapshot: date=2026-11-23 tests=1860 sourcecheck=172 analyzers=68 -->
+<!-- gate-snapshot: date=2026-11-23 tests=1865 sourcecheck=172 analyzers=68 -->
 
 - `Tools/gates.ps1` = build → SourceCheck + quick → tests → PVS, fail-fast.
   `-Parallel` — быстрая/медленная линии.
-- Снимок **2026-11-23**: tests **1860 PASS / 0 FAIL**,
+- Снимок **2026-11-23**: tests **1865 PASS / 0 FAIL**,
   SourceCheck **172 PASS / 0 FAIL**, analyzers **68 PASS / 0 FAIL**.
   Историю счётчика не выдавать за текущий прогон.
 - Baseline Roslynator обновлён **2026-11-21** (`-UpdateBaseline`): в дереве
