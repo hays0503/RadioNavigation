@@ -1,7 +1,7 @@
 {
   "name": "RadioNavigation",
   "version": "2.1",
-  "description": "CONSOLE/Sonne radio navigation beacon panel with audio synthesis and position fix. Optional North Atlantic currents based on ECMWF ORA-20C (1941), distributed by ICDC, Universitat Hamburg - attribution in README",
+  "description": "CONSOLE/Sonne radio navigation beacon panel, celestial sextant, and 1939-1945 North Atlantic/Arctic ocean currents and direct wind based on ECMWF ORA-20C, distributed by ICDC, Universitat Hamburg - attribution in README",
   "author": "testui",
   "supportedGameVersions": ["2026.1"],
   "assemblyName": "radionavigation",

@@ -2811,3 +2811,16 @@ Steam Cloud, без изменения экранных настроек. Све
 5. **Оффлайн-гейты (`RadioNavigation.SourceCheck`)**:
    - Исправлена коллизия вложенного типа `SandboxDock.DockPoint` vs верхнеуровневого `UBOAT.Game.Scene.Items.DockPoint` в `Dev/RadioNavigation.SourceCheck/DependencyClosure.cs`.
    - Все оффлайн-гейты (`build.ps1` + PVS-Studio, `analyze.ps1`, `SourceCheck`, `TestRunner`, `Analyzers.Tests`, Python `unittest`) пройдены без ошибок.
+
+### 13.39 Перевод в штатный режим по умолчанию (F9 prep) и раннер F8 (2026-11-23)
+
+1. **Включение по умолчанию (`CurrentSettings`) и сохранение A/B‑контролей:**
+   - Добавлен [`Source/Logic/CurrentSettings.cs`](../../Source/Logic/CurrentSettings.cs) (+ 5 юнит‑тестов в [`Dev/Tests/CurrentSettingsTests.cs`](../../Dev/Tests/CurrentSettingsTests.cs)): при обычном запуске игры (без `RADIONAV_*` env‑флагов и при отсутствии запрета в `PlayerPrefs RadioNav.Currents`) по умолчанию включаются 6‑тайловый атлас ORA‑20C `1939–1945` (`bundled`), прямой ветер, дрейф ближних судов/конвоев, относительные рули, перенос дальних групп и упреждение маршрута с ETA.
+   - В [`CurrentDiagnostics.cs`](../../Source/Logic/CurrentDiagnostics.cs) добавлена консольная команда `rn_currents [on|off]`, записывающая `PlayerPrefs RadioNav.Currents`; явные переопределения (`RADIONAV_CURRENTS=0`, `RADIONAV_ATLAS_TILE=0`, `RADIONAV_CURRENT_FIELD=0,0`, поканальные `"0"`) сохраняют приоритет для контрольных A/B‑прогонов.
+   - Обновлены пользовательские описания в [`README.md`](../../README.md), [`Manifest.json`](../../Manifest.json), [`DOCS.md`](../../DOCS.md) и [`AGENTS.md`](../../AGENTS.md).
+2. **Живой smoke‑тест без env‑переменных (`artifacts/reports/current-default-smoke-1/comparison.json`):**
+   - [`Dev/CurrentAtlasPrototype/run_default_smoke_live.py`](../../Dev/CurrentAtlasPrototype/run_default_smoke_live.py): `status = PASS` (`off_ok = true` с `waterSteps=0` при `RADIONAV_CURRENTS=0`; `default_ok = true` с `tiles=6`, `waterSteps=920`, `airSteps=919`, `far applied=1299`, `relativeRudder=True`, `nearbyFlag=True`, `CurrentRouteRuntime`, `MapWindDirectionDriver`, и проверкой `rn_currents off/on`, `30/30` сейвов проверены по SHA‑256).
+3. **Автоматизированный раннер `F8` и индикативный preflight (`artifacts/reports/current-f8-preflight-1/comparison.json`):**
+   - Добавлен [`Dev/CurrentAtlasPrototype/run_f8_live.py`](../../Dev/CurrentAtlasPrototype/run_f8_live.py) (использует `PresentMon_x64.exe` + `f8_presentmon.py` + `f8_frames.py` с безопасной изоляцией сейвов `b1_control`).
+   - В неадминистративной сессии `PresentMon_x64.exe` вернул `exit 1` (ETW‑трассировка требует elevated‑консоль); через штатный fallback `--source bridge` снят индикативный preflight (`A` `RADIONAV_CURRENTS=0` vs `B` `default`) на `Ryzen 9 7950X` в сценариях `open-sea` и `dense-convoy`: оба прохода удержали `60.0 FPS` (`p95=16.65 ms`, `max=17.67 ms`, `gcGen0=0`, `gcGen1=0`, `status="INDICATIVE_PASS"`, `30/30` сейвов целы).
+   - **Формальный `F8` (`OC-051`, `OC-052`) и `farIntervals` на границе `0.0166 с` остаются `NOT RUN`**: для закрытия `OC-051`/`OC-052` требуется запустить `python Dev/CurrentAtlasPrototype/run_f8_live.py <work> --target-midrange-pc --confirm-cloud-off` на целевом среднем ПК из elevated‑консоли с выключенным VSync (`SyncInterval == 0`).

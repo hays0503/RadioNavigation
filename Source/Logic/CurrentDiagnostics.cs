@@ -20,6 +20,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             registered = true;
             DevConsole.AddListener("rn_current", Report);
+            DevConsole.AddListener("rn_currents", ToggleOrDescribe);
             Debug.Log("[RadioNav][CURRENT] rn_current registered");
         }
 
@@ -31,6 +32,34 @@ namespace UBOAT.Mods.RadioNavigation
             foreach (string line in CurrentRuntimeAdapter.DescribeNearby())
                 text.Append('\n').Append(line);
             Debug.Log(text.ToString());
+        }
+
+        private static void ToggleOrDescribe(string[] args)
+        {
+            if (args?.Length >= 2)
+            {
+                string token = args[1];
+                if (CurrentSettings.IsDisabledToken(token))
+                {
+                    CurrentSettings.SaveMasterPreference(false);
+                    Debug.Log("[RadioNav][CURRENT] currents disabled (PlayerPrefs RadioNav.Currents=0; takes full effect on reload/restart)");
+                    return;
+                }
+                if (CurrentSettings.IsEnabledToken(token))
+                {
+                    CurrentSettings.SaveMasterPreference(true);
+                    Debug.Log("[RadioNav][CURRENT] currents enabled (PlayerPrefs RadioNav.Currents=1; takes full effect on reload/restart)");
+                    return;
+                }
+                Debug.LogWarning("[RadioNav][CURRENT] usage: rn_currents [on|off]");
+                return;
+            }
+            Debug.Log("[RadioNav][CURRENT] settings master=" + CurrentSettings.IsMasterEnabled()
+                + " atlas=\"" + CurrentSettings.ResolveRequestedAtlas() + "\""
+                + " wind=" + CurrentSettings.DirectWindEnabled()
+                + " nearby=" + CurrentSettings.NearbyDriftEnabled()
+                + " far=" + CurrentSettings.FarDriftEnabled()
+                + " route=" + CurrentSettings.RouteCurrentEnabled());
         }
     }
 }

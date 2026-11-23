@@ -21,7 +21,6 @@ namespace UBOAT.Mods.RadioNavigation
     public static class CurrentStrategicDrift
     {
         private const string LogPrefix = "[RadioNav][CURRENT][FAR] ";
-        private const string Variable = "RADIONAV_FAR_DRIFT";
         private const BindingFlags Hidden = BindingFlags.Instance | BindingFlags.NonPublic;
         private const BindingFlags AnyInstance = BindingFlags.Instance | BindingFlags.Public
             | BindingFlags.NonPublic;
@@ -46,11 +45,11 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static void TryInstall(Harmony harmony)
         {
-            if (Environment.GetEnvironmentVariable(Variable) != "1")
+            if (!CurrentSettings.FarDriftEnabled())
                 return;
             if (!CurrentRuntimeAdapter.HasField)
             {
-                Debug.LogWarning(LogPrefix + Variable + " set without a water source; far drift inert");
+                Debug.LogWarning(LogPrefix + CurrentSettings.FarVariable + " enabled without a water source; far drift inert");
                 return;
             }
             var method = typeof(SandboxMobileGroup).GetMethod("UpdateGroup", AnyInstance, null, Type.EmptyTypes, null);

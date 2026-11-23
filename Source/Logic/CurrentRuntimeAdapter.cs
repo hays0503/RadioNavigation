@@ -29,13 +29,6 @@ namespace UBOAT.Mods.RadioNavigation
     public static class CurrentRuntimeAdapter
     {
         private const string LogPrefix = "[RadioNav][CURRENT] ";
-        private const string FieldVariable = "RADIONAV_CURRENT_FIELD";
-        private const string ProfileVariable = "RADIONAV_CURRENT_PROFILE";
-        private const string AtlasVariable = "RADIONAV_ATLAS_TILE";
-        private const string BundledAtlasValue = "bundled";
-        private const string WindVariable = "RADIONAV_DIRECT_WIND";
-        private const string NearbyVariable = "RADIONAV_NEARBY_DRIFT";
-        private const string RudderVariable = "RADIONAV_RELATIVE_RUDDER";
         private const string BinderName = "RadioNavCurrentBinder";
         private const int NearbyLimit = 16;
 
@@ -85,8 +78,20 @@ namespace UBOAT.Mods.RadioNavigation
             if (stale != null)
                 Object.Destroy(stale);
 
-            useWind = Environment.GetEnvironmentVariable(WindVariable) == "1";
-            useNearby = Environment.GetEnvironmentVariable(NearbyVariable) == "1";
+            CurrentDiagnostics.EnsureRegistered();
+            if (!CurrentSettings.IsMasterEnabled())
+            {
+                currentField = null;
+                fieldKind = "none";
+                fieldSummary = null;
+                useWind = false;
+                useNearby = false;
+                useRelativeRudder = false;
+                Debug.Log(LogPrefix + "disabled (RADIONAV_CURRENT_FIELD unset); currents off; stock physics untouched");
+                return;
+            }
+            useWind = CurrentSettings.DirectWindEnabled();
+            useNearby = CurrentSettings.NearbyDriftEnabled();
             if (!TryReadField(out bool anyFlow))
                 return;
             if (!useWind && !anyFlow)
@@ -96,7 +101,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             if (!TryInstall(harmony))
                 return;
-            useRelativeRudder = anyFlow && Environment.GetEnvironmentVariable(RudderVariable) == "1"
+            useRelativeRudder = CurrentSettings.RelativeRudderEnabled(anyFlow)
                 && CurrentRudderAdapter.TryInstall(harmony, typeof(PlayerShip).Assembly.GetType("UBOAT.Game.Scene.Items.Rudder"));
             if (useNearby && anyFlow)
                 CurrentShipSpeedAdapter.TryInstall(harmony);
@@ -105,7 +110,6 @@ namespace UBOAT.Mods.RadioNavigation
             // OnLoaded fires before the campaign replaces the boot scene.
             Object.DontDestroyOnLoad(carrier);
             carrier.AddComponent<CurrentRuntimeBinder>();
-            CurrentDiagnostics.EnsureRegistered();
         }
 
         internal static string Describe()
@@ -184,12 +188,12 @@ namespace UBOAT.Mods.RadioNavigation
             currentField = null;
             fieldKind = "none";
             fieldSummary = null;
-            string atlasPath = ResolveAtlasPath(Environment.GetEnvironmentVariable(AtlasVariable));
+            string atlasPath = ResolveAtlasPath(CurrentSettings.ResolveRequestedAtlas());
             if (!string.IsNullOrEmpty(atlasPath))
             {
                 if (!CurrentAtlasField.TryLoad(atlasPath, out CurrentAtlasField atlas, out string error))
                 {
-                    Debug.LogWarning(LogPrefix + "invalid " + AtlasVariable + " \"" + atlasPath
+                    Debug.LogWarning(LogPrefix + "invalid " + CurrentSettings.AtlasVariable + " \"" + atlasPath
                         + "\": " + error + "; adapter disabled");
                     return false;
                 }
@@ -197,19 +201,19 @@ namespace UBOAT.Mods.RadioNavigation
                 anyFlow = atlas.HasFlow;
                 fieldKind = "atlas";
                 fieldSummary = atlas.ToString();
-                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(ProfileVariable))
-                    || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(FieldVariable)))
-                    Debug.LogWarning(LogPrefix + AtlasVariable + " overrides profile/constant sources");
+                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(CurrentSettings.ProfileVariable))
+                    || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(CurrentSettings.FieldVariable)))
+                    Debug.LogWarning(LogPrefix + CurrentSettings.AtlasVariable + " overrides profile/constant sources");
                 Debug.Log(LogPrefix + "requested atlas tile " + fieldSummary
                     + "; sample uses campaign UTC and hull lat/lon");
                 return true;
             }
-            string profile = Environment.GetEnvironmentVariable(ProfileVariable);
+            string profile = Environment.GetEnvironmentVariable(CurrentSettings.ProfileVariable);
             if (!string.IsNullOrEmpty(profile))
             {
                 if (!CurrentProfileField.TryParse(profile, out CurrentProfileField parsed, out string error))
                 {
-                    Debug.LogWarning(LogPrefix + "invalid " + ProfileVariable + " \"" + profile
+                    Debug.LogWarning(LogPrefix + "invalid " + CurrentSettings.ProfileVariable + " \"" + profile
                         + "\": " + error + "; adapter disabled");
                     return false;
                 }
@@ -217,17 +221,17 @@ namespace UBOAT.Mods.RadioNavigation
                 anyFlow = parsed.HasFlow;
                 fieldKind = "profile";
                 fieldSummary = parsed.ToString();
-                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(FieldVariable)))
-                    Debug.LogWarning(LogPrefix + ProfileVariable + " overrides " + FieldVariable);
+                if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(CurrentSettings.FieldVariable)))
+                    Debug.LogWarning(LogPrefix + CurrentSettings.ProfileVariable + " overrides " + CurrentSettings.FieldVariable);
                 Debug.Log(LogPrefix + "requested depth profile " + fieldSummary
                     + " (depth positive down, m/s); flow=" + anyFlow);
                 return true;
             }
-            string raw = Environment.GetEnvironmentVariable(FieldVariable);
+            string raw = Environment.GetEnvironmentVariable(CurrentSettings.FieldVariable);
             if (string.IsNullOrEmpty(raw))
             {
                 if (!useWind)
-                    Debug.Log(LogPrefix + "disabled (" + FieldVariable + " unset); stock physics untouched");
+                    Debug.Log(LogPrefix + "disabled (" + CurrentSettings.FieldVariable + " unset); stock physics untouched");
                 return true;
             }
             string[] parts = raw.Split(',');
@@ -238,7 +242,7 @@ namespace UBOAT.Mods.RadioNavigation
                 || !float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out north)
                 || !IsFinite(east) || !IsFinite(north))
             {
-                Debug.LogWarning(LogPrefix + "invalid " + FieldVariable + " \"" + raw
+                Debug.LogWarning(LogPrefix + "invalid " + CurrentSettings.FieldVariable + " \"" + raw
                     + "\"; expected \"east,north\" in m/s; adapter disabled");
                 return false;
             }
@@ -257,7 +261,7 @@ namespace UBOAT.Mods.RadioNavigation
         // literally, so an explicit folder still wins.
         private static string ResolveAtlasPath(string requested)
         {
-            if (requested != BundledAtlasValue)
+            if (requested != CurrentSettings.BundledAtlasValue)
                 return requested;
             return System.IO.Path.Combine(Application.persistentDataPath,
                 "Mods", "RadioNavigation", "Source", "Data", "CurrentAtlas");

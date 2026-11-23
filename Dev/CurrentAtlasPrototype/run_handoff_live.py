@@ -577,8 +577,9 @@ def main():
         parser.error("timeout must be positive")
     if STAGED_FIXTURE.exists():
         parser.error("temporary fixture already exists under Source; inspect it before proceeding")
-    if os.environ.get("RADIONAV_ROUTE_CURRENT"):
+    if os.environ.get("RADIONAV_ROUTE_CURRENT") == "1":
         parser.error("unset RADIONAV_ROUTE_CURRENT; the inherited runner does not clear it")
+    os.environ["RADIONAV_ROUTE_CURRENT"] = "0"
 
     sys.path.insert(0, str(REPORTS / "current-b1-control-20261121"))
     import run_live_series as live

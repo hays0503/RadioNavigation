@@ -83,9 +83,9 @@ namespace UBOAT.Mods.RadioNavigation
             harmony = owner;
             HarmonyPatchInstaller.Apply(harmony);
 
-            // Current transport adapter (plan §13.2 B1.1): fully inert — no
-            // patches, no GameObject — unless RADIONAV_CURRENT_FIELD is set
-            // before launch. Installs nothing by default.
+            // Current transport adapter: enabled by default using the bundled ORA-20C 1939-1945 atlas unless opted out via CurrentSettings.
+            // (PlayerPrefs or RADIONAV_* env).
+            // Default-on unless opted out (PlayerPrefs or RADIONAV_* env).
             CurrentRuntimeAdapter.EnsureRunning(harmony);
             CurrentRouteRuntime.TryInstall(harmony);
             CurrentStrategicDrift.TryInstall(harmony);

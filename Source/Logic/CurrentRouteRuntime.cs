@@ -34,7 +34,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static void TryInstall(Harmony harmony)
         {
-            if (Environment.GetEnvironmentVariable("RADIONAV_ROUTE_CURRENT") != "1"
+            if (!CurrentSettings.RouteCurrentEnabled()
                 || !CurrentRuntimeAdapter.WaterConfigured)
                 return;
             var target = typeof(Ship).GetMethod("FixedUpdate", Hidden, null, Type.EmptyTypes, null);

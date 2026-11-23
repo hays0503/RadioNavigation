@@ -431,8 +431,9 @@ def main():
     args = parser.parse_args()
     if not args.confirm_cloud_off:
         parser.error("Steam Cloud must be off")
-    if os.environ.get("RADIONAV_ROUTE_CURRENT"):
+    if os.environ.get("RADIONAV_ROUTE_CURRENT") == "1":
         parser.error("unset RADIONAV_ROUTE_CURRENT to keep the test stock")
+    os.environ["RADIONAV_ROUTE_CURRENT"] = "0"
     sys.path.insert(0, str(ROOT / "artifacts/reports/current-b1-control-20261121"))
     import run_live_series as live
     from run_depth_receipt import request, state
