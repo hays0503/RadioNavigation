@@ -227,9 +227,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 double backLat = fixLatDeg -
                     transferNm * Math.Cos(courseDeg * Deg2Rad) / 60.0;
-                double backLon = fixLonDeg -
-                    transferNm * Math.Sin(courseDeg * Deg2Rad) /
-                    (60.0 * Math.Cos(fixLatDeg * Deg2Rad));
+                double backLon = StepLongitude(fixLonDeg, fixLatDeg, -transferNm * Math.Sin(courseDeg * Deg2Rad));
 
                 double hc1, az1, hc2, az2;
                 RecomputeHcAz(Observation1, backLat, backLon, out hc1, out az1);
@@ -294,18 +292,19 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 1; i < iterations; i++)
             {
-                lopA = RefineTransferred(early, late.Utc, result.FixLatDeg, result.FixLonDeg,
+                LineOfPosition nextA = RefineTransferred(early, late.Utc, result.FixLatDeg, result.FixLonDeg,
                     courseDeg, speedKn);
-                lopB = RefineTransferred(middle, late.Utc, result.FixLatDeg, result.FixLonDeg,
+                LineOfPosition nextB = RefineTransferred(middle, late.Utc, result.FixLatDeg, result.FixLonDeg,
                     courseDeg, speedKn);
                 RecomputeHcAz(late, result.FixLatDeg, result.FixLonDeg,
                     out double hcLate, out double azLate);
-                lopC = BuildLopFromSight(late.HoDeg, hcLate, azLate,
+                LineOfPosition nextC = BuildLopFromSight(late.HoDeg, hcLate, azLate,
                     result.FixLatDeg, result.FixLonDeg);
 
                 CockedHatResult refined;
-                if (!TryTriangle(lopA, lopB, lopC, out refined))
+                if (!TryTriangle(nextA, nextB, nextC, out refined))
                     break;
+                lopA = nextA; lopB = nextB; lopC = nextC;
                 result = refined;
             }
 
@@ -393,13 +392,15 @@ namespace UBOAT.Mods.RadioNavigation
             double sideA = DistanceNm(bcLat, bcLon, caLat, caLon);
             double sideB = DistanceNm(caLat, caLon, abLat, abLon);
             double sideC = DistanceNm(abLat, abLon, bcLat, bcLon);
-            if (sideA > MaxTriangleSideNm || sideB > MaxTriangleSideNm || sideC > MaxTriangleSideNm)
+            if (!IsValidTriangleSize(sideA, sideB, sideC))
                 return false;
 
             double centreLat = (abLat + bcLat + caLat) / 3.0;
             double unwrappedBc = abLon + WrapLon180(bcLon - abLon);
             double unwrappedCa = abLon + WrapLon180(caLon - abLon);
             double centreLon = WrapLon180((abLon + unwrappedBc + unwrappedCa) / 3.0);
+            if (!IsValidCoordinate(centreLat, centreLon))
+                return false;
             double radius = Math.Max(DistanceNm(centreLat, centreLon, abLat, abLon),
                 Math.Max(DistanceNm(centreLat, centreLon, bcLat, bcLon),
                     DistanceNm(centreLat, centreLon, caLat, caLon)));
@@ -492,8 +493,7 @@ namespace UBOAT.Mods.RadioNavigation
             for (int i = 1; i < iterations; i++)
             {
                 double backLat = lat - runNm * Math.Cos(courseDeg * Deg2Rad) / 60.0;
-                double backLon = lon - runNm * Math.Sin(courseDeg * Deg2Rad)
-                    / (60.0 * Math.Cos(lat * Deg2Rad));
+                double backLon = StepLongitude(lon, lat, -runNm * Math.Sin(courseDeg * Deg2Rad));
                 RecomputeHcAz(first, backLat, backLon, out double hc1, out double az1);
                 RecomputeHcAz(second, lat, lon, out double hc2, out double az2);
                 LineOfPosition r1 = TranslateLop(
@@ -527,8 +527,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (runNm < 0.0)
                 runNm = 0.0;
             double backLat = fixLatDeg - runNm * Math.Cos(courseDeg * Deg2Rad) / 60.0;
-            double backLon = fixLonDeg - runNm * Math.Sin(courseDeg * Deg2Rad)
-                / (60.0 * Math.Cos(fixLatDeg * Deg2Rad));
+            double backLon = StepLongitude(fixLonDeg, fixLatDeg, -runNm * Math.Sin(courseDeg * Deg2Rad));
             RecomputeHcAz(observation, backLat, backLon, out double hc, out double az);
             LineOfPosition lop = BuildLopFromSight(observation.HoDeg, hc, az, backLat, backLon);
             return TranslateLop(lop, courseDeg, runNm);
@@ -579,7 +578,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             LineOfPosition lop;
             lop.TangentLatDeg = assumedLatDeg + dNorthNm / 60.0;
-            lop.TangentLonDeg = WrapLon180(assumedLonDeg + dEastNm / (60.0 * Math.Cos(assumedLatDeg * Deg2Rad)));
+            lop.TangentLonDeg = StepLongitude(assumedLonDeg, assumedLatDeg, dEastNm);
             lop.AzDeg = azDeg;
             return lop;
         }
@@ -594,7 +593,7 @@ namespace UBOAT.Mods.RadioNavigation
             double dEastNm = distanceNm * Math.Sin(courseRad);
 
             lop.TangentLatDeg += dNorthNm / 60.0;
-            lop.TangentLonDeg = WrapLon180(lop.TangentLonDeg + dEastNm / (60.0 * Math.Cos(lop.TangentLatDeg * Deg2Rad)));
+            lop.TangentLonDeg = StepLongitude(lop.TangentLonDeg, lop.TangentLatDeg, dEastNm);
             return lop;
         }
 
@@ -609,9 +608,12 @@ namespace UBOAT.Mods.RadioNavigation
             fixLatDeg = 0.0;
             fixLonDeg = 0.0;
 
+            if (!IsFiniteLop(lop1) || !IsFiniteLop(lop2))
+                return false;
+
             double refLat = 0.5 * (lop1.TangentLatDeg + lop2.TangentLatDeg);
             double refCos = Math.Cos(refLat * Deg2Rad);
-            if (Math.Abs(refCos) < 1e-9)
+            if (!(Math.Abs(refCos) >= 1e-9))
                 return false;
 
             // Local plane, anchor = tangent point of LOP2.
@@ -626,7 +628,7 @@ namespace UBOAT.Mods.RadioNavigation
             double t2x = Math.Cos(az2), t2y = -Math.Sin(az2);
 
             double cross = t1x * t2y - t1y * t2x;
-            if (Math.Abs(cross) < 1e-9)
+            if (!(Math.Abs(cross) >= 1e-9))
                 return false;
 
             // P1 + s*t1 = P2 + r*t2 with P2 = (0,0): solve for s.
@@ -637,7 +639,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             fixLatDeg = lop2.TangentLatDeg + fixN / 60.0;
             fixLonDeg = WrapLon180(lop2.TangentLonDeg + fixE / (60.0 * refCos));
-            return true;
+            return IsValidCoordinate(fixLatDeg, fixLonDeg);
         }
 
         /// <summary>
@@ -692,6 +694,35 @@ namespace UBOAT.Mods.RadioNavigation
         private static double WrapLon180(double lonDeg)
         {
             return Math.IEEERemainder(lonDeg, 360.0);
+        }
+
+        private static bool IsFinite(double v)
+        {
+            return !double.IsNaN(v) && !double.IsInfinity(v);
+        }
+
+        private static bool IsValidCoordinate(double latDeg, double lonDeg)
+        {
+            return IsFinite(latDeg) && IsFinite(lonDeg) && Math.Abs(latDeg) <= 90.0;
+        }
+
+        private static bool IsFiniteLop(LineOfPosition lop)
+        {
+            return IsFinite(lop.TangentLatDeg) && IsFinite(lop.TangentLonDeg) && IsFinite(lop.AzDeg);
+        }
+
+        private static bool IsValidTriangleSize(double sideA, double sideB, double sideC)
+        {
+            return IsFinite(sideA) && IsFinite(sideB) && IsFinite(sideC)
+                && sideA <= MaxTriangleSideNm && sideB <= MaxTriangleSideNm && sideC <= MaxTriangleSideNm;
+        }
+
+        private static double StepLongitude(double lonDeg, double latDeg, double dEastNm)
+        {
+            double cosLat = Math.Cos(latDeg * Deg2Rad);
+            if (!(Math.Abs(cosLat) >= 1e-9))
+                return WrapLon180(lonDeg);
+            return WrapLon180(lonDeg + dEastNm / (60.0 * cosLat));
         }
 
         /// <summary>

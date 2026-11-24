@@ -135,11 +135,11 @@ namespace UBOAT.Mods.RadioNavigation
             float coastW = coastMask != null ? coastMask.Sample(lat, lon) : 0f;
 
             float depthTaper = Mathf.Lerp(1.0f, 0.72f, Mathf.Clamp01(depth / 80f));
-            if (coastW > 0f)
+            float coastalAmp = coastW > 0f ? CoastalShelfMaxMps * coastW * unnamedShare * depthTaper : 0f;
+            if (coastalAmp > AbyssalBarotropicMps * unnamedShare)
             {
-                float amp = CoastalShelfMaxMps * coastW * unnamedShare * depthTaper;
-                sumEast += amp * maj;
-                sumNorth += amp * CoastalEllipticity * min;
+                sumEast += coastalAmp * maj;
+                sumNorth += coastalAmp * CoastalEllipticity * min;
                 return;
             }
 

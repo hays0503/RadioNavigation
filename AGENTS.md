@@ -138,7 +138,7 @@ Compiles the mod's `Source\**\*.cs` against a **clean, non-obfuscated signature-
 
 ### Проверки
 
-<!-- gate-snapshot: date=2026-11-24 tests=1889 sourcecheck=178 analyzers=76 -->
+<!-- gate-snapshot: date=2026-11-24 tests=1896 sourcecheck=178 analyzers=76 -->
 
 - `Tools/gates.ps1` = build → SourceCheck + quick → tests → PVS, fail-fast.
   `-Parallel` — быстрая/медленная линии.

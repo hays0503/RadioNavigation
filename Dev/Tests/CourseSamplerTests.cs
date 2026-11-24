@@ -209,5 +209,20 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.False(sampler.IsFresh(T0.AddSeconds(20)));
             Assert.Equal(double.MaxValue, new CourseSampler().SecondsSinceLastSample(T0));
         }
+
+        [Fact]
+        public void SkipAfterEstablishedSpeed_ResetsSpeedToZeroUntilNewWindow()
+        {
+            var sampler = new CourseSampler();
+            double degPerHour = 10.0 / 60.0; // ~10 kn north
+            for (int s = 0; s <= 14; s += 2)
+                sampler.AddSample(T0.AddSeconds(s), degPerHour * s / 3600.0, 0.0);
+            Assert.InRange(sampler.SpeedKn, 9.0, 11.0);
+
+            // Time-skip resets the track: speed must drop to 0 rather than staying 10 kn.
+            sampler.AddSample(T0.AddHours(2), 10.0, 0.0);
+            Assert.Equal(0f, sampler.SpeedKn);
+            Assert.True(sampler.IsFresh(T0.AddHours(2)));
+        }
     }
 }

@@ -71,6 +71,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             double angularRad = 0.001;
             Assert.Equal((float)(angularRad * 100.0),
                 ConstellationLineMath.WorldWidth(angularRad, 100.0, 0.0, 0.0, 1.5));
+            Assert.False(ConstellationLineMath.ClipToHorizon(double.NaN, 10.0, out _, out _));
+            Assert.Equal(0f, ConstellationLineMath.HorizonFade(double.NaN, 3.0));
+            Assert.Equal((float)(angularRad * 100.0),
+                ConstellationLineMath.WorldWidth(angularRad, 100.0, System.Math.PI, 1000.0, 1.5));
+            Assert.Equal((float)(angularRad * 100.0),
+                ConstellationLineMath.WorldWidth(angularRad, 100.0, double.NaN, 1000.0, 1.5));
         }
     }
 }

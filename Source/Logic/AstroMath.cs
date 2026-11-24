@@ -20,7 +20,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             // Упрощённо через Ticks — достаточно для 1939-1945 (±0.5с)
             DateTime j2000 = new DateTime(2000, 1, 1, 12, 0, 0, DateTimeKind.Utc);
-            double days = (utc.ToUniversalTime() - j2000).TotalDays;
+            double days = ((utc.Kind == DateTimeKind.Local ? utc.ToUniversalTime() : utc) - j2000).TotalDays;
             return 2451545.0 + days;
         }
 
@@ -69,7 +69,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             raRad = 0;
             decRad = 0;
-            if (planetId < 0 || planetId > 3) return false;
+            if (planetId < 0 || planetId > 3 || double.IsNaN(jd) || double.IsInfinity(jd)) return false;
 
             double T = (jd - 2451545.0) / 36525.0; // столетия от J2000
 
@@ -525,9 +525,9 @@ namespace UBOAT.Mods.RadioNavigation
         public static double MoonParallaxDeg(double jd)
         {
             double distance = MoonDistanceKm(jd);
-            if (distance <= 0.0)
+            if (!(distance > 0.0) || double.IsInfinity(distance))
                 return 0.0;
-            return Math.Asin(EarthRadiusKm / distance) / Deg2Rad;
+            return Math.Asin(Math.Min(1.0, EarthRadiusKm / distance)) / Deg2Rad;
         }
 
         /// <summary>
@@ -567,7 +567,7 @@ namespace UBOAT.Mods.RadioNavigation
             double ty = gy - oy;
             double tz = gz - oz;
             double len = Math.Sqrt(tx * tx + ty * ty + tz * tz);
-            if (len < 1e-9)
+            if (!(len >= 1e-9) || double.IsInfinity(len))
                 return false;
 
             raRad = Math.Atan2(ty, tx);

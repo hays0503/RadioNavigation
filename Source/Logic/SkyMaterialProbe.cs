@@ -72,6 +72,7 @@ namespace UBOAT.Mods.RadioNavigation
                 yield break;
             logged = true;
             LogSnapshot();
+            Destroy(gameObject);
         }
 
         private static void LogSnapshot()

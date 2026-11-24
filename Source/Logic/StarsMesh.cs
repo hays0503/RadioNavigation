@@ -87,6 +87,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             UsesBundledStarShader = material != null && material.shader != null
                 && material.shader.name == CelestialShaderResolver.BundledShaderName;
+            bundledShaderResolved = UsesBundledStarShader;
 
             Debug.Log("[RadioNav][StarsMesh] Initialized with " + StarCatalog.Stars.Length + " stars");
         }
@@ -214,7 +215,11 @@ namespace UBOAT.Mods.RadioNavigation
         {
             Camera cam;
             if (!CameraResolver.TryResolve(out cam))
+            {
+                if (meshRenderer != null && meshRenderer.enabled)
+                    meshRenderer.enabled = false;
                 return;
+            }
 
             TryUpgradeToBundledShader();
 
@@ -228,7 +233,10 @@ namespace UBOAT.Mods.RadioNavigation
 
             float lat, lon;
             if (!positionProvider.TryGetPosition(out lat, out lon))
+            {
+                meshRenderer.enabled = false;
                 return;
+            }
 
             if (material != null)
             {
@@ -318,6 +326,11 @@ namespace UBOAT.Mods.RadioNavigation
             // old "sizePx * 0.1" built quads of ~0.2-2 m at ~3825 m, i.e. ~0.05
             // screen pixels - the layer contributed no visible pixels at all
             // (measured live 2026-09-28, see docs/sternspreiz-lens-v1.md).
+            if (!(safeRadius > 0f) || cam.pixelHeight <= 0 || !(cam.fieldOfView > 0f) || cam.fieldOfView >= 179f)
+            {
+                meshRenderer.enabled = false;
+                return;
+            }
             float worldPerPixel = StarQuadScale.WorldUnitsPerPixel(
                 safeRadius, cam.fieldOfView, cam.pixelHeight);
 

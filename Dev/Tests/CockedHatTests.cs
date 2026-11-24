@@ -203,5 +203,18 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             calc.Record(FromTruth(Deneb, T0, TrueLat, TrueLon));
             Assert.True(calc.CalculateTriangleFix(0.0, 0.0, 2, out _));
         }
+
+        [Fact]
+        public void IntersectLops_NonFiniteAndPastPole_ReturnsFalse()
+        {
+            var valid = new LineOfPosition { TangentLatDeg = 54.0, TangentLonDeg = 10.0, AzDeg = 90.0 };
+            var nanAz = new LineOfPosition { TangentLatDeg = 54.0, TangentLonDeg = 10.0, AzDeg = double.NaN };
+            Assert.False(RunningFixCalculator.IntersectLops(valid, nanAz, out _, out _));
+
+            // Near-parallel LOPs whose tangent intersection overshoots +90 deg.
+            var polarA = new LineOfPosition { TangentLatDeg = 89.0, TangentLonDeg = 0.0, AzDeg = 91.0 };
+            var polarB = new LineOfPosition { TangentLatDeg = 89.0, TangentLonDeg = 5.0, AzDeg = 89.0 };
+            Assert.False(RunningFixCalculator.IntersectLops(polarA, polarB, out _, out _));
+        }
     }
 }

@@ -37,7 +37,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// holds the value (red light / shade filters preserve adaptation).</summary>
         public void Step(double dt, bool dark, bool shielded)
         {
-            if (!dark || shielded || dt <= 0.0)
+            if (!dark || shielded || double.IsNaN(dt) || dt <= 0.0)
                 return;
             if (dt > MaxStepSeconds)
                 dt = MaxStepSeconds;

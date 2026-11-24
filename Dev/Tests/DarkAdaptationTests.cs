@@ -71,5 +71,17 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             state.Step(-1.0, true, false);
             Assert.Equal(0.0, state.Value);
         }
+
+        [Fact]
+        public void Step_NaNDt_DoesNotPoisonValue()
+        {
+            var state = new DarkAdaptationState();
+            state.Step(1.0, true, false);
+            double before = state.Value;
+            state.Step(double.NaN, true, false);
+            Assert.Equal(before, state.Value);
+            Assert.False(double.IsNaN(state.Value));
+            Assert.True(state.IsRamping);
+        }
     }
 }

@@ -47,7 +47,7 @@ namespace UBOAT.Mods.RadioNavigation
             AstroMath.RaDecToEnu(raRad, decRad, lstDeg, latDeg, out altRad, out azRad, out e, out n, out u);
 
             double len = Math.Sqrt(e * e + n * n + u * u);
-            if (len < 1e-9)
+            if (!(len >= 1e-9) || double.IsInfinity(len))
                 return new SunFix(false, 0.0, 0.0, 0.0, 0f, 0f);
 
             return new SunFix(true, e / len, u / len, n / len,

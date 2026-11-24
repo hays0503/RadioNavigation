@@ -21,6 +21,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             t0 = 0.0;
             t1 = 1.0;
+            if (double.IsNaN(alt0Deg) || double.IsNaN(alt1Deg))
+                return false;
             if (alt0Deg > 0.0 && alt1Deg > 0.0)
                 return true;
             if (alt0Deg <= 0.0 && alt1Deg <= 0.0)
@@ -46,19 +48,28 @@ namespace UBOAT.Mods.RadioNavigation
             double fovRad, double screenPixels, double minPixels)
         {
             double angularWorld = angularWidthRad * distance;
-            if (screenPixels <= 1.0 || fovRad <= 0.0 || distance <= 0.0)
-                return (float)angularWorld;
+            if (!IsValidWorldWidthInput(angularWidthRad, distance, fovRad, screenPixels, minPixels))
+                return float.IsNaN((float)angularWorld) ? 0f : (float)angularWorld;
             double pixelsWorld = minPixels * 2.0 * distance * Math.Tan(fovRad * 0.5) / screenPixels;
             return (float)Math.Max(angularWorld, pixelsWorld);
+        }
+
+        private static bool IsValidWorldWidthInput(double angularWidthRad, double distance,
+            double fovRad, double screenPixels, double minPixels)
+        {
+            return !(double.IsNaN(angularWidthRad) || double.IsInfinity(angularWidthRad)
+                || double.IsNaN(minPixels) || double.IsInfinity(minPixels)
+                || !(screenPixels > 1.0 && distance > 0.0 && fovRad > 0.0 && fovRad < Math.PI)
+                || double.IsInfinity(distance) || double.IsInfinity(screenPixels));
         }
 
         /// <summary>Horizon fade for a line vertex: 0 at the horizon, 1 at
         /// fadeDeg above it (the old code cut the line dead at alt ≤ 0).</summary>
         public static float HorizonFade(double altDeg, double fadeDeg)
         {
-            if (altDeg <= 0.0)
+            if (!(altDeg > 0.0))
                 return 0f;
-            if (fadeDeg <= 0.0 || altDeg >= fadeDeg)
+            if (double.IsNaN(fadeDeg) || fadeDeg <= 0.0 || altDeg >= fadeDeg)
                 return 1f;
             return (float)(altDeg / fadeDeg);
         }

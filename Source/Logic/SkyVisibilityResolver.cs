@@ -22,10 +22,20 @@ namespace UBOAT.Mods.RadioNavigation
         private static object mapModeValue;
 
         /// <summary>Raw Atmosphere.Fogginess in [0..1]; 0 = clear air, 1 = dense fog.</summary>
+        private static void EnsureWeather()
+        {
+            if (weather != null)
+                return;
+            InjectionFramework framework = InjectionFramework.Instance;
+            if (framework != null)
+                weather = framework.GetInstance<Weather>();
+        }
+
         public static float GetFogginess()
         {
             try
             {
+                EnsureWeather();
                 if (weather == null)
                     return 0f;
 
@@ -52,6 +62,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
+                EnsureWeather();
                 if (weather == null)
                     return 1f;
 
@@ -81,6 +92,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
+                EnsureWeather();
                 if (weather == null)
                     return 108.0;
                 object sky = ReadMember(weather, "Sky");

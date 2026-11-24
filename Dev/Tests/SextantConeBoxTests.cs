@@ -94,6 +94,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             Assert.Equal(0f, SextantConeBox.DiameterUnits(0.5, 0.0, 600f));
             Assert.Equal(0f, SextantConeBox.DiameterUnits(0.0, 65.0, 600f));
+            Assert.Equal(0f, SextantConeBox.DiameterUnits(double.NaN, 65.0, 600f));
+            Assert.Equal(0f, SextantConeBox.DiameterUnits(1.0, 180.0, 600f));
         }
     }
 }

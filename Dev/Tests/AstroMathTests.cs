@@ -141,5 +141,23 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.InRange(newMoon, 0, 0.01);
             Assert.InRange(fullMoon, 0.99, 1.0);
         }
+
+        [Fact]
+        public void ToJulianDay_UnspecifiedKind_TreatedAsUtcNotLocal()
+        {
+            var utc = new DateTime(1942, 6, 15, 12, 0, 0, DateTimeKind.Utc);
+            var unspec = new DateTime(1942, 6, 15, 12, 0, 0, DateTimeKind.Unspecified);
+            Assert.Equal(AstroMath.ToJulianDay(utc), AstroMath.ToJulianDay(unspec), 12);
+        }
+
+        [Fact]
+        public void CelestialGuards_NonFiniteInputs_FailClosed()
+        {
+            Assert.False(AstroMath.PlanetRaDec(0, double.NaN, out _, out _));
+            Assert.Equal(0.0, AstroMath.MoonParallaxDeg(double.NaN));
+            Assert.False(AstroMath.MoonTopocentricRaDec(AstroMath.ToJulianDay(new DateTime(1942, 6, 15, 0, 0, 0, DateTimeKind.Utc)),
+                double.NaN, 0.0, out _, out _));
+            Assert.False(SunEphemeris.Compute(double.NaN, 0.0, new DateTime(1942, 6, 15, 12, 0, 0, DateTimeKind.Utc)).Ok);
+        }
     }
 }

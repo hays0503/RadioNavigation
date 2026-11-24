@@ -223,5 +223,15 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 }
             }
         }
+
+        [Fact]
+        public void ZenithTransit_UpperLimbOverNinety_StaysOpticalProjectionReady()
+        {
+            var body = new CelestialSkyBody(0, new CelestialSkyVector(0, 0.001, 1),
+                0, 0, 149600000.0, 0.53, Input());
+            Assert.True(body.VacuumAltitudeDeg > 89.9);
+            Assert.True(body.OpticalProjectionReady);
+            Assert.True(body.RefractedUpperDeg > 90.0 && body.RefractedUpperDeg < 90.5);
+        }
     }
 }

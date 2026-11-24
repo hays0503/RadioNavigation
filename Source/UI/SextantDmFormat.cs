@@ -13,14 +13,20 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>"221°04.2′" (invariant culture; wraps 59.96′ rounding).</summary>
         public static string FormatDm(double deg)
         {
-            double d = Math.Floor(deg);
-            double m = (deg - d) * 60.0;
+            if (double.IsNaN(deg) || double.IsInfinity(deg))
+                return "\u2014";
+            string sign = deg < 0.0 ? "\u2212" : "";
+            double abs = Math.Abs(deg);
+            double d = Math.Floor(abs);
+            double m = (abs - d) * 60.0;
             if (m >= 59.95)
             {
                 d += 1.0;
                 m = 0.0;
             }
-            return string.Format(CultureInfo.InvariantCulture,
+            if (d == 0.0 && m < 0.05)
+                sign = "";
+            return sign + string.Format(CultureInfo.InvariantCulture,
                 "{0}\u00B0{1:00.0}\u2032", (int)d, m);
         }
 

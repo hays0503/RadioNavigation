@@ -58,5 +58,15 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             Assert.Equal("45\u00B023.4'N", text);
         }
+
+        [Fact]
+        public void FormatDm_NegativeSunsetAndNonFinite_AreAccurate()
+        {
+            Assert.Equal("\u22120\u00B018.0\u2032", SextantDmFormat.FormatDm(-0.3));
+            Assert.Equal("\u22121\u00B000.0\u2032", SextantDmFormat.FormatDm(-0.9994));
+            Assert.Equal("0\u00B000.0\u2032", SextantDmFormat.FormatDm(-0.0001));
+            Assert.Equal("\u2014", SextantDmFormat.FormatDm(double.NaN));
+            Assert.Equal("\u2014", SextantDmFormat.FormatDm(double.PositiveInfinity));
+        }
     }
 }

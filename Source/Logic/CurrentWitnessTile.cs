@@ -73,7 +73,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static bool TryNearestAxis(double[] axis, double value, out int index)
         {
             index = 0;
-            if (value < axis[0] - 0.5 || value > axis[axis.Length - 1] + 0.5)
+            if (double.IsNaN(value) || value < axis[0] - 0.5 || value > axis[axis.Length - 1] + 0.5)
                 return false;
             int hit = Array.BinarySearch(axis, value);
             if (hit >= 0)

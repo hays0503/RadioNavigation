@@ -147,6 +147,7 @@ namespace UBOAT.Mods.RadioNavigation
             lastSampleUtc = utc;
             lastLat = latDeg;
             lastLon = lonDeg;
+            speedKn = 0f;
         }
 
         public CourseSamplerSnapshot CaptureState()

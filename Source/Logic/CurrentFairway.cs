@@ -101,7 +101,7 @@ namespace UBOAT.Mods.RadioNavigation
                 InstallRoute(ship, waypoints, area.name + DescribeRoute(area));
                 return;
             }
-            if (TryReturnToDeparture(nav, ship, start, name, waypoints))
+            if (TryReturnToDeparture(nav, ship, start, name, waypoints, docks?.DockAreas))
             {
                 InstallRoute(ship, waypoints, lastPort.Name + " (remembered authored fairway)");
                 return;
@@ -169,14 +169,31 @@ namespace UBOAT.Mods.RadioNavigation
         private static bool Matches(string text, string name) =>
             text?.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0;
 
+        private static bool HasLoadedBerth(IReadOnlyList<DockArea> areas, SandboxEntity port)
+        {
+            if (areas == null || port == null)
+                return false;
+            for (int i = 0; i < areas.Count; i++)
+            {
+                DockArea area = areas[i];
+                if (!area || !area.DockLocator)
+                    continue;
+                var parent = ParentEntityReference.GetParentEntity(area.DockLocator);
+                if (parent && ReferenceEquals(parent.SandboxEntity, port))
+                    return true;
+            }
+            return false;
+        }
+
         private static bool TryReturnToDeparture(WorldNavMesh nav, PlayerShip ship, Vector2 start,
-            string name, List<Vector2> route)
+            string name, List<Vector2> route, IReadOnlyList<DockArea> loadedAreas)
         {
             if (ship != lastSkipper || lastLane == null || lastPort?.Country == null
                 || !lastPort.Enabled || ship.Country.Affiliation == Affiliation.Neutral
                 || ship.Country.GetRelationWith(lastPort.Country) != Country.Relation.Ally
                 || (name.Length != 0 && !Matches(lastPort.Name, name))
-                || (lastBerth && lastBerth.gameObject.activeInHierarchy))
+                || (lastBerth && lastBerth.gameObject.activeInHierarchy)
+                || HasLoadedBerth(loadedAreas, lastPort))
                 return false;
             Vector2 trigger = lastLane[0];
             return (trigger - start).sqrMagnitude <= MaxApproachKm * MaxApproachKm

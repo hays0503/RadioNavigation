@@ -24,13 +24,19 @@ namespace UBOAT.Mods.RadioNavigation
         /// leaves the reticle hidden).</summary>
         public static float DiameterUnits(double coneDeg, double pipFovDeg, float ocularSizeUnits)
         {
-            if (pipFovDeg <= 0.0 || coneDeg <= 0.0)
+            if (!IsValidConeAngles(coneDeg, pipFovDeg))
                 return 0f;
-            float ocular = ocularSizeUnits > 0f && !float.IsNaN(ocularSizeUnits)
+            float ocular = ocularSizeUnits > 0f && !float.IsNaN(ocularSizeUnits) && !float.IsInfinity(ocularSizeUnits)
                 ? ocularSizeUnits : 600f;
             double halfFovRad = pipFovDeg * Math.PI / 360.0;
             double coneRad = coneDeg * Math.PI / 180.0;
             return (float)(Math.Tan(coneRad) / Math.Tan(halfFovRad) * ocular);
+        }
+
+        private static bool IsValidConeAngles(double coneDeg, double pipFovDeg)
+        {
+            return pipFovDeg > 0.0 && pipFovDeg < 180.0 && coneDeg > 0.0 && coneDeg < 90.0
+                && !double.IsInfinity(pipFovDeg) && !double.IsInfinity(coneDeg);
         }
 
         /// <summary>Radius of the tolerance circle (half the diameter) — the

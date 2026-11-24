@@ -96,7 +96,14 @@ namespace UBOAT.Mods.RadioNavigation
             AzimuthDeg = CelestialSkyMath.Wrap(Math.Atan2(VacuumEnu.X, VacuumEnu.Y) / CelestialSkyMath.R);
             RefractedCentreDeg = CelestialSkyMath.Refract(VacuumAltitudeDeg, input.PressureHpa, input.TemperatureC);
             RefractedLowerDeg = CelestialSkyMath.Refract(VacuumAltitudeDeg - diameter / 2, input.PressureHpa, input.TemperatureC);
-            RefractedUpperDeg = CelestialSkyMath.Refract(VacuumAltitudeDeg + diameter / 2, input.PressureHpa, input.TemperatureC);
+            RefractedUpperDeg = RefractUpperLimb(VacuumAltitudeDeg + diameter / 2, input.PressureHpa, input.TemperatureC);
+        }
+
+        private static double RefractUpperLimb(double upperAltDeg, double pressureHpa, double temperatureC)
+        {
+            return upperAltDeg > 90.0
+                ? 180.0 - CelestialSkyMath.Refract(180.0 - upperAltDeg, pressureHpa, temperatureC)
+                : CelestialSkyMath.Refract(upperAltDeg, pressureHpa, temperatureC);
         }
     }
 

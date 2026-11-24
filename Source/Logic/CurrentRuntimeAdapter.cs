@@ -225,6 +225,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static bool IsLandAt(double latitude, double longitude)
         {
+            longitude = Math.IEEERemainder(longitude, 360.0);
             if (LighthouseCoastProbe.TryGetDistanceKm(latitude, longitude, out double coastKm)
                 && coastKm <= 0.0)
                 return true;
@@ -488,7 +489,7 @@ namespace UBOAT.Mods.RadioNavigation
                 velocity = water;
                 return;
             }
-            var query = new CurrentQuery { DepthMeters = Mathf.Max(0f, depthMeters), Utc = GameUtc() };
+            var query = new CurrentQuery { DepthMeters = depthMeters > 0f ? depthMeters : 0f, Utc = GameUtc() };
             query.HasPosition = TryLatLong(scenePosition, out query.Latitude, out query.Longitude);
             if (recordPosition)
             {

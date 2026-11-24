@@ -59,6 +59,8 @@ namespace UBOAT.Mods.RadioNavigation
                     && material.GetFloat("_CloudOcclusionMode") != 0f)
                 {
                     material.SetFloat("_CloudOcclusionMode", 0f);
+                    if (material.HasProperty("_CloudOcclusionTex"))
+                        material.SetTexture("_CloudOcclusionTex", null);
                 }
                 return;
             }
