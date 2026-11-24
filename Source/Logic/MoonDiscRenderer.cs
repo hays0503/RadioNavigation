@@ -140,17 +140,29 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (discTexture != null)
                 Destroy(discTexture);
-            float[] alpha = MoonPhaseDisc.BuildAlphaField(TextureSize, phaseAngle, limbAngle);
+            // MoonPhaseDisc measures angle +X->+Y in top-down array rows (py=0
+            // at top), whereas Texture2D.SetPixels32 fills bottom-to-top and our
+            // LookRotation quad places +u = celestial east, +v = celestial north.
+            // Mapping pa -> pi/2 - pa and flipping py aligns N/E/S/W visually
+            // while preserving MoonPhaseDisc's tested coordinate convention.
+            float[] alpha = MoonPhaseDisc.BuildAlphaField(
+                TextureSize, phaseAngle, Math.PI * 0.5 - limbAngle);
             float[] coverage = MoonPhaseDisc.BuildCoverageField(TextureSize);
             Color32[] pixels = new Color32[alpha.Length];
-            for (int i = 0; i < alpha.Length; i++)
+            for (int py = 0; py < TextureSize; py++)
             {
-                float a = alpha[i];
-                // The lit side is bright grey; the unlit side stays a very dark
-                // disc (premultiplied, so it reads as a body, not a hole).
-                byte level = (byte)((0.06f * coverage[i] + 0.88f * a) * 255f + 0.5f);
-                byte alphaByte = (byte)(coverage[i] * 255f + 0.5f);
-                pixels[i] = new Color32(level, level, level, alphaByte);
+                int srcRow = py * TextureSize;
+                int dstRow = (TextureSize - 1 - py) * TextureSize;
+                for (int px = 0; px < TextureSize; px++)
+                {
+                    float a = alpha[srcRow + px];
+                    float cov = coverage[srcRow + px];
+                    // The lit side is bright grey; the unlit side stays a very dark
+                    // disc (premultiplied, so it reads as a body, not a hole).
+                    byte level = (byte)((0.06f * cov + 0.88f * a) * 255f + 0.5f);
+                    byte alphaByte = (byte)(cov * 255f + 0.5f);
+                    pixels[dstRow + px] = new Color32(level, level, level, alphaByte);
+                }
             }
             discTexture = new Texture2D(TextureSize, TextureSize, TextureFormat.RGBA32, false);
             discTexture.name = "RadioNavMoonDisc";
@@ -229,9 +241,16 @@ namespace UBOAT.Mods.RadioNavigation
             double diameter = MoonDiscScale.AngularDiameterDeg(jd, altRad);
             float size = (float)CelestialDiscRaster.QuadSide(radius, diameter);
             Vector3 direction = new Vector3((float)e, (float)u, (float)n).normalized;
+            double latRad = lat * (Math.PI / 180.0);
+            Vector3 celestialNorth = new Vector3(0f, (float)Math.Sin(latRad), (float)Math.Cos(latRad));
+            Vector3 quadUp = Vector3.ProjectOnPlane(celestialNorth, -direction);
+            if (quadUp.sqrMagnitude < 1e-6f)
+                quadUp = Vector3.up;
+            else
+                quadUp.Normalize();
             transform.position = cam.transform.position + direction * radius;
             transform.rotation = Quaternion.LookRotation(
-                cam.transform.position - transform.position, Vector3.up);
+                cam.transform.position - transform.position, quadUp);
             transform.localScale = new Vector3(size, size, 1f);
             meshRenderer.enabled = true;
         }

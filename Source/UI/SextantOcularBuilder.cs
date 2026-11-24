@@ -253,7 +253,8 @@ namespace UBOAT.Mods.RadioNavigation
             // One Zero): the game's post stack writes alpha < 1 into the
             // RTs and the stock UI shader blends the black lens backing
             // through, darkening the picture.
-            result.OpaqueViewMaterial = ResolveOpaqueViewMaterial(resourceManager, assetContext);
+            result.OpaqueViewMaterial = ResolveOpaqueViewMaterial(resourceManager, assetContext, out bool ownsMaterial);
+            result.OwnsOpaqueViewMaterial = ownsMaterial;
             if (result.OpaqueViewMaterial != null)
             {
                 ApplyApertureEdge(result.OpaqueViewMaterial);
@@ -465,8 +466,9 @@ namespace UBOAT.Mods.RadioNavigation
             material.SetFloat(ApertureEdgePixelsId, ApertureEdgePixels);
         }
 
-        private static Material ResolveOpaqueViewMaterial(ResourceManager resourceManager, UnityEngine.Object assetContext)
+        private static Material ResolveOpaqueViewMaterial(ResourceManager resourceManager, UnityEngine.Object assetContext, out bool ownsMaterial)
         {
+            ownsMaterial = false;
             if (resourceManager != null)
             {
                 Resource<Material> material =
@@ -488,6 +490,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Material created = new Material(shader);
                 created.name = OpaqueViewAssetName + " (runtime)";
+                ownsMaterial = true;
                 return created;
             }
 

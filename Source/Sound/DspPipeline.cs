@@ -127,10 +127,13 @@ namespace UBOAT.Mods.RadioNavigation
             float qsb = 1f;
             if (CarrierGenerator.IsValidSampleRate(sampleRate))
             {
-                qsb = 1f - QsbDepth * (0.5f + 0.5f * (float)Math.Sin(2.0 * Math.PI * QsbFrequency * qsbPhase / sampleRate));
-                qsbPhase += 1f;
-                if (qsbPhase >= sampleRate)
-                    qsbPhase -= sampleRate;
+                qsb = 1f - QsbDepth * (0.5f + 0.5f * (float)Math.Sin(2.0 * Math.PI * qsbPhase));
+                if (QsbFrequency > 0f)
+                {
+                    qsbPhase += QsbFrequency / sampleRate;
+                    if (qsbPhase >= 1f)
+                        qsbPhase -= (float)Math.Floor(qsbPhase);
+                }
             }
 
             float noise = GaussianNoise() * NoiseFloor;
@@ -218,9 +221,14 @@ namespace UBOAT.Mods.RadioNavigation
             cachedAlpha = ComputeAlpha(filterCutoff);
         }
 
+        private static bool IsNonFinite(float value)
+        {
+            return float.IsNaN(value) || float.IsInfinity(value);
+        }
+
         public float Process(float sample, float sampleRate)
         {
-            if (float.IsNaN(sample) || float.IsInfinity(sample))
+            if (IsNonFinite(sample))
                 return 0f;
 
             if (CarrierGenerator.IsValidSampleRate(sampleRate) && Math.Abs(sampleRate - this.sampleRate) > 0.5f)
@@ -242,7 +250,7 @@ namespace UBOAT.Mods.RadioNavigation
             float agcSample = sample / agcGain;
 
             prevFilter += cachedAlpha * (agcSample - prevFilter);
-            if (Math.Abs(prevFilter) < 1e-15f)
+            if (IsNonFinite(prevFilter) || Math.Abs(prevFilter) < 1e-15f)
                 prevFilter = 0f;
 
             float saturated = (float)Math.Tanh(SaturationDrive * prevFilter);
@@ -255,8 +263,11 @@ namespace UBOAT.Mods.RadioNavigation
                 saturated += whistle * WhistleLevel * WhistleMix;
             }
 
-            if (float.IsNaN(saturated) || float.IsInfinity(saturated))
+            if (IsNonFinite(saturated))
+            {
+                prevFilter = 0f;
                 return 0f;
+            }
             return Mathf.Clamp(saturated, -1f, 1f);
         }
 

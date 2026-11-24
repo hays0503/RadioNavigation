@@ -229,7 +229,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             for (int i = 0; i < characteristic.Length; i++)
             {
-                if (char.ToLowerInvariant(characteristic[i]) != 's' || i == 0)
+                if (!IsPeriodUnitAt(characteristic, i))
                 {
                     continue;
                 }
@@ -270,6 +270,21 @@ namespace UBOAT.Mods.RadioNavigation
             }
 
             return 0f;
+        }
+
+        private static bool IsPeriodUnitAt(string characteristic, int index)
+        {
+            if (index <= 0 || char.ToLowerInvariant(characteristic[index]) != 's')
+            {
+                return false;
+            }
+            if (index + 1 >= characteristic.Length || !char.IsLetter(characteristic[index + 1]))
+            {
+                return true;
+            }
+            return index + 2 < characteristic.Length
+                && string.Compare(characteristic, index, "sec", 0, 3, StringComparison.OrdinalIgnoreCase) == 0
+                && (index + 3 >= characteristic.Length || !char.IsLetter(characteristic[index + 3]));
         }
 
         private static bool IsDuplicateOfCurated(LighthouseProfile profile, IList<LighthouseProfile> curated)

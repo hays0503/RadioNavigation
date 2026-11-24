@@ -362,7 +362,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static double DistanceToLopNm(LineOfPosition lop, double latDeg, double lonDeg)
         {
             double refCos = Math.Cos(lop.TangentLatDeg * Deg2Rad);
-            double east = (lonDeg - lop.TangentLonDeg) * 60.0 * refCos;
+            double east = WrapLon180(lonDeg - lop.TangentLonDeg) * 60.0 * refCos;
             double north = (latDeg - lop.TangentLatDeg) * 60.0;
             double az = lop.AzDeg * Deg2Rad;
             return Math.Abs(east * Math.Sin(az) + north * Math.Cos(az));
@@ -397,7 +397,9 @@ namespace UBOAT.Mods.RadioNavigation
                 return false;
 
             double centreLat = (abLat + bcLat + caLat) / 3.0;
-            double centreLon = (abLon + bcLon + caLon) / 3.0;
+            double unwrappedBc = abLon + WrapLon180(bcLon - abLon);
+            double unwrappedCa = abLon + WrapLon180(caLon - abLon);
+            double centreLon = WrapLon180((abLon + unwrappedBc + unwrappedCa) / 3.0);
             double radius = Math.Max(DistanceNm(centreLat, centreLon, abLat, abLon),
                 Math.Max(DistanceNm(centreLat, centreLon, bcLat, bcLon),
                     DistanceNm(centreLat, centreLon, caLat, caLon)));
@@ -577,8 +579,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             LineOfPosition lop;
             lop.TangentLatDeg = assumedLatDeg + dNorthNm / 60.0;
-            lop.TangentLonDeg = assumedLonDeg +
-                dEastNm / (60.0 * Math.Cos(assumedLatDeg * Deg2Rad));
+            lop.TangentLonDeg = WrapLon180(assumedLonDeg + dEastNm / (60.0 * Math.Cos(assumedLatDeg * Deg2Rad)));
             lop.AzDeg = azDeg;
             return lop;
         }
@@ -593,8 +594,7 @@ namespace UBOAT.Mods.RadioNavigation
             double dEastNm = distanceNm * Math.Sin(courseRad);
 
             lop.TangentLatDeg += dNorthNm / 60.0;
-            lop.TangentLonDeg += dEastNm /
-                (60.0 * Math.Cos(lop.TangentLatDeg * Deg2Rad));
+            lop.TangentLonDeg = WrapLon180(lop.TangentLonDeg + dEastNm / (60.0 * Math.Cos(lop.TangentLatDeg * Deg2Rad)));
             return lop;
         }
 
@@ -615,7 +615,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return false;
 
             // Local plane, anchor = tangent point of LOP2.
-            double e1 = (lop1.TangentLonDeg - lop2.TangentLonDeg) * 60.0 * refCos;
+            double e1 = WrapLon180(lop1.TangentLonDeg - lop2.TangentLonDeg) * 60.0 * refCos;
             double n1 = (lop1.TangentLatDeg - lop2.TangentLatDeg) * 60.0;
 
             double az1 = lop1.AzDeg * Deg2Rad;
@@ -636,7 +636,7 @@ namespace UBOAT.Mods.RadioNavigation
             double fixN = n1 + s * t1y;
 
             fixLatDeg = lop2.TangentLatDeg + fixN / 60.0;
-            fixLonDeg = lop2.TangentLonDeg + fixE / (60.0 * refCos);
+            fixLonDeg = WrapLon180(lop2.TangentLonDeg + fixE / (60.0 * refCos));
             return true;
         }
 
@@ -680,12 +680,18 @@ namespace UBOAT.Mods.RadioNavigation
         {
             double lat1 = lat1Deg * Deg2Rad, lat2 = lat2Deg * Deg2Rad;
             double dLat = lat2 - lat1;
-            double dLon = (lon2Deg - lon1Deg) * Deg2Rad;
+            double dLon = WrapLon180(lon2Deg - lon1Deg) * Deg2Rad;
             double a = Math.Sin(dLat / 2.0) * Math.Sin(dLat / 2.0) +
                        Math.Cos(lat1) * Math.Cos(lat2) *
                        Math.Sin(dLon / 2.0) * Math.Sin(dLon / 2.0);
+            if (a > 1.0) a = 1.0; if (a < 0.0) a = 0.0;
             double c = 2.0 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1.0 - a));
             return NauticalMilePerRadian * c;
+        }
+
+        private static double WrapLon180(double lonDeg)
+        {
+            return Math.IEEERemainder(lonDeg, 360.0);
         }
 
         /// <summary>

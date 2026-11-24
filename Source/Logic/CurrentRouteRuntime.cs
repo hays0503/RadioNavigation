@@ -28,6 +28,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static UBOAT.Game.UI.INotificationBarUI notificationBar;
         private static bool noticeUnavailable;
         private static bool installed;
+        private static bool loadingListenerRegistered;
         private static Vector2 etaWaypoint;
         private static PlayerShip etaShip;
         private static float etaUpdatedAt;
@@ -46,6 +47,7 @@ namespace UBOAT.Mods.RadioNavigation
                     typeof(CurrentRouteRuntime).GetMethod(nameof(PatchSteeringBearing), Handlers)));
                 DevConsole.AddListener("rn_current_route", Report);
                 CurrentFairway.Register();
+                TryInstallLoadingListener();
                 installed = true;
                 Debug.Log(LogPrefix + "current-aware steering hook installed");
             }
@@ -136,7 +138,8 @@ namespace UBOAT.Mods.RadioNavigation
         internal static int HudMinutes(PlayerShip ship)
         {
             if (!ship || ship != etaShip || ship.Docked || !(ship.Route?.Count > 0)
-                || ship.Route.CurrentWaypoint != etaWaypoint || Time.realtimeSinceStartup - etaUpdatedAt > 2f)
+                || ship.Route.CurrentWaypoint != etaWaypoint
+                || (Time.timeScale > 0f && Time.realtimeSinceStartup - etaUpdatedAt > 2f))
                 return 0;
             return CurrentRouteNoticeText.Minutes(etaSeconds);
         }
@@ -155,6 +158,36 @@ namespace UBOAT.Mods.RadioNavigation
             var time = DWS.Common.InjectionFramework.InjectionFramework.Instance?
                 .GetInstance<UBOAT.Game.Core.Time.GameTime>();
             return time ? time.StoryTicks : 0L;
+        }
+
+        internal static void TryInstallLoadingListener()
+        {
+            if (!installed && !CurrentSettings.RouteCurrentEnabled())
+                return;
+            if (loadingListenerRegistered)
+                return;
+            var saves = DWS.Common.InjectionFramework.ScriptableObjectSingleton.LoadSingleton<UBOAT.Game.Core.Serialization.SavesManager>();
+            if (!saves)
+                return;
+            var field = typeof(UBOAT.Game.Core.Serialization.SavesManager).GetField("LoadingInitialization",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field != null)
+            {
+                var handlers = field.GetValue(saves) as Delegate;
+                field.SetValue(saves, SceneEventHandlerPurge.RemoveAll(handlers,
+                    typeof(CurrentRouteRuntime).FullName, nameof(OnLoading)));
+            }
+            saves.LoadingInitialization += OnLoading;
+            loadingListenerRegistered = true;
+        }
+
+        private static void OnLoading()
+        {
+            Notices.Reset();
+            pendingNotice = null;
+            status = "native";
+            etaShip = null;
+            etaUpdatedAt = 0f;
         }
 
         /// <summary>Called from the binder's Update: UI work stays off FixedUpdate.</summary>

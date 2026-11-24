@@ -104,6 +104,11 @@ namespace UBOAT.Mods.RadioNavigation
             localizationKeyField = decisionType.GetField("LocalizationKey", BindingFlags.Public | BindingFlags.Instance);
             if (localizationKeyField.IsNull())
                 localizationKeyProp = decisionType.GetProperty("LocalizationKey");
+            if (localizationKeyField.IsNull() && localizationKeyProp.IsNull())
+            {
+                Debug.LogError("[RadioNav] Decision.LocalizationKey missing in v" + gameVersion);
+                return;
+            }
 
             foreach (var ctor in decisionType.GetConstructors(BindingFlags.Public | BindingFlags.Instance))
             {

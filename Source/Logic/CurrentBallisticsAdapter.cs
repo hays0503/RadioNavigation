@@ -98,29 +98,30 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void InstallOrdnanceAndGunHooks(Harmony harmony)
         {
-            MethodInfo updateShells = typeof(Shell).GetMethod("UpdateShells", AnyStatic);
-            MethodInfo dcFixedUpdate = typeof(DepthCharge).GetMethod("FixedUpdate", DeclaredInstanceNonPublic, null, Type.EmptyTypes, null);
-            MethodInfo hhFixedUpdate = typeof(HedgehogProjectile).GetMethod("FixedUpdate", DeclaredInstanceNonPublic, null, Type.EmptyTypes, null);
-            MethodInfo getDirection = typeof(Gun).GetMethod("GetDirection", InstanceNonPublic, null, new[] { typeof(Entity), typeof(Vector3) }, null);
-            MethodInfo gunFire = typeof(Gun).GetMethod("Fire", InstanceNonPublic);
-
-            shellsField = typeof(Shell).GetField("shells", AnyStatic);
-            splashedField = typeof(Shell).GetField("splashed", InstanceNonPublic);
-            calibreField = typeof(Gun).GetField("calibre", InstanceNonPublic);
-            shellSpeedField = typeof(Gun).GetField("shellSpeed", InstanceNonPublic);
-            magazineSizeField = typeof(Gun).GetField("magazineSize", InstanceNonPublic);
-            parentObservatorField = typeof(Gun).GetField("parentObservator", InstanceNonPublic);
-
-            if (updateShells == null || dcFixedUpdate == null || hhFixedUpdate == null
-                || getDirection == null || gunFire == null
-                || shellsField == null || splashedField == null)
-            {
-                Debug.LogWarning(LogPrefix + "required hooks missing; ballistic wind & bracketing disabled");
-                return;
-            }
-
+            MethodInfo updateShells = null, dcFixedUpdate = null, hhFixedUpdate = null, getDirection = null, gunFire = null;
             try
             {
+                updateShells = typeof(Shell).GetMethod("UpdateShells", AnyStatic);
+                dcFixedUpdate = typeof(DepthCharge).GetMethod("FixedUpdate", DeclaredInstanceNonPublic, null, Type.EmptyTypes, null);
+                hhFixedUpdate = typeof(HedgehogProjectile).GetMethod("FixedUpdate", DeclaredInstanceNonPublic, null, Type.EmptyTypes, null);
+                getDirection = typeof(Gun).GetMethod("GetDirection", InstanceNonPublic, null, new[] { typeof(Entity), typeof(Vector3) }, null);
+                gunFire = typeof(Gun).GetMethod("Fire", InstanceNonPublic);
+
+                shellsField = typeof(Shell).GetField("shells", AnyStatic);
+                splashedField = typeof(Shell).GetField("splashed", InstanceNonPublic);
+                calibreField = typeof(Gun).GetField("calibre", InstanceNonPublic);
+                shellSpeedField = typeof(Gun).GetField("shellSpeed", InstanceNonPublic);
+                magazineSizeField = typeof(Gun).GetField("magazineSize", InstanceNonPublic);
+                parentObservatorField = typeof(Gun).GetField("parentObservator", InstanceNonPublic);
+
+                if (updateShells == null || dcFixedUpdate == null || hhFixedUpdate == null
+                    || getDirection == null || gunFire == null
+                    || shellsField == null || splashedField == null)
+                {
+                    Debug.LogWarning(LogPrefix + "required hooks missing; ballistic wind & bracketing disabled");
+                    return;
+                }
+
                 var afterShells = new HarmonyMethod(typeof(CurrentBallisticsAdapter).GetMethod(nameof(AfterUpdateShells), AnyStatic));
                 var afterDc = new HarmonyMethod(typeof(CurrentBallisticsAdapter).GetMethod(nameof(AfterDepthChargeFixedUpdate), AnyStatic));
                 var afterHh = new HarmonyMethod(typeof(CurrentBallisticsAdapter).GetMethod(nameof(AfterHedgehogFixedUpdate), AnyStatic));
@@ -139,7 +140,17 @@ namespace UBOAT.Mods.RadioNavigation
             }
             catch (Exception ex)
             {
+                UnpatchAll(harmony, updateShells, dcFixedUpdate, hhFixedUpdate, getDirection, gunFire);
                 Debug.LogWarning(LogPrefix + "patch failed: " + ex.Message);
+            }
+        }
+
+        private static void UnpatchAll(Harmony harmony, params MethodInfo[] methods)
+        {
+            for (int i = 0; i < methods.Length; i++)
+            {
+                if (methods[i] != null)
+                    harmony.Unpatch(methods[i], HarmonyPatchType.All, harmony.Id);
             }
         }
 
@@ -230,7 +241,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (!decoyInstalled || !__instance)
                 return;
-            if (!(decoyBodyField?.GetValue(__instance) is Rigidbody body) || body.isKinematic)
+            if (!(decoyBodyField?.GetValue(__instance) is Rigidbody body) || !body || body.isKinematic)
                 return;
             float dt = Time.fixedDeltaTime;
             if (dt <= 0f)
@@ -280,13 +291,13 @@ namespace UBOAT.Mods.RadioNavigation
             FlareBodies.TryGetValue(__instance, out Rigidbody body);
             if ((bool)body && !body.isKinematic)
             {
-                Vector3 dv = CurrentBallisticsMath.ComputeParachuteWindDeltaV(body.velocity, windMps, body.drag, dt);
+                Vector3 dv = CurrentBallisticsMath.IntegrateParachuteWindDeltaV(body.velocity, windMps, body.drag, dt);
                 if (dv.x != 0f || dv.z != 0f)
                     body.velocity += dv;
                 return;
             }
 
-            Vector3 shift = CurrentBallisticsMath.ComputeWindDriftDisplacement(windMps, dt);
+            Vector3 shift = CurrentBallisticsMath.IntegrateWindDriftDisplacement(windMps, dt);
             if (shift.x != 0f || shift.z != 0f)
                 __instance.transform.position += shift;
         }
@@ -310,7 +321,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             if ((bool)torpedoDudField.GetValue(__instance))
                 return;
-            if (!(torpedoBodyField.GetValue(__instance) is Rigidbody body))
+            if (!(torpedoBodyField.GetValue(__instance) is Rigidbody body) || !body)
                 return;
 
             float dt = Time.fixedDeltaTime;
@@ -381,7 +392,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             float kAir = CurrentBallisticsMath.ComputeShellAirDragFactor(body.mass);
-            Vector3 dv = CurrentBallisticsMath.ComputeAirWindDeltaV(body.velocity, windMps, kAir, body.drag, dt);
+            Vector3 dv = CurrentBallisticsMath.IntegrateAirWindDeltaV(body.velocity, windMps, kAir, body.drag, dt);
             if (dv.x != 0f || dv.z != 0f)
                 body.velocity += dv;
         }
@@ -452,7 +463,7 @@ namespace UBOAT.Mods.RadioNavigation
             Vector3 predictedDrift = CurrentBallisticsMath.EstimateShellWindDisplacementXZ(
                 __result * shellSpeed, windMps, kAir, tof);
 
-            float learnedFraction = state.ShotsAtTarget <= 0
+            float learnedFraction = !ReferenceEquals(state.LastTarget, target) || state.ShotsAtTarget <= 0
                 ? 0f
                 : CurrentBallisticsMath.ComputeLearnedWindFraction(state.WindProgress, windDifficulty);
 
@@ -465,6 +476,9 @@ namespace UBOAT.Mods.RadioNavigation
         {
             __state = default(FireState);
             if (!installed || !__instance || __instance.ManualAim || !target)
+                return;
+            float windSpeed = CurrentRuntimeAdapter.CurrentWindMps.magnitude;
+            if (windSpeed <= 0.1f)
                 return;
 
             GunBracketingState state = GetOrCreateState(__instance, target);
@@ -494,7 +508,7 @@ namespace UBOAT.Mods.RadioNavigation
             state.LastShotGameSeconds = nowSec;
             __state.Tracked = true;
             __state.AccuracyBefore = __instance.CurrentAccuracy;
-            __state.WindSpeedMps = CurrentRuntimeAdapter.CurrentWindMps.magnitude;
+            __state.WindSpeedMps = windSpeed;
         }
 
         private static void AfterFire(Gun __instance, Shell __result, FireState __state)
@@ -559,7 +573,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (weather == null)
                 weather = InjectionFramework.Instance?.GetInstance<Weather>();
-            return weather?.Sea != null ? weather.Sea.VerticalOffset : 0f;
+            return weather.IsNotNull() && weather.Sea != null ? weather.Sea.VerticalOffset : 0f;
         }
 
         private static double ResolveGameSeconds()

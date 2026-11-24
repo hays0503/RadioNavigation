@@ -6,7 +6,7 @@
         public bool IsDashSector;
         public int SectorNumber;
         public int TransitionIndex;
-        public float Gain;
+        public volatile float Gain;
         public float BeatFrequency;
         public int DotCount;
         public float CurrentBearing;

@@ -265,6 +265,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             Camera cloneCam = cloneGo.AddComponent<Camera>();
             cloneCam.CopyFrom(interiorCamera);
+            cloneCam.name = pipCamera.name + "InteriorClone";
             cloneCam.targetTexture = null;
             cloneCam.enabled = true;
 

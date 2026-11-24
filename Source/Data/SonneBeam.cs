@@ -71,7 +71,8 @@ namespace UBOAT.Mods.RadioNavigation
 
             SonneBeamStation station;
             string tableName = GetTableName(stationName);
-            if (!Stations.TryGetValue(tableName, out station)
+            if (string.IsNullOrEmpty(tableName)
+                || !Stations.TryGetValue(tableName, out station)
                 || !station.TryGetSignal(angle, out signal))
             {
                 return false;

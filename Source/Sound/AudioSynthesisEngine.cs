@@ -277,10 +277,11 @@ namespace UBOAT.Mods.RadioNavigation
                 float sample = 0f;
                 for (int s = 0; s < count; s++)
                 {
-                    if (stations[s].Gain.IsNegligible(0.001f))
+                    float gain = stations[s].Gain;
+                    if (gain.IsNegligible(0.001f))
                         continue;
                     if (keyers[s].KeyOn)
-                        sample += stations[s].Gain
+                        sample += gain
                             * (keyers[s].CurrentElementIsDash ? Constants.DashGainBoost : 1f)
                             * carriers[s].NextSample();
                     else

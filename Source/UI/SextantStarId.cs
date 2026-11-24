@@ -43,7 +43,7 @@ namespace UBOAT.Mods.RadioNavigation
         private float selectionLostSeconds;
         private float tickTimer;
         private CelestialBody lastFoundBody;
-        private float identifiedAltDeg;
+        private float identifiedAltDeg = float.NaN;
         private SightBlock lastBlock;
         // Debug aim readout (RadioNav.DebugAim): line-of-sight offsets in
         // arcminutes; NaN when the gate is off or no body is in the cone.
@@ -139,7 +139,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             tracker.Reset();
             tickTimer = 0f;
-            identifiedAltDeg = 0f;
+            identifiedAltDeg = float.NaN;
             lastFoundBody = CelestialBody.None();
             selection.Clear();
             selectedInCone = false;

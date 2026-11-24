@@ -86,6 +86,7 @@ namespace UBOAT.Mods.RadioNavigation
             public Image OpticsGrimeImage;
             public Image[] OpticsMotes;
             public Material OpaqueViewMaterial;
+            public bool OwnsOpaqueViewMaterial;
             // Sprites created with Sprite.Create are NOT owned by the canvas
             // GameObject; the controller must Destroy() them explicitly.
             public readonly System.Collections.Generic.List<Sprite> OwnedSprites =

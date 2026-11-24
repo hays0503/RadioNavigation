@@ -233,6 +233,34 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(53, signal.DashCount);
         }
 
+        [Fact]
+        public void Initialize_SevilleDotSectorAround99Deg_IsMonotonicAndIncludes19And23()
+        {
+            Assert.True(SonneBeam.Initialize(FindDataDirectory()), SonneBeam.LastLoadError);
+
+            NavigationElementType[] pattern;
+            SonneBeamSignal s23, s19;
+            Assert.True(SonneBeam.TryGetNavigationPattern("Seville", 99.2, out pattern, out s23));
+            Assert.False(s23.IsDashSector);
+            Assert.Equal(23, s23.DotCount);
+
+            Assert.True(SonneBeam.TryGetNavigationPattern("Seville", 99.9, out pattern, out s19));
+            Assert.False(s19.IsDashSector);
+            Assert.Equal(19, s19.DotCount);
+        }
+
+        [Fact]
+        public void TryGetNavigationPattern_NullOrEmptyStation_ReturnsFalse()
+        {
+            Assert.True(SonneBeam.Initialize(FindDataDirectory()), SonneBeam.LastLoadError);
+            NavigationElementType[] pattern;
+            SonneBeamSignal signal;
+            Assert.False(SonneBeam.TryGetNavigationPattern(null, 45.0, out pattern, out signal));
+            Assert.Null(pattern);
+            Assert.False(SonneBeam.TryGetNavigationPattern("", 45.0, out pattern, out signal));
+            Assert.Null(pattern);
+        }
+
         private static void AssertRepeated(
             NavigationElementType[] pattern,
             int start,

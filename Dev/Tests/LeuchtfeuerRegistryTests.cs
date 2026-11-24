@@ -36,6 +36,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         [InlineData("Fl(3)W.12s23M", 30f)]     // 360/12, range suffix ignored
         [InlineData("Oc.WG.6s7/4M", 60f)]      // 360/6
         [InlineData("Q(9) 15s", 24f)]          // 360/15
+        [InlineData("23sm / Fl W 20s", 18f)]   // German luminous range 'sm' ignored
+        [InlineData("Weiß 16sm Rot 11sm Grün 11sm / Oc WRG 5sec", 72f)] // 'sm' skipped, 'sec' accepted
+        [InlineData("rot 7sm / F R (rotes Dauerlicht)", 0f)]             // fixed light with 'sm' range must not rotate
         [InlineData("F.G.9M", 0f)]             // fixed light
         [InlineData("8 F.R. (horiz.)", 0f)]    // fixed
         [InlineData("", 0f)]

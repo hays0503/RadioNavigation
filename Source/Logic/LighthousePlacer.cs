@@ -299,7 +299,7 @@ namespace UBOAT.Mods.RadioNavigation
                 {
                     gateScratch.Add(placement);
                 }
-                else if (LighthouseSpawnBudget.Consumed(placement.Spawned, placement.WantsSpawn) == 1)
+                else if (!placement.Fatal && LighthouseSpawnBudget.Consumed(placement.Spawned, placement.WantsSpawn) == 1)
                 {
                     // F222: a pending grant (WantsSpawn && !Spawned) also
                     // occupies a slot; counting only Spawned let the cap be
@@ -524,6 +524,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Debug.LogError(LogPrefix + " '" + placement.GroupName + "' giving up after " +
                     MaxAttemptsPerProfile + " attempts; check prefab/bundle availability");
                 placement.Fatal = true;
+                placement.WantsSpawn = false;
                 return false;
             }
 
@@ -566,6 +567,7 @@ namespace UBOAT.Mods.RadioNavigation
                     Debug.LogError(LogPrefix + " '" + placement.GroupName + "': prefab not found: '" +
                         placement.Profile.PrefabPath + "'");
                     placement.Fatal = true;
+                    placement.WantsSpawn = false;
                     return false;
                 }
             }

@@ -28,6 +28,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (Mathf.Approximately(cursorAngle, value))
                     return;
                 cursorAngle = value;
+                CursorHandler.SyncVisualAngle(value);
                 EmitFrequency();
             }
         }

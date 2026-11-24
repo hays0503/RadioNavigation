@@ -98,12 +98,14 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static void UnbindNearby(Rigidbody targetBody)
         {
-            if (targetBody == null || Nearby.Count == 0)
+            if (Nearby.Count == 0)
                 return;
             Expired.Clear();
             foreach (var pair in Nearby)
-                if (pair.Key == null || ReferenceEquals(pair.Value.Body, targetBody))
+            {
+                if (pair.Key == null || pair.Value.Body == null || ReferenceEquals(pair.Value.Body, targetBody))
                     Expired.Add(pair.Key);
+            }
             foreach (var key in Expired)
                 Nearby.Remove(key);
         }

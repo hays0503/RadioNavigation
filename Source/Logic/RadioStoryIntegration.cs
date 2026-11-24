@@ -51,7 +51,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
-                if (!TryInit() || StoryDecisionGateway.DecisionCtor.IsNull() || StoryDecisionGateway.StageField.IsNull())
+                if (!TryInit() || StoryDecisionGateway.DecisionCtor.IsNull() || StoryDecisionGateway.StageField.IsNull()
+                    || (StoryDecisionGateway.LocalizationKeyField.IsNull() && StoryDecisionGateway.LocalizationKeyProp.IsNull()))
                 {
                     Debug.LogWarning("[RadioNav] Init failed, cannot inject T3PLL38");
                     return;

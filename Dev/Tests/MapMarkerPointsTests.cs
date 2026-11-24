@@ -194,5 +194,16 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(0, MapMarkerPoints.ClampCreateCount(5, 0));
             Assert.Equal(0, MapMarkerPoints.ClampCreateCount(5, -1));
         }
+
+        [Fact]
+        public void IsStaticKey_ProtectsStaticMarkersAndAllowsErasingDynamicMarkers()
+        {
+            Assert.True(MapMarkerPoints.IsStaticKey("RadioNav LH DE-042"));
+            Assert.True(MapMarkerPoints.IsStaticKey("RadioNav STN DDH"));
+            Assert.False(MapMarkerPoints.IsStaticKey("RadioNav FIX"));
+            Assert.False(MapMarkerPoints.IsStaticKey("RadioNav LOP A+B"));
+            Assert.False(MapMarkerPoints.IsStaticKey(""));
+            Assert.False(MapMarkerPoints.IsStaticKey(null));
+        }
     }
 }

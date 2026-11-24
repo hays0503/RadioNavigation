@@ -140,7 +140,8 @@ namespace UBOAT.Mods.RadioNavigation
                     > MeshRebuildPolicy.MaxCameraMoveM
                 || Quaternion.Angle(cam.transform.rotation, lastCameraRotation)
                     > MeshRebuildPolicy.MaxCameraRotationDeg;
-            bool timeDrift = Math.Abs(MeshRebuildPolicy.AngularDifferenceDeg(lstDeg, lastLstDeg))
+            bool timeDrift = double.IsNaN(lastLstDeg) || double.IsNaN(lastLatitude)
+                || Math.Abs(MeshRebuildPolicy.AngularDifferenceDeg(lstDeg, lastLstDeg))
                     > MeshRebuildPolicy.MaxLstDriftDeg
                 || Math.Abs(latitude - lastLatitude) > MeshRebuildPolicy.MaxLatitudeDriftDeg;
             bool needsRebuild = !meshRenderer.enabled || cameraMoved

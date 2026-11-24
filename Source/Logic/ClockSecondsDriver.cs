@@ -168,6 +168,8 @@ namespace UBOAT.Mods.RadioNavigation
                 expectedContactsText = null;
                 contactsSecond = long.MinValue;
             }
+            if (string.IsNullOrEmpty(secondsDateFormat))
+                return;
 
             DateTime localTime = gameTime.LocalDateTime;
             long key = ClockSecondsText.SecondKey(localTime);

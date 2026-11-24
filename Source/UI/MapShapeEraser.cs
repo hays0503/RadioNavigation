@@ -54,7 +54,7 @@ namespace UBOAT.Mods.RadioNavigation
             MapPointUI hovered = MapPointUI.HoveredPoint;
             if (hovered == null || hovered.Data == null)
                 return;
-            if (!MapMarkerPoints.IsOwned(hovered.Data.Name))
+            if (!MapMarkerPoints.IsStaticKey(hovered.Data.Name))
                 return;
 
             int removed = RemoveShapesFor(hovered.Data);

@@ -79,6 +79,15 @@ namespace UBOAT.Mods.RadioNavigation
                 && name.StartsWith(Prefix, StringComparison.Ordinal);
         }
 
+        /// <summary>True when the point name is one of the mod's non-erasable
+        /// static markers (lighthouse or radio beacon).</summary>
+        public static bool IsStaticKey(string name)
+        {
+            return !string.IsNullOrEmpty(name)
+                && (name.StartsWith(LighthouseKeyPrefix, StringComparison.Ordinal)
+                    || name.StartsWith(StationKeyPrefix, StringComparison.Ordinal));
+        }
+
         /// <summary>Names the save sanitizer may deduplicate: our own points
         /// (including the MCP test points) and the legacy literal name written
         /// by the first MCP builds.</summary>

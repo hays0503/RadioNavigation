@@ -53,12 +53,22 @@ namespace UBOAT.Mods.RadioNavigation
                 if (!Resolve())
                     return false;
                 endpoints.Clear();
+                var transferredSlots = new HashSet<int>();
                 foreach (MapPointUI point in Object.FindObjectsOfType<MapPointUI>(true))
                 {
                     if (point == null || point.Data == null || !SextantLopPlot.OwnsEndpoint(point.Data.Name))
                         continue;
                     endpoints.Add(point);
-                    StylePoint(point, false);
+                    int slot; bool moved, end;
+                    if (SextantLopPlot.TryKey(point.Data.Name, out slot, out moved, out end) && moved)
+                        transferredSlots.Add(slot);
+                }
+                foreach (MapPointUI point in endpoints)
+                {
+                    int slot; bool moved, end;
+                    bool coincident = SextantLopPlot.TryKey(point.Data.Name, out slot, out moved, out end)
+                        && !moved && !transferredSlots.Contains(slot);
+                    StylePoint(point, coincident);
                 }
                 foreach (MapLineUI line in Object.FindObjectsOfType<MapLineUI>(true))
                 {

@@ -264,6 +264,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal static void ResetForReload()
         {
+            patchAttempted = false;
+            patched = false;
             RestoreRendererStage();
         }
 

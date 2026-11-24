@@ -16,6 +16,7 @@ namespace UBOAT.Mods.RadioNavigation
         private Vector2 cursorOverrideHotspot;
         private bool moveCursorActive;
         private bool isDragging;
+        private bool pointerExitedDuringDrag;
         private int activePointerId = -1;
         private bool chronometerPointerInside;
         private ExpanderHandler expander;
@@ -128,6 +129,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
 
             isDragging = true;
+            pointerExitedDuringDrag = false;
             activePointerId = eventData.pointerId;
         }
 
@@ -147,10 +149,19 @@ namespace UBOAT.Mods.RadioNavigation
             if (eventData.pointerId != activePointerId) return;
             isDragging = false;
             activePointerId = -1;
+            if (!pointerExitedDuringDrag)
+                return;
+            pointerExitedDuringDrag = false;
+            if (moveCursorActive && cursorOverrideTexture.IsNull())
+            {
+                Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+                moveCursorActive = false;
+            }
         }
 
         public void OnPointerEnter(PointerEventData eventData)
         {
+            pointerExitedDuringDrag = false;
             if (chronometerPointerInside)
                 return;
             if (eventData.dragging)
@@ -171,8 +182,13 @@ namespace UBOAT.Mods.RadioNavigation
             // F187: while dragging, the cursor may leave the panel bounds
             // (fast drag); OnEndDrag resets the cursor via OnPointerExit
             // semantics below - keep the move cursor until the drag ends.
-            if (!moveCursorActive || isDragging)
+            if (!moveCursorActive)
                 return;
+            if (isDragging)
+            {
+                pointerExitedDuringDrag = true;
+                return;
+            }
 
             Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
             moveCursorActive = false;
@@ -200,6 +216,7 @@ namespace UBOAT.Mods.RadioNavigation
             // F149: reset drag state on disable so a mid-drag disable (which
             // skips OnEndDrag) cannot lock out future drags.
             isDragging = false;
+            pointerExitedDuringDrag = false;
             activePointerId = -1;
 
             if (!moveCursorActive)

@@ -84,7 +84,8 @@ namespace RadioNavigation.SourceCheck
             Assigns(late, "transform.localScale", "new Vector3(size, size, 1f)");
             var bake = Method(moon, "RebuildTexture");
             Var(bake, "coverage", "MoonPhaseDisc.BuildCoverageField(TextureSize)");
-            Var(bake, "alphaByte", "(byte)(coverage[i] * 255f + 0.5f)");
+            Var(bake, "cov", "coverage[srcRow + px]");
+            Var(bake, "alphaByte", "(byte)(cov * 255f + 0.5f)");
             Assigns(late, "material.color", "new Color(visibility, visibility, visibility, 1f)");
             Call(Method(Source("UI/SextantController.cs"), "TryGetOwnMoon"), "AstroMath.MoonTopocentricRaDec",
                 "jd", "lat", "lstDeg", "out double raRad", "out double decRad");

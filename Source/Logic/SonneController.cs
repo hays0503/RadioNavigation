@@ -10,9 +10,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const int SonneZoneIndex = 1;
         private const float TimeCompressionThreshold = 1.01f;
 
-        private static readonly AudioClip silentClip = AudioClip.Create(
-            "SonneSilent", AudioSynthesisEngine.DeviceSampleRate * 2, 1,
-            AudioSynthesisEngine.DeviceSampleRate, false);
+        private static AudioClip silentClip;
 
         // Station fleet state + tuning/navigation live in StationManager
         // (extracted, P5.6 slice SC-2); the fleet object stays here for
@@ -52,6 +50,18 @@ namespace UBOAT.Mods.RadioNavigation
         private const float PositionLogInterval = 10f;
         private float positionLogTimer;
 
+        private static AudioClip EnsureSilentClip()
+        {
+            if (silentClip == null)
+            {
+                silentClip = AudioClip.Create(
+                    "SonneSilent", AudioSynthesisEngine.DeviceSampleRate * 2, 1,
+                    AudioSynthesisEngine.DeviceSampleRate, false);
+                silentClip.hideFlags = HideFlags.DontSave;
+            }
+            return silentClip;
+        }
+
         private void Awake()
         {
             suppressAudioForTimeCompression = IsTimeCompressed(Time.timeScale);
@@ -73,7 +83,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             cachedAudioSource = GetComponent<AudioSource>();
             var audio = cachedAudioSource;
-            audio.clip = silentClip;
+            audio.clip = EnsureSilentClip();
             audio.loop = true;
             audio.Play();
 

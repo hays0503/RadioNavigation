@@ -96,17 +96,16 @@ namespace UBOAT.Mods.RadioNavigation
             if (camera == null) throw new InvalidOperationException("Actual FPP view camera unavailable");
             player.SetDesired(equipped, reading && !optics); player.Advance(Mathf.Max(0, dt));
             float gripWeight = 1;
+            float frame = (float)player.CurrentTime*24+1;
             if (player.CurrentPhase == CPlathAdaptiveAnimationPlayer.Phase.Raising || player.CurrentPhase == CPlathAdaptiveAnimationPlayer.Phase.Lowering)
             {
-                float frame = (float)player.CurrentTime*24+1;
                 gripWeight = CPlathAdaptiveMechanismRig.LeftGripWeight(player.CurrentClip.name, frame);
             }
             else if (!player.IsVisible) gripWeight = 0;
-            readClearance.Apply(player.CurrentClip.name, (float)player.CurrentTime*24+1);
+            readClearance.Apply(player.CurrentClip.name, frame);
             mechanisms.Apply(degrees, shadeState.IsActive, dt, gripWeight);
-            float viewFrame = (float)player.CurrentTime*24+1;
-            player.AlignToCamera(camera.transform, readClearance.ViewOffset(player.CurrentClip.name, viewFrame),
-                readClearance.ViewPosition(player.CurrentClip.name, viewFrame));
+            player.AlignToCamera(camera.transform, readClearance.ViewOffset(player.CurrentClip.name, frame),
+                readClearance.ViewPosition(player.CurrentClip.name, frame));
             bool visible = player.IsVisible && !optics;
             bool inside = MainCamera.Instance != null && MainCamera.Instance.IsInsideBoat;
             int layer = LayerMask.NameToLayer(inside ? "Interior" : "Default");

@@ -530,7 +530,7 @@ public sealed class FakeInput { public void RemoveBlockade(object owner) {} }
 public static class SunDiscRenderer { public static bool Active; public static void RandomizeDisc() {} public static void ResetDirection() {} }
 public static class StarsMesh { public static bool Shielded; }
 public static class CameraResolver { public static void UnfreezeRadius() {} }
-public static class SextantPipPose { public static void ClearTestAim() { ProbeState.ClearAimCalls++; } }
+public static class SextantPipPose { public static void ClearTestAim() { ProbeState.ClearAimCalls++; } public static void RestoreProbeViewCamera(object cam) {} }
 public static class RadioNavProbeJson { public static string Escape(string value) { return value; } }
 public sealed class SextantController {
     private const string LogPrefix = ""[Sextant]"";
@@ -581,7 +581,7 @@ public sealed class SextantController {
     private void UpdateGlare(float dt) {} private void UpdateStarId(float dt) {}
     private void UpdateSightLines() {} private void UpdateOpticsMotes() {}
     private void UpdateBodiesReadout(float dt) {} private void UpdateMoonParity(float dt) {}
-    private void ToggleHelp() {} private void PollUiScale() {}
+    private void ToggleHelp() {} private void PollUiScale() {} private void UpdateTableSun() {}
     public bool TryGetPositionForProbe(out float lat, out float lon) { lat = lon = 0; return true; }
     public object CaptureSunDiscSighting(CelestialBody body) { return null; }
     /* CONTROLLER */

@@ -50,6 +50,7 @@ namespace UBOAT.Mods.RadioNavigation
         private TextMeshProUGUI tooltipText;
         private bool built;
         private bool pinned;
+        private bool pointerHovered;
 
         public MapPointUI Point => point;
         public bool Pinned => pinned;
@@ -287,6 +288,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnPointerEnter(PointerEventData eventData)
         {
+            pointerHovered = true;
             if (Owner == null)
                 return;
             Owner.OnBridgeHoverEnter(this);
@@ -294,9 +296,21 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void OnPointerExit(PointerEventData eventData)
         {
+            pointerHovered = false;
             if (Owner == null)
                 return;
             Owner.OnBridgeHoverExit(this);
+        }
+
+        public void OnDisable()
+        {
+            if (!pointerHovered)
+                return;
+            pointerHovered = false;
+            if (Owner != null)
+                Owner.OnBridgeHoverExit(this);
+            else if (!pinned)
+                HideTooltip();
         }
 
         public void OnPointerClick(PointerEventData eventData)

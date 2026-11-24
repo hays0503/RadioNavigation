@@ -153,7 +153,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (!enabled || !CurrentRuntimeAdapter.NearbyDriftEnabled || !group
                 || group is SandboxPlayerWolfpack || group.IsAirborne || group.IsBeingDestroyed
-                || group.SpawnState != SpawnState.Spawning || group.Route.Count == 0)
+                || group.SpawnState != SpawnState.Spawning || group.Route == null || group.Route.Count == 0)
                 return false;
             var entities = group.Entities;
             if (entities == null)

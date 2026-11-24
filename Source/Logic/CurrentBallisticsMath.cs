@@ -77,6 +77,23 @@ namespace UBOAT.Mods.RadioNavigation
             return new Vector3(dvx, 0f, dvz);
         }
 
+        internal static Vector3 IntegrateAirWindDeltaV(Vector3 velocity, Vector3 windMps,
+            float airDragFactor, float linearDrag, float dt)
+        {
+            if (dt <= 0f || float.IsNaN(dt) || float.IsInfinity(dt))
+                return Vector3.zero;
+            float remaining = Math.Min(dt, 1f);
+            Vector3 cur = velocity;
+            while (remaining > 1e-6f)
+            {
+                float step = remaining > 0.1f ? 0.1f : remaining;
+                Vector3 dv = ComputeAirWindDeltaV(cur, windMps, airDragFactor, linearDrag, step);
+                cur = new Vector3(cur.x + dv.x, cur.y, cur.z + dv.z);
+                remaining -= step;
+            }
+            return new Vector3(cur.x - velocity.x, 0f, cur.z - velocity.z);
+        }
+
         internal static Vector3 ComputeQuadraticAirWindAccel(Vector3 velocity, Vector3 windMps, float airDragFactor)
         {
             if (airDragFactor <= 0f)
@@ -138,6 +155,23 @@ namespace UBOAT.Mods.RadioNavigation
             return new Vector3((wx - velocity.x) * alpha, 0f, (wz - velocity.z) * alpha);
         }
 
+        internal static Vector3 IntegrateParachuteWindDeltaV(Vector3 velocity, Vector3 windMps,
+            float bodyDrag, float dt)
+        {
+            if (dt <= 0f || float.IsNaN(dt) || float.IsInfinity(dt))
+                return Vector3.zero;
+            float remaining = Math.Min(dt, 1f);
+            Vector3 cur = velocity;
+            while (remaining > 1e-6f)
+            {
+                float step = remaining > 0.1f ? 0.1f : remaining;
+                Vector3 dv = ComputeParachuteWindDeltaV(cur, windMps, bodyDrag, step);
+                cur = new Vector3(cur.x + dv.x, cur.y, cur.z + dv.z);
+                remaining -= step;
+            }
+            return new Vector3(cur.x - velocity.x, 0f, cur.z - velocity.z);
+        }
+
         internal static int AdvanceSeabedContactTicks(int currentTicks, bool sleeping, bool terrainContact)
         {
             if (terrainContact)
@@ -165,6 +199,23 @@ namespace UBOAT.Mods.RadioNavigation
         internal static Vector3 ComputeWindDriftDisplacement(Vector3 windMps, float dt)
         {
             return ScaleHorizontalStep(windMps, 1f, dt);
+        }
+
+        internal static Vector3 IntegrateWindDriftDisplacement(Vector3 windMps, float dt)
+        {
+            if (dt <= 0f || float.IsNaN(dt) || float.IsInfinity(dt))
+                return Vector3.zero;
+            float remaining = Math.Min(dt, 1f);
+            float tx = 0f, tz = 0f;
+            while (remaining > 1e-6f)
+            {
+                float step = remaining > 0.1f ? 0.1f : remaining;
+                Vector3 s = ScaleHorizontalStep(windMps, 1f, step);
+                tx += s.x;
+                tz += s.z;
+                remaining -= step;
+            }
+            return new Vector3(tx, 0f, tz);
         }
 
         private static Vector3 ScaleHorizontalStep(Vector3 flowMps, float blend, float dt)
@@ -253,7 +304,7 @@ namespace UBOAT.Mods.RadioNavigation
             float htz = targetPoint.z - spawnPosition.z;
             float range = Mathf.Sqrt(htx * htx + htz * htz);
             if (range > 1f)
-                dir = CompensateAimVector(dir, htx, htz, range, predictedWindDriftXZ, learnedFraction);
+                dir = CompensateAimVector(dir, range, predictedWindDriftXZ, learnedFraction);
 
             float gustSigma = 0.0085f * Mathf.Clamp01(windDifficulty) * (1f - 0.35f * Mathf.Clamp01(learnedFraction));
             if (gustSigma > 0f)
@@ -262,16 +313,22 @@ namespace UBOAT.Mods.RadioNavigation
             return TryNormalize(dir, out Vector3 normalized) ? normalized : dir;
         }
 
-        private static Vector3 CompensateAimVector(Vector3 dir, float htx, float htz, float range,
+        private static Vector3 CompensateAimVector(Vector3 dir, float range,
             Vector3 predictedWindDriftXZ, float learnedFraction)
         {
-            float cx = htx - learnedFraction * predictedWindDriftXZ.x;
-            float cz = htz - learnedFraction * predictedWindDriftXZ.z;
-            float compRange = Mathf.Sqrt(cx * cx + cz * cz);
-            if (compRange <= 1f)
-                return dir;
             float horizLen = Mathf.Sqrt(dir.x * dir.x + dir.z * dir.z);
             if (horizLen <= 1e-4f)
+                return dir;
+
+            // Project horizontal range along vanillaLaunchDir's (dir.x, dir.z)
+            // so target-velocity lead and vanilla spread stay intact instead of
+            // reverting to the unled bearing toward targetPoint.
+            float vx = (dir.x / horizLen) * range;
+            float vz = (dir.z / horizLen) * range;
+            float cx = vx - learnedFraction * predictedWindDriftXZ.x;
+            float cz = vz - learnedFraction * predictedWindDriftXZ.z;
+            float compRange = Mathf.Sqrt(cx * cx + cz * cz);
+            if (compRange <= 1f)
                 return dir;
 
             float ax = cx / compRange;

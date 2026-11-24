@@ -100,6 +100,7 @@ namespace UBOAT.Mods.RadioNavigation
             // SavesManager singleton resolves.
             MapSaveSanitizer.TryInstall();
             SextantSavePersistence.TryInstall();
+            CurrentRouteRuntime.TryInstallLoadingListener();
 
             // Dev-console diagnostics (calibration probe: rn_lighthouse_height)
             LighthouseHeightProbe.EnsureRegistered();
@@ -271,6 +272,7 @@ namespace UBOAT.Mods.RadioNavigation
             // singleton is resolvable (LoadSingleton returns null early).
             MapSaveSanitizer.TryInstall();
             SextantSavePersistence.TryInstall();
+            CurrentRouteRuntime.TryInstallLoadingListener();
             // A scene transition may expose a new decorative star dome; ask
             // the suppressor for one discovery scan instead of polling every
             // second (a full renderer scan costs ~25 ms).

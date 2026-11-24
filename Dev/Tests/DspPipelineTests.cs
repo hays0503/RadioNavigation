@@ -149,5 +149,61 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             float outVal = dsp.Process(0.5f, 0f);
             Assert.InRange(outVal, -1f, 1f);
         }
+
+        [Fact]
+        public void Atmosphere_QsbEnvelopeIsContinuousAcrossOneSecondBoundary()
+        {
+            var atmo = new Atmosphere(1);
+            atmo.NoiseFloor = 0f;
+            atmo.ImpulseProbability = 0f;
+            atmo.QsbDepth = 0.75f;
+            atmo.QsbFrequency = 0.15f;
+
+            float at44099 = 0f, at44100 = 0f;
+            float min = float.MaxValue, max = float.MinValue;
+            for (int i = 0; i < 44100 * 7; i++)
+            {
+                float cur = atmo.Apply(1f, 44100f);
+                if (i == 44099) at44099 = cur;
+                if (i == 44100) at44100 = cur;
+                if (cur < min) min = cur;
+                if (cur > max) max = cur;
+            }
+            float stepAt1s = Math.Abs(at44100 - at44099);
+            Assert.True(stepAt1s < 1e-3f, "QSB envelope jumped across 1s boundary by " + stepAt1s);
+            Assert.True(min < 0.27f, "Expected QSB to reach full trough (~0.25), got min=" + min);
+            Assert.True(max > 0.99f, "Expected QSB to reach peak (~1.0), got max=" + max);
+        }
+
+        [Fact]
+        public void ReceiverDsp_RecoversFromNonFiniteFilterState()
+        {
+            var dsp = new ReceiverDsp(44100f);
+            FieldInfo prevField = typeof(ReceiverDsp).GetField("prevFilter", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(prevField);
+            prevField.SetValue(dsp, float.NaN);
+
+            float recovery = 0f;
+            for (int i = 0; i < 10; i++)
+                recovery = dsp.Process(0.5f, 44100f);
+
+            Assert.False(float.IsNaN(recovery) || float.IsInfinity(recovery));
+            Assert.True(recovery > 0.05f, "Expected filter to recover from NaN, got " + recovery);
+        }
+
+        [Fact]
+        public void StationState_GainField_IsVolatile()
+        {
+            FieldInfo field = typeof(StationState).GetField("Gain", BindingFlags.Public | BindingFlags.Instance);
+            Assert.NotNull(field);
+            Type[] mods = field.GetRequiredCustomModifiers();
+            bool isVolatile = false;
+            for (int i = 0; i < mods.Length; i++)
+            {
+                if (mods[i].FullName == "System.Runtime.CompilerServices.IsVolatile")
+                    isVolatile = true;
+            }
+            Assert.True(isVolatile, "StationState.Gain must be volatile across main/audio threads");
+        }
     }
 }

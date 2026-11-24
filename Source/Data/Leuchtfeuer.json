@@ -759,7 +759,7 @@
                         "country":  "Deutschland",
                         "location":  "Greifswald - Wieck (Greifswalder Bodden)",
                         "lat":  54.098167,
-                        "lon":  54.098167,
+                        "lon":  13.452,
                         "fireHeight":  "5 m",
                         "characteristic":  "Q(3)6,5s3M",
                         "type":  "Breakwater light",
@@ -2402,7 +2402,7 @@
                         "fireHeight":  "28 m",
                         "characteristic":  "Fl.R.",
                         "type":  "Breakwater light",
-                        "code":  "A3925.x"
+                        "code":  "A3925"
                     },
                     {
                         "name":  "Skye Bridge Main Crossing North",
@@ -3095,7 +3095,7 @@
                         "fireHeight":  "14 m",
                         "characteristic":  "F.G.",
                         "type":  "Breakwater light",
-                        "code":  "E1197.x"
+                        "code":  "E1197"
                     },
                     {
                         "name":  "Marina Outer Mole Head",
@@ -3421,7 +3421,7 @@
                         "country":  "Italien",
                         "location":  "Chioggia (Adria - Golf von Venedig)",
                         "lat":  45.234517,
-                        "lon":  45.234517,
+                        "lon":  12.2897,
                         "fireHeight":  "9 m",
                         "characteristic":  "Fl (2) G 7s",
                         "type":  "Breakwater light",
@@ -4745,7 +4745,7 @@
                         "fireHeight":  "13 m",
                         "characteristic":  "R",
                         "type":  "Breakwater light",
-                        "code":  "N4901.x"
+                        "code":  "N4901"
                     },
                     {
                         "name":  "Yesilköy Burnu",
@@ -5097,7 +5097,7 @@
                         "fireHeight":  "4 m",
                         "characteristic":  "F.G.3s2M",
                         "type":  "Breakwater light",
-                        "code":  "N4917.2"
+                        "code":  "N4917.2a"
                     },
                     {
                         "name":  "Marineakademie, Südmole",

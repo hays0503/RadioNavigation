@@ -83,13 +83,24 @@ namespace UBOAT.Mods.RadioNavigation
         private double loadWorkMs;
         private double heavyWorkMs;
         private double sink;
+        private bool savedDisplayLimiter;
+        private int savedVSyncCount;
+        private int savedTargetFrameRate;
 
         public static void EnsureRunning()
         {
             if (Environment.GetEnvironmentVariable("RADIONAV_WIND_PROBE") != "1")
                 return;
-            if (FindObjectOfType<WindProbeRuntime>() != null)
-                return;
+            foreach (WindProbeRuntime existing in FindObjectsOfType<WindProbeRuntime>())
+            {
+                if (existing != null)
+                    return;
+            }
+            foreach (MonoBehaviour candidate in FindObjectsOfType<MonoBehaviour>())
+            {
+                if (candidate != null && candidate.GetType().Name == typeof(WindProbeRuntime).Name)
+                    Destroy(candidate.gameObject);
+            }
             var go = new GameObject("WindProbeRuntime");
             go.AddComponent<WindProbeRuntime>();
             DontDestroyOnLoad(go);
@@ -111,6 +122,16 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 basisCos[i] = Math.Cos(i * 0.17);
                 basisSin[i] = Math.Sin(i * 0.17);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (savedDisplayLimiter)
+            {
+                QualitySettings.vSyncCount = savedVSyncCount;
+                Application.targetFrameRate = savedTargetFrameRate;
+                savedDisplayLimiter = false;
             }
         }
 
@@ -180,6 +201,9 @@ namespace UBOAT.Mods.RadioNavigation
             // measurement window and restore it afterwards; nothing is saved.
             int originalVSync = QualitySettings.vSyncCount;
             int originalTarget = Application.targetFrameRate;
+            savedVSyncCount = originalVSync;
+            savedTargetFrameRate = originalTarget;
+            savedDisplayLimiter = true;
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = -1;
             idleCount = 0;
@@ -231,6 +255,7 @@ namespace UBOAT.Mods.RadioNavigation
             heavyManagedDelta = GC.GetTotalMemory(false) - managed0;
             QualitySettings.vSyncCount = originalVSync;
             Application.targetFrameRate = originalTarget;
+            savedDisplayLimiter = false;
 
             MainCamera endCamera = FindObjectOfType<MainCamera>();
             cameraModeEnd = endCamera != null ? endCamera.CurrentMode.ToString() : "unknown";
@@ -670,6 +695,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static string Fmt(double value)
         {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+                return "null";
             return value.ToString("R", CultureInfo.InvariantCulture);
         }
 

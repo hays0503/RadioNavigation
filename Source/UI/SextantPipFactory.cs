@@ -132,6 +132,9 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             }
 
+            if (LeftCamera != null || RightCamera != null || LeftRt != null || RightRt != null)
+                Destroy();
+
             effectMirror = mirror;
             RtSize = desired;
 
@@ -313,6 +316,11 @@ namespace UBOAT.Mods.RadioNavigation
             rightData = null;
             cachedViewCamera = null;
             cachedViewData = null;
+            sourceSsmsFog = null;
+            sourceSsms = null;
+            sourcePpv1 = null;
+            effectMirror = null;
+            waterAttachWarned = false;
             if (LeftCamera != null) UnityEngine.Object.Destroy(LeftCamera.gameObject);
             if (RightCamera != null) UnityEngine.Object.Destroy(RightCamera.gameObject);
             LeftCamera = null;

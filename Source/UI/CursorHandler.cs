@@ -19,9 +19,32 @@ namespace UBOAT.Mods.RadioNavigation
         // F102: ScrollRect is static after setup; cache instead of walking
         // the hierarchy every frame while scrolling.
         private ScrollRect cachedScrollRect;
+        private static CursorHandler activeInstance;
+
+        internal static void SyncVisualAngle(float angle)
+        {
+            if (activeInstance.IsNull() || activeInstance.cursorRect.IsNull())
+                return;
+            float clamped = Mathf.Clamp(angle, MinAngle, MaxAngle);
+            activeInstance.cursorRect.localRotation = Quaternion.Euler(0f, 0f, -clamped);
+        }
+
+        private void OnDisable()
+        {
+            isHovering = false;
+            isDragging = false;
+            activePointerId = -1;
+        }
+
+        private void OnDestroy()
+        {
+            if (activeInstance == this)
+                activeInstance = null;
+        }
 
         private void Start()
         {
+            activeInstance = this;
             cursorRect = GetComponent<RectTransform>();
             if (cursorRect.IsNull())
             {

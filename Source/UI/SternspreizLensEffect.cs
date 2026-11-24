@@ -104,6 +104,9 @@ namespace UBOAT.Mods.RadioNavigation
         private float lastLat = float.NaN;
         private float lastFov = float.NaN;
         private float lastLengthDeg = float.NaN;
+        private double lastLimitingMag = double.NaN;
+        private float lastFogginess = float.NaN;
+        private double lastAdaptation = double.NaN;
         private float lastRebuildRealtime;
         private float lastTiltRebuildRealtime = float.NegativeInfinity;
         private float lastTiltDeg = float.NaN;
@@ -255,12 +258,25 @@ namespace UBOAT.Mods.RadioNavigation
 
             DateTime utc = GameTimeResolver.GetUtcNow();
             double lstDeg = AstroMath.LstDeg(AstroMath.ToJulianDay(utc), lon);
-            if (!MeshRebuildPolicy.NeedsRebuild(pipCamera.transform.position, lastCamPos,
-                    pipCamera.transform.rotation, lastCamRot, lstDeg, lastLstDeg, lat, lastLat,
-                    true))
+            bool cameraOrSkyChanged = MeshRebuildPolicy.NeedsRebuild(
+                    pipCamera.transform.position, lastCamPos,
+                    pipCamera.transform.rotation, lastCamRot,
+                    lstDeg, lastLstDeg, lat, lastLat, true)
+                || EnvironmentChanged(utc, lat, lon);
+            if (!cameraOrSkyChanged)
                 return false;
             return MeshRebuildPolicy.RebuildIntervalElapsed(
                 lastRebuildRealtime, Time.realtimeSinceStartup);
+        }
+
+        private bool EnvironmentChanged(DateTime utc, float lat, float lon)
+        {
+            float fogginess = SkyVisibilityResolver.GetFogginess();
+            double limitingMag = StarSkyConditions.LimitingMagnitude(utc, lat, lon);
+            double adaptation = StarsMesh.CurrentAdaptation;
+            return Math.Abs(limitingMag - lastLimitingMag) > 0.05
+                || Math.Abs(fogginess - lastFogginess) > 0.02f
+                || Math.Abs(adaptation - lastAdaptation) > 0.02;
         }
 
         private void RebuildField()
@@ -290,6 +306,9 @@ namespace UBOAT.Mods.RadioNavigation
             lastLat = lat;
             lastFov = pipCamera.fieldOfView;
             lastLengthDeg = LengthDeg;
+            lastLimitingMag = limitingMag;
+            lastFogginess = fogginess;
+            lastAdaptation = adaptation;
             lastRebuildRealtime = Time.realtimeSinceStartup;
         }
 

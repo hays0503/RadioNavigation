@@ -640,16 +640,7 @@ namespace UBOAT.Mods.RadioNavigation
             FixSameBody = sameBody;
             FixPublished = false;
             FixErrorNm = double.NaN;
-            sb.Append(FixCardGeometry).Append(' ')
-              .Append(crossDeg.ToString("F0", CultureInfo.InvariantCulture))
-              .Append('\u00B0').Append(" \u2014 ");
-            if (crossDeg > 30.0)
-                sb.Append(FixCardGeomGood).Append('\n');
-            else if (crossDeg >= 15.0)
-                sb.Append(FixCardGeomFair).Append('\n');
-            else
-                sb.Append(FixCardGeomPoor).Append('\n')
-                  .Append(FixCardComposer.GeometryAdvice(crossDeg, sameBody)).Append('\n');
+            AppendGeometryLine(sb, crossDeg, sameBody);
 
             // A huge intercept is almost always a mis-aim, not a position
             // error: tell the navigator before the fix is published.
@@ -660,7 +651,7 @@ namespace UBOAT.Mods.RadioNavigation
                 sb.Append(FixCardCheckAim).Append('\n');
 
             // Near-parallel LOPs: the intersection is unusable, do not publish.
-            if (!RunningFixCalculator.IsCrossingUsable(crossDeg))
+            if (!runningFix.HasThird && !RunningFixCalculator.IsCrossingUsable(crossDeg))
             {
                 FixMapMarker.Clear();
                 sb.Append("FIX \u2014 ").Append(FixCardComposer.CoincidentMessage(sameBody));
@@ -713,6 +704,20 @@ namespace UBOAT.Mods.RadioNavigation
                   .Append(errNm.ToString("F1", CultureInfo.InvariantCulture)).Append(" NM");
             }
             sectionText = sb.ToString();
+        }
+
+        private static void AppendGeometryLine(StringBuilder sb, double crossDeg, bool sameBody)
+        {
+            sb.Append(FixCardGeometry).Append(' ')
+              .Append(crossDeg.ToString("F0", CultureInfo.InvariantCulture))
+              .Append('\u00B0').Append(" \u2014 ");
+            if (crossDeg > 30.0)
+                sb.Append(FixCardGeomGood).Append('\n');
+            else if (crossDeg >= 15.0)
+                sb.Append(FixCardGeomFair).Append('\n');
+            else
+                sb.Append(FixCardGeomPoor).Append('\n')
+                  .Append(FixCardComposer.GeometryAdvice(crossDeg, sameBody)).Append('\n');
         }
 
         /// <summary>

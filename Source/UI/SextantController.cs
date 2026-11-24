@@ -382,6 +382,7 @@ namespace UBOAT.Mods.RadioNavigation
                 Instance = null;
             if (IsOpen && gameInput != null)
                 gameInput.RemoveBlockade(this);
+            SextantPipPose.RestoreProbeViewCamera(viewCamera);
             pipFactory.Destroy();
             SextantPipPose.Reset();
             SextantPipPose.ClearTestAim();
@@ -391,7 +392,18 @@ namespace UBOAT.Mods.RadioNavigation
             SunDiscRenderer.ResetDirection();
             CameraResolver.UnfreezeRadius();
 
+            DestroyOwnedOverlayAssets();
+            renderCheck.Destroy();
+        }
+
+        private void DestroyOwnedOverlayAssets()
+        {
             if (canvasRoot != null) Destroy(canvasRoot);
+            if (overlayResult != null && overlayResult.OwnsOpaqueViewMaterial && overlayResult.OpaqueViewMaterial != null)
+            {
+                Destroy(overlayResult.OpaqueViewMaterial);
+                overlayResult.OpaqueViewMaterial = null;
+            }
             bloomCut.Destroy();
             if (ringTexture != null) Destroy(ringTexture);
             if (circleMaskTexture != null) Destroy(circleMaskTexture);
@@ -407,7 +419,6 @@ namespace UBOAT.Mods.RadioNavigation
                 }
                 ownedSprites.Clear();
             }
-            renderCheck.Destroy();
         }
 
         // ---- open / close -------------------------------------------------
@@ -441,6 +452,7 @@ namespace UBOAT.Mods.RadioNavigation
             ResetReadingState();
 
             AttachAndConfigureCameras();
+            UpdateTableSun();
 
             UpdateFilterLabel();
             UpdateFilterDim();
@@ -557,6 +569,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (!IsOpen)
                 return;
 
+            SextantPipPose.RestoreProbeViewCamera(viewCamera);
             IsOpen = false;
             renderOnlyProbe = false;
             sightOnlyProbe = false;

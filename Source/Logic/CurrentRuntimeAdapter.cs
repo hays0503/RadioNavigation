@@ -102,7 +102,12 @@ namespace UBOAT.Mods.RadioNavigation
             useNearby = CurrentSettings.NearbyDriftEnabled();
             useBallistic = CurrentSettings.BallisticWindEnabled();
             if (!TryReadField(out bool anyFlow))
+            {
+                useWind = false;
+                useNearby = false;
+                useBallistic = false;
                 return;
+            }
             if (!useWind && !anyFlow && !useBallistic)
             {
                 Debug.Log(LogPrefix + "no ambient flow requested; no water drag transpilers installed");
@@ -158,6 +163,8 @@ namespace UBOAT.Mods.RadioNavigation
             var hull = ship.GetComponentInChildren<NeuralNetworkPhysics>();
             if (!hull)
                 return false;
+            if (Nearby.TryGetValue(hull, out NearbyDriftHull existing) && !existing.Current())
+                RemoveNearbyEntry(hull, existing);
             if (!Nearby.ContainsKey(hull) && Nearby.Count < NearbyLimit)
                 BindNearby(ship);
             return Nearby.TryGetValue(hull, out NearbyDriftHull entry) && entry.Body == body && entry.Current();
@@ -549,8 +556,15 @@ namespace UBOAT.Mods.RadioNavigation
             // the deck. Fade over the last exposed metre; omit mast drag.
             exposure = ship == null ? 0f : Mathf.Clamp01(-ship.Depth);
             if (useNearby)
+            {
                 foreach (var entry in Nearby.Values)
+                {
                     entry.Refresh();
+                    if (useRelativeRudder)
+                        CurrentRudderAdapter.SetNearbyWater(entry.Body, entry.Water);
+                    CurrentShipSpeedAdapter.SetWater(entry.Ship, entry.Water);
+                }
+            }
         }
 
         private static void BindCollisionHooks(PlayerShip ship)
@@ -696,6 +710,15 @@ namespace UBOAT.Mods.RadioNavigation
             return true;
         }
 
+        private static void RemoveNearbyEntry(NeuralNetworkPhysics hull, NearbyDriftHull entry)
+        {
+            if (useRelativeRudder)
+                CurrentRudderAdapter.UnbindNearby(entry.Body);
+            if (useNearby)
+                CurrentShipSpeedAdapter.Unbind(entry.Ship);
+            Nearby.Remove(hull);
+        }
+
         private static void ScanNearby()
         {
             nextNearbyScan = Time.realtimeSinceStartup + 2f;
@@ -716,13 +739,7 @@ namespace UBOAT.Mods.RadioNavigation
             foreach (var hull in Expired)
             {
                 if (Nearby.TryGetValue(hull, out NearbyDriftHull stale))
-                {
-                    if (useRelativeRudder)
-                        CurrentRudderAdapter.UnbindNearby(stale.Body);
-                    if (useNearby)
-                        CurrentShipSpeedAdapter.Unbind(stale.Ship);
-                }
-                Nearby.Remove(hull);
+                    RemoveNearbyEntry(hull, stale);
             }
 
             if (boundShip == null)

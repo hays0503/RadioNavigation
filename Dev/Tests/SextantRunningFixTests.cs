@@ -549,5 +549,31 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.True(errNm < 0.05,
                 string.Format("fix {0:F5},{1:F5} err {2:F4} NM", lat, lon, errNm));
         }
+
+        [Fact]
+        public void AntimeridianFix_And_AntipodalDistance_StayFiniteAndWrapped()
+        {
+            // Antipodal points must never produce NaN via Math.Sqrt(1.0 - a) when a > 1.0.
+            double antipodal = RunningFixCalculator.DistanceNm(0.0, 0.0, 0.0, 180.0);
+            Assert.False(double.IsNaN(antipodal));
+            Assert.True(antipodal > 10700.0);
+
+            // LOPs straddling +-180 deg must intersect across the dateline, not 359.8 deg away.
+            var lop1 = new LineOfPosition
+            {
+                TangentLatDeg = 10.0,
+                TangentLonDeg = 179.95,
+                AzDeg = 90.0
+            };
+            var lop2 = new LineOfPosition
+            {
+                TangentLatDeg = 10.05,
+                TangentLonDeg = -179.95,
+                AzDeg = 0.0
+            };
+            Assert.True(RunningFixCalculator.IntersectLops(lop1, lop2, out double fixLat, out double fixLon));
+            Assert.InRange(Math.Abs(fixLat - 10.05), 0.0, 0.01);
+            Assert.InRange(Math.Abs(Math.Abs(fixLon) - 179.95), 0.0, 0.01);
+        }
     }
 }

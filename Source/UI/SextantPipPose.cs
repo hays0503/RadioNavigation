@@ -382,6 +382,14 @@ namespace UBOAT.Mods.RadioNavigation
         ///     probe is no longer moving - including the frame after the
         ///     instrument is closed, which is what clears it on re-open.
         /// </summary>
+        internal static void RestoreProbeViewCamera(Camera viewCamera)
+        {
+            if (viewProbeDriving && viewCamera != null)
+                viewCamera.transform.eulerAngles = viewProbeHome;
+            viewProbeDriving = false;
+            viewProbeHome = Vector3.zero;
+        }
+
         private static Vector3 ApplyProbeToViewCamera(Transform mt, Vector3 mainEuler,
             SextantAimProbe.State probeState)
         {

@@ -220,5 +220,50 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 ticks = CurrentBallisticsMath.AdvanceSeabedContactTicks(ticks, false, false);
             Assert.Equal(0, ticks);
         }
+
+        [Fact]
+        public void ApplyWindCompensation_PreservesTargetLeadWhenLearnedFractionIsZero()
+        {
+            Vector3 spawn = Vector3.zero;
+            Vector3 targetPos = new Vector3(0f, 0f, 3000f);
+            // Moving target requires lateral lead along +X baked into vanillaLaunchDir.
+            float dx = 0.35f, dy = 0.25f, dz = 0.9f;
+            float invLen = 1f / (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            Vector3 ledDir = new Vector3(dx * invLen, dy * invLen, dz * invLen);
+
+            Vector3 result = CurrentBallisticsMath.ApplyWindCompensation(
+                ledDir, spawn, targetPos,
+                new Vector3(40f, 0f, -15f),
+                learnedFraction: 0f,
+                windDifficulty: 0f,
+                gaussX: 0f, gaussY: 0f);
+
+            Assert.InRange(Math.Abs(result.x - ledDir.x), 0f, 1e-4f);
+            Assert.InRange(Math.Abs(result.y - ledDir.y), 0f, 1e-4f);
+            Assert.InRange(Math.Abs(result.z - ledDir.z), 0f, 1e-4f);
+        }
+
+        [Fact]
+        public void IntegrateSubsteps_PreservesWindDriftUnderTimeCompression()
+        {
+            var vel = new Vector3(0f, 0f, 300f);
+            var wind = new Vector3(16f, 0f, 0f);
+            float kAir = CurrentBallisticsMath.ComputeShellAirDragFactor(9.5f);
+
+            Vector3 oneStep = CurrentBallisticsMath.ComputeAirWindDeltaV(vel, wind, kAir, 0f, 0.1f);
+            Vector3 subStepped = CurrentBallisticsMath.IntegrateAirWindDeltaV(vel, wind, kAir, 0f, 0.4f);
+            Assert.True(subStepped.x > oneStep.x * 3.5f,
+                "Expected 0.4s time-compressed frame to integrate multiple substeps, got " + subStepped.x + " vs 0.1s=" + oneStep.x);
+
+            Vector3 singleDisp = CurrentBallisticsMath.ComputeWindDriftDisplacement(wind, 0.4f);
+            Vector3 integratedDisp = CurrentBallisticsMath.IntegrateWindDriftDisplacement(wind, 0.4f);
+            Assert.InRange(Math.Abs(singleDisp.x - 1.6f), 0f, 1e-5f);
+            Assert.InRange(Math.Abs(integratedDisp.x - 6.4f), 0f, 1e-4f);
+
+            Vector3 singlePara = CurrentBallisticsMath.ComputeParachuteWindDeltaV(Vector3.zero, wind, 1.5f, 0.4f);
+            Vector3 integratedPara = CurrentBallisticsMath.IntegrateParachuteWindDeltaV(Vector3.zero, wind, 1.5f, 0.4f);
+            Assert.True(integratedPara.x > singlePara.x * 2.0f,
+                "Expected substepped parachute coupling at dt=0.4s to exceed single-step 0.1s clamp");
+        }
     }
 }

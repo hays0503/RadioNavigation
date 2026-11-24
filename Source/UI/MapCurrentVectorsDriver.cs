@@ -69,14 +69,21 @@ namespace UBOAT.Mods.RadioNavigation
             if (root != null)
             {
                 MonoBehaviour[] existing = root.GetComponents<MonoBehaviour>();
+                bool hasForeign = false;
                 for (int i = 0; i < existing.Length; i++)
                 {
-                    if (existing[i].IsNotNull()
-                        && existing[i].GetType().Name == nameof(MapCurrentVectorsDriver))
+                    if (existing[i].IsNotNull() && existing[i].GetType() == typeof(MapCurrentVectorsDriver))
                         return;
+                    if (existing[i].IsNotNull() && existing[i].GetType().Name == nameof(MapCurrentVectorsDriver))
+                        hasForeign = true;
+                }
+                if (hasForeign)
+                {
+                    Destroy(root);
+                    root = null;
                 }
             }
-            else
+            if (root == null)
             {
                 root = new GameObject(DriverName);
                 DontDestroyOnLoad(root);

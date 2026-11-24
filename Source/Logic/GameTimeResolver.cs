@@ -12,7 +12,11 @@ namespace UBOAT.Mods.RadioNavigation
         public static DateTime GetUtcNow()
         {
             if (gameTime == null)
-                gameTime = InjectionFramework.Instance.GetInstance<GameTime>();
+            {
+                InjectionFramework framework = InjectionFramework.Instance;
+                if (framework != null)
+                    gameTime = framework.GetInstance<GameTime>();
+            }
 
             if (gameTime != null)
                 return DateTime.SpecifyKind(gameTime.GmtDateTime, DateTimeKind.Utc);

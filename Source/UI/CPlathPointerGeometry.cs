@@ -53,8 +53,13 @@ namespace UBOAT.Mods.RadioNavigation
                     surface.RebuildBounds(); surfaces.Add(surface);
                 }
                 foreach (var skin in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                {
+                    if (!skin || !skin.sharedMesh) continue;
+                    int vlen = skin.sharedMesh.vertexCount;
                     surfaces.Add(new Surface { transform = skin.transform, renderer = skin, skin = skin,
-                        baked = new Mesh(), triangles = skin.sharedMesh.triangles, target = Nothing });
+                        baked = new Mesh(), triangles = skin.sharedMesh.triangles,
+                        screen = new Vector3[vlen], target = Nothing });
+                }
             }
             catch { Dispose(); throw; }
         }
@@ -84,6 +89,8 @@ namespace UBOAT.Mods.RadioNavigation
                 if (!surface.skin) continue;
                 surface.skin.BakeMesh(surface.baked, false);
                 surface.vertices = surface.baked.vertices;
+                if (surface.screen == null || surface.screen.Length != surface.vertices.Length)
+                    surface.screen = new Vector3[surface.vertices.Length];
                 surface.RebuildBounds();
             }
             lastReading = reading;
