@@ -22,6 +22,7 @@ namespace UBOAT.Mods.RadioNavigation
         Transform[] nodes;
         Renderer[] renderers;
         readonly CPlathShadeState shadeState = new CPlathShadeState();
+        readonly CPlathWalkBob walkBob = new CPlathWalkBob();
         SkinnedMeshRenderer nativeBody;
         bool nativeBodyWasEnabled, ownsNativeVisibility, initialized, optics;
         bool equipped, reading;
@@ -104,8 +105,7 @@ namespace UBOAT.Mods.RadioNavigation
             else if (!player.IsVisible) gripWeight = 0;
             readClearance.Apply(player.CurrentClip.name, frame);
             mechanisms.Apply(degrees, shadeState.IsActive, dt, gripWeight);
-            player.AlignToCamera(camera.transform, readClearance.ViewOffset(player.CurrentClip.name, frame),
-                readClearance.ViewPosition(player.CurrentClip.name, frame));
+            AlignWithWalkBob(camera, frame, dt);
             bool visible = player.IsVisible && !optics;
             bool inside = MainCamera.Instance != null && MainCamera.Instance.IsInsideBoat;
             int layer = LayerMask.NameToLayer(inside ? "Interior" : "Default");
@@ -117,6 +117,22 @@ namespace UBOAT.Mods.RadioNavigation
                 AcquireNativeBody(); LeaseNearPlane(camera);
             }
             else { RestoreNativeBody(); ReleaseNearPlane(); }
+        }
+
+        void AlignWithWalkBob(Camera camera, float frame, float dt)
+        {
+            string clipName = player.CurrentClip.name;
+            float readWeight = CPlathAdaptiveReadClearance.Weight(clipName, frame);
+            float attenuation = (!player.IsVisible || optics) ? 0f : (1f - 0.65f * readWeight);
+            bool walking, running;
+            CPlathFppMotionSampler.Sample(out walking, out running);
+            float bobDt = Time.timeScale > 0f ? dt : 0f;
+            CPlathWalkBobPose bob = walkBob.Step(bobDt, walking, running, attenuation);
+            Vector3 bobPos = new Vector3(bob.OffsetX, bob.OffsetY, bob.OffsetZ);
+            Quaternion bobRot = Quaternion.Euler(bob.PitchDeg, bob.YawDeg, bob.RollDeg);
+            player.AlignToCamera(camera.transform,
+                readClearance.ViewOffset(clipName, frame) * Quaternion.Inverse(bobRot),
+                readClearance.ViewPosition(clipName, frame) + bobPos);
         }
 
         void AcquireNativeBody()
@@ -157,7 +173,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         internal void Suspend()
         {
-            equipped = reading = optics = false; RestoreNativeBody(); ReleaseNearPlane();
+            equipped = reading = optics = false; walkBob.Reset(); RestoreNativeBody(); ReleaseNearPlane();
             if (model != null) model.SetActive(false);
             initialized = false;
         }

@@ -1369,7 +1369,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private void UpdateBodiesReadout(float dt)
         {
-            float eyeHeightM = solarOptics.Ready ? (float)solarOptics.EyeHeightM : float.NaN;
+            float eyeHeightM = solarOptics.EyeHeightReady ? (float)solarOptics.EyeHeightM : float.NaN;
             // Outside the boat AND not on the map: the same gate the star sky
             // uses, so the map camera cannot leak into the readout.
             bool canSight = SkyVisibilityResolver.IsPlayerOutside();

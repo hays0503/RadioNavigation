@@ -24,6 +24,7 @@ namespace UBOAT.Mods.RadioNavigation
         private int appliedLayer = -1;
         private readonly HeldKeyEdge[] shadeEdges = { new HeldKeyEdge(), new HeldKeyEdge(), new HeldKeyEdge(), new HeldKeyEdge() };
         private static readonly KeyCode[] shadeKeys = { KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4 };
+        private readonly CPlathWalkBob fallbackWalkBob = new CPlathWalkBob();
         internal bool IsHeld { get; private set; }
         internal bool Aiming { get; private set; }
         internal string LastError { get; private set; }
@@ -101,6 +102,7 @@ namespace UBOAT.Mods.RadioNavigation
             readingRequested = false;
             if (readPointer != null) readPointer.Suspend();
             IsHeld = false; Aiming = false;
+            fallbackWalkBob.Reset();
             if (animated != null) { animated.SetOptics(false); animated.SetDesired(false, false); }
             if (model != null) model.SetActive(false);
         }
@@ -109,6 +111,7 @@ namespace UBOAT.Mods.RadioNavigation
             readingRequested = false;
             if (readPointer != null) readPointer.Suspend();
             IsHeld = false; Aiming = false;
+            fallbackWalkBob.Reset();
             if (animated != null) animated.Suspend();
             if (model != null) model.SetActive(false);
         }
@@ -191,12 +194,18 @@ namespace UBOAT.Mods.RadioNavigation
             Camera camera = ViewCamera(exterior);
             if (camera == null) { model.SetActive(false); return; }
             if (!ApplyViewLayer(camera)) { model.SetActive(false); return; }
-            Quaternion rotation = camera.transform.rotation * Quaternion.Euler(0f, 160f, -8f);
+            bool walking, running;
+            CPlathFppMotionSampler.Sample(out walking, out running);
+            float bobDt = Time.timeScale > 0f ? dt : 0f;
+            CPlathWalkBobPose bob = fallbackWalkBob.Step(bobDt, walking, running, 1f);
+            Vector3 bobPos = new Vector3(bob.OffsetX, bob.OffsetY, bob.OffsetZ);
+            Quaternion bobRot = Quaternion.Euler(bob.PitchDeg, bob.YawDeg, bob.RollDeg);
+            Quaternion rotation = camera.transform.rotation * bobRot * Quaternion.Euler(0f, 160f, -8f);
             // Exterior FPP uses a much larger near plane than the interior
             // view. Keep the real-size model in front of it without modifying
             // either game camera or moving the virtual interior itself.
             float distance = Mathf.Max(.65f, camera.nearClipPlane + .25f);
-            Vector3 grip = camera.transform.TransformPoint(new Vector3(.15f * distance / .65f, -.08f * distance / .65f, distance));
+            Vector3 grip = camera.transform.TransformPoint(new Vector3(.15f * distance / .65f, -.08f * distance / .65f, distance) + bobPos);
             model.transform.SetPositionAndRotation(grip - rotation * rig.GripLocal, rotation);
             model.SetActive(true);
         }

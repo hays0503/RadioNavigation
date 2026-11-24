@@ -127,7 +127,7 @@ namespace UBOAT.Mods.RadioNavigation
                 ? "\u2014"
                 : eyeHeightM.ToString("F1", CultureInfo.InvariantCulture) + " \u043C"));
 
-            AppendSun(rows, status, candidates, utc, lon, lat, pipAzDeg, pipAltDeg, canSight, sun);
+            AppendSun(rows, status, candidates, utc, lon, lat, eyeHeightM, pipAzDeg, pipAltDeg, canSight, sun);
             AppendMoon(rows, status, candidates, moonJd, moonLst, lat, pipAzDeg, pipAltDeg, canSight);
             AppendStars(rows, candidates, jd, lstDeg, lat, pipAzDeg, pipAltDeg, canSight);
             AppendForecast(status, utc, lat, lon);
@@ -371,7 +371,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// the candidates (it cannot be sighted below).</summary>
         private static void AppendSun(List<KeyValuePair<string, string>> rows, StringBuilder status,
             List<BodyRecommendation.Candidate> candidates,
-            DateTime utc, float lonDeg, float lat,
+            DateTime utc, float lonDeg, float lat, float eyeHeightM,
             double pipAzDeg, double pipAltDeg, bool withArrows, SunDiscSighting sun)
         {
             double centre, bearing;
@@ -389,7 +389,12 @@ namespace UBOAT.Mods.RadioNavigation
             float alt, az;
             if (!TrySunAltAz(sun, out alt, out az))
             {
-                status.Append("\nСолнце SH5: источник/горизонт недоступен");
+                double unused;
+                bool belowTableFloor = !float.IsNaN(eyeHeightM) && eyeHeightM >= 0f && eyeHeightM <= 14f
+                    && !SolarHeightReduction.TryLowerLimb(centre, eyeHeightM, utc.Month, out unused);
+                status.Append(belowTableFloor
+                    ? "\n\u0421\u043E\u043B\u043D\u0446\u0435 SH5: \u043D\u0438\u0436\u0435 3\u00B0 (\u0432\u043D\u0435 F VIII)"
+                    : "\n\u0421\u043E\u043B\u043D\u0446\u0435 SH5: \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A/\u0433\u043E\u0440\u0438\u0437\u043E\u043D\u0442 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D");
                 return;
             }
             status.Append("\nSH5 LL: нижний край");

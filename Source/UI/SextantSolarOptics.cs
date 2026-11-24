@@ -11,6 +11,7 @@ namespace UBOAT.Mods.RadioNavigation
         private Camera cachedCamera;
         private WaterCamera waterCamera;
         public bool Ready { get; private set; }
+        public bool EyeHeightReady { get; private set; }
         public double EyeHeightM { get; private set; }
         public double HorizonAltitudeDeg { get; private set; }
         public double DiameterDeg { get; private set; }
@@ -24,6 +25,8 @@ namespace UBOAT.Mods.RadioNavigation
         public void Refresh(Camera camera, bool canSight, DateTime utc, double lat, double lon)
         {
             Ready = false;
+            EyeHeightReady = false;
+            EyeHeightM = 0;
             Direction = Vector3.zero;
             if (!canSight || camera == null || !Sh5SunAlmanac.Loaded)
                 return;
@@ -36,6 +39,11 @@ namespace UBOAT.Mods.RadioNavigation
             if (water == null)
                 return;
             double eye = camera.transform.position.y - water.transform.position.y;
+            if (!double.IsNaN(eye) && !double.IsInfinity(eye) && eye >= 0)
+            {
+                EyeHeightM = eye;
+                EyeHeightReady = true;
+            }
             float curvature = Shader.GetGlobalFloat("_EarthCurvatureCompensation");
             if (curvature != 0f && curvature != 1f)
                 return;

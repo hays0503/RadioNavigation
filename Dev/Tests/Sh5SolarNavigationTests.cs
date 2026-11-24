@@ -258,12 +258,51 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                     disc.Limb, out ho, out correction));
                 Assert.Equal(39.57297848946271, ho, 10);
                 Assert.False(optics.Sighting(false).TableCompatible);
-                optics.Refresh(camera, false, time, 55, 5.75);
-                Assert.False(optics.Ready);
-                Assert.True(optics.Sighting(true).TableRequested);
-                Assert.False(optics.Sighting(true).TableCompatible);
+            optics.Refresh(camera, false, time, 55, 5.75);
+            Assert.False(optics.Ready);
+            Assert.False(optics.EyeHeightReady);
+            Assert.True(optics.Sighting(true).TableRequested);
+            Assert.False(optics.Sighting(true).TableCompatible);
             }
             finally { SunEphemerisCalibration.SetDelta(old); }
+        }
+
+        [Fact]
+        public void Sh5_OpticsExposesEyeHeightAtNightAndLowSunBelowThreeDegrees()
+        {
+            var camera = Camera(104.5f, 100);
+            UnityEngine.Shader.Curvature = 1f;
+            var optics = new SextantSolarOptics();
+
+            // Sunset / low Sun (~1.3 deg true altitude, below F VIII 3 deg floor)
+            DateTime lowSun = FindSolarAltitude(55.0, 5.75, Utc("1939-09-02T17:00:00Z"), 0.5, 2.5);
+            optics.Refresh(camera, true, lowSun, 55, 5.75);
+            Assert.False(optics.Ready);
+            Assert.True(optics.EyeHeightReady);
+            Assert.Equal(4.5, optics.EyeHeightM, 6);
+
+            // Night (Sun below horizon)
+            DateTime night = Utc("1939-09-02T23:00:00Z");
+            optics.Refresh(camera, true, night, 55, 5.75);
+            Assert.False(optics.Ready);
+            Assert.True(optics.EyeHeightReady);
+            Assert.Equal(4.5, optics.EyeHeightM, 6);
+
+            // Inside / underwater / missing water clears eye height
+            optics.Refresh(Camera(99.5f, 100), true, night, 55, 5.75);
+            Assert.False(optics.EyeHeightReady);
+        }
+
+        private static DateTime FindSolarAltitude(double lat, double lon, DateTime start, double minAlt, double maxAlt)
+        {
+            for (int m = 0; m < 180; m++)
+            {
+                DateTime t = start.AddMinutes(m);
+                double alt, az;
+                if (Sh5SolarNavigation.TryCentre(t, lat, lon, out alt, out az) && alt >= minAlt && alt <= maxAlt)
+                    return t;
+            }
+            throw new InvalidOperationException("No matching low solar altitude found");
         }
 
         [Fact]
