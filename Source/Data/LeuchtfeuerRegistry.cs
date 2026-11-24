@@ -142,7 +142,8 @@ namespace UBOAT.Mods.RadioNavigation
             string name = GetString(entry, "name");
             double lat = GetDouble(entry, "lat");
             double lon = GetDouble(entry, "lon");
-            if (string.IsNullOrEmpty(name) || double.IsNaN(lat) || double.IsNaN(lon))
+            if (string.IsNullOrEmpty(name) || double.IsNaN(lat) || double.IsInfinity(lat)
+                || double.IsNaN(lon) || double.IsInfinity(lon))
             {
                 return null;
             }
@@ -196,7 +197,8 @@ namespace UBOAT.Mods.RadioNavigation
 
             float value;
             if (!seenDigit || !float.TryParse(
-                    digits, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+                    digits, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
+                || float.IsNaN(value) || float.IsInfinity(value) || value < 0f)
             {
                 return 0f;
             }

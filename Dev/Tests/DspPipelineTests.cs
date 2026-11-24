@@ -131,6 +131,15 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.False(float.IsNaN(s2) || float.IsInfinity(s2));
             c.Reset();
             Assert.Equal(0f, c.NextSample());
+
+            var lowRate = new CarrierGenerator(8000f);
+            lowRate.Frequency = 12000f;
+            for (int i = 0; i < 40; i++)
+            {
+                float sample = lowRate.NextSample();
+                Assert.False(float.IsNaN(sample) || float.IsInfinity(sample));
+                Assert.InRange(sample, -1f, 1f);
+            }
         }
 
         [Fact]

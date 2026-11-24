@@ -100,8 +100,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             if (material != null)
                 Destroy(material);
-            if (meshFilter != null && meshFilter.mesh != null)
-                Destroy(meshFilter.mesh);
+            if (meshFilter.IsNotNull() && meshFilter.sharedMesh.IsNotNull())
+                Destroy(meshFilter.sharedMesh);
         }
 
         private void LateUpdate()

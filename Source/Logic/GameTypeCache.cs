@@ -23,6 +23,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static Type Resolve(string typeName)
         {
+            if (string.IsNullOrEmpty(typeName))
+                return null;
             Type type;
             if (!defaultCache.TryGetValue(typeName, out type))
             {
@@ -35,6 +37,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static Type Resolve(string typeName, params string[] probeAssemblies)
         {
+            if (string.IsNullOrEmpty(typeName) || probeAssemblies.IsNull())
+                return null;
+            if (probeAssemblies.Length == 0)
+                return null;
             string key = typeName + "\0" + string.Join("\0", probeAssemblies);
             if (!cache.TryGetValue(key, out Type type))
             {

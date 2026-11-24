@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
@@ -52,7 +52,7 @@ namespace UBOAT.Mods.RadioNavigation
             phase += smoothedFrequency / sampleRate;
 
             if (phase >= 1.0)
-                phase -= 1.0;
+                phase -= Math.Floor(phase);
 
             return sample;
         }

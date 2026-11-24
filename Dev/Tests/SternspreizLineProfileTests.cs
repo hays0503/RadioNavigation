@@ -109,6 +109,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 () => SternspreizLineProfile.AngularWidthMeters(1d, 0d));
             Assert.Throws<ArgumentOutOfRangeException>(
                 () => SternspreizLineProfile.AngularWidthMeters(double.NaN, 100d));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => SternspreizLineProfile.AngularWidthMeters(180d, 100d));
         }
 
         [Fact]

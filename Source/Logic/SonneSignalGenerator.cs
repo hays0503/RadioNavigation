@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -22,10 +22,11 @@ namespace UBOAT.Mods.RadioNavigation
         // (|angular difference to BaseAngle| <= half of the sector width, wrapped).
         public static bool CalculateInBeam(float bearing, float baseAngle, float sectorWidthDeg)
         {
-            float angleDiff = Math.Abs(((bearing + 360f) % 360f) - baseAngle);
-            if (angleDiff > 180f)
-                angleDiff = 360f - angleDiff;
-            return angleDiff <= sectorWidthDeg / 2f;
+            if (float.IsNaN(bearing) || float.IsInfinity(bearing)
+                || float.IsNaN(baseAngle) || float.IsInfinity(baseAngle)
+                || float.IsNaN(sectorWidthDeg) || float.IsInfinity(sectorWidthDeg))
+                return false;
+            return AngularDistance(bearing, baseAngle) <= sectorWidthDeg / 2f;
         }
 
         public static float AngularDistance(float first, float second)
@@ -39,6 +40,8 @@ namespace UBOAT.Mods.RadioNavigation
         // transition group.
         public static NavigationPattern ToNavigationPattern(NavigationElementType[] elements, int groupSize = 8)
         {
+            if (groupSize <= 0)
+                groupSize = 8;
             if (elements.IsNull() || elements.Length.IsZero())
                 return new NavigationPattern(Array.Empty<Group>(), (byte)groupSize, 255);
 

@@ -90,6 +90,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Type type = GameTypeCache.Resolve("System.String");
 
             Assert.Null(type);
+            Assert.Null(GameTypeCache.Resolve(null));
+            Assert.Null(GameTypeCache.Resolve("", HostAssembly()));
+            Assert.Null(GameTypeCache.Resolve("System.String", null));
         }
 
         [Fact]

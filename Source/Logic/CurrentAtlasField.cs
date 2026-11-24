@@ -143,7 +143,8 @@ namespace UBOAT.Mods.RadioNavigation
             velocity = Vector3.zero;
             if (!query.HasPosition || query.Utc == default(DateTime))
                 return false;
-            double seconds = (query.Utc - Epoch).TotalSeconds;
+            DateTime utc = query.Utc.Kind == DateTimeKind.Local ? query.Utc.ToUniversalTime() : query.Utc;
+            double seconds = (utc - Epoch).TotalSeconds;
             if (!SampleAt(seconds, query, query.Longitude, out CurrentVelocity water)
                 && !SampleAt(seconds, query, query.Longitude + 360.0, out water)
                 && !SampleAt(seconds, query, query.Longitude - 360.0, out water))

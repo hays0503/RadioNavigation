@@ -26,6 +26,8 @@ namespace UBOAT.Mods.RadioNavigation
         public static void Setup(UBOAT.Game.Scene.Rendering.AdditionalCameraData data,
             UBOAT.Game.Scene.Rendering.AdditionalCameraData mainData, int cullingMask)
         {
+            if (data == null)
+                return;
             Type type = data.GetType();
             Type passType = type.GetNestedType("CameraPass",
                 BindingFlags.Public | BindingFlags.NonPublic);
@@ -98,6 +100,11 @@ namespace UBOAT.Mods.RadioNavigation
                 for (int i = 0; i < source.Length; i++)
                 {
                     object src = source.GetValue(i);
+                    if (src == null)
+                    {
+                        passes.SetValue(Activator.CreateInstance(passType, cullingMask), i);
+                        continue;
+                    }
                     int mask = cullingMask;
                     if (cullingProp != null)
                     {

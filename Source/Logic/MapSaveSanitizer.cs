@@ -95,13 +95,17 @@ namespace UBOAT.Mods.RadioNavigation
             if (database == null)
                 return;
 
+            var points = database.Points;
+            if (points == null)
+                return;
+
             if (string.Equals(phase, "save", StringComparison.Ordinal))
             {
                 if (!loggedSaveRun)
                 {
                     loggedSaveRun = true;
                     Debug.Log("[RadioNav][Map] save sanitizer ran (save): points=" +
-                        database.Points.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        points.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 }
             }
             else
@@ -109,14 +113,12 @@ namespace UBOAT.Mods.RadioNavigation
                 // One line per load: proves the load-phase prune runs on the
                 // populated database (loading is rare, unlike autosaves).
                 Debug.Log("[RadioNav][Map] save sanitizer ran (load): points=" +
-                    database.Points.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    points.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
 
             var referenced = CollectReferencedPoints(database);
             var keepers = new Dictionary<string, MapPointData>(StringComparer.Ordinal);
             List<MapPointData> removals = null;
-
-            var points = database.Points;
             for (int i = 0; i < points.Count; i++)
             {
                 MapPointData data = points[i];
@@ -186,6 +188,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void CollectLinePoints(HashSet<MapPointData> referenced, IList<MapLineData> lines)
         {
+            if (lines == null)
+                return;
             for (int i = 0; i < lines.Count; i++)
             {
                 MapLineData line = lines[i];
@@ -198,6 +202,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void CollectCirclePoints(HashSet<MapPointData> referenced, IList<MapCircleData> circles)
         {
+            if (circles == null)
+                return;
             for (int i = 0; i < circles.Count; i++)
             {
                 MapCircleData circle = circles[i];
@@ -210,6 +216,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void CollectAnglePoints(HashSet<MapPointData> referenced, IList<MapAngleData> angles)
         {
+            if (angles == null)
+                return;
             for (int i = 0; i < angles.Count; i++)
             {
                 MapAngleData angle = angles[i];
@@ -252,7 +260,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static void DestroyDuplicateScenePoints(Dictionary<string, MapPointData> keepers)
         {
             MapPointUI[] all = UnityEngine.Object.FindObjectsOfType<MapPointUI>(true);
-            if (all.Length == 0)
+            if (all.IsNull() || all.Length == 0)
                 return;
 
             int destroyed = 0;

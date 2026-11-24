@@ -45,12 +45,14 @@ namespace UBOAT.Mods.RadioNavigation
             stockKmPerSecond + new Vector2(waterMetersPerSecond.x, waterMetersPerSecond.z) * 0.001f;
 
         internal static Vector2 Midpoint(Vector2 start, Vector2 end, Vector2 drift, int index, int steps) =>
-            start + (end - start) * ((index + 0.5f) / steps) + drift;
+            steps <= 0 ? start : start + (end - start) * ((index + 0.5f) / steps) + drift;
 
         internal static DateTime MidpointUtc(DateTime end, long elapsedTicks, int index, int steps)
         {
+            if (steps <= 0 || elapsedTicks < 0 || end == default(DateTime))
+                return default(DateTime);
             long ticksBack = (long)(elapsedTicks * (1d - (index + 0.5d) / steps));
-            return end == default(DateTime) || ticksBack > end.Ticks ? default(DateTime) : end.AddTicks(-ticksBack);
+            return ticksBack > end.Ticks ? default(DateTime) : end.AddTicks(-ticksBack);
         }
     }
 }

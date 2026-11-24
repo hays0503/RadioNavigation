@@ -410,6 +410,14 @@ namespace UBOAT.Mods.RadioNavigation
             return WindCompass.PrefersRussian(parsed);
         }
 
+        public void OnDestroy()
+        {
+            if (value != null)
+                Destroy(value.gameObject);
+            value = null;
+            ClearBinding();
+        }
+
         private void SetVisible(bool visible)
         {
             if (value != null && value.gameObject.activeSelf != visible)

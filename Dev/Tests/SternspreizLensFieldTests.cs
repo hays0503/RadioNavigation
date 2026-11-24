@@ -408,6 +408,19 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void BuildStreakMesh_ClampsToShortestOutputBuffer()
+        {
+            var stars = new[] { Star(0f, 0f, 1f), Star(0.05f, 0f, 1f) };
+            int emitted = SternspreizLensField.BuildStreakMesh(stars, 2, IdentityCamera(0f),
+                Optics(1f, 0.2f, 100f),
+                new float[SternspreizLensField.PositionFloatCount(2)],
+                new float[SternspreizLensField.ColorFloatCount(1)],
+                new float[SternspreizLensField.UvFloatCount(1)],
+                new int[SternspreizLensField.IndexCount(2)]);
+            Assert.Equal(1, emitted);
+        }
+
+        [Fact]
         public void BufferSizeHelpers_MatchTheEmittedLayout()
         {
             Assert.Equal(12, SternspreizLensField.PositionFloatCount(1));

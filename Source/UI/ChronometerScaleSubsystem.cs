@@ -91,7 +91,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public void Capture(RectTransform chronometerDragContainer)
         {
-            if (scaleCaptured)
+            if (scaleCaptured || chronometerDragContainer.IsNull())
                 return;
 
             originalScale = chronometerDragContainer.localScale;
@@ -106,6 +106,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public void CaptureAttached(RectTransform chronometerDragContainer)
         {
+            if (chronometerDragContainer.IsNull())
+                return;
             attachedScale = chronometerDragContainer.localScale;
         }
 
@@ -149,8 +151,11 @@ namespace UBOAT.Mods.RadioNavigation
 
             chronometerDragContainer.localScale = attachedScale;
             expanded = false;
-            owner.SetScaleHover(false);
-            owner.SetMoveHover(false);
+            if (owner.IsNotNull())
+            {
+                owner.SetScaleHover(false);
+                owner.SetMoveHover(false);
+            }
         }
 
         /// <summary>Clears the snapshot (restore path).</summary>

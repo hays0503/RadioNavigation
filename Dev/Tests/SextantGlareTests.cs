@@ -45,5 +45,14 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             // sunAltitude 120° would give intensity 2.0 — must clamp to 1.0
             Assert.Equal(1.0, SextantGlare.Glare(0.0, 120.0, 0, PipFov), 6);
         }
+
+        [Fact]
+        public void NonFiniteInputs_ReturnZero()
+        {
+            Assert.Equal(0.0, SextantGlare.Glare(double.NaN, 30.0, 0, PipFov));
+            Assert.Equal(0.0, SextantGlare.Glare(0.0, double.NaN, 0, PipFov));
+            Assert.Equal(0.0, SextantGlare.Glare(0.0, 30.0, 0, double.NaN));
+            Assert.Equal(0.0, SextantGlare.Glare(0.0, double.PositiveInfinity, 0, PipFov));
+        }
     }
 }

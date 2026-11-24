@@ -117,6 +117,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Dictionary<string, object> entry = Entry("X", 53.5, 8.1);
             entry["lat"] = "not-a-number";
             Assert.Null(LeuchtfeuerRegistry.BuildProfile(entry));
+
+            Dictionary<string, object> infEntry = Entry("X", double.PositiveInfinity, 8.1);
+            Assert.Null(LeuchtfeuerRegistry.BuildProfile(infEntry));
         }
 
         [Fact]

@@ -77,6 +77,7 @@ namespace UBOAT.Mods.RadioNavigation
             GameTypeCache.Clear();
             TypeMemberCache.Clear();
             SkyVisibilityResolver.Reset();
+            CloudOcclusionBinding.Reset();
             SkyMaterialProbe.Reset();
             WarnOnce.Reset();
             FixMapMarker.Clear();

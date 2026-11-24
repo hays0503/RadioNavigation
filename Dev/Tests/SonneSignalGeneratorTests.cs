@@ -62,5 +62,14 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             Assert.Equal(0, SonneSignalGenerator.GetCallsignElementCount(""));
         }
+
+        [Fact]
+        public void CalculateInBeam_HandlesNaNAndWrappedBearings()
+        {
+            Assert.False(SonneSignalGenerator.CalculateInBeam(float.NaN, 310f, 5f));
+            Assert.True(SonneSignalGenerator.CalculateInBeam(-410f, 310f, 5f));
+            var fallback = SonneSignalGenerator.ToNavigationPattern(SonneBeam.BuildPattern(38, false), 0);
+            Assert.Equal(64, fallback.ElementCount);
+        }
     }
 }

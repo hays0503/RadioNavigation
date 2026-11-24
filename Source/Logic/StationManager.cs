@@ -78,7 +78,7 @@ namespace UBOAT.Mods.RadioNavigation
             // math (division by zero / NaN ratio). Silence all stations
             // instead of leaving stale gains behind.
             float f = frequencyKHz * 1000f;
-            if (f.IsNegligible(0.001f) || float.IsNaN(f))
+            if (frequencyKHz <= 0f || !IsFinite(f))
             {
                 for (int i = 0; i < Stations.Length; i++)
                     Stations[i].Gain = 0f;
@@ -98,18 +98,19 @@ namespace UBOAT.Mods.RadioNavigation
                     continue;
                 }
 
-                float? freq = beaconStations[i].History?[0].FrequencyKHz;
-                if (freq.IsNull())
+                BeaconHistoryEntry[] history = beaconStations[i].History;
+                if (history.IsNull() || history.Length == 0 || !history[0].FrequencyKHz.HasValue)
                 {
                     Stations[i].Gain = 0f;
                     continue;
                 }
 
-                float gain = StationGainModel.ComputeGain(frequencyKHz, freq.Value, qualityFactor);
+                float stationFreqKHz = history[0].FrequencyKHz.Value;
+                float gain = StationGainModel.ComputeGain(frequencyKHz, stationFreqKHz, qualityFactor);
 
                 Stations[i].Gain = gain;
 
-                float offset = frequencyKHz - freq.Value;
+                float offset = frequencyKHz - stationFreqKHz;
                 Stations[i].BeatFrequency = StationGainModel.ComputeBeatFrequency(offset);
                 AudioSynthesisEngine.ApplyCarrierPitch(Carriers[i], Stations[i], Keyers[i]);
 
@@ -164,7 +165,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             float elapsed = 0f;
             if (IsStationNavigating(index))
-                elapsed = Time.time - s.NavigationStartTime;
+                elapsed = Math.Max(0f, Time.time - s.NavigationStartTime);
 
             return StationDiagnosticsReport.Build(
                 station, callsign, s, Schedulers[index].CurrentPhase, elapsed);

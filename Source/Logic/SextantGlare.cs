@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -21,7 +21,10 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public static double Glare(double angleToSunDeg, double sunAltitudeDeg, int filters, double pipFovDeg)
         {
-            if (sunAltitudeDeg <= 0.0)
+            if (double.IsNaN(angleToSunDeg) || double.IsInfinity(angleToSunDeg)
+                || double.IsNaN(sunAltitudeDeg) || double.IsInfinity(sunAltitudeDeg)
+                || double.IsNaN(pipFovDeg) || double.IsInfinity(pipFovDeg)
+                || sunAltitudeDeg <= 0.0)
                 return 0.0;
 
             double sunIntensity = sunAltitudeDeg / 60.0;

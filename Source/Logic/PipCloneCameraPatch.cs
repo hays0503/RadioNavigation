@@ -192,7 +192,7 @@ namespace UBOAT.Mods.RadioNavigation
             MonoBehaviour[] behaviours = camera.GetComponents<MonoBehaviour>();
             for (int i = 0; i < behaviours.Length; i++)
             {
-                if (behaviours[i]?.GetType().Name == "VirtualSceneRenderer")
+                if (behaviours[i].IsNotNull() && behaviours[i].GetType().Name == "VirtualSceneRenderer")
                     return behaviours[i];
             }
             return null;

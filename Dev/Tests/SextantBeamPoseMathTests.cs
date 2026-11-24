@@ -96,6 +96,22 @@ namespace Tests
         }
 
         [Fact]
+        public void SextantBeamPose_ToStringUsesInvariantCulture()
+        {
+            var original = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture =
+                    System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+                Assert.Equal("(1.250,234.500)", new SextantBeamPose(1.25, 234.5).ToString());
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = original;
+            }
+        }
+
+        [Fact]
         public void InteriorClone_MustCarryItsOwnBeamNotTheEngineCamera()
         {
             // The live failure: the clone reported the engine's Interior Camera

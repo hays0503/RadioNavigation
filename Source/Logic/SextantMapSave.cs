@@ -22,6 +22,8 @@ namespace UBOAT.Mods.RadioNavigation
             MapChartingDatabase db = MapSaveSanitizer.ResolveDatabase();
             if (db == null)
                 return state;
+            if (db.Points == null)
+                return state;
             int found = 0;
             foreach (MapPointData point in db.Points)
             {
@@ -68,6 +70,8 @@ namespace UBOAT.Mods.RadioNavigation
             MapChartingDatabase db = MapSaveSanitizer.ResolveDatabase();
             if (db == null)
                 return;
+            if (db.Points == null)
+                return;
             var removed = new HashSet<MapPointData>();
             for (int i = db.Points.Count - 1; i >= 0; i--)
             {
@@ -110,6 +114,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static void RemoveMatching<T>(IList<T> items, Func<T, bool> predicate, Action<T> remove)
         {
+            if (items == null)
+                return;
             for (int i = items.Count - 1; i >= 0; i--)
             {
                 if (predicate(items[i]))

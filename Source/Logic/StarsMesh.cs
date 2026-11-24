@@ -28,6 +28,8 @@ namespace UBOAT.Mods.RadioNavigation
         private const double MaxLimitingDriftMag = 0.1;
         private const float AdaptationRebuildInterval = 0.2f; // 5 Hz while ramping
         private readonly DarkAdaptationState adaptation = new DarkAdaptationState();
+        private const float MaxFogDrift = 0.02f;
+        private const float MaxRadiusDriftM = 1f;
         private double lastLimitingMag = double.NaN;
         private float lastAdaptationRebuildTime;
         private float lastRebuildRealtime;
@@ -57,6 +59,8 @@ namespace UBOAT.Mods.RadioNavigation
         private Quaternion lastCamRot;
         private double lastLstDeg;
         private float lastLat;
+        private float lastSafeRadius = float.NaN;
+        private float lastFogginess = float.NaN;
         private float lastLogTime;
 
         private readonly List<Vector3> vertices = new List<Vector3>();
@@ -184,6 +188,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (instance == this)
                 instance = null;
             UsesBundledStarShader = false;
+            Shielded = false;
+            willRenderLogged = false;
             if (spriteTexture != null)
                 Destroy(spriteTexture);
             if (material != null)
@@ -262,7 +268,8 @@ namespace UBOAT.Mods.RadioNavigation
             bool adapting = adaptation.IsRamping
                 && Time.unscaledTime - lastAdaptationRebuildTime > AdaptationRebuildInterval;
 
-            if (!NeedsRebuild(cam, lstDeg, lat, limitingMag, adapting)
+            float safeRadius = CameraResolver.SafeRadius(cam);
+            if (!NeedsRebuild(cam, lstDeg, lat, limitingMag, fogginess, safeRadius, adapting)
                 && meshFilter.mesh != null && meshFilter.mesh.vertexCount > 0)
                 return;
 
@@ -271,6 +278,8 @@ namespace UBOAT.Mods.RadioNavigation
             lastLstDeg = lstDeg;
             lastLat = lat;
             lastLimitingMag = limitingMag;
+            lastFogginess = fogginess;
+            lastSafeRadius = safeRadius;
             lastRebuildRealtime = Time.realtimeSinceStartup;
             if (adapting)
                 lastAdaptationRebuildTime = Time.unscaledTime;
@@ -283,12 +292,14 @@ namespace UBOAT.Mods.RadioNavigation
         /// adaptation ramp) is throttled to MinRebuildIntervalSeconds so the
         /// 5046-star mesh is not rebuilt ~1.3×/s per mesh.</summary>
         private bool NeedsRebuild(Camera cam, double lstDeg, float lat,
-            double limitingMag, bool adapting)
+            double limitingMag, float fogginess, float safeRadius, bool adapting)
         {
             if (Vector3.Distance(cam.transform.position, lastCamPos)
                     > MeshRebuildPolicy.MaxCameraMoveM
                 || Quaternion.Angle(cam.transform.rotation, lastCamRot)
-                    > MeshRebuildPolicy.MaxCameraRotationDeg)
+                    > MeshRebuildPolicy.MaxCameraRotationDeg
+                || float.IsNaN(lastSafeRadius)
+                || Math.Abs(safeRadius - lastSafeRadius) > MaxRadiusDriftM)
                 return true;
 
             bool timeDrift = Math.Abs(MeshRebuildPolicy.AngularDifferenceDeg(lstDeg, lastLstDeg))
@@ -296,6 +307,8 @@ namespace UBOAT.Mods.RadioNavigation
                 || Math.Abs(lat - lastLat) > MeshRebuildPolicy.MaxLatitudeDriftDeg
                 || double.IsNaN(lastLimitingMag)
                 || Math.Abs(limitingMag - lastLimitingMag) > MaxLimitingDriftMag
+                || float.IsNaN(lastFogginess)
+                || Math.Abs(fogginess - lastFogginess) > MaxFogDrift
                 || adapting;
             return timeDrift && MeshRebuildPolicy.RebuildIntervalElapsed(
                 lastRebuildRealtime, Time.realtimeSinceStartup);

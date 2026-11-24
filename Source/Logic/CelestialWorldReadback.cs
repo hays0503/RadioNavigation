@@ -8,7 +8,10 @@ namespace UBOAT.Mods.RadioNavigation
         internal static bool TryRead(object weather, out double latitude, out double longitude, out double utc)
         {
             latitude = longitude = utc = double.NaN;
-            object sky = Member(weather, "Sky"), world = Member(sky, "World");
+            if (weather.IsNull()) return false;
+            object sky = Member(weather, "Sky");
+            if (sky.IsNull()) return false;
+            object world = Member(sky, "World");
             return Number(Member(world, "Latitude"), out latitude)
                 && Number(Member(world, "Longitude"), out longitude)
                 && Number(Member(world, "UTC"), out utc);

@@ -12,7 +12,8 @@ namespace UBOAT.Mods.RadioNavigation
     {
         public static float ComputeGain(float tunedKHz, float stationKHz, float qualityFactor)
         {
-            if (float.IsNaN(tunedKHz) || float.IsNaN(stationKHz) || stationKHz == 0f)
+            if (!IsFinite(tunedKHz) || !IsFinite(stationKHz) || !IsFinite(qualityFactor)
+                || tunedKHz <= 0f || stationKHz <= 0f)
                 return 0f;
             float f = tunedKHz * 1000f;
             float f0 = stationKHz * 1000f;
@@ -22,8 +23,15 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static float ComputeBeatFrequency(float offsetKHz)
         {
+            if (!IsFinite(offsetKHz))
+                return Constants.BfoBaseHz;
             return Math.Max(Constants.BfoMinHz,
                 Math.Min(Constants.BfoMaxHz, Constants.BfoBaseHz + offsetKHz * 1000f));
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 }

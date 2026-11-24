@@ -91,5 +91,17 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(0.00275f, ground.y, 7);
             Assert.Equal(stock, CurrentStrategicStep.WorldVelocity(stock, Vector3.zero));
         }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-2)]
+        public void RejectsNonPositiveStepCountWithoutDividingByZero(int steps)
+        {
+            var start = new Vector2(12f, -4f);
+            var end = new DateTime(1941, 11, 30, 0, 0, 0, DateTimeKind.Utc);
+            Assert.Equal(start, CurrentStrategicStep.Midpoint(start, new Vector2(20f, 0f), Vector2.zero, 0, steps));
+            Assert.Equal(default(DateTime), CurrentStrategicStep.MidpointUtc(end, TimeSpan.TicksPerHour, 0, steps));
+            Assert.Equal(default(DateTime), CurrentStrategicStep.MidpointUtc(end, -1L, 0, 2));
+        }
     }
 }

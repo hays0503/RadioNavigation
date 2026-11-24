@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
@@ -34,7 +35,7 @@ namespace UBOAT.Mods.RadioNavigation
         {
             bool isIndex = i < 4;
             int number = isIndex ? i + 1 : i - 3;
-            shades[i] = nodes[(isIndex ? "Index_Shade_" : "Horizon_Shade_") + number.ToString("00") + "_Pivot"];
+            shades[i] = nodes[(isIndex ? "Index_Shade_" : "Horizon_Shade_") + number.ToString("00", CultureInfo.InvariantCulture) + "_Pivot"];
             float authored = isIndex ? i * 2f : new[] { 87f, 89f, 90f }[i - 4];
             shadeZero[i] = shades[i].localRotation * Quaternion.AngleAxis(authored, Vector3.up);
         }

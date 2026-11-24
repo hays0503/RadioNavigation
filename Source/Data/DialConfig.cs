@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace UBOAT.Mods.RadioNavigation
@@ -141,7 +141,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static string FormatFrequency(float frequency, int bandIndex)
         {
-            if (float.IsNaN(frequency))
+            if (float.IsNaN(frequency) || float.IsInfinity(frequency))
                 return "---";
 
             if (bandIndex.IsNegative() || bandIndex >= Bands.Length)

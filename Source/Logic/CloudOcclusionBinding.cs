@@ -211,6 +211,18 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
+        internal static void Reset()
+        {
+            cachedCloud = null;
+            cachedGBuffer = null;
+            nextRetryRealtime = 0f;
+            cloudFoundLogged = false;
+            cloudMissingLogged = false;
+            gbufferFoundLogged = false;
+            gbufferMissingLogged = false;
+            inventoryLogged = false;
+        }
+
         private static bool RetryDue()
         {
             float now = Time.realtimeSinceStartup;

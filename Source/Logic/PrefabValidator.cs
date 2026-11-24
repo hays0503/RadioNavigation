@@ -29,6 +29,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Returns the subset of required paths absent from the prefab.</summary>
         public static List<string> FindMissing(Func<string, bool> pathExists)
         {
+            if (pathExists == null)
+                return new List<string>(RequiredChildren);
             var missing = new List<string>();
             foreach (string path in RequiredChildren)
             {

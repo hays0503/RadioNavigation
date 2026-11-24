@@ -226,8 +226,9 @@ namespace UBOAT.Mods.RadioNavigation
 
             float halfLength = fullWidth * 0.5f;
             float halfThickness = fullThickness * 0.5f;
-            int maxEmittable = Math.Min(positions.Length / (VerticesPerStreak * 3),
-                indices.Length / IndicesPerStreak);
+            int maxEmittable = Math.Min(
+                Math.Min(positions.Length / (VerticesPerStreak * 3), colors.Length / (VerticesPerStreak * 4)),
+                Math.Min(uvs.Length / (VerticesPerStreak * 2), indices.Length / IndicesPerStreak));
 
             int emitted = 0;
             for (int s = 0; s < starCount && emitted < maxEmittable; s++)

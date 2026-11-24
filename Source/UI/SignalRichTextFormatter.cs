@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text;
 
 namespace UBOAT.Mods.RadioNavigation
@@ -12,6 +12,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static string FormatRichText(List<SignalEntry> entries)
         {
+            if (entries == null)
+                return string.Empty;
             var sb = new StringBuilder(entries.Count * 20);
             SignalCharType prevType = SignalCharType.Separator;
 
@@ -69,6 +71,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void TrimEntries(List<SignalEntry> entries, ref int morseCharCount)
         {
+            if (entries == null)
+                return;
             // F120: RemoveAt(0) is O(n) per call — collapse the trim into a
             // single RemoveRange when multiple entries must go.
             int removeCount = 0;
@@ -85,6 +89,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static void TrimDecodedText(StringBuilder decodedText)
         {
+            if (decodedText == null)
+                return;
             if (decodedText.Length > MaxDecodedChars)
                 decodedText.Remove(0, decodedText.Length - MaxDecodedChars);
         }

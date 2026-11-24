@@ -138,11 +138,34 @@ namespace UBOAT.Mods.RadioNavigation
             return false;
         }
 
+        internal static Type FindSkyRootComponentType(string rootName)
+        {
+            for (int i = 0; i < SkyRoots.Length; i++)
+            {
+                if (SkyRoots[i].Name == rootName)
+                    return SkyRoots[i].ComponentType;
+            }
+            return null;
+        }
+
         private sealed class UnitySceneContentHost : ISceneContentHost
         {
             public bool Exists(string rootName)
             {
-                return GameObject.Find(rootName).IsNotNull();
+                GameObject existing = GameObject.Find(rootName);
+                if (existing.IsNull())
+                    return false;
+
+                // Hot reload leaves old-assembly DontDestroyOnLoad roots alive;
+                // replace any root lacking this assembly's component type.
+                Type expectedType = FindSkyRootComponentType(rootName);
+                if (expectedType != null && existing.GetComponent(expectedType).IsNull())
+                {
+                    existing.SetActive(false);
+                    Object.Destroy(existing);
+                    return false;
+                }
+                return true;
             }
 
             public void CreateRoot(string rootName, Type componentType)

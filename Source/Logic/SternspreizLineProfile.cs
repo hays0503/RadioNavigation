@@ -204,7 +204,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public static float AngularWidthMeters(double angleDeg, double distanceM)
         {
-            if (double.IsNaN(angleDeg) || double.IsInfinity(angleDeg) || angleDeg < 0d)
+            if (double.IsNaN(angleDeg) || double.IsInfinity(angleDeg) || angleDeg < 0d || angleDeg >= 180d)
                 throw new ArgumentOutOfRangeException("angleDeg");
             if (double.IsNaN(distanceM) || double.IsInfinity(distanceM) || distanceM <= 0d)
                 throw new ArgumentOutOfRangeException("distanceM");
@@ -221,7 +221,7 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public static double PixelsForAngle(double angleDeg, double verticalFovDeg, int viewportPixels)
         {
-            if (double.IsNaN(angleDeg) || double.IsInfinity(angleDeg) || angleDeg < 0d)
+            if (double.IsNaN(angleDeg) || double.IsInfinity(angleDeg) || angleDeg < 0d || angleDeg >= 180d)
                 throw new ArgumentOutOfRangeException("angleDeg");
             if (double.IsNaN(verticalFovDeg) || double.IsInfinity(verticalFovDeg)
                 || verticalFovDeg <= 0d || verticalFovDeg >= 179d)

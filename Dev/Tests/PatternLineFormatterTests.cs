@@ -92,6 +92,9 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal("01:05", PatternLineFormatter.FormatDuration(65f));
             Assert.Equal("02:05", PatternLineFormatter.FormatDuration(125f));
             Assert.Equal("59:59", PatternLineFormatter.FormatDuration(3599f));
+            Assert.Equal("00:00", PatternLineFormatter.FormatDuration(-5f));
+            Assert.Equal("00:00", PatternLineFormatter.FormatDuration(float.NaN));
+            Assert.Equal("00:00", PatternLineFormatter.FormatDuration(float.PositiveInfinity));
         }
 
         [Fact]

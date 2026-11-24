@@ -71,5 +71,21 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         {
             Assert.Equal(300f, StationGainModel.ComputeBeatFrequency(-0.9f));
         }
+
+        [Theory]
+        [InlineData(float.PositiveInfinity, 257f, 20f)]
+        [InlineData(257f, 257f, float.NaN)]
+        [InlineData(0f, 257f, 20f)]
+        public void Gain_NonFiniteOrZero_ReturnsZero(float f, float f0, float q)
+        {
+            Assert.Equal(0f, StationGainModel.ComputeGain(f, f0, q));
+        }
+
+        [Fact]
+        public void Beat_NonFiniteOffset_ReturnsBase()
+        {
+            Assert.Equal(1000f, StationGainModel.ComputeBeatFrequency(float.NaN));
+            Assert.Equal(1000f, StationGainModel.ComputeBeatFrequency(float.PositiveInfinity));
+        }
     }
 }

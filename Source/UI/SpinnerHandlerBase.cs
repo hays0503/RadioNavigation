@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -37,7 +37,7 @@ namespace UBOAT.Mods.RadioNavigation
         protected virtual bool UseSmoothing() => true;
         protected virtual float ClampTargetAngle(float raw)
         {
-            if (float.IsNaN(raw))
+            if (float.IsNaN(raw) || float.IsInfinity(raw))
                 return minAngle;
             return Mathf.Clamp(raw, minAngle, maxAngle);
         }
@@ -67,7 +67,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (img.IsNotNull())
                 img.raycastTarget = true;
 
-            currentAngle = Mathf.Clamp(startAngle, minAngle, maxAngle);
+            currentAngle = ClampTargetAngle(startAngle);
             spinnerRect.localRotation = Quaternion.Euler(0, 0, -currentAngle);
 
             if (minAngle > maxAngle)

@@ -35,6 +35,12 @@ namespace UBOAT.Mods.RadioNavigation.Tests
                 query.HasPosition = true;
                 query.Utc = default(DateTime);
                 Assert.False(field.TrySample(query, out _));
+
+                var localT = new DateTime(1941, 11, 5, 3, 0, 0, DateTimeKind.Utc).ToLocalTime();
+                query.Utc = localT;
+                Assert.True(field.TrySample(query, out var localWater));
+                Assert.Equal(water.x, localWater.x, 6);
+                Assert.Equal(water.z, localWater.z, 6);
             }
             finally
             {

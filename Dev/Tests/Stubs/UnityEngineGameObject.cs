@@ -37,6 +37,8 @@ namespace UnityEngine
 
         public Component AddComponent(Type type) { return null; }
 
+        public void SetActive(bool value) { }
+
         public T[] GetComponents<T>() where T : Component { return new T[0]; }
     }
 }

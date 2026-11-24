@@ -83,6 +83,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void AddSample(DateTime utc, double latDeg, double lonDeg)
         {
+            if (!IsFiniteCoordinate(latDeg, lonDeg))
+                return;
             if (!hasLastSample)
             {
                 Seed(utc, latDeg, lonDeg);
@@ -163,14 +165,21 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Input has been validated by SextantSaveCodec. Restoring
         /// the game-time track permits a third sight immediately after load;
         /// the existing gap/teleport guards still restart an obsolete track.</summary>
+        private static bool IsFiniteCoordinate(double latDeg, double lonDeg)
+        {
+            return !double.IsNaN(latDeg) && !double.IsInfinity(latDeg)
+                && !double.IsNaN(lonDeg) && !double.IsInfinity(lonDeg);
+        }
+
         public void RestoreState(CourseSamplerSnapshot state)
         {
             Reset();
             if (state == null)
                 return;
-            courseDeg = state.CourseDeg;
-            speedKn = state.SpeedKn;
-            samples.AddRange(state.Samples);
+            courseDeg = float.IsNaN(state.CourseDeg) || float.IsInfinity(state.CourseDeg) ? 0f : state.CourseDeg;
+            speedKn = float.IsNaN(state.SpeedKn) || float.IsInfinity(state.SpeedKn) || state.SpeedKn < 0f ? 0f : state.SpeedKn;
+            if (state.Samples != null)
+                samples.AddRange(state.Samples);
             if (samples.Count == 0)
                 return;
             CourseTrackSample last = samples[samples.Count - 1];

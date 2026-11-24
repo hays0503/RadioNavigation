@@ -1095,6 +1095,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 cachedViewCamera = viewCamera;
                 cachedViewData = viewCamera.GetComponent<UBOAT.Game.Scene.Rendering.AdditionalCameraData>();
+                ResolveMirrorSources(viewCamera, true);
             }
             if (cachedViewData == null)
                 return;
@@ -1327,8 +1328,9 @@ namespace UBOAT.Mods.RadioNavigation
             // (per-frame SyncPostProfile, gate RadioNav.Ppv1Mirror): the
             // Р’В§16.10 removal predates the Р’В§16.17 root cause, and the eyes
             // verifiably grade through it (FPP NG profile).
-            ResolveMirrorSources(viewCamera);
-            effectMirror.AddMirroredEffectComponents(viewCamera, go);
+            ResolveMirrorSources(viewCamera, false);
+            if (effectMirror != null)
+                effectMirror.AddMirroredEffectComponents(viewCamera, go);
 
             // PlayWay renders the sea only for cameras carrying a WaterCamera
             // (waterCamerasCache registry; HullEffectsRenderer.GetWaterCamera
@@ -1350,7 +1352,7 @@ namespace UBOAT.Mods.RadioNavigation
                 if (waterCam != null)
                 {
                     WaterCamera mainWater = viewCamera.GetComponent<WaterCamera>();
-                    if (mainWater != null)
+                    if (mainWater != null && effectMirror != null)
                     {
                         effectMirror.MirrorComponent(mainWater, waterCam);
                         Debug.Log(LogPrefix + " WATERCAM copied to " + name + " from main camera");
@@ -1372,7 +1374,8 @@ namespace UBOAT.Mods.RadioNavigation
             // installed the sun's glow is disabled inside that half's lens;
             // the main camera's PostProcessLayer never consumes this layer,
             // so the FPP view keeps its normal bloom.
-            bloomCut.EnsureVolume(go, rightSide);
+            if (bloomCut != null)
+                bloomCut.EnsureVolume(go, rightSide);
 
             SextantCameraProbe probe = go.AddComponent<SextantCameraProbe>();
             probe.tracked = cam;
@@ -1394,9 +1397,9 @@ namespace UBOAT.Mods.RadioNavigation
             return cam;
         }
 
-        private void ResolveMirrorSources(Camera viewCamera)
+        private void ResolveMirrorSources(Camera viewCamera, bool force)
         {
-            if (sourceSsmsFog != null || viewCamera == null)
+            if (viewCamera == null || (!force && sourceSsmsFog != null))
                 return;
             sourceSsmsFog = FindComponent(viewCamera, "SSMSGlobalFog");
             sourceSsms = FindComponent(viewCamera, "SSMS");

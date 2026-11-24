@@ -53,7 +53,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void BeginLocalDrag(RectTransform chronometerDragContainer, PointerEventData eventData)
         {
-            if (!isRaised() || !isRadioVisible() || eventData == null)
+            if (chronometerDragContainer.IsNull() || !isRaised() || !isRadioVisible() || eventData == null)
                 return;
 
             if (eventData.pointerPress.IsNotNull()
@@ -78,7 +78,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void DragLocal(RectTransform chronometerDragContainer, PointerEventData eventData)
         {
-            if (!localDragActive || eventData == null)
+            if (chronometerDragContainer.IsNull() || !localDragActive || eventData == null)
                 return;
 
             RectTransform parent = chronometerDragContainer.parent as RectTransform;
@@ -134,7 +134,7 @@ namespace UBOAT.Mods.RadioNavigation
             System.Action cancelNativeDrag,
             System.Action persistPosition)
         {
-            if (!mapDragActive)
+            if (chronometerDragContainer.IsNull() || !mapDragActive)
                 return;
             if (!isExpanded() || isRaised())
             {

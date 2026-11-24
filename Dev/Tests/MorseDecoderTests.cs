@@ -56,5 +56,13 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             var buf = new StringBuilder("..-..-.--.-");
             Assert.Equal("FRQ", MorseDecoder.Decode("frq", buf));
         }
+
+        [Fact]
+        public void Decode_NullOrEmptyInputs_ReturnsEmpty()
+        {
+            Assert.Equal(string.Empty, MorseDecoder.Decode(null, new StringBuilder(".-")));
+            Assert.Equal(string.Empty, MorseDecoder.Decode("", new StringBuilder(".-")));
+            Assert.Equal(string.Empty, MorseDecoder.Decode("FRQ", null));
+        }
     }
 }

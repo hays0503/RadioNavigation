@@ -40,6 +40,7 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.NotEmpty(PrefabValidator.RequiredChildren);
             var set = new HashSet<string>(PrefabValidator.RequiredChildren);
             Assert.Equal(PrefabValidator.RequiredChildren.Length, set.Count);
+            Assert.Equal(PrefabValidator.RequiredChildren.Length, PrefabValidator.FindMissing(null).Count);
         }
     }
 }

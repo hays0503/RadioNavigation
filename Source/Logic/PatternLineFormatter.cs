@@ -43,10 +43,13 @@ namespace UBOAT.Mods.RadioNavigation
 
         public static string FormatDuration(float seconds)
         {
+            if (float.IsNaN(seconds) || float.IsInfinity(seconds) || seconds < 0f)
+                seconds = 0f;
             int s = Mathf.RoundToInt(seconds);
             int min = s / 60;
             int sec = s % 60;
-            return min.ToString("D2") + ":" + sec.ToString("D2");
+            return min.ToString("D2", CultureInfo.InvariantCulture)
+                + ":" + sec.ToString("D2", CultureInfo.InvariantCulture);
         }
 
         public static string StationSuffix(string baseText, StationScheduler.Phase phase, float navigationElapsed)

@@ -31,6 +31,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public static string Decode(string callsign, StringBuilder morseBuffer)
         {
+            if (string.IsNullOrEmpty(callsign) || morseBuffer == null)
+                return string.Empty;
             var decoded = new StringBuilder();
             int pos = 0;
             foreach (char ch in callsign.ToUpperInvariant())

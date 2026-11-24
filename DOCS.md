@@ -5,7 +5,7 @@
 контракты ниже → датированные результаты приёмки → исторические планы. Старый
 чеклист сам по себе не означает, что функцию нужно реализовать заново.
 
-<!-- gate-snapshot: date=2026-11-24 tests=1896 sourcecheck=178 analyzers=76 -->
+<!-- gate-snapshot: date=2026-11-24 tests=1910 sourcecheck=178 analyzers=76 -->
 
 Снимок прогона **2026-11-23**: tests
 **1877 PASS / 0 FAIL**, SourceCheck **178 PASS / 0 FAIL**, analyzers

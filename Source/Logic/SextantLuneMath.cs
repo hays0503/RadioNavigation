@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace UBOAT.Mods.RadioNavigation
 {
@@ -29,7 +30,8 @@ namespace UBOAT.Mods.RadioNavigation
 
         public override string ToString()
         {
-            return "(" + X.ToString("F4") + "," + Y.ToString("F4") + ")";
+            return "(" + X.ToString("F4", CultureInfo.InvariantCulture)
+                + "," + Y.ToString("F4", CultureInfo.InvariantCulture) + ")";
         }
     }
 

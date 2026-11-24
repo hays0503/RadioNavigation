@@ -224,5 +224,28 @@ namespace UBOAT.Mods.RadioNavigation.Tests
             Assert.Equal(0f, sampler.SpeedKn);
             Assert.True(sampler.IsFresh(T0.AddHours(2)));
         }
+
+        [Fact]
+        public void NonFiniteCoordinatesAndNullRestoreSamples_HandledSafely()
+        {
+            var sampler = new CourseSampler();
+            sampler.AddSample(T0, double.NaN, 0.0);
+            Assert.False(sampler.IsFresh(T0));
+
+            sampler.AddSample(T0, 50.0, 1.0);
+            sampler.AddSample(T0.AddSeconds(4), double.PositiveInfinity, 1.0);
+            Assert.True(sampler.IsFresh(T0));
+            Assert.Equal(0f, sampler.SpeedKn);
+
+            sampler.RestoreState(new CourseSamplerSnapshot
+            {
+                CourseDeg = float.NaN,
+                SpeedKn = float.PositiveInfinity,
+                Samples = null
+            });
+            Assert.Equal(0f, sampler.CourseDeg);
+            Assert.Equal(0f, sampler.SpeedKn);
+            Assert.False(sampler.IsFresh(T0));
+        }
     }
 }

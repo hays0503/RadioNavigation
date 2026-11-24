@@ -88,6 +88,7 @@ namespace UBOAT.Mods.RadioNavigation
         GameObject boundModel, canvasObject, tooltipObject;
         RectTransform tooltipRect;
         Text label;
+        Canvas tooltipCanvas;
         CanvasScaler scaler;
         readonly CPlathPointerButton button = new CPlathPointerButton();
         bool failed;
@@ -180,8 +181,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (canvasObject == null)
             {
                 canvasObject = new GameObject("CPlath_ReadTooltip", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
-                var canvas = canvasObject.GetComponent<Canvas>();
-                canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 20000;
+                tooltipCanvas = canvasObject.GetComponent<Canvas>();
+                tooltipCanvas.renderMode = RenderMode.ScreenSpaceOverlay; tooltipCanvas.sortingOrder = 20000;
                 scaler = canvasObject.GetComponent<CanvasScaler>();
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
                 var group = canvasObject.AddComponent<CanvasGroup>(); group.blocksRaycasts = false; group.interactable = false;
@@ -203,7 +204,7 @@ namespace UBOAT.Mods.RadioNavigation
                 label.verticalOverflow = VerticalWrapMode.Truncate;
             }
             scaler.scaleFactor = scale;
-            canvasObject.GetComponent<Canvas>().scaleFactor = scale;
+            if (tooltipCanvas != null) tooltipCanvas.scaleFactor = scale;
             label.text = text;
             Vector2 size = new Vector2(label.preferredWidth+20, label.preferredHeight+10);
             tooltipRect.sizeDelta = size;

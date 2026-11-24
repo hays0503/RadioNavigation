@@ -2,6 +2,8 @@ using DWS.Common.InjectionFramework;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using UBOAT.Game.Scene;
+using UBOAT.Game.Scene.Camera;
 using UBOAT.Game.Scene.Environment;
 using UnityEngine;
 
@@ -16,36 +18,46 @@ namespace UBOAT.Mods.RadioNavigation
         // cached in TypeMemberCache (keyed by Type, no per-frame string key).
         [Inject] private static Weather weather;
 
-        // "Map" enum comparison: Enum.ToString() allocates on Mono, so cache
-        // the parsed enum value once instead of formatting per frame.
-        private static bool mapModeResolved;
-        private static object mapModeValue;
+        private static int fogginessFrame = -1;
+        private static float cachedFogginess;
+        private static int visibilityFrame = -1;
+        private static float cachedVisibility = 1f;
+        private static int sunZenithFrame = -1;
+        private static double cachedSunZenithDeg = 108.0;
+        private static int outsideFrame = -1;
+        private static bool cachedOutside;
 
-        /// <summary>Raw Atmosphere.Fogginess in [0..1]; 0 = clear air, 1 = dense fog.</summary>
-        private static void EnsureWeather()
+        private static bool TryGetSky(out object sky)
         {
-            if (weather != null)
-                return;
-            InjectionFramework framework = InjectionFramework.Instance;
-            if (framework != null)
-                weather = framework.GetInstance<Weather>();
+            sky = null;
+            if (weather.IsNull())
+            {
+                InjectionFramework framework = InjectionFramework.Instance;
+                if (framework != null)
+                    weather = framework.GetInstance<Weather>();
+            }
+            if (weather.IsNull())
+                return false;
+            sky = ReadMember(weather, "Sky");
+            return sky.IsNotNull();
         }
 
+        /// <summary>Raw Atmosphere.Fogginess in [0..1]; 0 = clear air, 1 = dense fog.</summary>
         public static float GetFogginess()
         {
+            int frame = Time.frameCount;
+            if (fogginessFrame == frame)
+                return cachedFogginess;
+
+            float result = 0f;
             try
             {
-                EnsureWeather();
-                if (weather == null)
-                    return 0f;
-
-                object sky = ReadMember(weather, "Sky");
-                if (sky == null)
-                    return 0f;
-
-                object atmosphere = ReadMember(sky, "Atmosphere");
-                float fogginess = ReadFloat(atmosphere, "Fogginess");
-                return Math.Max(0f, Math.Min(1f, fogginess));
+                if (TryGetSky(out object sky))
+                {
+                    object atmosphere = ReadMember(sky, "Atmosphere");
+                    float fogginess = ReadFloat(atmosphere, "Fogginess");
+                    result = Math.Max(0f, Math.Min(1f, fogginess));
+                }
             }
             catch (Exception e)
             {
@@ -54,34 +66,40 @@ namespace UBOAT.Mods.RadioNavigation
                 // (game rename) is visible instead of silently wrong.
                 if (WarnOnce.ShouldLog("SkyVisibilityResolver.GetFogginess"))
                     Debug.LogWarning("[RadioNav][Sky] GetFogginess failed: " + e.Message);
-                return 0f;
             }
+
+            fogginessFrame = frame;
+            cachedFogginess = result;
+            return result;
         }
 
         public static float GetVisibility()
         {
+            int frame = Time.frameCount;
+            if (visibilityFrame == frame)
+                return cachedVisibility;
+
+            float result = 1f;
             try
             {
-                EnsureWeather();
-                if (weather == null)
-                    return 1f;
-
-                object sky = ReadMember(weather, "Sky");
-                if (sky == null)
-                    return 1f;
-
-                object atmosphere = ReadMember(sky, "Atmosphere");
-                float fogginess = ReadFloat(atmosphere, "Fogginess");
-                float lerpValue = ReadFloat(sky, "LerpValue");
-                float visibility = (1f - fogginess) * (1f - lerpValue);
-                return Math.Max(0f, Math.Min(1f, visibility));
+                if (TryGetSky(out object sky))
+                {
+                    object atmosphere = ReadMember(sky, "Atmosphere");
+                    float fogginess = ReadFloat(atmosphere, "Fogginess");
+                    float lerpValue = ReadFloat(sky, "LerpValue");
+                    float visibility = (1f - fogginess) * (1f - lerpValue);
+                    result = Math.Max(0f, Math.Min(1f, visibility));
+                }
             }
             catch (Exception e)
             {
                 if (WarnOnce.ShouldLog("SkyVisibilityResolver.GetVisibility"))
                     Debug.LogWarning("[RadioNav][Sky] GetVisibility failed: " + e.Message);
-                return 1f;
             }
+
+            visibilityFrame = frame;
+            cachedVisibility = result;
+            return result;
         }
 
         /// <summary>Sun zenith distance (degrees) from the game sky
@@ -90,23 +108,29 @@ namespace UBOAT.Mods.RadioNavigation
         /// failure cannot wash the star field out.</summary>
         public static double GetSunZenithDeg()
         {
+            int frame = Time.frameCount;
+            if (sunZenithFrame == frame)
+                return cachedSunZenithDeg;
+
+            double result = 108.0;
             try
             {
-                EnsureWeather();
-                if (weather == null)
-                    return 108.0;
-                object sky = ReadMember(weather, "Sky");
-                if (sky == null)
-                    return 108.0;
-                object value = ReadMember(sky, "SunZenith");
-                return value == null ? 108.0 : Convert.ToDouble(value);
+                if (TryGetSky(out object sky))
+                {
+                    object value = ReadMember(sky, "SunZenith");
+                    if (value != null)
+                        result = Convert.ToDouble(value);
+                }
             }
             catch (Exception e)
             {
                 if (WarnOnce.ShouldLog("SkyVisibilityResolver.GetSunZenithDeg"))
                     Debug.LogWarning("[RadioNav][Sky] GetSunZenithDeg failed: " + e.Message);
-                return 108.0;
             }
+
+            sunZenithFrame = frame;
+            cachedSunZenithDeg = result;
+            return result;
         }
 
         /// <summary>
@@ -117,50 +141,28 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public static bool IsPlayerOutside()
         {
+            int frame = Time.frameCount;
+            if (outsideFrame == frame)
+                return cachedOutside;
+
+            bool result = false;
             try
             {
-                object mainCamera = ReadStatic("UBOAT.Game.Scene.Camera.MainCamera", "Instance");
-                if (mainCamera.IsNull())
-                    return false;
-
-                bool insideBoat = ReadBool(mainCamera, "IsInsideBoat");
-                if (insideBoat)
-                    return false;
-
-                object mode = ReadMember(mainCamera, "CurrentMode");
-                if (mode != null && IsMode(mode, "Map", ref mapModeResolved, ref mapModeValue))
-                    return false;
-
-                return true;
+                MainCamera mainCamera = MainCamera.Instance;
+                if (mainCamera.IsNotNull() && !mainCamera.IsInsideBoat)
+                {
+                    result = mainCamera.CurrentMode != CameraMode.Map;
+                }
             }
             catch (Exception e)
             {
                 if (WarnOnce.ShouldLog("SkyVisibilityResolver.IsPlayerOutside"))
                     Debug.LogWarning("[RadioNav][Sky] IsPlayerOutside failed: " + e.Message);
-                return false;
             }
-        }
 
-        private static object ReadStatic(string typeName, string memberName)
-        {
-            Type type = GameTypeCache.Resolve(typeName);
-            if (type == null)
-                return null;
-
-            MemberInfo cached = TypeMemberCache.GetStaticMember(type, memberName);
-            if (cached == null)
-            {
-                if (WarnOnce.ShouldLog("SkyVisibilityResolver." + type.Name + "." + memberName + "#static"))
-                    Debug.LogWarning("[RadioNav][Sky] static member not found: " + type.Name + "." + memberName);
-                return null;
-            }
-            return cached is PropertyInfo property ? property.GetValue(null, null) : ((FieldInfo)cached).GetValue(null);
-        }
-
-        private static bool ReadBool(object target, string memberName)
-        {
-            object value = ReadMember(target, memberName);
-            return value != null && Convert.ToBoolean(value);
+            outsideFrame = frame;
+            cachedOutside = result;
+            return result;
         }
 
         private static float ReadFloat(object target, string memberName)
@@ -191,32 +193,16 @@ namespace UBOAT.Mods.RadioNavigation
         }
 
         /// <summary>
-        /// True when <paramref name="mode"/> equals the named enum value; the
-        /// parsed value is cached so no per-frame Enum.ToString() allocation.
-        /// </summary>
-        private static bool IsMode(object mode, string name, ref bool resolved, ref object value)
-        {
-            if (!resolved)
-            {
-                resolved = true;
-                Type modeType = mode.GetType();
-                if (modeType.IsEnum)
-                {
-                    try { value = Enum.Parse(modeType, name); }
-                    catch (ArgumentException) { value = null; }
-                }
-            }
-            return value != null && value.Equals(mode);
-        }
-
-        /// <summary>
-        /// Hot-reload hygiene: forget cached enum values. Member lookups live
-        /// in TypeMemberCache, cleared by the bootstrapper.
+        /// Hot-reload hygiene: forget cached frame state and weather ref.
+        /// Member lookups live in TypeMemberCache, cleared by the bootstrapper.
         /// </summary>
         public static void Reset()
         {
-            mapModeResolved = false;
-            mapModeValue = null;
+            weather = null;
+            fogginessFrame = -1;
+            visibilityFrame = -1;
+            sunZenithFrame = -1;
+            outsideFrame = -1;
         }
     }
 }

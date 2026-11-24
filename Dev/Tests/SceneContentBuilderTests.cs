@@ -129,6 +129,14 @@ namespace UBOAT.Mods.RadioNavigation.Tests
         }
 
         [Fact]
+        public void FindSkyRootComponentType_ResolvesKnownRootsAndRejectsUnknown()
+        {
+            Assert.Equal(typeof(StarsMesh), SceneContentBuilder.FindSkyRootComponentType("StarSkyRoot"));
+            Assert.Equal(typeof(SunDiscRenderer), SceneContentBuilder.FindSkyRootComponentType("SunDiscRoot"));
+            Assert.Null(SceneContentBuilder.FindSkyRootComponentType("UnknownRoot"));
+        }
+
+        [Fact]
         public void EnsureMapComponents_Partial_OnlyMissingAdded()
         {
             var present = new HashSet<Type> { typeof(StationMapOverlay), typeof(FixMapMarker) };

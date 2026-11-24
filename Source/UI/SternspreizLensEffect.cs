@@ -201,7 +201,8 @@ namespace UBOAT.Mods.RadioNavigation
             lastDrew = false;
             lastMode = "off";
 
-            if (!Enabled || !configured || !rightEye || disposed || !SextantController.IsOpen)
+            if (!Enabled || !configured || !rightEye || disposed || !SextantController.IsOpen
+                || pipCamera == null || positionProvider == null)
                 return;
 
             if (CanSightSky())
@@ -427,7 +428,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             int glowWidth = Mathf.Max(1, width / 2);
             int glowHeight = Mathf.Max(1, height / 2);
-            UpdateInteriorProjection(width, glowWidth);
+            UpdateInteriorProjection(width, height, glowWidth);
             commandBuffer.Clear();
             commandBuffer.GetTemporaryRT(InteriorGlowTargetAId, glowWidth, glowHeight, 0,
                 FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear);
@@ -478,7 +479,7 @@ namespace UBOAT.Mods.RadioNavigation
             lastMode = "inside";
         }
 
-        private void UpdateInteriorProjection(int targetWidth, int glowWidth)
+        private void UpdateInteriorProjection(int targetWidth, int targetHeight, int glowWidth)
         {
             if (interiorMaterial == null || pipCamera == null || targetWidth <= 0)
                 return;
@@ -517,7 +518,7 @@ namespace UBOAT.Mods.RadioNavigation
             Debug.Log(string.Format(CultureInfo.InvariantCulture,
                 "{0} INTERIOROPTICS rt={1}x{2} fov={3:F1} line={4:F2}px halfLen={5:F2}tex "
                 + "halfThick={6:F2}tex guard={7:F1}px dir={8:F3},{9:F3}",
-                LogPrefix, targetWidth, targetWidth, pipCamera.fieldOfView,
+                LogPrefix, targetWidth, targetHeight, pipCamera.fieldOfView,
                 linePixels * InteriorStreakLengthScale, halfLengthTexels, halfThicknessTexels,
                 compactnessRadiusPixels, direction.x, direction.y));
         }

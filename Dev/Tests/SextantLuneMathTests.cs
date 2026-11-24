@@ -44,6 +44,22 @@ namespace Tests
         }
 
         [Fact]
+        public void SextantLuneOffset_ToStringUsesInvariantCulture()
+        {
+            var original = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture =
+                    System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+                Assert.Equal("(0.1250,-0.2500)", new SextantLuneOffset(0.125, -0.25).ToString());
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = original;
+            }
+        }
+
+        [Fact]
         public void Rest_ShowsAUniformThinRingAtTheRim()
         {
             SextantLuneOffset rest = Offset(0d, 0d);

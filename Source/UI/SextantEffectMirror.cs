@@ -605,8 +605,14 @@ namespace UBOAT.Mods.RadioNavigation
                 else
                 {
                     RenderTexture previous = RenderTexture.active;
-                    Graphics.Blit(source, target);
-                    RenderTexture.active = previous;
+                    try
+                    {
+                        Graphics.Blit(source, target);
+                    }
+                    finally
+                    {
+                        RenderTexture.active = previous;
+                    }
                 }
                 return true;
             }
@@ -626,6 +632,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// </summary>
         public void MirrorComponent(Component source, Component target)
         {
+            if (source == null || target == null)
+                return;
             CopyMembers(source, target, GetMirrorMembersCached(source.GetType()));
         }
 

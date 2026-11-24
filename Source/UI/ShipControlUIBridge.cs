@@ -171,11 +171,15 @@ namespace UBOAT.Mods.RadioNavigation
         /// <summary>Writes the normalized screen position through the native override + clamp.</summary>
         public static bool PersistExpandedPosition(RectTransform container)
         {
-            if (!TryResolvePositionBridge())
+            if (container.IsNull() || !TryResolvePositionBridge())
+                return false;
+            if (uiDialsDataHolderField == null)
                 return false;
             try
             {
                 object holder = uiDialsDataHolderField.GetValue(null);
+                if (holder == null)
+                    return false;
                 Vector2 screenPos = container.position;
                 Vector2 current = ChronometerMapDragMath.ToNormalizedOverride(screenPos, Screen.width, Screen.height);
                 Vector2 limited = (Vector2)applyToolPositionLimitsMethod.Invoke(
