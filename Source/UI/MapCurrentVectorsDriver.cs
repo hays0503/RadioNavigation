@@ -61,6 +61,9 @@ namespace UBOAT.Mods.RadioNavigation
         private float cachedDepthM = float.NaN;
         private bool cachedCoastReady;
         private bool hasSamples;
+        private bool visualsDirty = true;
+        private float cachedVisualElevation = float.NaN;
+        private Vector3 cachedVisualOrigin;
         private bool warned;
 
         public static void EnsureRunning()
@@ -98,7 +101,10 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             MapCurrentVectorsDriver driver = root.GetComponent<MapCurrentVectorsDriver>();
             if (driver != null)
+            {
                 driver.hasSamples = false;
+                driver.visualsDirty = true;
+            }
         }
 
         public void OnDestroy()
@@ -188,6 +194,7 @@ namespace UBOAT.Mods.RadioNavigation
             bool next = !CurrentSettings.MapVectorsEnabled();
             CurrentSettings.SaveMapVectorsPreference(next);
             hasSamples = false;
+            visualsDirty = true;
             Debug.Log("[RadioNav][CURRENT] map vectors " + (next ? "ON" : "OFF") + " (Shift+Y)");
         }
 
@@ -246,6 +253,7 @@ namespace UBOAT.Mods.RadioNavigation
             DateTime utc = CurrentRuntimeAdapter.GameUtc();
             float depthM = ResolveSampleDepthMeters();
 
+            bool resampled = false;
             if (NeedsResample(spec, centerKm, utc, depthM))
             {
                 activeGridCount = CurrentVectorOverlayMath.BuildSampleGrid(centerKm, spec, samplePointsKm);
@@ -261,9 +269,29 @@ namespace UBOAT.Mods.RadioNavigation
                 cachedDepthM = depthM;
                 cachedCoastReady = CurrentRuntimeAdapter.IsCoastReady;
                 hasSamples = true;
+                resampled = true;
             }
 
+            Vector3 sceneOrigin = sandbox.EncounterToSceneSpace(Vector2.zero);
+            if (!resampled && !NeedsVisualRefresh(spec.ElevationMeters, sceneOrigin))
+                return;
+
             ApplyVisuals(spec);
+            cachedVisualElevation = spec.ElevationMeters;
+            cachedVisualOrigin = sceneOrigin;
+            visualsDirty = false;
+        }
+
+        private bool NeedsVisualRefresh(float elevationMeters, Vector3 sceneOrigin)
+        {
+            if (visualsDirty || float.IsNaN(cachedVisualElevation))
+                return true;
+            if (Mathf.Abs(elevationMeters - cachedVisualElevation) > cachedVisualElevation * 0.005f)
+                return true;
+            float dx = sceneOrigin.x - cachedVisualOrigin.x;
+            float dy = sceneOrigin.y - cachedVisualOrigin.y;
+            float dz = sceneOrigin.z - cachedVisualOrigin.z;
+            return dx * dx + dy * dy + dz * dz > 1e-4f;
         }
 
         private bool NeedsResample(CurrentVectorGridSpec spec, Vector2 centerKm, DateTime utc, float depthM)
@@ -355,7 +383,11 @@ namespace UBOAT.Mods.RadioNavigation
         private void SetContainerActive(bool active)
         {
             if (container != null && container.gameObject.activeSelf != active)
+            {
                 container.gameObject.SetActive(active);
+                if (active)
+                    visualsDirty = true;
+            }
         }
 
         private void EnsureAssets()

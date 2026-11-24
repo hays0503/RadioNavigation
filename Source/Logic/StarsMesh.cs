@@ -62,6 +62,7 @@ namespace UBOAT.Mods.RadioNavigation
         private float lastSafeRadius = float.NaN;
         private float lastFogginess = float.NaN;
         private float lastLogTime;
+        private bool hasBuiltMesh;
 
         private readonly List<Vector3> vertices = new List<Vector3>();
         private readonly List<int> triangles = new List<int>();
@@ -270,7 +271,7 @@ namespace UBOAT.Mods.RadioNavigation
 
             float safeRadius = CameraResolver.SafeRadius(cam);
             if (!NeedsRebuild(cam, lstDeg, lat, limitingMag, fogginess, safeRadius, adapting)
-                && meshFilter.mesh != null && meshFilter.mesh.vertexCount > 0)
+                && hasBuiltMesh && meshFilter.mesh != null)
                 return;
 
             lastCamPos = cam.transform.position;
@@ -422,6 +423,7 @@ namespace UBOAT.Mods.RadioNavigation
             Bounds bounds = mesh.bounds;
             bounds.Expand(worldPerPixel * StarBrightness.MaxSizePx);
             mesh.bounds = bounds;
+            hasBuiltMesh = true;
 
             if (visibleCount > 0 && Time.time - lastLogTime > 5f)
             {

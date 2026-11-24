@@ -12,7 +12,6 @@ using UBOAT.Game.Core.Time;
 using UBOAT.Game.Sandbox;
 using UBOAT.Game.Scene.Entities;
 using UBOAT.Game.Scene.Environment;
-using UBOAT.Game.Scene.Environment.Terrain;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -41,6 +40,7 @@ namespace UBOAT.Mods.RadioNavigation
         private static NeuralNetworkPhysics target;
         private static PlayerShip boundShip;
         private static ICurrentField currentField;
+        private static CurrentAtlasField atlasField;
         private static string fieldKind = "none";
         private static string fieldSummary;
         private static GameTime gameTime;
@@ -89,6 +89,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (!CurrentSettings.IsMasterEnabled())
             {
                 currentField = null;
+                atlasField = null;
                 fieldKind = "none";
                 fieldSummary = null;
                 useWind = false;
@@ -208,6 +209,7 @@ namespace UBOAT.Mods.RadioNavigation
         // not a silent year/depth extrapolation.
         private static void WrapAtlasWithTidalLayer(CurrentAtlasField atlas, out bool anyFlow)
         {
+            atlasField = atlas;
             if (CurrentSettings.TidalCurrentsEnabled())
             {
                 var tidal = CurrentTidalField.CreateWithAtlas(atlas);
@@ -226,21 +228,20 @@ namespace UBOAT.Mods.RadioNavigation
         private static bool IsLandAt(double latitude, double longitude)
         {
             longitude = Math.IEEERemainder(longitude, 360.0);
-            if (LighthouseCoastProbe.TryGetDistanceKm(latitude, longitude, out double coastKm)
-                && coastKm <= 0.0)
-                return true;
-            WorldMaps.Map elevMap = WorldMaps.ElevationMap;
-            if (elevMap == null)
-                return false;
-            Vector2 encounterKm = Coordinates.ToWorldPosition(latitude, longitude);
-            float elevationM = elevMap.GetAtWorldSpace(encounterKm.x, encounterKm.y);
-            return !float.IsNaN(elevationM) && elevationM > 0.5f;
+            if (LighthouseCoastProbe.TryIsLandFast(latitude, longitude, out bool isLand))
+                return isLand;
+            // Fallback while CoastQuadTree finishes background loading at boot:
+            // stay strictly in-memory via the loaded RNW1 atlas land mask rather
+            // than touching WorldMaps.ElevationMap (64-tile FIFO disk/LOH thrash).
+            CurrentAtlasField atlas = atlasField;
+            return atlas != null && atlas.TryGetSurfaceLandMask(latitude, longitude, out bool atlasLand) && atlasLand;
         }
 
         private static bool TryReadField(out bool anyFlow)
         {
             anyFlow = false;
             currentField = null;
+            atlasField = null;
             fieldKind = "none";
             fieldSummary = null;
             string atlasPath = ResolveAtlasPath(CurrentSettings.ResolveRequestedAtlas());
@@ -478,6 +479,16 @@ namespace UBOAT.Mods.RadioNavigation
             SampleWater(position, ship ? Mathf.Max(0f, ship.Depth) : 0f, out Vector3 sampled, true);
             water = sampled;
             CurrentRudderAdapter.SetWater(water);
+            if (useNearby && Nearby.Count > 0)
+            {
+                foreach (var entry in Nearby.Values)
+                {
+                    entry.Refresh();
+                    if (useRelativeRudder)
+                        CurrentRudderAdapter.SetNearbyWater(entry.Body, entry.Water);
+                    CurrentShipSpeedAdapter.SetWater(entry.Ship, entry.Water);
+                }
+            }
         }
 
         private static void SampleWater(Vector3 scenePosition, float depthMeters, out Vector3 velocity,
@@ -556,15 +567,10 @@ namespace UBOAT.Mods.RadioNavigation
             // Depth is measured to the top of the hull/conning tower, not to
             // the deck. Fade over the last exposed metre; omit mast drag.
             exposure = ship == null ? 0f : Mathf.Clamp01(-ship.Depth);
-            if (useNearby)
+            if (useNearby && Nearby.Count > 0)
             {
                 foreach (var entry in Nearby.Values)
-                {
-                    entry.Refresh();
-                    if (useRelativeRudder)
-                        CurrentRudderAdapter.SetNearbyWater(entry.Body, entry.Water);
-                    CurrentShipSpeedAdapter.SetWater(entry.Ship, entry.Water);
-                }
+                    entry.RefreshPhysicsState();
             }
         }
 
@@ -832,12 +838,17 @@ namespace UBOAT.Mods.RadioNavigation
                     && Ship.DockPoint == null && ReferenceEquals(identity, entity.SandboxEntity);
             }
 
-            internal void Refresh()
+            internal void RefreshPhysicsState()
             {
                 // Native DockPoint clamps NPC bodies with FreezeAll; the
                 // shared callback rejects that constraint on the same tick.
                 Active = Current();
                 Exposure = Active ? Mathf.Clamp01(-entity.Depth) : 0f;
+            }
+
+            internal void Refresh()
+            {
+                RefreshPhysicsState();
                 Vector3 sampled = Vector3.zero;
                 if (Active)
                     SampleWater(entity.transform.position, Mathf.Max(0f, entity.Depth), out sampled);

@@ -41,6 +41,7 @@ namespace UBOAT.Mods.RadioNavigation
 
         private MapPointUI point;
         private Image pointImage;
+        private RectTransform pointImageRect;
         private TextMeshProUGUI pointLabel;
         private RectTransform visual;
         private Image backdrop;
@@ -51,6 +52,9 @@ namespace UBOAT.Mods.RadioNavigation
         private bool built;
         private bool pinned;
         private bool pointerHovered;
+        private float lastAppliedLossy = float.NaN;
+        private float lastAppliedIconPx = float.NaN;
+        private double lastAppliedUnitsPerPixel = double.NaN;
 
         public MapPointUI Point => point;
         public bool Pinned => pinned;
@@ -91,7 +95,10 @@ namespace UBOAT.Mods.RadioNavigation
         private void Neutralise()
         {
             if (pointImage == null)
+            {
                 pointImage = GetComponent<Image>();
+                pointImageRect = pointImage != null ? pointImage.rectTransform : null;
+            }
             if (pointImage != null)
             {
                 if (pointImage.color.a != 0f)
@@ -209,33 +216,46 @@ namespace UBOAT.Mods.RadioNavigation
         public void ApplyFrame(float iconPx, double unitsPerPixel, bool interactive,
             bool positionLocked, Vector2 trueEncounterPosition, string keyName)
         {
-            Neutralise();
-
-            if (point != null && point.Interactive != interactive)
-                point.Interactive = interactive;
-
-            if (!string.IsNullOrEmpty(keyName) && point != null && point.Name != keyName)
-                point.Name = keyName;
-
-            if (positionLocked && point != null && point.Position != trueEncounterPosition)
-                point.Position = trueEncounterPosition;
+            if (point != null)
+            {
+                if (point.Interactive != interactive)
+                    point.Interactive = interactive;
+                if (!string.IsNullOrEmpty(keyName) && point.Name != keyName)
+                    point.Name = keyName;
+                if (positionLocked && point.Position != trueEncounterPosition)
+                    point.Position = trueEncounterPosition;
+            }
 
             float rootLossy = transform.lossyScale.x;
             if (visual == null || rootLossy <= LighthouseMarkerSizing.MinParentLossyScale)
                 return;
 
+            if (rootLossy == lastAppliedLossy
+                && iconPx == lastAppliedIconPx
+                && unitsPerPixel == lastAppliedUnitsPerPixel)
+                return;
+
+            lastAppliedLossy = rootLossy;
+            lastAppliedIconPx = iconPx;
+            lastAppliedUnitsPerPixel = unitsPerPixel;
+
+            ApplyVisualMetrics(iconPx, unitsPerPixel, rootLossy);
+        }
+
+        private void ApplyVisualMetrics(float iconPx, double unitsPerPixel, float rootLossy)
+        {
             // The hitbox rect follows the icon's pixel policy (the game scales
             // the root itself, so the rect is derived from the live scale):
             // world hitbox = Hitbox/Icon × iconPx × unitsPerPixel, exactly like
             // the old custom hitbox child was.
-            if (pointImage != null)
+            if (pointImageRect != null)
             {
                 float hitboxUnits = (float)(NavMapMarkerBase.HitboxSizeUnits * iconPx
                     * unitsPerPixel
                     / (LighthouseMarkerSizing.IconSizeCanvasUnits * rootLossy));
                 var hitbox = new Vector2(hitboxUnits, hitboxUnits);
-                if (pointImage.rectTransform.sizeDelta != hitbox)
-                    pointImage.rectTransform.sizeDelta = hitbox;
+                if (pointImageRect.sizeDelta != hitbox)
+                    pointImageRect.sizeDelta = hitbox;
             }
 
             float scale = (float)LighthouseMarkerSizing.MarkerScale(

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using HarmonyLib;
 using UBOAT.Game.Scene.Entities;
 using UnityEngine;
@@ -18,8 +19,9 @@ namespace UBOAT.Mods.RadioNavigation
 
         private static readonly Dictionary<Ship, Vector3> WaterByShip = new Dictionary<Ship, Vector3>();
         private static readonly List<Ship> Expired = new List<Ship>();
-        private static FieldInfo avgField;
-        private static FieldInfo counterField;
+        private static Func<Ship, float> getAverage;
+        private static Action<Ship, float> setAverage;
+        private static Func<Ship, int> getCounter;
         private static bool installed;
 
         private struct SpeedState
@@ -46,8 +48,9 @@ namespace UBOAT.Mods.RadioNavigation
             try
             {
                 harmony.Patch(fixedUpdate, prefix: new HarmonyMethod(before), postfix: new HarmonyMethod(after));
-                avgField = avg;
-                counterField = counter;
+                getAverage = BuildGetter<float>(avg, "GetShipAverageVelocity");
+                setAverage = BuildSetter<float>(avg, "SetShipAverageVelocity");
+                getCounter = BuildGetter<int>(counter, "GetShipAverageCounter");
                 installed = true;
                 return true;
             }
@@ -55,6 +58,41 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 Debug.LogWarning("[RadioNav][CURRENT] ship speed patch rejected: " + ex.Message);
                 return false;
+            }
+        }
+
+        private static Func<Ship, T> BuildGetter<T>(FieldInfo field, string name)
+        {
+            try
+            {
+                var dm = new DynamicMethod(name, typeof(T), new[] { typeof(Ship) }, typeof(Ship), true);
+                ILGenerator il = dm.GetILGenerator();
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldfld, field);
+                il.Emit(OpCodes.Ret);
+                return (Func<Ship, T>)dm.CreateDelegate(typeof(Func<Ship, T>));
+            }
+            catch (Exception)
+            {
+                return ship => (T)field.GetValue(ship);
+            }
+        }
+
+        private static Action<Ship, T> BuildSetter<T>(FieldInfo field, string name)
+        {
+            try
+            {
+                var dm = new DynamicMethod(name, typeof(void), new[] { typeof(Ship), typeof(T) }, typeof(Ship), true);
+                ILGenerator il = dm.GetILGenerator();
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Stfld, field);
+                il.Emit(OpCodes.Ret);
+                return (Action<Ship, T>)dm.CreateDelegate(typeof(Action<Ship, T>));
+            }
+            catch (Exception)
+            {
+                return (ship, val) => field.SetValue(ship, val);
             }
         }
 
@@ -119,8 +157,8 @@ namespace UBOAT.Mods.RadioNavigation
             if (Physics.autoSimulation && body.drag > 0f && (water.x != 0f || water.z != 0f))
                 body.AddForce(water * (body.mass * body.drag), ForceMode.Force);
             __state.Active = true;
-            __state.PreviousAverage = (float)avgField.GetValue(__instance);
-            __state.PreviousCounter = (int)counterField.GetValue(__instance);
+            __state.PreviousAverage = getAverage(__instance);
+            __state.PreviousCounter = getCounter(__instance);
         }
 
         private static void AfterFixedUpdate(Ship __instance, SpeedState __state)
@@ -129,7 +167,7 @@ namespace UBOAT.Mods.RadioNavigation
                 return;
             float updated = ComputeThroughWaterAverage(body.velocity, body.drag, Time.fixedDeltaTime,
                 water, body.rotation, Time.timeScale, __state.PreviousAverage);
-            avgField.SetValue(__instance, updated);
+            setAverage(__instance, updated);
             if (__state.PreviousCounter <= 1)
                 __instance.AverageVelocityLowFrequency = updated;
         }

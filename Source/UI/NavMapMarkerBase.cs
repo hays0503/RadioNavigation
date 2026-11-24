@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using DWS.Common.InjectionFramework;
 using DWS.Common.Resources;
 using TMPro;
@@ -72,6 +73,9 @@ namespace UBOAT.Mods.RadioNavigation
             public bool HasTruePosition;
         }
 
+        private static readonly FieldInfo ChartingPointsField = typeof(MapChartingUI).GetField(
+            "points", BindingFlags.Instance | BindingFlags.NonPublic);
+
         private static TMP_FontAsset tooltipFont;
         private static Sprite backdropSprite;
         private static Sprite fallbackIconSprite;
@@ -90,6 +94,7 @@ namespace UBOAT.Mods.RadioNavigation
         private readonly List<string> explicitRemovals = new List<string>();
         private readonly Dictionary<string, MapPointUI> pointsByName = new Dictionary<string, MapPointUI>();
         private readonly Dictionary<string, int> indexByKey = new Dictionary<string, int>();
+        private readonly Dictionary<string, MarkerView> previousViews = new Dictionary<string, MarkerView>(StringComparer.Ordinal);
         private bool[] shownBuffer = new bool[0];
         private MapChartingUI charting;
         private bool prepared;
@@ -100,6 +105,10 @@ namespace UBOAT.Mods.RadioNavigation
         private int hoveredIndex = -1;
         private float lastIconPx = LighthouseMarkerSizing.MinIconPixelSize;
         private double lastUnitsPerPixel;
+        private bool declutterDirty = true;
+        private double lastDeclutterGap = double.NaN;
+        private Vector3 lastDeclutterOrigin;
+        private int lastShownCount;
 
         protected abstract int MarkerCount { get; }
         /// <summary>Adoption key of the marker (see MapMarkerPoints).</summary>
@@ -167,6 +176,8 @@ namespace UBOAT.Mods.RadioNavigation
             float scale, float iconPx) { }
         protected virtual float MaintenanceIntervalSeconds => 0f;
         protected virtual void OnMaintenance() { }
+        protected virtual bool NeedsImmediateReconcile => false;
+        protected virtual void OnReconcileCompleted() { }
 
         private void Update()
         {
@@ -237,7 +248,7 @@ namespace UBOAT.Mods.RadioNavigation
         private void RunReconcile()
         {
             reconcileTimer -= Time.unscaledDeltaTime;
-            if (reconcileTimer > 0f)
+            if (reconcileTimer > 0f && !NeedsImmediateReconcile)
                 return;
             reconcileTimer = ReconcileIntervalSeconds;
 
@@ -264,6 +275,7 @@ namespace UBOAT.Mods.RadioNavigation
             }
             ApplyPlan();
             RebuildViews();
+            OnReconcileCompleted();
         }
 
         private void CollectDesiredKeys()
@@ -286,34 +298,41 @@ namespace UBOAT.Mods.RadioNavigation
         {
             existingNames.Clear();
             pointsByName.Clear();
-            // includeInactive: the declutter deactivates hidden points, and a
-            // default FindObjectsOfType would not see them — the reconcile
-            // would then treat them as missing and duplicate the fleet.
+            // Fast path: MapChartingUI owns every created/restored MapPointUI in
+            // its private `points` list (including declutter-deactivated ones).
+            // Reading it directly avoids a whole-scene FindObjectsOfType (~10 ms).
+            if (ChartingPointsField != null && charting != null
+                && ChartingPointsField.GetValue(charting) is List<MapPointUI> nativePoints)
+            {
+                for (int i = 0; i < nativePoints.Count; i++)
+                    RegisterExistingPoint(nativePoints[i]);
+                return;
+            }
+
             MapPointUI[] all = FindObjectsOfType<MapPointUI>(true);
             for (int i = 0; i < all.Length; i++)
+                RegisterExistingPoint(all[i]);
+        }
+
+        private void RegisterExistingPoint(MapPointUI point)
+        {
+            if (point == null || point.Data == null)
+                return;
+            string name = point.Data.Name;
+            if (!MapMarkerPoints.IsOwned(name))
+                return;
+            existingNames.Add(name);
+            if (!pointsByName.ContainsKey(name))
             {
-                MapPointUI point = all[i];
-                if (point == null || point.Data == null)
-                    continue;
-                string name = point.Data.Name;
-                if (!MapMarkerPoints.IsOwned(name))
-                    continue;
-                existingNames.Add(name);
-                if (!pointsByName.ContainsKey(name))
-                {
-                    pointsByName.Add(name, point);
-                }
-                else
-                {
-                    // Duplicate of an owned name (a runaway from an earlier
-                    // build): keep the first, destroy the rest. Remove the row
-                    // before the deferred Destroy so a save in this frame
-                    // cannot resurrect it.
-                    point.Destroyed -= OnPointDestroyedHandler;
-                    MapSaveSanitizer.RemovePointDataBeforeDestroy(point.Data);
-                    Destroy(point.gameObject);
-                }
+                pointsByName.Add(name, point);
+                return;
             }
+            // Duplicate of an owned name (a runaway from an earlier build):
+            // keep the first, destroy the rest. Remove the row before the
+            // deferred Destroy so a save in this frame cannot resurrect it.
+            point.Destroyed -= OnPointDestroyedHandler;
+            MapSaveSanitizer.RemovePointDataBeforeDestroy(point.Data);
+            Destroy(point.gameObject);
         }
 
         private void ApplyPlan()
@@ -376,11 +395,11 @@ namespace UBOAT.Mods.RadioNavigation
         /// already had a view.</summary>
         private void RebuildViews()
         {
-            var previous = new Dictionary<string, MarkerView>(StringComparer.Ordinal);
+            previousViews.Clear();
             for (int i = 0; i < views.Count; i++)
             {
                 if (!string.IsNullOrEmpty(views[i].Key))
-                    previous[views[i].Key] = views[i];
+                    previousViews[views[i].Key] = views[i];
             }
 
             views.Clear();
@@ -397,7 +416,7 @@ namespace UBOAT.Mods.RadioNavigation
                 }
 
                 MarkerView view;
-                if (!previous.TryGetValue(key, out view) || view.Point != point)
+                if (!previousViews.TryGetValue(key, out view) || view.Point != point)
                 {
                     view = new MarkerView();
                     view.HasTruePosition = PreserveInitialPointPosition;
@@ -414,6 +433,9 @@ namespace UBOAT.Mods.RadioNavigation
                 point.Destroyed += OnPointDestroyedHandler;
                 views.Add(view);
             }
+
+            previousViews.Clear();
+            declutterDirty = true;
 
             if (hoveredIndex >= 0)
             {
@@ -476,66 +498,105 @@ namespace UBOAT.Mods.RadioNavigation
         private void UpdateViews()
         {
             bool declutter = DeclutterEnabled && lastUnitsPerPixel > 0.0;
-            declutterItems.Clear();
-            if (declutter && shownBuffer.Length < views.Count)
-                shownBuffer = new bool[views.Count];
+            double declutterGap = 0.0;
+            Vector3 sceneOrigin = Vector3.zero;
+            bool runDeclutter = declutter && NeedsDeclutterRefresh(out declutterGap, out sceneOrigin);
+            if (runDeclutter)
+            {
+                declutterItems.Clear();
+                if (shownBuffer.Length < views.Count)
+                    shownBuffer = new bool[views.Count];
+            }
 
             bool pointsTool = charting != null && charting.CurrentTool == MapChartingUI.Tool.Points;
-
+            bool anyMoved = false;
             for (int i = 0; i < views.Count; i++)
             {
-                MarkerView view = views[i];
-                if (view.Point == null)
-                    continue;
+                if (UpdateSingleView(i, views[i], pointsTool, declutter, runDeclutter))
+                    anyMoved = true;
+            }
 
-                view.TruePosition = GetEncounterPosition(view.Index);
-                bool sourceMoved = !view.HasTruePosition || view.TruePosition != view.LastTruePosition;
-                view.LastTruePosition = view.TruePosition;
-                view.HasTruePosition = true;
-                MapMarkerPolicy policy = MapMarkerPoints.Evaluate(
-                    PointKind(view.Index), PointSuppressed(view.Index), true, pointsTool);
-                view.Interactive = policy.Interactive;
-                view.PositionLocked = policy.PositionLocked;
-                // Static markers keep their true position even while the
-                // declutter has them hidden (their bridge's LateUpdate does not
-                // run on an inactive GameObject). Dynamic markers (fix / LOP):
-                // a NEW observation changes the source position and wins over
-                // the point's own position; an unchanged source means the
-                // player dragged the point — the drag is preserved instead of
-                // being overwritten every frame (swarm 2026-09-25: stale FIX
-                // position after the second observation).
-                if (MapMarkerPoints.ShouldWritePosition(view.PositionLocked, sourceMoved,
-                        view.Point.Position != view.TruePosition))
-                {
-                    view.Point.Position = view.TruePosition;
-                }
+            FinishDeclutterPass(declutter, runDeclutter, anyMoved, declutterGap, sceneOrigin);
+        }
 
-                Vector3 position = sandbox.EncounterToSceneSpace(view.TruePosition);
-                OnMarkerPositioned(view.Index, position,
-                    (float)LighthouseMarkerSizing.MarkerScale(lastIconPx, lastUnitsPerPixel, 1f),
-                    lastIconPx);
+        private bool UpdateSingleView(int viewIndex, MarkerView view, bool pointsTool,
+            bool declutter, bool runDeclutter)
+        {
+            if (view.Point == null)
+                return false;
 
-                if (!declutter)
-                {
-                    view.Visible = true;
-                    ApplyVisibility(view);
-                    continue;
-                }
+            view.TruePosition = GetEncounterPosition(view.Index);
+            bool sourceMoved = !view.HasTruePosition || view.TruePosition != view.LastTruePosition;
+            view.LastTruePosition = view.TruePosition;
+            view.HasTruePosition = true;
 
+            MapMarkerPolicy policy = MapMarkerPoints.Evaluate(
+                PointKind(view.Index), PointSuppressed(view.Index), true, pointsTool);
+            view.Interactive = policy.Interactive;
+            view.PositionLocked = policy.PositionLocked;
+
+            // Static markers keep their true position even while declutter hides
+            // them. Dynamic markers (fix/LOP) preserve user drags until the
+            // underlying source position changes.
+            if (MapMarkerPoints.ShouldWritePosition(view.PositionLocked, sourceMoved,
+                    view.Point.Position != view.TruePosition))
+            {
+                view.Point.Position = view.TruePosition;
+            }
+
+            Vector3 position = sandbox.EncounterToSceneSpace(view.TruePosition);
+            OnMarkerPositioned(view.Index, position,
+                (float)LighthouseMarkerSizing.MarkerScale(lastIconPx, lastUnitsPerPixel, 1f),
+                lastIconPx);
+
+            if (!declutter)
+            {
+                view.Visible = true;
+                ApplyVisibility(view);
+                return sourceMoved;
+            }
+
+            if (runDeclutter)
+            {
                 declutterItems.Add(new MarkerDeclutter.Item
                 {
-                    ViewIndex = i,
+                    ViewIndex = viewIndex,
                     X = position.x,
                     Y = position.z,
                     Priority = Priority(view.Index),
-                    // Pinned/hovered never suppress: a deactivated root
-                    // receives no PointerExit, so its tooltip would dangle.
                     Forced = view.Pinned || view.Index == hoveredIndex
                 });
             }
+            return sourceMoved;
+        }
 
-            if (declutter)
-                ApplyDeclutter();
+        private void FinishDeclutterPass(bool declutter, bool runDeclutter, bool anyMoved,
+            double declutterGap, Vector3 sceneOrigin)
+        {
+            if (!declutter)
+                return;
+            if (runDeclutter)
+                ApplyDeclutter(declutterGap, sceneOrigin);
+            else
+            {
+                if (anyMoved)
+                    declutterDirty = true;
+                LogDeclutterStats(lastShownCount);
+            }
+        }
+
+        private bool NeedsDeclutterRefresh(out double gap, out Vector3 sceneOrigin)
+        {
+            gap = MarkerDeclutter.DefaultGapFactor * lastIconPx * lastUnitsPerPixel;
+            sceneOrigin = sandbox.EncounterToSceneSpace(Vector2.zero);
+            if (declutterDirty || double.IsNaN(lastDeclutterGap))
+                return true;
+            if (Math.Abs(gap - lastDeclutterGap) > lastDeclutterGap * 0.005)
+                return true;
+            float dx = sceneOrigin.x - lastDeclutterOrigin.x;
+            float dy = sceneOrigin.y - lastDeclutterOrigin.y;
+            float dz = sceneOrigin.z - lastDeclutterOrigin.z;
+            return dx * dx + dy * dy + dz * dz > 1e-4f;
         }
 
         /// <summary>
@@ -543,9 +604,8 @@ namespace UBOAT.Mods.RadioNavigation
         /// the shown/hidden state to the points. The gap is world units:
         /// screen px target × scene units per screen px.
         /// </summary>
-        private void ApplyDeclutter()
+        private void ApplyDeclutter(double gap, Vector3 sceneOrigin)
         {
-            double gap = MarkerDeclutter.DefaultGapFactor * lastIconPx * lastUnitsPerPixel;
             int shownCount = MarkerDeclutter.Select(declutterItems, gap, shownBuffer);
             for (int i = 0; i < views.Count; i++)
             {
@@ -555,6 +615,10 @@ namespace UBOAT.Mods.RadioNavigation
                 ApplyVisibility(views[i]);
             }
 
+            lastShownCount = shownCount;
+            lastDeclutterGap = gap;
+            lastDeclutterOrigin = sceneOrigin;
+            declutterDirty = false;
             LogDeclutterStats(shownCount);
         }
 
@@ -595,6 +659,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (view == null)
                 return;
             hoveredIndex = view.Index;
+            declutterDirty = true;
             RefreshTooltip(view);
             OnHoverEnter(view.Index);
         }
@@ -605,7 +670,10 @@ namespace UBOAT.Mods.RadioNavigation
             if (view == null)
                 return;
             if (hoveredIndex == view.Index)
+            {
                 hoveredIndex = -1;
+                declutterDirty = true;
+            }
             if (!view.Pinned && bridge != null)
                 bridge.HideTooltip();
             OnHoverExit(view.Index);
@@ -617,6 +685,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (view == null)
                 return;
             view.Pinned = !view.Pinned;
+            declutterDirty = true;
             RefreshTooltip(view);
             OnClick(view.Index);
         }

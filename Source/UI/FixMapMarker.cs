@@ -55,12 +55,21 @@ namespace UBOAT.Mods.RadioNavigation
         // double-load-safe behaviour, see NavMapMarkerBase.ApplyPlan).
         private static bool clearRequested;
         private static bool restoredFromSave;
+        private static int modelVersion;
+        private int lastReconciledVersion = -1;
 
         protected override bool PreserveInitialPointPosition => restoredFromSave;
         // Saved native rows can be created by MapChartingUI earlier in the
         // Loaded queue than the worksheet restore. Never stale-clean or move
         // them using the temporary empty model in that window.
         protected override bool ContentReady => !SextantSavePersistence.IsLoading;
+        protected override float ReconcileIntervalSeconds => 10f;
+        protected override bool NeedsImmediateReconcile => lastReconciledVersion != modelVersion;
+
+        protected override void OnReconcileCompleted()
+        {
+            lastReconciledVersion = modelVersion;
+        }
 
         public static void Set(double latDeg, double lonDeg, string label)
         {
@@ -70,6 +79,7 @@ namespace UBOAT.Mods.RadioNavigation
             FixLat = latDeg;
             FixLon = lonDeg;
             FixLabel = label ?? "FIX";
+            modelVersion++;
         }
 
         /// <summary>Publishes the cocked-hat vertices (P6): A = B∩C, B = C∩A,
@@ -84,6 +94,7 @@ namespace UBOAT.Mods.RadioNavigation
             VertexLat[2] = cLat;
             VertexLon[2] = cLon;
             HasTriangle = true;
+            modelVersion++;
         }
 
         /// <summary>Series reset (O): drop the pin and allow publishing.</summary>
@@ -96,6 +107,7 @@ namespace UBOAT.Mods.RadioNavigation
             suppressedIndices.Clear();
             clearRequested = true;
             restoredFromSave = false;
+            modelVersion++;
         }
 
         /// <summary>New observation recorded (I): a fresh fix may publish again.</summary>
@@ -110,6 +122,7 @@ namespace UBOAT.Mods.RadioNavigation
             // authoritative; normal stale cleanup removes old LOP keys.
             clearRequested = false;
             HasTriangle = false;
+            modelVersion++;
         }
 
         internal static FixMarkerSnapshot CaptureState()
@@ -149,6 +162,7 @@ namespace UBOAT.Mods.RadioNavigation
             // A bootstrap/session reset must not erase freshly restored rows.
             clearRequested = false;
             restoredFromSave = true;
+            modelVersion++;
         }
 
         /// <summary>Stale cleanup scope: only the fix marker's own keys

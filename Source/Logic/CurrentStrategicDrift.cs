@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using System.Reflection.Emit;
 using HarmonyLib;
 using UBOAT.Game.Sandbox;
 using UBOAT.Game.Scene.Entities;
@@ -25,7 +26,7 @@ namespace UBOAT.Mods.RadioNavigation
         private const BindingFlags AnyInstance = BindingFlags.Instance | BindingFlags.Public
             | BindingFlags.NonPublic;
         private const BindingFlags HandlerFlags = BindingFlags.Static | BindingFlags.NonPublic;
-        private static FieldInfo groupBody;
+        private static Func<SandboxMobileGroup, Rigidbody2D> getGroupBody;
         private static bool enabled;
         private static int applied;
         private static int skippedLong;
@@ -55,15 +56,16 @@ namespace UBOAT.Mods.RadioNavigation
             var method = typeof(SandboxMobileGroup).GetMethod("UpdateGroup", AnyInstance, null, Type.EmptyTypes, null);
             var validateVelocity = typeof(SandboxMobileGroup).GetMethod("ValidateRigidBodyVelocity", Hidden);
             var routeChanged = typeof(SandboxMobileGroup).GetMethod("Route_Changed", Hidden);
-            groupBody = typeof(SandboxMobileGroup).GetField("rigidBody2D", Hidden);
-            if (method == null || groupBody == null || validateVelocity == null || routeChanged == null)
+            var bodyField = typeof(SandboxMobileGroup).GetField("rigidBody2D", Hidden);
+            if (method == null || bodyField == null || validateVelocity == null || routeChanged == null)
             {
                 Debug.LogWarning(LogPrefix + "native group hooks not found (game update?); far drift inert:"
                     + " method=" + (method != null)
-                    + " body=" + (groupBody != null) + " velocity hooks="
+                    + " body=" + (bodyField != null) + " velocity hooks="
                     + (validateVelocity != null && routeChanged != null));
                 return;
             }
+            getGroupBody = BuildGroupBodyGetter(bodyField);
             try
             {
                 harmony.Patch(method, prefix: Handler(nameof(Before)), postfix: Handler(nameof(After)));
@@ -82,6 +84,25 @@ namespace UBOAT.Mods.RadioNavigation
             }
             if (enabled)
                 TryInstallSceneHandoff(harmony);
+        }
+
+        private static Func<SandboxMobileGroup, Rigidbody2D> BuildGroupBodyGetter(FieldInfo field)
+        {
+            try
+            {
+                var dm = new DynamicMethod("GetGroupRigidBody2D", typeof(Rigidbody2D),
+                    new[] { typeof(SandboxMobileGroup) }, typeof(SandboxMobileGroup), true);
+                ILGenerator il = dm.GetILGenerator();
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldfld, field);
+                il.Emit(OpCodes.Ret);
+                return (Func<SandboxMobileGroup, Rigidbody2D>)dm.CreateDelegate(
+                    typeof(Func<SandboxMobileGroup, Rigidbody2D>));
+            }
+            catch (Exception)
+            {
+                return g => (Rigidbody2D)field.GetValue(g);
+            }
         }
 
         private static HarmonyMethod Handler(string name) =>
@@ -274,7 +295,7 @@ namespace UBOAT.Mods.RadioNavigation
             if (drift.x == 0f && drift.y == 0f)
                 return;
             group.Position = end + drift;
-            var body = (Rigidbody2D)groupBody.GetValue(group);
+            var body = getGroupBody(group);
             if (body)
                 body.position = group.Position;
             lastOffsetKm = drift;
@@ -305,7 +326,7 @@ namespace UBOAT.Mods.RadioNavigation
         // change the scalar (through-water) speed used by its route and fuel.
         private static void SyncWorldVelocity(SandboxMobileGroup group, DateTime utc)
         {
-            var body = (Rigidbody2D)groupBody.GetValue(group);
+            var body = getGroupBody(group);
             if (!body)
                 return;
             Vector2 position = group.Position;

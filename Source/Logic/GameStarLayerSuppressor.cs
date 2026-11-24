@@ -157,9 +157,14 @@ namespace UBOAT.Mods.RadioNavigation
             // camera render.
             ReassertRendererStage();
 
-            // A full Resources.FindObjectsOfTypeAll scan costs ~25 ms. Run it
-            // once per scene (requested by the scene hook) and retry only while
-            // no dome has been found yet; a found dome is re-asserted per frame.
+            // A full Resources.FindObjectsOfTypeAll scan costs ~4-8 ms. The
+            // game's star dome is inactive on the map and during daytime, so
+            // scanning then always finds 0 renderers and would keep retrying
+            // every 5 s. Defer discovery until the player is actually outside
+            // under a twilight/night sky where the dome can be active.
+            if (!SkyVisibilityResolver.IsPlayerOutside() || SkyVisibilityResolver.GetVisibility() <= 0.001f)
+                return;
+
             float now = Time.realtimeSinceStartup;
             if (rendererScanRequested)
             {

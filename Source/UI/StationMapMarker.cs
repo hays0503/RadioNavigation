@@ -23,6 +23,10 @@ namespace UBOAT.Mods.RadioNavigation
 
         protected override int MarkerCount => BeaconData.Stations.Length;
 
+        /// <summary>Radio stations are static during a session; match the
+        /// lighthouse 10 s reconcile cadence instead of scanning every second.</summary>
+        protected override float ReconcileIntervalSeconds => 10f;
+
         protected override string PointKey(int index)
         {
             return MapMarkerPoints.StationKey(

@@ -60,5 +60,41 @@ namespace UBOAT.Mods.RadioNavigation
                 return false;
             }
         }
+
+        /// <summary>
+        /// Zero-allocation, zero-disk land check using only the in-memory
+        /// <see cref="CoastQuadTree"/> (<c>sampleFullRange: false</c>). Unlike
+        /// <see cref="TryGetDistanceKm"/>, points further than 4.6 km from the
+        /// shoreline never touch <c>WorldMaps.LandDistanceMap</c> (whose 64-tile
+        /// FIFO cache synchronously reads 256 KB from disk and allocates a
+        /// 256 KB LOH array on every miss).
+        /// </summary>
+        public static bool TryIsLandFast(double latitude, double longitude, out bool isLand)
+        {
+            isLand = false;
+            if (!Ready)
+            {
+                return false;
+            }
+
+            try
+            {
+                Vector2 encounterKm = Coordinates.ToWorldPosition((float)latitude, (float)longitude);
+                float signed = coastQuadTree.GetDistanceToCoast(encounterKm, false);
+                if (float.IsNaN(signed) || float.IsInfinity(signed))
+                {
+                    return false;
+                }
+
+                isLand = signed <= 0f;
+                return true;
+            }
+            catch (Exception e)
+            {
+                if (WarnOnce.ShouldLog("LighthouseCoastProbe.TryIsLandFast"))
+                    Debug.LogError("[RadioNav][LandProbe] fast land query failed: " + e.Message);
+                return false;
+            }
+        }
     }
 }
