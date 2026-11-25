@@ -337,6 +337,7 @@ namespace UBOAT.Mods.RadioNavigation
                     return;
 
                 SceneContentBuilder.Build(radio);
+                RadioDirectionFinderInstaller.EnsureRunning();
 
                 int hCount = radio.GetComponents<MonoBehaviour>().Length;
                 Debug.Log("[RadioNav][DIAG] scene=" + scene.name +

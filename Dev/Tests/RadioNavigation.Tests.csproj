@@ -427,6 +427,11 @@
     <Compile Include="..\..\Source\UI\SextantZoom.cs" Link="Source\UI\SextantZoom.cs" />
     <Compile Include="..\..\Source\UI\SextantArcInput.cs" Link="Source\UI\SextantArcInput.cs" />
     <Compile Include="..\..\Source\UI\SextantReadout.cs" Link="Source\UI\SextantReadout.cs" />
+    <Compile Include="..\..\Source\Logic\RadioDFPoseMath.cs" Link="Source\Logic\RadioDFPoseMath.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="RadioDFStationTests.cs" />
   </ItemGroup>
 
 </Project>
