@@ -34,12 +34,29 @@ namespace UBOAT.Mods.RadioNavigation
         private Transform cameraAnchor;
         private Transform dofTargetAnchor;
         private Quaternion baseLocalRotation = Quaternion.identity;
+        private T3PLLa38Rig receiverRig;
         private ResourceLink<InputAxis> horizontalLookAxis;
         private ResourceLink<InputAxis> verticalLookAxis;
         private UnityEngine.Camera cachedMainCamera;
         private object externalProxy;
         private float yawDeg;
         private float pitchDeg;
+        private float targetFovDeg = RadioDFPoseMath.MaxZoomFovDeg;
+        private float currentFovDeg = RadioDFPoseMath.MaxZoomFovDeg;
+        private float restoredFovDeg = RadioDFPoseMath.MaxZoomFovDeg;
+        private bool hasRestoredFov;
+        private bool isSeated;
+        private bool rmbLooking;
+        private T3ControlKind hoveredKind;
+        private T3ControlKind activeDragKind;
+        private float lastMouseX;
+        private Canvas tooltipCanvas;
+        private RectTransform tooltipBox;
+        private UnityEngine.UI.Text tooltipLabel;
+        private GameUI.Mode previousUiMode;
+        private readonly RaycastHit[] rayHits = new RaycastHit[24];
+
+        private const int InteriorLayerMask = 1 << 23;
 
         public UnityEngine.Camera MainCamera
         {
@@ -66,11 +83,12 @@ namespace UBOAT.Mods.RadioNavigation
             }
         }
 
-        internal void Configure(Transform camAnchor, Transform dofAnchor, Quaternion initialLocalRotation)
+        internal void Configure(Transform camAnchor, Transform dofAnchor, Quaternion initialLocalRotation, T3PLLa38Rig rig)
         {
             cameraAnchor = camAnchor;
             dofTargetAnchor = dofAnchor;
             baseLocalRotation = initialLocalRotation;
+            receiverRig = rig;
         }
 
         public bool CanBeUsedByCharacter(PlayableCharacter character)
@@ -80,27 +98,110 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void StartController(GenericCameraController controller)
         {
-            cachedMainCamera = UnityEngine.Camera.main;
+            cachedMainCamera = ResolveRaycastCamera(controller);
             EnsureLookAxes();
             yawDeg = 0f;
             pitchDeg = 0f;
+            isSeated = true;
+            rmbLooking = false;
+            hoveredKind = T3ControlKind.None;
+            activeDragKind = T3ControlKind.None;
 
-            if (cameraAnchor.IsNotNull())
+            UnityEngine.Camera fovCam = ResolvePrimaryCamera(controller);
+            hasRestoredFov = fovCam != null;
+            restoredFovDeg = fovCam != null ? fovCam.fieldOfView : RadioDFPoseMath.MaxZoomFovDeg;
+            targetFovDeg = RadioDFPoseMath.ClampZoomFov(restoredFovDeg);
+            currentFovDeg = targetFovDeg;
+            WriteCameraFov(controller);
+
+            if (cameraAnchor != null)
                 cameraAnchor.localRotation = baseLocalRotation;
+            receiverRig?.SetCollidersEnabled(true);
 
-            if (controller.IsNull())
+            GameUI gameUI = GetService<GameUI>();
+            if (gameUI != null)
+            {
+                if (gameUI.CurrentMode != GameUI.Mode.DeviceManualMode
+                    && gameUI.CurrentMode != GameUI.Mode.FullscreenUI
+                    && gameUI.CurrentMode != GameUI.Mode.FullscreenHighBarUI)
+                    previousUiMode = gameUI.CurrentMode;
+                gameUI.SetMode(GameUI.Mode.DeviceManualMode);
+            }
+
+            CursorManager cursorManager = GetService<CursorManager>();
+            cursorManager?.AddCursorVisibilityFlag(this);
+
+            if (controller == null)
                 return;
 
             controller.DisplayCharacter = false;
-            if (cameraAnchor.IsNotNull())
+            if (cameraAnchor != null)
                 controller.TweenCameraTo(cameraAnchor, 0.35f);
         }
 
         public void UpdateController(GenericCameraController controller)
         {
-            if (cameraAnchor.IsNull() || controller.IsNull())
+            if (cameraAnchor == null || controller == null)
                 return;
 
+            controller.MainCamera?.DisruptZoom();
+
+            UpdateLookMode();
+            float scroll = Input.GetAxis("Mouse ScrollWheel");
+
+            if (rmbLooking)
+            {
+                HideTooltip();
+                StepCameraLook(controller);
+                if (!controller.IsFullInterfaceVisible)
+                    StepWheelZoom(scroll);
+                AdvanceZoomSmoothing(controller);
+                return;
+            }
+
+            HandleControlInteraction(controller);
+            if (hoveredKind == T3ControlKind.None
+                && activeDragKind == T3ControlKind.None
+                && !controller.IsFullInterfaceVisible)
+            {
+                StepWheelZoom(scroll);
+            }
+            AdvanceZoomSmoothing(controller);
+            UpdateControllerTooltip();
+        }
+
+        public void LateUpdateController(GenericCameraController controller)
+        {
+            if (!isSeated || controller == null)
+                return;
+
+            WriteCameraFov(controller);
+        }
+
+        private void UpdateLookMode()
+        {
+            bool wantLook = Input.GetMouseButton(1) && activeDragKind == T3ControlKind.None;
+            if (wantLook == rmbLooking)
+                return;
+
+            rmbLooking = wantLook;
+            CursorManager cursorManager = GetService<CursorManager>();
+            if (cursorManager == null)
+                return;
+
+            if (rmbLooking)
+            {
+                cursorManager.SetDefaultCursor();
+                cursorManager.RemoveCursorVisibilityFlag(this);
+            }
+            else
+            {
+                cursorManager.AddCursorVisibilityFlag(this);
+            }
+        }
+
+        private void StepCameraLook(GenericCameraController controller)
+        {
             if (!CanLookAround(controller))
                 return;
 
@@ -110,10 +211,235 @@ namespace UBOAT.Mods.RadioNavigation
             if (deltaH == 0f && deltaV == 0f)
                 return;
 
-            float sensitivity = GetLookSensitivity();
+            float sensitivity = RadioDFPoseMath.ComputeZoomScaledLookSensitivity(GetLookSensitivity(), currentFovDeg);
             bool invert = GetInvertMouse();
             RadioDFPoseMath.StepLookAngles(yawDeg, pitchDeg, deltaH, deltaV, sensitivity, invert, out yawDeg, out pitchDeg);
             cameraAnchor.localRotation = baseLocalRotation * Quaternion.Euler(pitchDeg, yawDeg, 0f);
+        }
+
+        private void HandleControlInteraction(GenericCameraController controller)
+        {
+            CursorManager cursorManager = GetService<CursorManager>();
+            if (controller.IsFullInterfaceVisible || receiverRig == null)
+            {
+                hoveredKind = T3ControlKind.None;
+                activeDragKind = T3ControlKind.None;
+                cursorManager?.SetDefaultCursor();
+                return;
+            }
+
+            if (activeDragKind != T3ControlKind.None)
+            {
+                UpdateActiveDrag(cursorManager);
+                return;
+            }
+
+            UnityEngine.Camera cam = ResolveRaycastCamera(controller);
+            if (cam == null)
+                return;
+
+            Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+            if (!TryPickControlHit(ray, out hoveredKind))
+            {
+                hoveredKind = T3ControlKind.None;
+                cursorManager?.SetDefaultCursor();
+                return;
+            }
+
+            cursorManager?.SetHoverCursor();
+
+            ProcessHoveredInput();
+        }
+
+        private void StepWheelZoom(float scroll)
+        {
+            if (Mathf.Abs(scroll) > 0.001f)
+                targetFovDeg = RadioDFPoseMath.StepZoomFov(targetFovDeg, scroll);
+        }
+
+        private void AdvanceZoomSmoothing(GenericCameraController controller)
+        {
+            if (Mathf.Abs(currentFovDeg - targetFovDeg) < 0.02f)
+                currentFovDeg = targetFovDeg;
+            else
+                currentFovDeg = Mathf.Lerp(currentFovDeg, targetFovDeg, 1f - Mathf.Exp(-18f * Time.unscaledDeltaTime));
+
+            WriteCameraFov(controller);
+        }
+
+        private void WriteCameraFov(GenericCameraController controller)
+        {
+            SetCameraFov(controller, currentFovDeg);
+        }
+
+        private void SetCameraFov(GenericCameraController controller, float fovDeg)
+        {
+            UnityEngine.Camera primary = ResolvePrimaryCamera(controller);
+            if (primary != null)
+                primary.fieldOfView = fovDeg;
+
+            UnityEngine.Camera interior = ResolveRaycastCamera(controller);
+            if (interior != null && interior != primary)
+                interior.fieldOfView = fovDeg;
+        }
+
+        private UnityEngine.Camera ResolvePrimaryCamera(GenericCameraController controller)
+        {
+            GameMainCamera mainCam = controller != null ? controller.MainCamera : GameMainCamera.Instance;
+            return mainCam?.Camera ?? UnityEngine.Camera.main;
+        }
+
+        private UnityEngine.Camera ResolveRaycastCamera(GenericCameraController controller)
+        {
+            GameMainCamera mainCam = controller != null ? controller.MainCamera : GameMainCamera.Instance;
+            UnityEngine.Camera fallbackCam = cachedMainCamera != null ? cachedMainCamera : UnityEngine.Camera.main;
+            return mainCam?.InteriorCamera?.Camera ?? fallbackCam;
+        }
+
+        private bool TryPickControlHit(Ray ray, out T3ControlKind kind)
+        {
+            kind = T3ControlKind.None;
+            int count = Physics.RaycastNonAlloc(ray, rayHits, 4.0f, InteriorLayerMask);
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = rayHits[i];
+                T3ControlKind cand;
+                if (hit.collider == null || !receiverRig.TryResolveControl(hit.collider, out cand))
+                    continue;
+                if (hit.distance < bestDist)
+                {
+                    bestDist = hit.distance;
+                    kind = cand;
+                }
+            }
+            return kind != T3ControlKind.None;
+        }
+
+        private void UpdateActiveDrag(CursorManager cursorManager)
+        {
+            if (!Input.GetMouseButton(0))
+            {
+                activeDragKind = T3ControlKind.None;
+                cursorManager?.SetDefaultCursor();
+                return;
+            }
+
+            float curX = Input.mousePosition.x;
+            float delta = (curX - lastMouseX) / Mathf.Max(400f, Screen.height);
+            lastMouseX = curX;
+            if (Mathf.Abs(delta) > 0.0001f)
+                receiverRig.AdjustContinuous(activeDragKind, delta * 1.8f);
+        }
+
+        private void ProcessHoveredInput()
+        {
+            if (Input.GetMouseButtonDown(0))
+            {
+                if (T3PLLa38ControlMath.IsContinuousControl(hoveredKind))
+                {
+                    activeDragKind = hoveredKind;
+                    lastMouseX = Input.mousePosition.x;
+                }
+                else
+                {
+                    receiverRig.ClickOrStepControl(hoveredKind, 1);
+                }
+            }
+
+            float scroll = Input.GetAxis("Mouse ScrollWheel");
+            if (Mathf.Abs(scroll) > 0.001f)
+            {
+                if (T3PLLa38ControlMath.IsContinuousControl(hoveredKind))
+                    receiverRig.AdjustContinuous(hoveredKind, scroll * 0.45f);
+                else
+                    receiverRig.ClickOrStepControl(hoveredKind, scroll > 0f ? 1 : -1);
+            }
+        }
+
+        private void UpdateControllerTooltip()
+        {
+            if (!isSeated || rmbLooking || receiverRig == null)
+            {
+                HideTooltip();
+                return;
+            }
+
+            T3ControlKind shown = activeDragKind != T3ControlKind.None ? activeDragKind : hoveredKind;
+            if (shown == T3ControlKind.None)
+            {
+                HideTooltip();
+                return;
+            }
+
+            string text = receiverRig.FormatReadout(shown, ResolveCurrentLanguage());
+            if (string.IsNullOrEmpty(text))
+            {
+                HideTooltip();
+                return;
+            }
+
+            EnsureTooltipUi();
+            tooltipLabel.text = text;
+            float w = Mathf.Clamp(tooltipLabel.preferredWidth + 20f, 120f, 460f);
+            tooltipBox.sizeDelta = new Vector2(w, 28f);
+            float x = Mathf.Clamp(Input.mousePosition.x + 18f, 8f, Screen.width - w - 8f);
+            float y = Mathf.Clamp(Input.mousePosition.y - 36f, 8f, Screen.height - 36f);
+            tooltipBox.position = new Vector3(x, y, 0f);
+            if (!tooltipCanvas.enabled)
+                tooltipCanvas.enabled = true;
+        }
+
+        private static string ResolveCurrentLanguage()
+        {
+            ILocale loc = GetService<ILocale>();
+            if (loc != null && !string.IsNullOrEmpty(loc.Language))
+                return loc.Language;
+            Locale concrete = GetService<Locale>();
+            if (concrete != null && !string.IsNullOrEmpty(concrete.Language))
+                return concrete.Language;
+            return RadioLocale.GetCurrentLanguage();
+        }
+
+        private void HideTooltip()
+        {
+            if (tooltipCanvas?.enabled == true)
+                tooltipCanvas.enabled = false;
+        }
+
+        private void EnsureTooltipUi()
+        {
+            if (tooltipCanvas != null)
+                return;
+
+            GameObject canvasGo = new GameObject("T3TooltipCanvas", typeof(RectTransform));
+            canvasGo.transform.SetParent(transform, false);
+            tooltipCanvas = canvasGo.AddComponent<Canvas>();
+            tooltipCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            tooltipCanvas.sortingOrder = 500;
+
+            GameObject boxGo = new GameObject("Box", typeof(RectTransform));
+            boxGo.transform.SetParent(canvasGo.transform, false);
+            tooltipBox = boxGo.GetComponent<RectTransform>();
+            tooltipBox.anchorMin = Vector2.zero;
+            tooltipBox.anchorMax = Vector2.zero;
+            tooltipBox.pivot = Vector2.zero;
+            tooltipBox.sizeDelta = new Vector2(220f, 28f);
+
+            UnityEngine.UI.Image bg = boxGo.AddComponent<UnityEngine.UI.Image>();
+            bg.color = new Color(0.06f, 0.07f, 0.08f, 0.86f);
+            bg.raycastTarget = false;
+
+            tooltipLabel = UIElementFactory.CreateLabel(boxGo.transform, "Text", "");
+            tooltipLabel.fontSize = 14;
+            tooltipLabel.color = new Color(1f, 0.94f, 0.78f);
+            tooltipLabel.alignment = TextAnchor.MiddleLeft;
+            tooltipLabel.raycastTarget = false;
+            RectTransform lrt = tooltipLabel.GetComponent<RectTransform>();
+            lrt.anchorMin = Vector2.zero;
+            lrt.anchorMax = Vector2.one;
+            lrt.offsetMin = new Vector2(10f, 2f);
+            lrt.offsetMax = new Vector2(-10f, -2f);
         }
 
         public bool OnUserExitRequest()
@@ -123,14 +449,38 @@ namespace UBOAT.Mods.RadioNavigation
 
         public void StopController(GenericCameraController controller, CameraModeDescriptor nextModeDescriptor)
         {
-            if (cameraAnchor.IsNotNull())
+            isSeated = false;
+            rmbLooking = false;
+            hoveredKind = T3ControlKind.None;
+            activeDragKind = T3ControlKind.None;
+            HideTooltip();
+
+            if (hasRestoredFov)
+            {
+                SetCameraFov(controller, restoredFovDeg);
+                hasRestoredFov = false;
+            }
+
+            receiverRig?.SetCollidersEnabled(false);
+
+            CursorManager cursorManager = GetService<CursorManager>();
+            if (cursorManager != null)
+            {
+                cursorManager.SetDefaultCursor();
+                cursorManager.RemoveCursorVisibilityFlag(this);
+            }
+
+            GameUI gameUI = GetService<GameUI>();
+            gameUI?.SetMode(previousUiMode);
+
+            if (cameraAnchor != null)
                 cameraAnchor.localRotation = baseLocalRotation;
 
             if (nextModeDescriptor.Mode == CameraMode.FPP)
                 return;
 
-            PlayableCharacter character = controller.IsNotNull() ? controller.Character : null;
-            if (character.IsNotNull() && character.Action is SitAtDirectionFinderAction)
+            PlayableCharacter character = controller != null ? controller.Character : null;
+            if (character?.Action is SitAtDirectionFinderAction)
                 character.StopCurrentAction();
         }
 
@@ -489,5 +839,6 @@ namespace UBOAT.Mods.RadioNavigation
             cam.SetFPPController(ch, CameraTransitionType.FadeInOut, true);
             return "exited";
         }
+
     }
 }

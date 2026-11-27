@@ -32,16 +32,22 @@ namespace UBOAT.Mods.RadioNavigation
         private static PropertyInfo languageProp;
         private static MethodInfo loadSingletonMethod;
         private static Type localeType;
+        private static bool initAttempted;
 
         internal static void Reset()
         {
             languageProp = null;
             loadSingletonMethod = null;
             localeType = null;
+            initAttempted = false;
         }
 
         internal static void EnsureInitialized()
         {
+            if (initAttempted)
+                return;
+            initAttempted = true;
+
             var singletonType = GameTypeCache.Resolve("DWS.Common.InjectionFramework.ScriptableObjectSingleton");
             if (singletonType != null)
                 loadSingletonMethod = singletonType.GetMethod("LoadSingleton", new[] { typeof(Type) });
@@ -79,6 +85,8 @@ namespace UBOAT.Mods.RadioNavigation
         {
             try
             {
+                if (!initAttempted)
+                    EnsureInitialized();
                 if (loadSingletonMethod.IsNull() || localeType.IsNull() || languageProp.IsNull())
                     return "english";
                 object locale = loadSingletonMethod.Invoke(null, new object[] { localeType });

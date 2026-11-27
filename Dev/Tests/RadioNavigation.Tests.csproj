@@ -428,10 +428,12 @@
     <Compile Include="..\..\Source\UI\SextantArcInput.cs" Link="Source\UI\SextantArcInput.cs" />
     <Compile Include="..\..\Source\UI\SextantReadout.cs" Link="Source\UI\SextantReadout.cs" />
     <Compile Include="..\..\Source\Logic\RadioDFPoseMath.cs" Link="Source\Logic\RadioDFPoseMath.cs" />
+    <Compile Include="..\..\Source\Logic\T3PLLa38ControlMath.cs" Link="Source\Logic\T3PLLa38ControlMath.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="RadioDFStationTests.cs" />
+    <Compile Include="T3PLLa38Tests.cs" />
   </ItemGroup>
 
 </Project>

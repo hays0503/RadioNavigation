@@ -134,15 +134,28 @@ namespace UBOAT.Mods.RadioNavigation
             EnsureReflectionFields();
             DestroyStaleChildren(radioRoom, stool);
 
+            BoxCollider t3Collider = FindT3PllCollider(radioRoom);
             RadioDFPosedAnchor pose = ComputePoseForRadioRoom(radioRoom, stool);
+
+            T3StubCutoutBoxes boxes = default(T3StubCutoutBoxes);
+            GameObject prefab;
+            Shader stubShader;
+            T3PLLa38Rig receiverRig = null;
+            if (t3Collider != null && T3PLLa38AssetLoader.TryLoadAssets(out prefab, out stubShader))
+            {
+                if (RadioDFStubRemover.Apply(radioRoom, t3Collider, stubShader, out boxes))
+                    receiverRig = T3PLLa38Rig.Install(radioRoom, boxes);
+            }
+
             Transform camAnchor = CreateChildTransform(radioRoom, CamAnchorName,
                 new Vector3(pose.EyeX, pose.EyeY, pose.EyeZ), Quaternion.identity);
-            Vector3 lookDir = new Vector3(pose.TargetX - pose.EyeX, pose.TargetY - pose.EyeY, pose.TargetZ - pose.EyeZ);
+            float focusY = receiverRig != null ? boxes.MountY + (T3PLLa38ControlMath.CabinetHeightM * boxes.MountScale * 0.56f) : pose.TargetY;
+            Vector3 lookDir = new Vector3(pose.TargetX - pose.EyeX, focusY - pose.EyeY, pose.TargetZ - pose.EyeZ);
             if (lookDir.sqrMagnitude > 1e-6f)
                 camAnchor.localRotation = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
 
             Transform dofAnchor = CreateChildTransform(radioRoom, DofAnchorName,
-                new Vector3(pose.DofX, pose.DofY, pose.DofZ), Quaternion.identity);
+                new Vector3(pose.DofX, focusY, pose.DofZ), Quaternion.identity);
 
             Transform animOrigin = CreateAnimOrigin(radioRoom, stool, pose);
 
@@ -157,12 +170,12 @@ namespace UBOAT.Mods.RadioNavigation
             HighlightEffect highlight = ConfigureHighlight(seatGo, stool);
             InteractableSlot slot = CreateSlot(seatGo, animOrigin);
             ConfigureInteractable(seatGo, slot);
-            seatGo.AddComponent<RadioDirectionFinderController>().Configure(camAnchor, dofAnchor, camAnchor.localRotation);
+            seatGo.AddComponent<RadioDirectionFinderController>().Configure(camAnchor, dofAnchor, camAnchor.localRotation, receiverRig);
             ConfigureActivator(seatGo, stool);
             ConfigureSelectable(seatGo, highlight);
 
             seatGo.SetActive(true);
-            Debug.Log("[RadioNav][DF] Installed seated direction finder station on Radio Room/Stool");
+            Debug.Log("[RadioNav][DF] Installed seated direction finder station on Radio Room/Stool" + (receiverRig != null ? " with T3PLLa38 rig" : ""));
         }
 
         private static void DestroyStaleChildren(Transform radioRoom, Transform stool)

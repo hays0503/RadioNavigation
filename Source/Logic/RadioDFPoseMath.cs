@@ -41,10 +41,13 @@ namespace UBOAT.Mods.RadioNavigation
         internal const float DefaultEyeHeightAboveDeck = 1.15f;
         internal const float MinEyeHeightAboveStool = 1.05f;
         internal const float MaxEyeHeightAboveStool = 1.24f;
-        internal const float SeatBackOffsetZ = 0.06f;
+        internal const float SeatForwardOffsetZ = -0.05f;
         internal const float MaxYawDeg = 85f;
         internal const float MinPitchDeg = -55f;
         internal const float MaxPitchDeg = 55f;
+        internal const float MinZoomFovDeg = 5f;
+        internal const float MaxZoomFovDeg = 65f;
+        internal const float DefaultZoomNotchFactor = 0.85f;
 
         internal static RadioDFPosedAnchor ComputeStationAnchor(
             float stoolX,
@@ -74,7 +77,7 @@ namespace UBOAT.Mods.RadioNavigation
             {
                 EyeX = stoolX,
                 EyeY = eyeY,
-                EyeZ = stoolZ + SeatBackOffsetZ,
+                EyeZ = stoolZ + SeatForwardOffsetZ,
                 TargetX = targetX,
                 TargetY = targetY,
                 TargetZ = targetZ,
@@ -154,6 +157,33 @@ namespace UBOAT.Mods.RadioNavigation
             float verticalStep = verticalDelta * safeSensitivity;
             float signedVertical = invertMouse ? verticalStep : -verticalStep;
             nextPitchDeg = Clamp(pitchDeg + signedVertical, MinPitchDeg, MaxPitchDeg);
+        }
+
+        internal static float ClampZoomFov(float fovDeg)
+        {
+            if (float.IsNaN(fovDeg) || float.IsInfinity(fovDeg))
+                return MaxZoomFovDeg;
+            return Clamp(fovDeg, MinZoomFovDeg, MaxZoomFovDeg);
+        }
+
+        internal static float StepZoomFov(float currentFovDeg, float scrollDelta)
+        {
+            float safeCurrent = ClampZoomFov(currentFovDeg);
+            if (float.IsNaN(scrollDelta) || float.IsInfinity(scrollDelta) || Math.Abs(scrollDelta) <= 1e-4f)
+                return safeCurrent;
+
+            float notches = Clamp(scrollDelta * 10f, -6f, 6f);
+            float scaled = safeCurrent * (float)Math.Pow(DefaultZoomNotchFactor, notches);
+            return ClampZoomFov(scaled);
+        }
+
+        internal static float ComputeZoomScaledLookSensitivity(float baseSensitivity, float currentFovDeg)
+        {
+            float safeBase = baseSensitivity > 0f && !float.IsNaN(baseSensitivity) && !float.IsInfinity(baseSensitivity)
+                ? baseSensitivity
+                : 1f;
+            float fovScale = ClampZoomFov(currentFovDeg) / MaxZoomFovDeg;
+            return safeBase * fovScale;
         }
 
         internal static RadioDFStoolColliderBounds ComputeColliderBounds(

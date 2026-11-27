@@ -63,7 +63,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             Assert.Equal(1.065f, pose.EyeX, 3);
             Assert.Equal(1.159f, pose.EyeY, 3);
-            Assert.Equal(7.255f, pose.EyeZ, 3);
+            Assert.Equal(7.145f, pose.EyeZ, 3);
+            Assert.True(pose.EyeZ < 7.195f);
             Assert.True(pose.TargetX > 0.969f && pose.TargetX < 1.283f);
             Assert.Equal(1.179f, pose.TargetY, 3);
             Assert.Equal(6.777f, pose.TargetZ, 3);
@@ -80,7 +81,8 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             Assert.Equal(0.780f, pose.EyeX, 3);
             Assert.Equal(1.295f, pose.EyeY, 3);
-            Assert.Equal(6.889f, pose.EyeZ, 3);
+            Assert.Equal(6.779f, pose.EyeZ, 3);
+            Assert.True(pose.EyeZ < 6.829f);
             Assert.True(pose.TargetX > 0.476f && pose.TargetX < 0.901f);
             Assert.Equal(1.389f, pose.TargetY, 3);
         }
@@ -115,6 +117,39 @@ namespace UBOAT.Mods.RadioNavigation.Tests
 
             RadioDFPoseMath.StepLookAngles(0f, 0f, 0f, 12f, 2f, true, out yaw, out pitch);
             Assert.Equal(24f, pitch, 3);
+        }
+
+        [Fact]
+        public void StepZoomFov_ClampsBetweenFiveAndSixtyFiveAndZoomsMonotonically()
+        {
+            Assert.Equal(RadioDFPoseMath.MaxZoomFovDeg, RadioDFPoseMath.ClampZoomFov(90f), 3);
+            Assert.Equal(RadioDFPoseMath.MinZoomFovDeg, RadioDFPoseMath.ClampZoomFov(1f), 3);
+            Assert.Equal(RadioDFPoseMath.MaxZoomFovDeg, RadioDFPoseMath.ClampZoomFov(float.NaN), 3);
+
+            float zoomedIn = RadioDFPoseMath.StepZoomFov(65f, 0.1f);
+            Assert.True(zoomedIn < 65f && zoomedIn >= 5f);
+
+            float zoomedMin = zoomedIn;
+            for (int i = 0; i < 40; i++)
+                zoomedMin = RadioDFPoseMath.StepZoomFov(zoomedMin, 0.1f);
+            Assert.Equal(5f, zoomedMin, 3);
+
+            float zoomedOut = RadioDFPoseMath.StepZoomFov(5f, -0.1f);
+            Assert.True(zoomedOut > 5f && zoomedOut <= 65f);
+
+            float zoomedMax = zoomedOut;
+            for (int i = 0; i < 40; i++)
+                zoomedMax = RadioDFPoseMath.StepZoomFov(zoomedMax, -0.1f);
+            Assert.Equal(65f, zoomedMax, 3);
+        }
+
+        [Fact]
+        public void ComputeZoomScaledLookSensitivity_ScalesProportionallyWithFov()
+        {
+            Assert.Equal(2f, RadioDFPoseMath.ComputeZoomScaledLookSensitivity(2f, 65f), 3);
+            float atFive = RadioDFPoseMath.ComputeZoomScaledLookSensitivity(2f, 5f);
+            Assert.Equal(2f * (5f / 65f), atFive, 4);
+            Assert.Equal(1f, RadioDFPoseMath.ComputeZoomScaledLookSensitivity(-1f, 65f), 3);
         }
 
         [Fact]
